@@ -1,0 +1,51 @@
+# 🤖 Revisión automática de PRs con Claude Code.
+#
+# APAGADO hasta que exista la variable de repo CLAUDE_REVIEW=true. Se hace así a propósito:
+# sin el secreto configurado la acción falla, y un CI rojo permanente es un CI que nadie mira.
+#
+# Para encenderlo hacen falta DOS cosas que solo puede hacer la dueña del repo:
+#   1. Instalar la Claude GitHub App (https://github.com/apps/claude) en el repo u organización.
+#   2. Guardar el secreto: ANTHROPIC_API_KEY (clave de API) o CLAUDE_CODE_OAUTH_TOKEN
+#      (token de suscripción, `claude setup-token`). Si usas el segundo, cambia la línea
+#      `anthropic_api_key` por `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`.
+#   3. Crear la variable de repo CLAUDE_REVIEW con valor `true`.
+#
+# Quién puede dispararlo: la propia acción exige que quien abre el PR tenga permiso de
+# escritura, y rechaza a los bots. Además, GitHub NO entrega secretos a un PR que venga de un
+# fork, así que un PR de fuera nunca gasta crédito: lo revisa una persona.
+name: revisión de Claude
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+
+concurrency:                      # un PR con muchos push no dispara revisiones en paralelo
+  group: revision-claude-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  revision:
+    # Apagado por defecto + solo ramas de este repo (los forks no traen secreto).
+    if: >-
+      vars.CLAUDE_REVIEW == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
+          plugins: "code-review@claude-code-plugins"
+          prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
+          claude_args: |
+            --max-turns 15
+            --allowedTools "mcp__github_inline_comment__create_inline_comment"

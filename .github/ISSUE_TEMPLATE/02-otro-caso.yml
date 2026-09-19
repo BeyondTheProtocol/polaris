@@ -1,0 +1,19 @@
+name: 🧪 Lo usé para otro caso
+description: Cogiste el arnés para otra enfermedad u otro contexto y algo no encajó
+labels: ["otro-caso"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Este reporte vale más que un PR: dice dónde el patrón deja de servir. 🙌
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Para qué lo usaste
+      description: Sin datos personales. El objetivo y el tipo de caso bastan
+    validations: {required: true}
+  - type: textarea
+    id: rompio
+    attributes:
+      label: Qué se rompió o qué faltó
+    validations: {required: true}

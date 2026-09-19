@@ -1,0 +1,8 @@
+# Quien revisa, por defecto, todo lo que llega.
+# El muro y el arnés de publicación no se mezclan sin su OK.
+*                       @titular
+/tools/salida.py        @titular
+/tools/publicar.py      @titular
+/tools/ci_barrido.py    @titular
+/.claude/hooks/         @titular
+/.github/               @titular
