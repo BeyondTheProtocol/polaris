@@ -2605,6 +2605,66 @@
    "auditable": false,
    "repetida": true,
    "nota": "Es DETECTABLE en la respuesta (una ficha de producto que mete evidencia clínica, «pregúntale a Lola» o «espera a la analítica»), así que la clase es `salida` — pero el check aún NO existe: el mecanismo va a null para que el hueco se vea — y sin mecanismo no puede declararse auditable (regla anti-falso-verde). Clasificada el 17-sep-2026 al cerrar el hueco del registro."
+  },
+  {
+   "slug": "feedback-veto-escrito-en-codigo-se-publica",
+   "que": "Un fichero que VETA un término lo escribe: si se publica, publica el veto",
+   "clase": "lint-doc",
+   "mecanismo": "tests/test_publicar_fuga.py + tools/publicar.py::vetados_en",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "19-sep-26: el muro del pipeline salio al repo publico con el nombre propio y un termino vetado dentro de sus propias reglas. Ahora los identificativos viven en un overlay gitignored y el barrido casa tambien despues de \\b."
+  },
+  {
+   "slug": "feedback-no-inferir-ausencia-de-salida-truncada",
+   "que": "No afirmar que algo NO existe a partir de una salida cortada con head/tail/grep",
+   "clase": "salida",
+   "mecanismo": ".claude/hooks/gate_salida.py::falsa_certeza (parcial: pilla la afirmacion sin sello, no el origen truncado)",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "Para NEGAR hace falta consulta dirigida y completa. Hoy solo se detecta si ademas va sin sello."
+  },
+  {
+   "slug": "feedback-siempre-enlaces-comprar-y-leer",
+   "que": "Cada item accionable lleva enlace para comprar (verificado, envio a Espana) o para leer (PubMed/DOI/guia)",
+   "clase": "contexto",
+   "mecanismo": "criterio; sin anclaje en codigo",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "19-sep-26. Una lista de nombres le devuelve a ella el trabajo de buscar cada cosa."
+  },
+  {
+   "slug": "feedback-suplementos-en-ensayo-decide-ella",
+   "que": "En ensayos decide ella que toma: lista por evidencia con semaforo de riesgo, sin sermon repetido",
+   "clase": "contexto",
+   "mecanismo": "criterio; el muro clinico ya impide el consejo medico",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "Complementa feedback-no-repetir-disclaimers-muro: el caveat va una vez, no en cada producto."
+  },
+  {
+   "slug": "feedback-mensaje-personal-a-peer-voz-literal-no-pulir",
+   "que": "Un mensaje MUY personal a un peer se relaya en su voz literal, sin pasarlo por el pulido",
+   "clase": "contexto",
+   "mecanismo": "criterio; excepcion explicita al pase de voz-titular",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "Ella rechazo una version pulida: en lo personal, pulir resta verdad."
   }
  ]
 }

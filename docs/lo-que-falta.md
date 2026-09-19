@@ -3,14 +3,17 @@
 Los cinco problemas abiertos de Polaris, dichos por su dueña. No es una lista de deseos: es
 donde el sistema **duele hoy**. Si alguno es tu terreno, un issue argumentado vale más que un PR.
 
-Las cifras salen del propio repo y del registro del lazo el 19-sep-2026.
+Las cifras salen del propio repo y del registro del lazo el 19-sep-2026. Lo tachado ya está
+hecho; lo demás sigue abierto.
 
 ---
 
 ## 1. 🏠 El carril local está parado
 
-- [ ] Decir en la documentación que el carril local está **disponible pero sin uso real**
+- [x] Decir en la documentación que el carril local está **disponible pero sin uso real**
 - [ ] Averiguar por qué no se le llama: ¿no hay tareas de ese tipo, o algo dejó de invocarlo?
+- [x] Retirar el modelo local descargado que nadie cableaba (5 GB): se probó contra el que ya
+      estaba y daba **la misma salida**, así que no aportaba nada
 
 **Estado:** `ollama` corre con `qwen3:8b`, y el registro del muro tiene **122 llamadas**, la
 última el **14-jul-2026**. Para comparar: `nvidia` 10.065, `claude` 8.720.
@@ -26,8 +29,12 @@ ni en ninguna herramienta. Instalar sin cablear deja piezas muertas que nadie au
 
 ## 2. 🧰 Demasiadas herramientas y agentes, y ninguna gestión de su ciclo de vida
 
-- [ ] Detectar solapes: dos herramientas que hacen lo mismo con nombres distintos
-- [ ] Marcar lo muerto: qué no se ha llamado en N meses
+- [x] Marcar lo muerto: `tools/inventario.py --huerfanas` cruza quién nombra a quién, los
+      daemons y el último commit. **De 5 huérfanas a 0**: una estaba desenchufada (se enchufó)
+      y cuatro eran CLIs de mano sin documentar (se documentaron)
+- [x] Que cada agente declare **cada cuánto** se espera que trabaje (`ritmo:` en la ficha:
+      permanente / a-demanda / estacional / dormido), con test que lo exige
+- [ ] Detectar solapes automáticamente: dos piezas que hacen lo mismo con nombres distintos
 - [ ] Un criterio de retirada, no solo de creación
 - [ ] Que crear una herramienta nueva obligue a declarar qué reemplaza
 
@@ -81,6 +88,10 @@ demanda, sin inflar el prompt ni fiarlo todo a la suerte del recuperador.
 
 ## 5. ⏰ Las rutinas automáticas se caen y nadie se entera a tiempo
 
+- [x] Que un daemon **deshabilitado** se detecte y se levante, en vez de reintentar a ciegas
+- [x] Que una alerta no se multiplique sola: claves sin contadores, y una cadena no se itera
+      letra a letra
+- [x] Que un agente lanzado por launchd **no aparezca como «sin usar»**
 - [ ] Que una rutina que deja de correr **avise sola**, no se descubra semanas después
 - [ ] Distinguir «no hay nada que hacer» de «esto lleva roto un mes»
 - [ ] Reintento y recuperación, no solo detección
