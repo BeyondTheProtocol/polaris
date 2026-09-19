@@ -4,6 +4,7 @@ alias: Alby Hernández
 description: Alby: se le CONSULTA sobre arneses locales, ejecucion multi-modelo barata y memoria semantica. Opina como uno mas del comite.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-28
 version: 1
 ---

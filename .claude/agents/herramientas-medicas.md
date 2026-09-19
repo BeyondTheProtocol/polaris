@@ -3,6 +3,7 @@ name: herramientas-medicas
 description: Construye las herramientas medicas y bioinformaticas hacia NED, a nivel elite.
 model: fable
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

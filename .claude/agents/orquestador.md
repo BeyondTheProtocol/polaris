@@ -3,6 +3,7 @@ name: orquestador
 description: Puerta de entrada: lee la intencion, decide el plan y reparte al comite, agente o herramienta correcta.
 model: opus
 estado: activo
+ritmo: permanente
 revision: 2026-06-26
 version: 2
 ---

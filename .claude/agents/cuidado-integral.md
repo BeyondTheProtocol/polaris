@@ -4,6 +4,7 @@ description: Tu Nucleo: cuida a {{TITULAR}} persona en 4 dimensiones (fisica, ps
 tools: Read, Write, Edit, Bash, WebSearch, WebFetch, mcp__visualize__show_widget, mcp__visualize__read_me
 model: opus
 estado: activo
+ritmo: permanente
 revision: 2026-06-25
 version: 1
 ---

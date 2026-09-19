@@ -3,6 +3,7 @@ name: legal-burocracia
 description: Legal y burocracia: consentimientos, GDPR de datos medicos, MTA y transferencia UE-EEUU, tramites, la asociacion.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

@@ -4,6 +4,7 @@ description: Metacapa: como {{TITULAR}} trabaja con la IA, no el codigo ni el ca
 model: sonnet
 tools: Read, Grep, Glob, Bash, mcp__ccd_session_mgmt__search_session_transcripts
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

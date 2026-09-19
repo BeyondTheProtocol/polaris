@@ -3,6 +3,7 @@ name: forense-pericial
 description: Redacta y AUDITA informes periciales informaticos forenses: ciberacoso, suplantacion, prueba digital.
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-28
 version: 1
 ---

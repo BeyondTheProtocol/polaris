@@ -3,6 +3,7 @@ name: comunidad
 description: Comunidad: agradecimientos, engagement, voluntarios y respuestas a comentarios o preguntas en redes. Solo borradores.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-07-15
 version: 2
 disallowedTools: Bash

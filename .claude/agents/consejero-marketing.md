@@ -5,6 +5,7 @@ description: {{CONTACTO}}: se le CONSULTA sobre marketing y posicionamiento. Opi
 model: sonnet
 tools: Read, Grep, Glob, Bash
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

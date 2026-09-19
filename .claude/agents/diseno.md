@@ -3,6 +3,7 @@ name: diseno
 description: Comite de marca, diseno y design system: valida TODO lo que se ve antes de publicarse (regla de {{TITULAR}}, 22/6/26).
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

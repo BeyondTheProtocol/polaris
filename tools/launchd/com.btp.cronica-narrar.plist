@@ -7,7 +7,7 @@
 		<key>BTP_AGENT</key>
 		<string>periodista</string>
 		<key>BTP_MODEL</key>
-		<string>haiku</string>
+		<string>sonnet</string>
 		<key>BTP_ORQUESTADOR</key>
 		<string>claude-suscripcion</string>
 		<key>MURO_PROFILE</key>

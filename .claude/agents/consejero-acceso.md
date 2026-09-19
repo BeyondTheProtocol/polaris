@@ -4,6 +4,7 @@ alias: Sid {{CONTACTO}}
 description: Sid, founder-mode: motor de ACCESO (ensayos, laboratorios, fondos, contactos). Encuentra el cuello de botella real y el eslabon que desbloquea el siguiente.
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

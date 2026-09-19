@@ -3,6 +3,7 @@ name: auto-mejora
 description: Rutina de mejora continua y radar externo: consolida las correcciones de {{TITULAR}} en memorias, reglas y frenos ejecutables. Corre lun/mie/vie/dom.
 model: opus
 estado: activo
+ritmo: permanente
 revision: 2026-07-31
 version: 4
 ---

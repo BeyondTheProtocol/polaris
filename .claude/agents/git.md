@@ -1,9 +1,10 @@
 ---
 name: git
 description: Mecanica de git del repo: ramas, commits con scope, historial limpio y fusiones a casa base.
-model: sonnet
+model: haiku
 tools: Bash, Read, Grep, Glob
 estado: activo
+ritmo: permanente
 revision: 2026-07-10
 version: 2
 ---

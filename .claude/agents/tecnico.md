@@ -3,6 +3,7 @@ name: tecnico
 description: Mantiene y mejora G0DM0D3, helptitular-site, dashboards e integraciones, Y LA INFRAESTRUCTURA INTERNA de Polaris (daemons launchd, cola, correo IMAP/SMTP, secretos del Llavero, tools/). Siempre por rama o PR.
 model: sonnet
 estado: activo
+ritmo: permanente
 revision: 2026-09-12
 version: 2
 ---

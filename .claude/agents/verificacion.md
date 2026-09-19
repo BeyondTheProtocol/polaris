@@ -4,6 +4,7 @@ description: Watchdog adversarial: contrasta afirmaciones contra fuentes primari
 model: fable
 tools: Read, Grep, Glob, Bash
 estado: activo
+ritmo: permanente
 revision: 2026-06-26
 version: 2
 ---

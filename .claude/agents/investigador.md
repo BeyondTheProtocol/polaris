@@ -3,6 +3,7 @@ name: investigador
 description: OSINT: saca toda la informacion publica de una persona, @handle, laboratorio o empresa.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

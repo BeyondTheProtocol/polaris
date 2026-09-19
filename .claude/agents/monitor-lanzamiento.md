@@ -4,6 +4,7 @@ description: Mide como va un lanzamiento en redes (Umami + metricas de la plataf
 model: sonnet
 tools: Bash, Read, Grep, Glob
 estado: activo
+ritmo: estacional
 revision: 2026-06-25
 version: 1
 ---

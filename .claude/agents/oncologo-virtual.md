@@ -3,6 +3,7 @@ name: oncologo-virtual
 description: Copiloto del caso clinico: mantiene el hilo, consulta al comite y prepara opciones y preguntas para sus medicos reales.
 model: fable
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

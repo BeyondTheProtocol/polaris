@@ -66,6 +66,40 @@ def _modelo_real_en_el_lazo():
     return real
 
 
+def _usos_daemon(dias):
+    """Pasadas que hizo un agente COMO DAEMON, del registro de observabilidad.
+
+    19-sep-2026 — el agujero que hacía inútil a este auditor: `_usos` solo mira los transcripts
+    de sesión, donde aparece quien invoca a otro con `subagent_type`. Un agente que corre desde
+    launchd NO deja rastro ahí, así que salía con CERO usos llevando meses trabajando a diario.
+    Con ese cero se llegó a proponer retirar al `orquestador`, que corre cada mañana. Un medidor
+    que solo ve una de las dos puertas no mide: engaña."""
+    corte = datetime.now() - timedelta(days=dias)
+    out = Counter()
+    d = os.path.join(REPO, "tools", "state", "observabilidad")
+    if not os.path.isdir(d):
+        return out
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".jsonl"):
+            continue
+        ruta = os.path.join(d, fn)
+        try:
+            if datetime.fromtimestamp(os.path.getmtime(ruta)) < corte:
+                continue
+            with open(ruta, encoding="utf-8", errors="replace") as fh:
+                for linea in fh:
+                    try:
+                        reg = json.loads(linea)
+                    except ValueError:
+                        continue
+                    agente = reg.get("agente") or reg.get("agent")
+                    if agente:
+                        out[agente] += 1
+        except OSError:
+            continue
+    return out
+
+
 def _usos(dias):
     """Cuenta invocaciones reales de agentes y skills en los transcripts."""
     corte = datetime.now() - timedelta(days=dias)
@@ -98,6 +132,10 @@ def main(argv):
     a = ap.parse_args(argv)
 
     usos_ag, usos_sk = _usos(a.dias)
+    # Las dos puertas suman: invocado en sesión + pasadas como daemon.
+    usos_daemon = _usos_daemon(a.dias)
+    for agente, n in usos_daemon.items():
+        usos_ag[agente] += n
     real = _modelo_real_en_el_lazo()
 
     agentes, incoherentes, huerfanos = [], [], []

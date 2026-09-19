@@ -5,6 +5,7 @@ description: {{CONTACTO}}: se le CONSULTA sobre arquitectura de sistemas agentic
 tools: Read, Grep, Glob, Bash
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-26
 version: 1
 ---

@@ -4,6 +4,7 @@ description: Narra el viaje humano de {{TITULAR}} en su voz, en primera persona.
 model: sonnet
 tools: Read, Write, Glob, Grep
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

@@ -3,6 +3,7 @@ name: comite-medico
 description: Comite ingeniero: investiga la literatura con verificacion adversarial de 5 lentes, mapeada a las dianas del tumor, y alimenta el Radar.
 model: fable
 estado: activo
+ritmo: permanente
 revision: 2026-06-26
 version: 2
 ---

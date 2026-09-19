@@ -4,6 +4,7 @@ description: La Orbita: planifica y reserva el viaje (vuelos, hoteles, logistica
 tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 model: opus
 estado: activo
+ritmo: estacional
 revision: 2026-06-25
 version: 1
 ---

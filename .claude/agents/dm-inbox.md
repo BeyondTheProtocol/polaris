@@ -3,6 +3,7 @@ name: dm-inbox
 description: Mina Instagram y LinkedIn VIA los avisos por email (sin tocar las redes, cero baneo) y tria lo valioso.
 model: sonnet
 estado: activo
+ritmo: permanente
 revision: 2026-06-25
 version: 1
 ---

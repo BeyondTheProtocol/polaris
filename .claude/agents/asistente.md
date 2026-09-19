@@ -6,6 +6,7 @@ model: sonnet
 # fuerza BTP_MODEL=haiku (decision de coste del 3-jul-26: Vega = 54% del gasto).
 # Aqui sonnet vale para cuando se la invoca como subagente en sesion interactiva.
 estado: activo
+ritmo: permanente
 revision: 2026-06-25
 version: 1
 ---

@@ -11,7 +11,7 @@
 		<key>BTP_MAX_TURNS</key>
 		<string>150</string>
 		<key>BTP_MODEL</key>
-		<string>sonnet</string>
+		<string>opus</string>
 		<key>BTP_SETTINGS</key>
 		<string>settings.auto-mejora.json</string>
 		<key>BTP_ORQUESTADOR</key>

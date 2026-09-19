@@ -4,6 +4,7 @@ description: Monta una caja nueva (mini-sistema especializado) a partir de un GO
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

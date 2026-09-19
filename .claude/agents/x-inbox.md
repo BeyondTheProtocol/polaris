@@ -3,6 +3,7 @@ name: x-inbox
 description: Mina el buzon de X (menciones, guardados, DMs) y tria lo valioso hacia la vacuna.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

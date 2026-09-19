@@ -3,6 +3,7 @@ name: acceso-herramientas
 description: Cuando una IA o herramienta bloquea o rechaza algo: distingue celo espurio (falso positivo) de riesgo real al muro, y pelea el falso positivo. Tambien al elegir herramienta para una tarea sensible a rechazos.
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

@@ -4,6 +4,7 @@ description: Manos web: ejecuta en el navegador una reserva o tramite YA decidid
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 estado: borrador
+ritmo: a-demanda
 revision: 2026-06-26
 version: 1
 ---

@@ -3,6 +3,7 @@ name: prensa
 description: Gabinete de prensa: convierte la atencion de los medios en contactos utiles (oncologos, expertos), fondos y acceso.
 model: sonnet
 estado: activo
+ritmo: permanente
 revision: 2026-06-25
 version: 1
 disallowedTools: Bash

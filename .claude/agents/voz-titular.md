@@ -4,6 +4,7 @@ description: Pase de voz de {{TITULAR}} (escrito y hablado) para cualquier borra
 tools: Read, Write, Edit, Bash, WebSearch, WebFetch
 model: opus
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

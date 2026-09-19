@@ -3,6 +3,7 @@ name: finanzas-transparencia
 description: Dinero: presupuestos, proyecciones, reportes a donantes y pagina de gastos. NO mueve dinero.
 model: sonnet
 estado: activo
+ritmo: a-demanda
 revision: 2026-06-25
 version: 1
 ---

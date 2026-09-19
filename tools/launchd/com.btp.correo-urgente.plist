@@ -17,7 +17,7 @@
 		<key>BTP_MAX_TURNS</key>
 		<string>40</string>
 		<key>BTP_MODEL</key>
-		<string>haiku</string>
+		<string>sonnet</string>
 		<key>BTP_QUIET_NIGHT</key>
 		<string>1</string>
 		<key>MURO_PROFILE</key>

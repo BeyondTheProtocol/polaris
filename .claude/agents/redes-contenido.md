@@ -3,6 +3,7 @@ name: redes-contenido
 description: Contenido para IG/X/LinkedIn/TikTok en su voz: ideas, guiones de Reels y Stories, captions, threads. Solo borradores.
 model: sonnet
 estado: activo
+ritmo: estacional
 revision: 2026-07-12
 version: 2
 disallowedTools: Bash
