@@ -49,6 +49,16 @@ def _labels_cargados():
     return labs
 
 
+def _deshabilitado(label):
+    """¿Tiene launchd marcado este label como deshabilitado? (marca persistente, sobrevive al
+    reinicio). `launchctl print-disabled` es la única forma de verlo: `list` no lo muestra."""
+    r = subprocess.run(['launchctl', 'print-disabled', DOMAIN], capture_output=True, text=True)
+    for linea in (r.stdout or '').splitlines():
+        if '"%s"' % label in linea:
+            return 'disabled' in linea.split('=>')[-1]
+    return False
+
+
 def _esta_cargado(label):
     return label in _labels_cargados()
 
@@ -191,6 +201,16 @@ def activar(arg, reemplaza=False, kick=False, dry=False):
             shutil.copyfile(destino, destino + '.bak')
         with open(destino, 'w', encoding='utf-8') as fh:
             fh.write(contenido)
+        # DESHABILITADO (19-sep-2026). `launchctl disable` deja una marca PERSISTENTE: el
+        # servicio no aparece en `launchctl list`, `bootstrap` falla con «Input/output error» —
+        # que no dice nada— y el reintento no sirve de nada, porque no es transitorio. Pasó con
+        # el dispatcher del lazo y el bot: llevaban días abajo, la cola sin vaciarse y las
+        # alertas repitiéndose (una de ellas 679 veces) porque los encargos que debían cerrarlas
+        # no llegaban a correr. Se comprueba y se levanta la marca ANTES de arrancar.
+        if _deshabilitado(label):
+            print('· %s estaba DESHABILITADO en launchd; lo habilito' % label)
+            subprocess.run(['launchctl', 'enable', '%s/%s' % (DOMAIN, label)],
+                           capture_output=True, text=True)
         if reemplaza:
             subprocess.run(['launchctl', 'bootout', '%s/%s' % (DOMAIN, label)], capture_output=True, text=True)
         # REINTENTO + COMPROBACIÓN (31-jul-26). Con `--reemplaza` ya hemos hecho `bootout`: si el

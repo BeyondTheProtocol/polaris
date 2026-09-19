@@ -160,6 +160,7 @@ runpy test_jobs_caidos.py
 runpy test_healthcheck_acuse.py
 runpy test_bucles_colgados.py
 runpy test_activar_daemon.py
+runpy test_activar_daemon_deshabilitado.py
 runpy test_plists_home.py
 runpy test_vigia.py
 runpy test_anatomia.py
