@@ -1686,6 +1686,74 @@ DRIVE_PROBE_INTERVAL_H = 6
 DRIVE_MARCA_CADUCADO = "OAuth de usuario (escritura): CADUCADO"
 
 
+LLM_PROBE_INTERVAL_H = 6
+# Lo que dicen los proveedores cuando lo que falta es DINERO, no servicio. Se separa del resto
+# porque la acción es distinta: un caído se espera, un sin-saldo hay que recargarlo.
+_SIN_SALDO = re.compile(r"insufficient\s+balance|no resource package|credit balance is too low|"
+                        r"quota|billing|recharge|payment required|exceeded your current quota|"
+                        r"saldo", re.I)
+
+
+def _check_llms(salud=None, ahora=None):
+    """¿Responde cada LLM del enrutador, y a cuál se le acabó el saldo? (19-sep-2026)
+
+    El agujero que tapa: `_check_ias` sonda los endpoints con un GET, y un GET responde 200 con
+    el saldo a CERO —lo dice el propio comentario de `ia_health.refrescar_credito_claude`—. Por
+    eso se montó una sonda de crédito REAL… solo para Claude. Del resto nadie sabía nada: GLM
+    llevaba el 19-sep devolviendo «Insufficient balance» en cada llamada del enrutador y ninguna
+    alerta saltó, porque el único que hace la llamada de verdad es `enruta.salud()`, y a ese
+    nadie le preguntaba.
+
+    Dos claves distintas a propósito, porque la acción no es la misma:
+      · `llm_sin_saldo:<proveedor>` — hay que recargar. Es de {{TITULAR}}, y por eso es «humano».
+      · `llm_caido:<proveedor>`     — no responde. Se espera, se reintenta, y degrada solo.
+    """
+    ahora = ahora or time.time()
+    estado_p = os.path.join(HC, "llms.json")
+    prev = {}
+    try:
+        with open(estado_p, encoding="utf-8") as fh:
+            prev = json.load(fh)
+    except Exception:
+        pass
+    if (ahora - prev.get("ts", 0)) / 3600.0 < LLM_PROBE_INTERVAL_H:
+        return [], {"throttled": True, "sin_saldo": prev.get("sin_saldo", []),
+                    "caidos": prev.get("caidos", [])}
+    if salud is None:
+        try:
+            sys.path.insert(0, os.path.join(REPO, "tools"))
+            import enruta as _enruta
+            salud = _enruta.salud(refrescar=True)
+        except Exception as e:  # noqa: BLE001
+            return [], {"error": "%r" % e}
+
+    alertas, sin_saldo, caidos = [], [], []
+    for nombre, dato in sorted((salud or {}).items()):
+        if (dato or {}).get("ok"):
+            continue
+        detalle = str((dato or {}).get("detalle") or "")[:160]
+        if _SIN_SALDO.search(detalle):
+            sin_saldo.append(nombre)
+            alertas.append(("llm_sin_saldo:%s" % nombre,
+                            "💳 %s se quedó SIN SALDO: hay que recargar para volver a usarlo. (%s)"
+                            % (nombre, detalle)))
+        else:
+            caidos.append(nombre)
+            # DOS PASADAS PARA GRITAR (19-sep-2026): la primera medición real dio `grok` caído y
+            # la sonda directa, medio minuto después, decía OK — un timeout de red. Un aviso por
+            # cada hipo enseña a ignorar los avisos. Sin saldo NO espera: eso no se arregla solo.
+            if nombre in (prev.get("caidos") or []):
+                alertas.append(("llm_caido:%s" % nombre,
+                                "🔌 %s no responde (dos pasadas seguidas): %s" % (nombre, detalle)))
+    try:
+        os.makedirs(HC, exist_ok=True)
+        with open(estado_p, "w", encoding="utf-8") as fh:
+            json.dump({"ts": ahora, "sin_saldo": sin_saldo, "caidos": caidos}, fh, ensure_ascii=False)
+    except Exception:
+        pass
+    return alertas, {"sin_saldo": sin_saldo, "caidos": caidos}
+
+
 def _check_drive_oauth(run=subprocess.run, state_dir=None):
     """¿Sigue vivo el permiso de ESCRITURA de Drive? (11-sep-2026)
 
@@ -2759,6 +2827,15 @@ def run():
         alertas.extend(ia_alertas)
     except Exception as e:
         chk["ias_error"] = "%r" % e                # log técnico, nunca para {{TITULAR}}
+
+    # 3g-bis. ¿Responde cada LLM del enrutador, y a cuál se le acabó el SALDO? (19-sep-2026)
+    # El GET de la sonda de arriba responde 200 con el saldo a cero; esto hace la llamada real.
+    try:
+        llm_alertas, llm_info = _check_llms()
+        chk["llms"] = llm_info
+        alertas.extend(llm_alertas)
+    except Exception as e:
+        chk["llms_error"] = "%r" % e
 
     # 3h. EXPOSICIÓN DOCKER/COLIMA (seguridad): ¿algún contenedor publica un puerto a 0.0.0.0 (más
     #     allá de loopback / la tailnet 100.x)? Docker puede abrir agujeros en el firewall. Si Colima
