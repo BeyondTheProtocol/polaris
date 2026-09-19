@@ -34,6 +34,7 @@ ROOT = os.environ.get("BTP_REPO") or os.path.dirname(os.path.dirname(os.path.abs
 # ── Qué entra. Lo que no está aquí, no se publica. ───────────────────────────────────────
 INCLUIR = (
     "tools", "tests", ".claude", "pipeline", "evals", "docs",
+    ".github",                  # el CI que revisa lo que llega por PR (19-sep-26)
     "requirements.txt", ".gitignore", ".gitleaks.toml", ".gitleaksignore",
     "README.md", "CONTRIBUTING.md", "LICENSE", "AGENTS.md", "CHANGELOG.md",
     "CLAUDE.md",                # la constitución: el muro que el README describe
@@ -56,7 +57,22 @@ EXCLUIR_DIR = {
 # Vacía desde el 16-sep-2026: los detectores de PHI ya no llevan dentro los datos que
 # buscan — viven en overlays `*.local.json` gitignored. Se publican enteros y funcionan;
 # lo que falta es la lista, que cada cual escribe en local.
-EXCLUIR_FICHERO = set()
+# 19-sep-2026: estas baterías NO se publican porque dependen de lo que aquí se sustituye o
+# de estado vivo que allí no existe — y publicadas salían ROJAS en el CI del repo público
+# («Gemma ({{CENTRO}}) sigue siendo persona» falla justo porque la despersonalización hizo
+# su trabajo). `_coser_runner` las comenta en `tests/test_all.sh` para que el runner público
+# no llame a ficheros ausentes. Un CI que nace en rojo no lo mira nadie.
+EXCLUIR_FICHERO = {
+    os.path.join("tests", n) for n in (
+        "test_correo.py",               # el triaje de correo lleva dentro nombres reales
+        "test_correo_responder.py",
+        "test_adjuntos_clinicos.py",    # adjuntos del historial clínico
+        "test_historial.py",            # el archivo clínico: centros, pruebas, fechas
+        "test_historial_indexado.py",
+        "test_deuda_escalada.py",       # exige el libro de deuda del lazo (estado vivo)
+        "test_fugu_egress.py",          # deny-list de la caja aislada, local
+    )
+}
 
 EXCLUIR_PAT = (
     re.compile(r"^_PRIVADO"),

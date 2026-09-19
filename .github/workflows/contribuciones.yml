@@ -1,0 +1,60 @@
+# Lo que ENTRA por PR al repo público pasa por aquí antes de que nadie lo mezcle.
+#
+# Por qué existe (19-sep-2026): este repo es un árbol DERIVADO de uno privado que sostiene
+# el caso clínico de una persona. `tools/publicar.py` vigila lo que sale; esto vigila lo que
+# entra. Un PR con una clave, un teléfono o un dato clínico pegado en un fixture acabaría
+# publicado con el nombre del proyecto encima.
+#
+# Permisos mínimos a propósito: este workflow LEE el código del PR y no escribe en ningún
+# sitio. El texto de un PR es dato no confiable; aquí solo se mira el DIFF, nunca se ejecuta
+# nada que venga escrito en su descripción.
+name: contribuciones
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  guardia:
+    name: barrido y sintaxis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # hace falta la base para el diff del PR
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Barrido de lo que trae el PR
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch -q origin "${{ github.base_ref }}"
+            python3 tools/ci_barrido.py --diff "origin/${{ github.base_ref }}...HEAD"
+          else
+            python3 tools/ci_barrido.py --todo
+          fi
+
+      - name: El barrido se prueba a sí mismo
+        run: python3 tools/ci_barrido.py --selftest
+
+      - name: Todo el Python compila
+        run: python3 -m compileall -q tools tests pipeline evals
+
+  tests:
+    name: batería
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Sin el contenido privado ni el estado vivo, muchas baterías se saltan solas: eso es
+      # lo esperado aquí. Lo que no puede es haber rojos.
+      - name: tests/test_all.sh
+        run: bash tests/test_all.sh

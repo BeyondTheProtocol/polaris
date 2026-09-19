@@ -33,7 +33,7 @@ runpy test_gate_citas.py
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
 runpy test_tier_evidencia.py
-runpy test_deuda_escalada.py
+# (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_kpi_ned.py
 runpy test_backup.py
 runpy test_salud_reconciliar.py
@@ -103,11 +103,11 @@ runpy test_persecucion.py
 runpy test_memoria_contactos.py
 runpy test_anticipa.py
 runpy test_vega_metrics.py
-runpy test_correo.py
+# (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_correo_imap.py
-runpy test_adjuntos_clinicos.py
-runpy test_historial.py
-runpy test_historial_indexado.py
+# (no publicado: cubre un detector de PHI que vive solo en local)
+# (no publicado: cubre un detector de PHI que vive solo en local)
+# (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_historial_sync.py
 runpy test_healthcheck_drive.py
 runpy test_subir_historial_drive.py
@@ -115,10 +115,10 @@ runpy test_pendientes.py
 runpy test_correo_smtp.py
 runpy test_correo_triage.py
 runpy test_triage_route_correo.py
-runpy test_correo_responder.py
+# (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_instagram_dm.py
 runpy test_dm_inbox_buzones.py
-runpy test_fugu_egress.py
+# (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_borde.py
 runpy test_deid.py
 runpy test_kb_pdf_avisos.py
@@ -199,6 +199,7 @@ runpy test_x_guardados_cli.py
 runpy test_onco.py
 runpy test_publicar_fuga.py
 runpy test_publicar_sync.py
+runpy test_ci_barrido.py
 runpy test_capacidades.py
 runpy test_centralita_blacklist.py
 runpy test_correo_smtp_gate.py
