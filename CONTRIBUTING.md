@@ -75,3 +75,5 @@ clínicos no los ve nadie más que tú.
 ¿Encontraste algo que permita egress sin gate, ejecución de texto de las cajas, o fuga
 de la carpeta clínica? **No abras un issue público.** Escribe en privado por el correo
 del perfil de GitHub.
+
+<!-- PR de prueba: comprobar que la revision automatica responde. Se cierra sin fusionar. -->
