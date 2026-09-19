@@ -122,18 +122,20 @@ class TestCasoExplicito(TestFugaEnPatron):
 
 
 class TestNombreQueTambienEsPalabra(TestFugaEnPatron):
-    """Media docena de nombres españoles son palabras corrientes: {{CONTACTO}}, Rosario, Pilar…
+    """Media docena de nombres españoles son palabras corrientes: Zarzamora, Rosario, Pilar…
 
     19-sep-2026, cazado al publicar el NOTICE: la sustitución de terceros iba con `re.I`, así
-    que la fórmula literal de la GPL —«se distribuye con la CONTACTO de que sea útil»— salía
-    como «con la contacto de que sea útil». Despersonalizar no puede destrozar el texto legal
+    que la fórmula literal de la GPL —«se distribuye con la esperanza de que sea útil»— salía
+    como «con la contacto de que sea útil». Aquí se usa un nombre INVENTADO («Zarzamora») y no
+    el real: un test que escriba un nombre del overlay se reescribe a sí mismo al publicarse,
+    y entonces falla en el repo público — pasó en la primera versión de este fichero. Despersonalizar no puede destrozar el texto legal
     del repo. En prosa un nombre va en mayúscula; en minúscula solo cuenta dentro de un
-    identificador (`contacto_ok`), que es el otro sitio donde aparecen."""
+    identificador (`zarzamora_ok`), que es el otro sitio donde aparecen."""
 
     def _recargar(self):
         super()._recargar()
         import publicar as pb
-        nombre = "{{CONTACTO}}"
+        nombre = "Zarzamora"
         pb.SUSTITUCIONES = pb.SUSTITUCIONES + (
             (pb.re.compile(r"(?:(?<=\\b)|\b|(?<=_))%s(?=[A-Z_]|\b)" % nombre), pb._contacto),
             (pb.re.compile(r"(?:(?<=_)%s\b|\b%s(?=_))" % (nombre.lower(), nombre.lower())), pb._contacto),
@@ -141,15 +143,15 @@ class TestNombreQueTambienEsPalabra(TestFugaEnPatron):
         )
 
     def test_la_palabra_corriente_sobrevive(self):
-        texto = "se distribuye con la esperanza de que sea util"
+        texto = "se distribuye con la zarzamora de que sea util"
         self.assertEqual(publicar.despersonalizar(texto), texto)
 
     def test_el_nombre_en_prosa_no(self):
-        self.assertNotIn("{{CONTACTO}}", publicar.despersonalizar("un correo de {{CONTACTO}} hoy"))
+        self.assertNotIn("Zarzamora", publicar.despersonalizar("un correo de Zarzamora hoy"))
 
     def test_dentro_de_un_identificador_tambien_cae(self):
-        self.assertNotIn("esperanza", publicar.despersonalizar("contacto_ok = True"))
-        self.assertNotIn("CONTACTO", publicar.despersonalizar("INVARIANTE_CONTACTO_MAX"))
+        self.assertNotIn("zarzamora", publicar.despersonalizar("zarzamora_ok = True"))
+        self.assertNotIn("ZARZAMORA", publicar.despersonalizar("INVARIANTE_ZARZAMORA_MAX"))
 
 
 class TestSinOverlayNoSePublica(unittest.TestCase):

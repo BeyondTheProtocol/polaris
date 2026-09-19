@@ -1689,7 +1689,10 @@ DRIVE_MARCA_CADUCADO = "OAuth de usuario (escritura): CADUCADO"
 LLM_PROBE_INTERVAL_H = 6
 # Lo que dicen los proveedores cuando lo que falta es DINERO, no servicio. Se separa del resto
 # porque la acción es distinta: un caído se espera, un sin-saldo hay que recargarlo.
-_SIN_SALDO = re.compile(r"insufficient\s+balance|no resource package|credit balance is too low|"
+# OJO con el nombre: `_SIN_SALDO` (una cadena) ya existe más arriba, para el log de Anthropic.
+# Definir aquí otro con el mismo nombre lo PISABA y `_check_saldo_api` reventaba con
+# «'in <string>' requires string as left operand, not re.Pattern». Lo cazó test_saldo_api.
+_SIN_SALDO_LLM = re.compile(r"insufficient\s+balance|no resource package|credit balance is too low|"
                         r"quota|billing|recharge|payment required|exceeded your current quota|"
                         r"saldo", re.I)
 
@@ -1732,7 +1735,7 @@ def _check_llms(salud=None, ahora=None):
         if (dato or {}).get("ok"):
             continue
         detalle = str((dato or {}).get("detalle") or "")[:160]
-        if _SIN_SALDO.search(detalle):
+        if _SIN_SALDO_LLM.search(detalle):
             sin_saldo.append(nombre)
             alertas.append(("llm_sin_saldo:%s" % nombre,
                             "💳 %s se quedó SIN SALDO: hay que recargar para volver a usarlo. (%s)"
