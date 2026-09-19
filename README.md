@@ -146,6 +146,12 @@ trabajo perdido. Lo esencial:
 | 🥈 | **Usarlo para tu caso y contar qué se rompió** | Si el arnés no encaja en otra enfermedad u otro contexto, ese reporte vale más que un PR |
 | 🥉 | **Un PR pequeño y acotado**, con issue previo | Entra rápido porque se puede leer entero |
 
+### 🧠 ¿Sabes de modelos, bioinformática o literatura médica?
+
+Hay una lista de **preguntas abiertas** en [docs/enrutado-modelos.md](docs/enrutado-modelos.md):
+qué modelo se usa hoy para cada tarea del caso, por qué se eligió, y dónde una opinión fundada
+nos ahorraría semanas. Eso se responde con un issue, no con un PR.
+
 ### ⚠️ Antes de invertir una tarde, entiende esto
 
 **Un merge hecho aquí se pierde en la siguiente regeneración.** No es una política: el

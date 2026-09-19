@@ -1,0 +1,41 @@
+name: 🧠 Propuesta de modelo o herramienta
+description: Crees que hay un modelo, predictor o fuente mejor para una de las tareas del caso
+labels: ["modelo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Antes de escribir, mira [docs/enrutado-modelos.md](../../blob/master/docs/enrutado-modelos.md):
+        ahí están las tareas abiertas y qué se usa hoy para cada una. 🙏
+  - type: dropdown
+    id: tarea
+    attributes:
+      label: ¿Para qué tarea?
+      options:
+        - Leer literatura sin inventar citas
+        - Interpretar un molecular
+        - Predecir presentación de péptidos (neoantígenos)
+        - Encontrar ensayos clínicos
+        - Tumores fríos e inmunoterapia
+        - Modelo abierto que corra en local
+        - Otra (dila abajo)
+    validations: {required: true}
+  - type: input
+    id: cual
+    attributes:
+      label: Qué propones
+      description: Modelo, herramienta, base de datos o fuente
+    validations: {required: true}
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Con qué evidencia
+      description: Un benchmark, un paper, o tu experiencia real usándolo. «Se dice que es bueno» no sirve
+    validations: {required: true}
+  - type: dropdown
+    id: local
+    attributes:
+      label: ¿Puede correr en local?
+      description: Decide casi siempre. El dato crudo no sale de la máquina
+      options: ["Sí, corre en local", "No: exige mandar datos fuera", "No lo sé"]
+    validations: {required: true}

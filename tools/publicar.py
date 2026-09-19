@@ -300,9 +300,23 @@ def _vetados_del_perfil():
     return tuple(out)
 
 
-def vetados_en(texto):
+# 19-sep-2026 — CASO EXPLÍCITO. {{TITULAR}} pide ayuda pública sobre qué modelos usar para SU caso,
+# y para eso quien lea tiene que entender el caso: «tan genérico no sirve». Un fichero puede
+# declarar este marcador en su cabecera y entonces el perfil clínico NO se sustituye ahí.
+# Lo que NO cambia nunca: nombre, apellidos, fecha de nacimiento y contactos siguen fuera. La
+# identidad no se negocia; el diagnóstico es suyo y ella decide dónde se cuenta.
+MARCA_CASO_EXPLICITO = "publicar: caso-explicito"
+
+
+def caso_explicito(texto):
+    return MARCA_CASO_EXPLICITO in (texto[:4000] or "")
+
+
+def vetados_en(texto, con_perfil=True):
     """Los términos vetados que sobreviven. Lista vacía = limpio."""
-    patrones = VETADOS + _vetados_del_titular() + _vetados_del_perfil()
+    patrones = VETADOS + _vetados_del_titular()
+    if con_perfil:
+        patrones += _vetados_del_perfil()
     return sorted({m.group(0) for p in patrones for m in p.finditer(texto)})
 
 
@@ -350,7 +364,7 @@ def _copiar_uno(rel, destino):
     if es_texto(origen):
         with io.open(origen, encoding="utf-8", errors="replace") as fh:
             contenido = fh.read()
-        contenido = despersonalizar(contenido)
+        contenido = despersonalizar(contenido, con_perfil=not caso_explicito(contenido))
         if rel == os.path.join("tests", "test_all.sh"):
             contenido = _coser_runner(contenido)
         with io.open(salida, "w", encoding="utf-8") as fh:
@@ -375,7 +389,10 @@ def _barrer(destino):
             hits = vetados_en(rel)
             if es_texto(ruta):
                 with io.open(ruta, encoding="utf-8", errors="replace") as fh:
-                    hits += vetados_en(fh.read())
+                    contenido = fh.read()
+                # Un fichero con el marcador cuenta el caso a propósito: el barrido sigue
+                # exigiendo que no haya identidad, y deja pasar solo el perfil clínico.
+                hits += vetados_en(contenido, con_perfil=not caso_explicito(contenido))
             if hits:
                 sucios.append((rel, sorted(set(hits))))
     return sucios

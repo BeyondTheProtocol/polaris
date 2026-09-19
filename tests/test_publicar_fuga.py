@@ -95,6 +95,32 @@ class TestFugaEnPatron(unittest.TestCase):
         self.assertEqual(publicar.despersonalizar("nada que ver aquí"), "nada que ver aquí")
 
 
+class TestCasoExplicito(TestFugaEnPatron):
+    """Un fichero puede contar el CASO a propósito; la IDENTIDAD no se negocia nunca.
+
+    19-sep-2026: pedir ayuda pública sobre qué modelo usar exige contar para qué caso es
+    («tan genérico no sirve»). El marcador levanta solo el perfil clínico, y solo en el
+    fichero que lo lleva."""
+
+    MARCADO = ("<!-- publicar: caso-explicito -->\n"
+               "el caso es una enfermedad Vetada, y lo firma Zoraida Pergamino")
+
+    def test_con_marcador_el_perfil_clinico_sobrevive(self):
+        salida = publicar.despersonalizar(self.MARCADO, con_perfil=not publicar.caso_explicito(self.MARCADO))
+        self.assertIn("Vetada", salida)          # el perfil clínico se queda
+        self.assertNotIn("Zoraida", salida)      # la identidad, no
+
+    def test_sin_marcador_el_perfil_clinico_desaparece(self):
+        sin = "el caso es una enfermedad Vetada"
+        self.assertNotIn("Vetada", publicar.despersonalizar(sin))
+
+    def test_el_barrido_no_denuncia_el_perfil_del_fichero_marcado(self):
+        limpio = publicar.despersonalizar(self.MARCADO, con_perfil=False)
+        self.assertEqual(publicar.vetados_en(limpio, con_perfil=False), [])
+        # pero sí lo denunciaría en un fichero normal
+        self.assertTrue(publicar.vetados_en("una enfermedad Vetada"))
+
+
 class TestSinOverlayNoSePublica(unittest.TestCase):
     def test_sin_overlay_aborta_en_vez_de_publicar_en_crudo(self):
         vacio, destino = tempfile.mkdtemp(), tempfile.mkdtemp()
