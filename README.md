@@ -146,6 +146,12 @@ trabajo perdido. Lo esencial:
 | 🥈 | **Usarlo para tu caso y contar qué se rompió** | Si el arnés no encaja en otra enfermedad u otro contexto, ese reporte vale más que un PR |
 | 🥉 | **Un PR pequeño y acotado**, con issue previo | Entra rápido porque se puede leer entero |
 
+### 👥 ¿Te interesan los agentes y cómo se reparten el trabajo?
+
+Los 33 agentes están publicados en `.claude/agents/`, uno por fichero, y
+[docs/agentes.md](docs/agentes.md) explica quién es quién, qué reglas heredan todos y dónde una
+mirada de fuera ayudaría más.
+
 ### 🧠 ¿Sabes de modelos, bioinformática o literatura médica?
 
 Hay una lista de **preguntas abiertas** en [docs/enrutado-modelos.md](docs/enrutado-modelos.md):
