@@ -95,6 +95,11 @@ PROVEEDORES = {
         "usd_mtok": 0.94,
         "fuerzas": {
             "buscar_vivo": "búsqueda en vivo de web Y de X en la misma llamada",
+            # Su papel, en palabras de {{TITULAR}} (19-sep-26): «el investigador macarra que busca
+            # petróleo donde los demás no llegan». Va a por lo que no está en los índices
+            # limpios —X en vivo, foros, lo que se dice antes de publicarse—. Por eso se queda
+            # aunque Perplexity sirva `xai/grok-4.6`: eso da el modelo, no el acceso.
+            "rastrear": "lo que no está en los índices limpios: X en vivo, foros, fuentes marginales",
             "redes": "el único con acceso real a X",
         },
         "aviso": "en citas es el menos fiable del grupo: cotejar siempre (Tow Center/CJR 2025)",
@@ -109,8 +114,14 @@ PROVEEDORES = {
         "fuerzas": {
             "citas": "devuelve fuentes citadas, y es el mejor de los buscadores en alucinación de cita",
             "buscar_vivo": "búsqueda web reciente con síntesis",
+            # 19-sep-2026: su Agent API sirve 46 modelos de VARIAS casas con la misma clave
+            # (`perplexity.py --modelos`). Eso lo convierte además en carril barato y en
+            # suplente cuando a otro proveedor se le acaba el saldo — que es justo lo que
+            # pasó con GLM ese día: `perplexity/glm-5.3` respondió sin recargar nada.
+            "barato": "46 modelos de varias casas con una sola clave (--modelo <id>)",
         },
-        "aviso": "para evidencia médica, Consensus/scite van antes; toda cita se coteja",
+        "aviso": "para evidencia médica, Consensus/scite van antes; toda cita se coteja. "
+                 "El agente solo BUSCA si se le pide: sin eso responde de memoria",
     },
     "gemini": {
         "tool": "gemini.py",
@@ -155,6 +166,10 @@ PROVEEDORES = {
         "fuerzas": {
             "barato": "alternativa de bajo coste",
         },
+        # 19-sep-2026: prepago a CERO y decisión de NO recargarlo — el mismo modelo se sirve
+        # por Perplexity (`perplexity/glm-5.3`) con una clave que ya se paga. La sonda de
+        # salud lo dejará fuera solo mientras siga sin saldo; no hace falta borrarlo.
+        "aviso": "sin saldo desde el 19-sep-26; su relevo es perplexity --modelo perplexity/glm-5.3",
     },
 }
 
@@ -176,6 +191,9 @@ PISTAS = {
     "codigo": ("codigo", "script", "funcion", "bug", "test", "refactor", "python", "bash"),
     "escribir": ("redacta", "redactar", "escribe", "borrador", "correo", "texto", "copy",
                  "articulo", "narra"),
+    # Lo que Grok hace mejor que nadie aquí: ir a por lo que no está indexado limpio.
+    "rastrear": ("quien dice", "se rumorea", "foro", "reddit", "en x ", "twitter", "hilo",
+                 "antes de que se publique", "nadie ha publicado", "rastrea", "husmea"),
     "volumen": ("masivo", "en lote", "todas las", "cientos", "miles", "clasifica cada",
                 "resumir cada", "por cada"),
     "razonar": ("analiza", "razona", "decide", "compara", "evalua", "por que", "explica",

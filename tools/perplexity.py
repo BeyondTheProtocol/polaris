@@ -211,14 +211,21 @@ def main():
     if "--pro" in args:
         model_override = "perplexity/sonar-pro"; args.remove("--pro")
     if "--reasoning" in args:
-        model_override = "sonar-reasoning-pro"; args.remove("--reasoning")
+        model_override = "perplexity/sonar-reasoning-pro"; args.remove("--reasoning")
     if "--deep" in args:
-        model_override = "sonar-deep-research"; args.remove("--deep")
+        model_override = "perplexity/sonar-deep-research"; args.remove("--deep")
     if "--clinico" in args:  # preset caso {{TITULAR}}: literatura ingeniera + mejor modelo
         opts["academic"] = True
         if not model_override:
-            model_override = "sonar-pro"
+            model_override = "perplexity/sonar-pro"
         args.remove("--clinico")
+
+    # Cualquiera de los 46 del catálogo, por su id (`--modelo anthropic/claude-opus-5`).
+    # Es lo que convierte esta tool en un carril multi-casa con UNA sola clave.
+    if "--modelo" in args:
+        i = args.index("--modelo")
+        if i + 1 < len(args):
+            model_override = args[i + 1]; del args[i:i + 2]
 
     # flags con valor
     def take(flag):
