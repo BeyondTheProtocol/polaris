@@ -11,7 +11,10 @@ skip=0
 SOLO_CASA_BASE="test_xurl.py test_x_guardados_enriquecido.py test_llavero_mudo.py
 test_bucles_colgados.py test_plists_home.py test_anatomia_tecnica.py test_auto_mejora_turnos.py
 test_digest.sh test_muro_costura_rm.py test_coste_repo.py"
-_salta() { [ -n "$BTP_PORTABLE" ] && case " $SOLO_CASA_BASE " in *" $1 "*) return 0;; esac; return 1; }
+# `$(echo …)` colapsa los saltos de línea de la lista: sin eso, las baterías que caen al
+# principio o al final de cada línea no casaban y seguían corriendo (4 rojos en el primer CI).
+_salta() { [ -n "$BTP_PORTABLE" ] || return 1
+           case " $(echo $SOLO_CASA_BASE) " in *" $1 "*) return 0;; esac; return 1; }
 run() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
         [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
         [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "/tmp/rojo-$1.log" 2>/dev/null;
