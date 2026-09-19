@@ -41,6 +41,25 @@ que el proyecto sea honesto.
 > una tesis, una investigación, un trámite legal largo, el cuidado de un familiar. Lo que se
 > publica aquí es el **arnés**, no el caso.
 
+## 📣 Por qué este repo es público
+
+Sin rodeos: **está abierto para que Polaris mejore, y para que esa mejora acorte el camino a
+NED.** No se publica para enseñar un proyecto bonito ni para conseguir estrellas.
+
+Un sistema que sostiene un caso clínico y solo se mira a sí mismo acumula puntos ciegos. Abrirlo
+es la forma más barata de que alguien de fuera diga «ese método de verificación tiene un
+agujero», «para eso hay un modelo mejor» o «ese ensayo lo estáis buscando en el sitio
+equivocado». Cada una de esas frases puede valer semanas, y las semanas son justo lo que no
+sobra.
+
+Así que si entras, **entra a romperlo**: [docs/enrutado-modelos.md](docs/enrutado-modelos.md)
+tiene las preguntas abiertas sobre modelos con el caso clínico delante, y
+[docs/agentes.md](docs/agentes.md) explica quién hace qué y dónde falla el reparto. Un issue
+bien argumentado ayuda más que cien commits.
+
+Lo segundo, y también importante: si esto le sirve a otra persona que está peleando su propia
+enfermedad, mejor. Pero el orden es ese, y se dice claro.
+
 ---
 
 ## ⚡ Arrancar

@@ -24,17 +24,28 @@
 
 ## 🗺️ Quién hace qué hoy
 
-| Proveedor | Para qué | Salvedad escrita en el código |
-|---|---|---|
-| 🏠 **Local** (ollama) | De-identificar, extraer, clasificar. **Egress cero**: es el único destino para dato crudo | Para razonar de verdad, no llega |
-| 🟣 **Claude** | Razonar, y todo lo que toca material sensible | Es el runtime, no una tool |
-| ⚫ **Grok** | Buscar en vivo en web **y** en X en la misma llamada | En citas, el menos fiable del grupo: se cotejan siempre |
-| 🔵 **Perplexity** | Búsqueda con fuentes citadas | Para evidencia médica van antes scite y Consensus |
-| 🟢 **ChatGPT / Gemini** | Segunda y tercera voz del panel | Casas distintas a propósito |
-| 🟩 **NVIDIA / GLM** | Volumen barato, nunca clínico | Gratis o casi, y por eso limitados |
+Esta es la lista **real** de lo que hay conectado hoy, con el modelo por defecto de cada carril
+(los valores viven en `tools/<proveedor>.py`, así que se pueden comprobar):
 
-Y por encima de todos, para evidencia médica: **scite y los MCP de literatura antes que
-cualquier buscador LLM**, y **toda cita se abre y se coteja** antes de usarse. Un modelo que
+| Proveedor | Modelo por defecto | Para qué | ¿Puede ver material sensible? |
+|---|---|---|---|
+| 🏠 **Local** (ollama) | `qwen3:8b` | De-identificar, extraer y clasificar. **Egress cero** | ✅ Sí, y es el **único** destino del dato crudo |
+| 🟣 **Claude** | el runtime de Claude Code | Razonar, y todo lo que toca material sensible | ✅ Sí |
+| ⚫ **Grok** | `grok-4.3` | Buscar en vivo en web **y** en X en la misma llamada | ❌ No |
+| 🔵 **Perplexity** | `sonar` | Búsqueda con fuentes citadas | ❌ No |
+| 🟠 **ChatGPT** | `gpt-5` | Segunda voz del panel, razonar | ❌ No |
+| 🔷 **Gemini** | `gemini-2.5-pro` | Tercera voz del panel, contexto largo | ❌ No |
+| 🟩 **NVIDIA** | `nemotron-3-ultra-550b` | Volumen y tareas mecánicas. Gratis | ❌ Nunca |
+| 🟨 **GLM** | `glm-5.2` | Alternativa barata para tareas no críticas | ❌ Nunca |
+
+**Salvedades escritas en el propio código**, no aquí de adorno: Grok es el menos fiable del grupo
+en citas y se cotejan siempre; el modelo local de-identifica y clasifica bien, pero **para razonar
+no llega**; los carriles gratis no ven nada clínico jamás.
+
+Y para evidencia médica, antes que cualquier LLM van los **MCP de literatura y datos**: `scite`,
+PubMed/PMC, `biomcp` y `cbioportal` (ver `.mcp.json`).
+
+**Toda cita se abre y se coteja** antes de usarse, venga del modelo que venga. Un modelo que
 inventa un PMID en un dossier clínico no es un error de estilo.
 
 ## 🚫 Lo que nunca sale de la máquina
