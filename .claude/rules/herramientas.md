@@ -36,7 +36,7 @@ La centralita (2-sep-26). Decide y explica por qué: el muro primero (la norma d
 
 ## Buscar
 - `grok.py`: web+X en vivo.
-- `perplexity.py`: citas.
+- `perplexity.py`: citas, por el **Agent API** (`/v1/agent`; el `/v1/sonar` viejo se retira el 27-sep-26). Da acceso a **46 modelos** de varias casas con la misma clave: `python3 tools/perplexity.py --modelos`. La búsqueda hay que pedirla (`tools: web_search`) o contesta de memoria.
 - `nvidia.py`: gratis, NO clínico.
 - `local.py`: LLM en casa vía ollama, **egress 0**; `--deid` para de-identificar.
 - **CLIs a demanda** (no las llama ningún daemon; se usan a mano y por eso NO son código muerto): `md_to_pdf_pro.py` (Markdown→PDF legible: hizo el paquete de elegibilidad de Moffitt), `md_to_pdf_pericial.py` (igual, con formato de informe pericial), `elevenlabs_voz.py` (su voz hablada en español), `snowflake_ts.py` (fecha de un tuit derivada de su id, sin llamar a la API).

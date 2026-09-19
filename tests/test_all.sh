@@ -161,6 +161,7 @@ runpy test_healthcheck_syspath.py
 runpy test_jobs_caidos.py
 runpy test_healthcheck_acuse.py
 runpy test_healthcheck_llms.py
+runpy test_perplexity_agent.py
 runpy test_healthcheck_alerta_str.py
 runpy test_bucles_colgados.py
 runpy test_activar_daemon.py
