@@ -5,9 +5,9 @@
 #
 # Para encenderlo hacen falta DOS cosas que solo puede hacer la dueña del repo:
 #   1. Instalar la Claude GitHub App (https://github.com/apps/claude) en el repo u organización.
-#   2. Guardar el secreto: ANTHROPIC_API_KEY (clave de API) o CLAUDE_CODE_OAUTH_TOKEN
-#      (token de suscripción, `claude setup-token`). Si usas el segundo, cambia la línea
-#      `anthropic_api_key` por `claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}`.
+#   2. Guardar el secreto CLAUDE_CODE_OAUTH_TOKEN (token de suscripción, `claude setup-token`).
+#      Para facturar por API en vez de por suscripción, cambia esa línea por
+#      `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}` y guarda ese otro secreto.
 #   3. Crear la variable de repo CLAUDE_REVIEW con valor `true`.
 #
 # Quién puede dispararlo: la propia acción exige que quien abre el PR tenga permiso de
@@ -42,7 +42,9 @@ jobs:
           fetch-depth: 1
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Token de suscripción (`claude setup-token`), no clave de API: así la revisión
+          # va contra la suscripción y no abre una factura nueva.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
           plugins: "code-review@claude-code-plugins"
           prompt: "/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}"
