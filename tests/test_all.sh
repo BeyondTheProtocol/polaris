@@ -198,6 +198,7 @@ runpy test_x_guardados_honestidad.py
 runpy test_x_guardados_cli.py
 runpy test_onco.py
 runpy test_publicar_fuga.py
+runpy test_publicar_sync.py
 runpy test_capacidades.py
 runpy test_centralita_blacklist.py
 runpy test_correo_smtp_gate.py

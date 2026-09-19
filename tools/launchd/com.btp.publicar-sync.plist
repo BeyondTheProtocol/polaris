@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.publicar-sync</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_REPO</key><string>/Users/polaris/claudecode</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/publicar_sync.py</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>20</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/publicar-sync.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/publicar-sync.err</string>
+</dict></plist>

@@ -330,6 +330,16 @@
    "script": "historial_sync.py",
    "concern": "historial-sync",
    "nota": "Drive → local → ingerir → reindexar el historial clínico. Una sola dirección: NO sube. Con HALT se salta la pata de Drive y hace el resto."
+  },
+  "com.btp.publicar-sync": {
+   "script": "publicar_sync.py",
+   "concern": "publicar-sync",
+   "nota": "Espejo publico (BeyondTheProtocol/polaris) al dia: deriva con publicar.py, exige overlay + barrido limpio + que compile, no toca nada con HALT. Diario 6:20."
+  },
+  "com.btp.radar-ned-diario": {
+   "script": "radar_ned_dia.sh",
+   "concern": "radar-ned-diario",
+   "nota": ""
   }
  }
 }

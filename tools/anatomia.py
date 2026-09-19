@@ -210,7 +210,8 @@ FAMILIAS = [
     ("buscar y verificar", ("grok", "perplexity", "nvidia", "consensus",
                             "scite", "pubmed", "radar", "kb", "elicit",
                             "verifica", "cotejo",
-                            "cn_fetch")),    # lee webs chinas geobloqueadas para investigar (13-sep)
+                            "cn_fetch",      # lee webs chinas geobloqueadas para investigar (13-sep)
+                            "onco")),        # grafo abierto de oncología en local (19-sep)
     ("salud del sistema", ("healthcheck", "vigia", "salud", "errores",
                            "observabilidad", "heartbeat", "diag", "ia_health",
                            "audit_", "frescura",
@@ -226,7 +227,10 @@ FAMILIAS = [
     ("dinero", ("coste", "cost_guard", "finanzas", "presupuesto", "pago",
                 "gasto")),
     ("git y ramas", ("git", "ramas", "deploy", "release", "worktree",
-                     "rebuild")),
+                     "rebuild",
+                     # el espejo público: derivar el árbol publicable y mantenerlo al día
+                     # (19-sep-26) — es fontanería de repos, no «otras»
+                     "publicar", "pr_portar")),
     ("el lazo", ("cola", "queue", "dispatcher", "run_agent", "panel", "decide_peticion",
                  "orquesta", "constelacion", "constructor", "evals",
                  "paso_consolidacion", "cerrar_sesion",
