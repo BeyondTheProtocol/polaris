@@ -39,6 +39,7 @@ La centralita (2-sep-26). Decide y explica por qué: el muro primero (la norma d
 - `perplexity.py`: citas.
 - `nvidia.py`: gratis, NO clínico.
 - `local.py`: LLM en casa vía ollama, **egress 0**; `--deid` para de-identificar.
+- `inventario.py`: qué pieza está viva y cuál no llama nadie (`--huerfanas`, `--agentes`). Clasificar no es borrar.
 - `onco.py`: OnCo (onco.cc), grafo abierto de oncología **en local** (`sync` · `buscar` · `ficha` · `novedades`); también es fuente del radar NED. Es mapa, no evidencia. **No usar `npx onco`/`onco-mcp`**: el 19-sep-26 `onco` en npm era otro paquete y `onco-mcp` no existía.
 - Evidencia médica con citas: **scite está conectado por MCP** (`mcp__scite__*`, reglas en `.claude/rules/scite-mcp.md`).
 

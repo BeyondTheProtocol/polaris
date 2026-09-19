@@ -210,6 +210,7 @@ runpy test_audit_herramientas.py
 runpy test_x_guardados_honestidad.py
 runpy test_x_guardados_cli.py
 runpy test_onco.py
+runpy test_inventario.py
 runpy test_publicar_fuga.py
 runpy test_publicar_sync.py
 runpy test_ci_barrido.py
