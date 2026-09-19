@@ -56,5 +56,8 @@ jobs:
           python-version: '3.12'
       # Sin el contenido privado ni el estado vivo, muchas baterías se saltan solas: eso es
       # lo esperado aquí. Lo que no puede es haber rojos.
+      # BTP_PORTABLE salta las baterías que solo pueden correr en un Mac con el sistema
+      # montado (Llavero, launchd, el binario xurl): aquí no hay con qué, y un rojo
+      # permanente convierte el CI en decoración.
       - name: tests/test_all.sh
-        run: bash tests/test_all.sh
+        run: BTP_PORTABLE=1 bash tests/test_all.sh

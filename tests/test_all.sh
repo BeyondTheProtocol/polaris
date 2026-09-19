@@ -4,14 +4,22 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY=/usr/bin/python3; [ -x "$PY" ] || PY=python3
 fail=0
 skip=0
-run() { echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
+# 19-sep-2026 — BTP_PORTABLE=1 (lo usa el CI del repo público en Linux): salta las baterías
+# que solo pueden pasar en la casa base: Llavero de macOS, plists de launchd, el binario
+# `xurl`, el panel técnico de la anatomía. No son opcionales, es que allí no hay con qué
+# correrlas. La batería completa sigue siendo la de casa base.
+SOLO_CASA_BASE="test_xurl.py test_x_guardados_enriquecido.py test_llavero_mudo.py
+test_bucles_colgados.py test_plists_home.py test_anatomia_tecnica.py test_auto_mejora_turnos.py
+test_digest.sh test_muro_costura_rm.py test_coste_repo.py"
+_salta() { [ -n "$BTP_PORTABLE" ] && case " $SOLO_CASA_BASE " in *" $1 "*) return 0;; esac; return 1; }
+run() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
         [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
         [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "/tmp/rojo-$1.log" 2>/dev/null;
                            echo "  🔴 ROJO: $1 (rc=$rc · log: /tmp/rojo-$1.log)"; }; }
 # El nombre del test que se pone ROJO se DICE (27/7/26). Antes runpy solo incrementaba el contador:
 # la batería acababa en "❌ 1 batería(s) con fallos" sin decir cuál, y había que ir a mano fichero a
 # fichero. Con el log guardado, además, el fallo se puede mirar después (importa para los flakes).
-runpy() { echo "── $1 ──"; "$PY" "$ROOT/tests/$1" >/tmp/t.$$ 2>/dev/null; local rc=$?; tail -1 /tmp/t.$$;
+runpy() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; "$PY" "$ROOT/tests/$1" >/tmp/t.$$ 2>/dev/null; local rc=$?; tail -1 /tmp/t.$$;
           [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
           [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "/tmp/rojo-$1.log" 2>/dev/null;
                              echo "  🔴 ROJO: $1 (rc=$rc · log: /tmp/rojo-$1.log)"; }; }
