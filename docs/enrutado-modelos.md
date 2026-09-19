@@ -31,12 +31,12 @@ Esta es la lista **real** de lo que hay conectado hoy, con el modelo por defecto
 |---|---|---|---|
 | 🏠 **Local** (ollama) | `qwen3:8b` | De-identificar, extraer y clasificar. **Egress cero** | ✅ Sí, y es el **único** destino del dato crudo |
 | 🟣 **Claude** | el runtime de Claude Code | Razonar, y todo lo que toca material sensible | ✅ Sí |
-| ⚫ **Grok** | `grok-4.3` | Buscar en vivo en web **y** en X en la misma llamada | ❌ No |
-| 🔵 **Perplexity** | `sonar` | Búsqueda con fuentes citadas | ❌ No |
+| ⚫ **Grok** | `grok-4.3` | **Rastrear**: lo que no está en los índices limpios — X en vivo, foros, fuentes marginales | ❌ No |
+| 🔵 **Perplexity** | `perplexity/sonar` | Búsqueda con fuentes citadas **y carril multi-casa: 46 modelos con una sola clave** | ❌ No |
 | 🟠 **ChatGPT** | `gpt-5` | Segunda voz del panel, razonar | ❌ No |
 | 🔷 **Gemini** | `gemini-2.5-pro` | Tercera voz del panel, contexto largo | ❌ No |
 | 🟩 **NVIDIA** | `nemotron-3-ultra-550b` | Volumen y tareas mecánicas. Gratis | ❌ Nunca |
-| 🟨 **GLM** | `glm-5.2` | Alternativa barata para tareas no críticas | ❌ Nunca |
+| 🟨 **GLM** | `glm-5.2` | Alternativa barata. **Sin saldo desde el 19-sep-26**; su relevo es `perplexity/glm-5.3`, el mismo modelo con una clave que ya se paga | ❌ Nunca |
 
 **Salvedades escritas en el propio código**, no aquí de adorno: Grok es el menos fiable del grupo
 en citas y se cotejan siempre; el modelo local de-identifica y clasifica bien, pero **para razonar
@@ -44,6 +44,24 @@ no llega**; los carriles gratis no ven nada clínico jamás.
 
 Y para evidencia médica, antes que cualquier LLM van los **MCP de literatura y datos**: `scite`,
 PubMed/PMC, `biomcp` y `cbioportal` (ver `.mcp.json`).
+
+### 🔎 Una clave, 46 modelos (19-sep-2026)
+
+El Agent API de Perplexity sirve modelos de **varias casas** con la misma clave —Anthropic,
+OpenAI, Google, xAI y los propios— y eso cambia dos cosas: hay suplente cuando a un proveedor se
+le acaba el saldo, y se puede comparar sin abrir cuenta nueva. `python3 tools/perplexity.py --modelos`
+lo lista en vivo.
+
+Con un cuidado que no es menor: **el agente solo busca si se le pide** (`tools: web_search`). Sin
+eso responde de memoria — en la primera prueba se inventó un ensayo clínico entero y devolvió cero
+fuentes. Un carril de citas sin citas no es más barato: es otro peor, disfrazado.
+
+### 🩺 Y alguien vigila que todo esto siga vivo
+
+Desde el 19-sep, cada seis horas se comprueba que **cada proveedor responde de verdad** (llamada
+real, no un `GET` que devuelve 200 con el saldo a cero) y se distinguen dos cosas que exigen
+acciones distintas: **sin saldo** (hay que recargar) y **caído** (se reintenta y degrada solo, y
+avisa solo tras dos pasadas seguidas, porque un timeout suelto no es una avería).
 
 **Toda cita se abre y se coteja** antes de usarse, venga del modelo que venga. Un modelo que
 inventa un PMID en un dossier clínico no es un error de estilo.

@@ -215,6 +215,17 @@ el CI.
 
 ---
 
+## 🩺 Lo que se vigila solo
+
+Ninguna de estas es una intención: las cuatro corren sin que nadie se acuerde.
+
+| Vigila | Qué hace | Dónde |
+|---|---|---|
+| 🧠 **Los modelos** | Cada 6 h comprueba que cada proveedor responde **de verdad** y separa «sin saldo» (hay que recargar) de «caído» (degrada solo). Avisa de una caída solo tras **dos pasadas seguidas**: un timeout suelto no es una avería | `tools/healthcheck.py::_check_llms` |
+| 📦 **El catálogo** | Qué pieza está viva y cuál no la llama nadie, cruzando citas, daemons y último commit | `tools/inventario.py` |
+| 👥 **Los agentes** | Cada ficha declara **cada cuánto** se espera que trabaje (`ritmo:`), y un test lo exige. Así un cero se puede leer: en un `a-demanda` es normal, en un `permanente` es alarma | `tests/test_agentes_ritmo.py` |
+| 🔁 **El espejo** | Regenera este repo a diario y **no publica** si el barrido encuentra algo o el árbol no compila | `tools/publicar_sync.py` |
+
 ## 📊 Estado
 
 En producción y en movimiento: ~165 commits/mes, ~60.000 líneas de código y ~31.000 de tests.

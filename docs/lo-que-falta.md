@@ -18,6 +18,11 @@ hecho; lo demás sigue abierto.
 **Estado:** `ollama` corre con `qwen3:8b`, y el registro del muro tiene **122 llamadas**, la
 última el **14-jul-2026**. Para comparar: `nvidia` 10.065, `claude` 8.720.
 
+**Lo que sí se movió el 19-sep:** el carril de Perplexity pasó a servir **46 modelos de varias
+casas con una sola clave**, así que un proveedor sin saldo ya tiene suplente sin abrir cuenta
+nueva. No resuelve el punto 1 —el local sigue sin usarse—, pero quita la excusa de «no hay
+alternativa».
+
 **Por qué duele:** el carril local es el **único destino permitido para el dato crudo**. Si
 está parado, o no se está de-identificando nada, o se está haciendo en otro sitio.
 
@@ -92,6 +97,8 @@ demanda, sin inflar el prompt ni fiarlo todo a la suerte del recuperador.
 - [x] Que una alerta no se multiplique sola: claves sin contadores, y una cadena no se itera
       letra a letra
 - [x] Que un agente lanzado por launchd **no aparezca como «sin usar»**
+- [x] Que **un LLM sin saldo** avise: el GET de la sonda vieja devolvía 200 con el saldo a
+      cero, así que nadie se enteraba. Ahora hay llamada real cada 6 h
 - [ ] Que una rutina que deja de correr **avise sola**, no se descubra semanas después
 - [ ] Distinguir «no hay nada que hacer» de «esto lleva roto un mes»
 - [ ] Reintento y recuperación, no solo detección
