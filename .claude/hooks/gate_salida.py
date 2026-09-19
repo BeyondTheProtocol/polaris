@@ -350,7 +350,7 @@ def preclinico_aplanado(t, tools=None):
     Es la regla 17 del protocolo mecanizada: hasta hoy (17-sep-26) vivía SOLO en el prompt,
     o sea que se cumplía cuando el modelo se acordaba. El daño de incumplirla es asimétrico
     y difícil de deshacer: una cita FABRICADA se desmiente enseñando el registro; una
-    contacto construida sobre un xenoinjerto ya se ha leído.
+    esperanza construida sobre un xenoinjerto ya se ha leído.
 
     Tres booleanos, tejidos por el CÓDIGO (mismo patrón que `tools/tier_evidencia.py`, que es
     quien resuelve el primero contra PubMed, sin LLM):

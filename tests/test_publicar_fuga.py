@@ -121,6 +121,37 @@ class TestCasoExplicito(TestFugaEnPatron):
         self.assertTrue(publicar.vetados_en("una enfermedad Vetada"))
 
 
+class TestNombreQueTambienEsPalabra(TestFugaEnPatron):
+    """Media docena de nombres españoles son palabras corrientes: {{CONTACTO}}, Rosario, Pilar…
+
+    19-sep-2026, cazado al publicar el NOTICE: la sustitución de terceros iba con `re.I`, así
+    que la fórmula literal de la GPL —«se distribuye con la CONTACTO de que sea útil»— salía
+    como «con la contacto de que sea útil». Despersonalizar no puede destrozar el texto legal
+    del repo. En prosa un nombre va en mayúscula; en minúscula solo cuenta dentro de un
+    identificador (`contacto_ok`), que es el otro sitio donde aparecen."""
+
+    def _recargar(self):
+        super()._recargar()
+        import publicar as pb
+        nombre = "{{CONTACTO}}"
+        pb.SUSTITUCIONES = pb.SUSTITUCIONES + (
+            (pb.re.compile(r"(?:(?<=\\b)|\b|(?<=_))%s(?=[A-Z_]|\b)" % nombre), pb._contacto),
+            (pb.re.compile(r"(?:(?<=_)%s\b|\b%s(?=_))" % (nombre.lower(), nombre.lower())), pb._contacto),
+            (pb.re.compile(r"(?<![A-Z0-9])%s(?![A-Z0-9])" % nombre.upper()), pb._contacto),
+        )
+
+    def test_la_palabra_corriente_sobrevive(self):
+        texto = "se distribuye con la esperanza de que sea util"
+        self.assertEqual(publicar.despersonalizar(texto), texto)
+
+    def test_el_nombre_en_prosa_no(self):
+        self.assertNotIn("{{CONTACTO}}", publicar.despersonalizar("un correo de {{CONTACTO}} hoy"))
+
+    def test_dentro_de_un_identificador_tambien_cae(self):
+        self.assertNotIn("esperanza", publicar.despersonalizar("contacto_ok = True"))
+        self.assertNotIn("CONTACTO", publicar.despersonalizar("INVARIANTE_CONTACTO_MAX"))
+
+
 class TestSinOverlayNoSePublica(unittest.TestCase):
     def test_sin_overlay_aborta_en_vez_de_publicar_en_crudo(self):
         vacio, destino = tempfile.mkdtemp(), tempfile.mkdtemp()

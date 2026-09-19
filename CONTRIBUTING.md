@@ -75,3 +75,12 @@ clínicos no los ve nadie más que tú.
 ¿Encontraste algo que permita egress sin gate, ejecución de texto de las cajas, o fuga
 de la carpeta clínica? **No abras un issue público.** Escribe en privado por el correo
 del perfil de GitHub.
+
+## Licencia de lo que envías
+
+Cada PR aceptado trae una línea `Signed-off-by` (`git commit -s`) y la aceptación explícita, en
+la descripción del PR, del [Acuerdo de contribución](ACUERDO-CONTRIBUCION.md).
+
+Es corto y **no te quita el copyright de lo que escribes**. Lo que permite es que el proyecto
+pueda seguir ofreciendo, además de la AGPL-3.0 gratuita, una licencia comercial a quien la
+necesite — sin tener que localizarte y pedirte permiso cada vez que alguien la pida.

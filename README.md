@@ -238,4 +238,15 @@ completo no es el objetivo; que nada se cierre solo, sí.
 
 ## 📄 Licencia
 
-[AGPL-3.0](LICENSE).
+[AGPL-3.0](LICENSE) · [NOTICE](NOTICE) · [Acuerdo de contribución](ACUERDO-CONTRIBUCION.md)
+
+En corto: **puedes usar y modificar Polaris libremente.** Si lo conviertes en parte de un
+producto o servicio que ofreces a terceros, tienes que **publicar tu código derivado con la
+misma licencia** — eso es lo que hace la AGPL y por eso está elegida.
+
+Si eso no te encaja porque quieres integrarlo en algo cerrado, existe la otra puerta: pide una
+**licencia comercial** a la titular en `beyondtheprotocolteam@gmail.com`, contando qué quieres
+hacer. Las dos vías conviven: la AGPL seguirá siendo gratis para todo el mundo, siempre.
+
+> ⚖️ Una licencia protege el **código**, no la idea. Cualquiera puede construir algo parecido
+> partiendo de cero, y eso está bien: lo que no puede es coger esto, cerrarlo y venderlo.

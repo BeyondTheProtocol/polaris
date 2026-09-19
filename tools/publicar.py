@@ -37,6 +37,12 @@ INCLUIR = (
     ".github",                  # el CI que revisa lo que llega por PR (19-sep-26)
     "requirements.txt", ".gitignore", ".gitleaks.toml", ".gitleaksignore",
     "README.md", "CONTRIBUTING.md", "LICENSE", "AGENTS.md", "CHANGELOG.md",
+    # Blindaje legal (19-sep-26): sin estos, la AGPL protege a medias — un repo sin línea de
+    # copyright obliga a demostrar autoría, y sin acuerdo de contribución el titular pierde la
+    # capacidad de relicenciar (y por tanto de vender una licencia comercial a quien no quiera
+    # abrir su código, que es justo el freno al «me lo cogen y lo monetizan cerrado»).
+    "NOTICE", "SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff",
+    "ACUERDO-CONTRIBUCION.md",
     "CLAUDE.md",                # la constitución: el muro que el README describe
     ".mcp.json",                # qué conectores MCP usa el arnés (sin secretos)
 )
@@ -201,6 +207,12 @@ def _por_caso(m):
     return "titular"
 
 
+# Nombres propios que en español son también palabras corrientes. Solo para estos manda la
+# mayúscula al sustituir; el resto se sustituye sin distinguir caso.
+_NOMBRES_QUE_SON_PALABRA = {"esperanza", "rosario", "pilar", "consuelo", "dolores", "paz",
+                            "soledad", "cruz", "alba", "aurora", "gloria", "mar", "sol",
+                            "angeles", "ángeles", "milagros", "amparo", "remedios"}
+
 _NOMBRE = _nombre_titular()
 
 # 19-sep-2026, FUGA REAL: el nombre escrito DENTRO de un patrón (`re.compile(r"\bNombre\b")`)
@@ -218,9 +230,25 @@ SUSTITUCIONES = (
 ) + tuple(
     (re.compile(p_, re.I), "{{FECHA_NAC}}") for p_ in _titular("nacimiento")
 ) + tuple(
-    # los nombres de terceros (contactos, colaboradores, médicos), del overlay
+    # Los nombres de terceros (contactos, colaboradores, médicos), del overlay.
+    # Por defecto van SIN distinguir mayúsculas: un nombre corto metido dentro de un detector
+    # (`…|contacto|…` en una regex) tiene que caer igual que en prosa — es el mismo fallo que
+    # publicó un término vetado el 17-sep.
     (re.compile(r"(?:(?<=\\b)|\b|(?<=_))%s(?=[A-Z_]|\b)" % re.escape(n), re.I), _contacto)
-    for n in _nombres_de_terceros()
+    for n in _nombres_de_terceros() if n.lower() not in _NOMBRES_QUE_SON_PALABRA
+) + tuple(
+    # Excepción para los que TAMBIÉN son palabra corriente ({{CONTACTO}}, Rosario, Pilar…): ahí
+    # sí manda la mayúscula, o se destroza texto legítimo. El caso que lo destapó: el NOTICE
+    # decía «se distribuye con la esperanza de que sea útil» —la fórmula literal de la GPL— y
+    # salía «con la contacto de que sea útil».
+    (re.compile(r"(?:(?<=\\b)|\b|(?<=_))%s(?=[A-Z_]|\b)" % re.escape(n.capitalize())), _contacto)
+    for n in _nombres_de_terceros() if n.lower() in _NOMBRES_QUE_SON_PALABRA
+) + tuple(
+    (re.compile(r"(?:(?<=_)%s\b|\b%s(?=_))" % (re.escape(n.lower()), re.escape(n.lower()))), _contacto)
+    for n in _nombres_de_terceros() if n.lower() in _NOMBRES_QUE_SON_PALABRA
+) + tuple(
+    (re.compile(r"(?<![A-Z0-9])%s(?![A-Z0-9])" % re.escape(n.upper())), _contacto)
+    for n in _nombres_de_terceros() if n.lower() in _NOMBRES_QUE_SON_PALABRA
 ) + (
     (re.compile(r"\bECOG\s*[0-4]\b", re.I), "ECOG {{N}}"),
 )

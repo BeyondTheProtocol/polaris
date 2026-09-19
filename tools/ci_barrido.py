@@ -83,6 +83,8 @@ EXENTOS_PAT = (
     # nadie mira. Un PR que toque tests/ lo revisa una persona.
     re.compile(r"^tests/"),
     re.compile(r"^evals/"),
+    # Los ficheros legales llevan por definición una dirección de contacto: para eso existen.
+    re.compile(r"^(SECURITY\.md|CODE_OF_CONDUCT\.md|CITATION\.cff|NOTICE)$"),
     re.compile(r"^pipeline/(data_ejemplo/|docs/|bin/(muro|preparar_reales|test_)\w*\.py$)"),
 )
 

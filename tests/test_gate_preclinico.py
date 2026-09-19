@@ -7,7 +7,7 @@ cazar una cita FABRICADA, pero no una cita REAL usada para sostener una promesa 
 estudio no sostiene: un xenoinjerto citado bajo «esto reduce el tumor» salía limpio.
 
 El daño es asimétrico y peor que el de la cita inventada: una cita falsa se desmiente
-enseñando el registro; una contacto construida sobre un estudio en ratones ya se ha leído.
+enseñando el registro; una esperanza construida sobre un estudio en ratones ya se ha leído.
 
 Fija las propiedades del check, sin tocar la red (subprocess mockeado):
   1. Afirmar eficacia sobre una cita preclínica sin nombrarlo → se caza.
@@ -117,7 +117,7 @@ class GatePreclinico(unittest.TestCase):
         self.assertIn("preclinico_aplanado", checks)
 
     def test_bloquea_aunque_el_gate_global_este_en_aviso(self):
-        """Su modo propio manda: una contacto falsa, una vez leída, tampoco se deshace."""
+        """Su modo propio manda: una esperanza falsa, una vez leída, tampoco se deshace."""
         self.assertEqual(g._bloquean([("preclinico_aplanado", "s", "m")], "aviso"),
                          ["preclinico_aplanado"])
 

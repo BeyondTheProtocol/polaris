@@ -1312,7 +1312,7 @@ _PERSONAS_REDACT = frozenset({
     "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto",
     "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto",
     "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto", "contacto",
-    "contacto", "sid", "contacto", "gil",
+    "esperanza", "sid", "contacto", "gil",
     # médicos / labs / contactos vistos en el registro
     "bernardo", "cordovez", "gemma", "comas", "cárdenas", "cardenas", "ruth", "gumbau",
     "domínguez", "dominguez", "bassani", "sternberg", "contacto", "navares", "rocío", "rocio",

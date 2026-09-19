@@ -64,6 +64,11 @@ class TestNoLadraPorLoNormal(unittest.TestCase):
             self.assertTrue(cb._exento(ruta), "%s debería estar exento" % ruta)
         self.assertFalse(cb._exento("tools/onco.py"))
 
+    def test_los_ficheros_legales_pueden_llevar_un_contacto(self):
+        """SECURITY.md sin dirección de contacto no sirve para nada."""
+        for ruta in ("SECURITY.md", "CODE_OF_CONDUCT.md", "CITATION.cff", "NOTICE"):
+            self.assertTrue(cb._exento(ruta), ruta)
+
 
 class TestElArbolPublicoPasaSuPropioBarrido(unittest.TestCase):
     """Si el repo que publicamos no pasa el guardia, el guardia no vale para nadie."""
