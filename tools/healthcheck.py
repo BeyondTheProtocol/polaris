@@ -27,6 +27,7 @@ el invariante del choke-point). Sin dependencias (stdlib).
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -967,6 +968,11 @@ def _puerto_vivo(host, port, timeout=HTTP_TIMEOUT_S):
         return False
 
 
+def _clave_frescura(aviso):
+    """Clave ESTABLE para un aviso de frescura: sin los contadores, que cambian cada vuelta."""
+    return "frescura_otro:" + re.sub(r"\d+", "N", aviso)[:40]
+
+
 def _hay_dns(host="api.telegram.org", timeout=3):
     """¿Resuelve nombres el Mac? Solo DNS: `getaddrinfo`, sin abrir conexión ni mandar un byte.
 
@@ -1015,7 +1021,13 @@ def _alertas_frescura(fav):
         elif "parado" in aviso or "sin señales" in aviso:
             clave = "frescura_agente_parado:" + aviso.split("'")[1] if "'" in aviso else "frescura_agente_parado"
         else:
-            clave = "frescura_otro:" + aviso[:40]  # prefijo estable para otros casos
+            # SIN NÚMEROS EN LA CLAVE (19-sep-2026). Aquí iba `aviso[:40]` tal cual, y esos 40
+            # caracteres incluyen los contadores: «🌿 2 rama(s) … (7 commit[s])». Cada vez que
+            # cambiaba el número nacía una clave NUEVA: alerta nueva, acuse nuevo, encargo nuevo
+            # y entrada nueva en el libro de deuda, por la MISMA condición. Había seis variantes
+            # vivas del mismo aviso. La regla ya estaba escrita en este módulo —la clave es
+            # estable, el texto lleva el detalle—; el código no la cumplía.
+            clave = _clave_frescura(aviso)
         (de_agente if clave.startswith("frescura_agente_") else alertas).append((clave, aviso))
     if de_agente and not _hay_dns():
         alertas.append(("red_sin_dns", RED_SIN_DNS_TEXTO))
@@ -1422,6 +1434,13 @@ def _emitir_si_cambia(alertas, categoria="humano"):
             _salud.reconciliar_acuses()
         except Exception:
             pass
+
+    # UNA CADENA NO ES UNA LISTA DE ALERTAS (19-sep-2026). Si alguien llama con un str suelto,
+    # el `for` de abajo lo recorre LETRA A LETRA: cada carácter se vuelve una clave de alerta y
+    # el sistema encola un diagnóstico por cada una. En `queue/failed/` había encargos reales
+    # pidiendo investigar la alerta «a» y la alerta «c». Se normaliza aquí, en la puerta.
+    if isinstance(alertas, (str, bytes)):
+        alertas = [alertas if isinstance(alertas, str) else alertas.decode("utf-8", "replace")]
 
     # Normalizar: extraer claves (para dedup) y textos (para el mensaje)
     claves, textos_por_clave = [], {}

@@ -18,6 +18,10 @@ Las cifras salen del propio repo y del registro del lazo el 19-sep-2026.
 **Por qué duele:** el carril local es el **único destino permitido para el dato crudo**. Si
 está parado, o no se está de-identificando nada, o se está haciendo en otro sitio.
 
+**Y hay un segundo síntoma del mismo mal:** hace una semana se descargó otro modelo local
+(`qwen3-abliterated:8b`, 5 GB) y **ningún código sabe que existe** — no aparece en el enrutador
+ni en ninguna herramienta. Instalar sin cablear deja piezas muertas que nadie audita.
+
 ---
 
 ## 2. 🧰 Demasiadas herramientas y agentes, y ninguna gestión de su ciclo de vida
@@ -27,7 +31,8 @@ está parado, o no se está de-identificando nada, o se está haciendo en otro s
 - [ ] Un criterio de retirada, no solo de creación
 - [ ] Que crear una herramienta nueva obligue a declarar qué reemplaza
 
-**Estado:** **189 herramientas** en `tools/`, **33 agentes** en `.claude/agents/` y **68
+**Estado:** **189 herramientas** en `tools/`, tres modelos descargados en local de los que
+**solo uno está cableado**, **33 agentes** en `.claude/agents/` y **68
 daemons** declarados. Cada problema nuevo tiende a crear una pieza nueva.
 
 **Por qué duele:** el catálogo crece más rápido que la capacidad de recordarlo. Una herramienta
@@ -89,6 +94,14 @@ vez por semana. Si se caen en silencio, el sistema parece vivo y no lo está.
 
 **Qué ayuda buscamos:** patrones de *supervisión* para trabajos periódicos en una sola máquina:
 heartbeat con umbral, reintento con marcha atrás, y una alerta que no se vuelva ruido.
+
+> ✅ **19-sep-2026, arreglado parte del 5:** dos daemons (el que ejecuta la cola y el bot)
+> llevaban días caídos por una marca `disabled` de launchd —invisible en `launchctl list` y con
+> un error que solo decía «Input/output error»—. Sin ellos, los encargos que debían cerrar cada
+> alerta nunca corrían: la alerta volvía a saltar y se encolaba otro encargo, en bucle. Además
+> se arreglaron dos fallos que lo alimentaban: una cadena suelta que se iteraba **letra a letra**
+> creando una alerta por carácter, y claves de alerta que **llevaban los contadores dentro**, así
+> que cada número nuevo nacía como una alerta nueva. Los tres con test.
 
 ---
 

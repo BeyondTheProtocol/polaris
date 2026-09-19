@@ -165,6 +165,13 @@ trabajo perdido. Lo esencial:
 | 🥈 | **Usarlo para tu caso y contar qué se rompió** | Si el arnés no encaja en otra enfermedad u otro contexto, ese reporte vale más que un PR |
 | 🥉 | **Un PR pequeño y acotado**, con issue previo | Entra rápido porque se puede leer entero |
 
+### 🧱 Lo que falta, por si quieres ir directo al grano
+
+[docs/lo-que-falta.md](docs/lo-que-falta.md) son los **cinco problemas abiertos** del sistema,
+con las cifras del repo delante y sin adornos: el carril local parado, demasiadas piezas sin
+gestión de su ciclo de vida, la dependencia de un solo runtime, el contexto que se pierde entre
+sesiones y las rutinas que se caen en silencio.
+
 ### 👥 ¿Te interesan los agentes y cómo se reparten el trabajo?
 
 Los 33 agentes están publicados en `.claude/agents/`, uno por fichero, y
