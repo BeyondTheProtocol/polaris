@@ -412,6 +412,16 @@ class LasConsultasSeMidenComoBusqueda(unittest.TestCase):
         self.assertFalse(d.sensible, d.motivo_sensible)
         self.assertIn("grok", d.elegidos)
 
+    def test_rastrear_tambien_es_una_busqueda(self):
+        """19-sep-26: la capacidad `rastrear` nació fuera de CAPS_CONSULTA y el embargo de
+        palabras públicas volvió a bloquear una búsqueda legítima. Una capacidad de BUSCAR se
+        declara en los dos sitios, o el borde cambia de criterio sin que nadie lo decida."""
+        d = enruta.elegir("rastrea en foros y en X qué se dice de la vacuna de BioNTech",
+                          estado=TODOS_VIVOS)
+        self.assertFalse(d.sensible, d.motivo_sensible)
+        self.assertIn("grok", d.elegidos)
+        self.assertIn("rastrear", enruta.CAPS_CONSULTA)
+
     def test_su_nombre_en_una_busqueda_sigue_bloqueando(self):
         d = enruta.elegir("busca en X qué se dice de {{TITULAR}} {{APELLIDO}}", estado=TODOS_VIVOS)
         self.assertTrue(d.sensible)

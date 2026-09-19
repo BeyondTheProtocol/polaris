@@ -219,7 +219,11 @@ def _norm(s):
 
 
 # Capacidades en las que lo que sale es una CONSULTA de búsqueda, no material suyo.
-CAPS_CONSULTA = ("buscar_vivo", "redes", "citas")
+# `rastrear` entra aquí (19-sep-26): al añadirla sin apuntarla en esta lista, «busca en X qué se
+# dice de la vacuna» dejó de contar como búsqueda y el embargo de palabras públicas volvió a
+# bloquearla — el test del muro lo cazó. Una capacidad nueva de BUSCAR se declara en los dos
+# sitios o el borde cambia de criterio sin que nadie lo decida.
+CAPS_CONSULTA = ("buscar_vivo", "redes", "citas", "rastrear")
 
 
 def capacidades_de(tarea):
