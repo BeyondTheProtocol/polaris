@@ -1,0 +1,111 @@
+{
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.sh",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_nudge.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/memoria_recall.sh",
+            "timeout": 12
+          },
+          {
+            "_comment": "Enrutado de COMITE (5-sep-26). plan_nudge mira el ALCANCE del prompt; este mira QUIEN debe analizarlo, y lo RECLASIFICA en cada vuelta: una sesion que entra por 'interpreta esta imagen' y acaba analizando el panel molecular del nodo NED hereda el nivel del contexto, no se queda con la clasificacion del primer mensaje. Avisa, no bloquea ni invoca (el coste es decision consciente). Un aviso por comite y sesion. Fail-open; bypass BTP_ENRUTADO_OFF=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enrutado_guard.py",
+            "timeout": 10
+          },
+          {
+            "_comment": "Presencia por Claude Code (11-sep-26). El dead-man de healthcheck solo oia a Telegram y daba a {{TITULAR}} por ausente mientras trabajaba aqui (deuda dead_man_ausencia, 1241 veces). Este hook solo APUNTA el prompt_id en una cola (sin el texto); healthcheck lo coteja contra el transcript (origin human, sin envoltorio de automatismo) y solo entonces llama a mark_seen. Fail-open para el prompt, fail-closed para la presencia.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/presencia_cc.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_comment": "Gate de SALIDA (25-jul-26). Revisa mi respuesta final ANTES de que {{TITULAR}} la lea, contra las normas de tools/normas.json marcadas clase=salida. Existe porque las memorias son CONTEXTO, no enforcement (lo dice la doc oficial), y el recall llega cuando ella escribe mientras el incumplimiento pasa cuando yo respondo. Determinista, sin LLM, FAIL-OPEN (cualquier error deja pasar), nunca frena una urgencia (🔴/CÓDIGO ROJO), sin bucles (respeta stop_hook_active), bypass con BTP_GATE_OFF=1. Modo en normas.json: arranca en 'aviso' y pasa a 'bloqueo' cuando estén medidos los falsos positivos.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/gate_salida.py",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "_comment": "La caja, paso 3 (13-sep-26). Si en este turno trabajaron 2 o más COMITÉS, junta lo que dijeron en UN dossier (tools/caja.py) y avisa de dónde está, en vez de entregar N volcados. Lo deja junto a los transcripts de esos subagentes (no crea sitio nuevo para datos del caso) y apunta en tools/state/caja/dossiers.jsonl quién participó, sin contenido. Modo AVISO: nunca bloquea. FAIL-OPEN, no repite, respeta stop_hook_active, bypass BTP_CAJA_OFF=1. Va aparte de traza_subagente.py porque este SÍ lee respuestas.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/cosecha_panel.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Sandbox de LECTURA clinica (14-jul-26). En interactivo NO habia ningun hook: cualquier agente (prensa, diseno...) podia abrir el disco clinico y no quedaba registro de un solo acceso. Este guard es ESTRECHO: solo vigila la lectura de rutas clinicas y obliga a pasar por tools/lector_clinico.py (la ventanilla auditada). NO se engancha aqui el muro_guard entero porque es una allowlist fail-closed pensada para el lazo 24/7 y romperia la sesion.",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/clinico_guard.py",
+            "timeout": 8
+          },
+          {
+            "_comment": "Recordatorio de la regla EN EL MOMENTO de actuar (25-jul-26). No bloquea: eso es cosa del muro (muro_guard) y del guard clinico. Existe porque lo que inyectan los hooks al empezar la sesion no sobrevive a /compact, y la accion arriesgada llega 40 turnos despues. Fail-open.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/regla_en_accion.py",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "_comment": "Contrato de asiento de la caja (13-sep-26). Añade al prompt de cada asiento de ANÁLISIS (lista en tools/caja.py) el contrato JSON que cosecha_panel.py necesita para juntar un dossier; sin él, los subagentes del chat no lo recibían (medido: 0 decisiones en el último panel real). Devuelve updatedInput con la entrada ENTERA y solo el prompt cambiado; NO pone permissionDecision (no toca permisos). Matcher propio, no el * del muro; ningún otro hook reescribe la entrada. FAIL-OPEN, no repite, bypass BTP_CONTRATO_OFF=1.",
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/contrato_asiento.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "Cuaderno de bitacora de sub-agentes (25-jul-26). run_agent.sh ya trazaba los comites que corren como daemon, pero los 29 que se invocan DENTRO de una sesion no dejaban ni una linea: el sistema no sabia a quien habia usado. Este hook apunta solo el NOMBRE del comite, la hora y si fue bien; nunca el prompt ni la respuesta. Fail-open: no puede bloquear nada.",
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/traza_subagente.py",
+            "timeout": 8
+          }
+        ]
+      }
+    ]
+  }
+}

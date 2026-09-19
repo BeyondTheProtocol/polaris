@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.radar-rutas</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MURO_PROFILE</key><string>privileged</string>
+    <key>BTP_AGENT</key><string>comite-medico</string>
+    <key>BTP_MODEL</key><string>fable</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+    <string>Radar de RUTAS a NED. Apoyo a la decisión, NO consejo médico — deciden sus médicos. La estrella polar es NED (sin enfermedad); la ruta de hoy es la vacuna personalizada, pero REVISABLE. Tu tarea: escanea literatura/ensayos (PubMed, ClinicalTrials, BioMCP) buscando si ha aparecido una RUTA mejor a NED para su perfil (HR+/HER2- BC-NED; ver reference-clinical-profile). Para CADA candidata creíble, regístrala SIN re-apuntar nada: python3 tools/cumbre.py ruta --titulo "..." --fuente "NCT/DOI" --veto pendiente --nota "por qué podría ser mejor + caveat". NUNCA cambies la ruta_actual: solo registras para que {{TITULAR}} y el comité veten. Verifica antes de registrar (sin inventar). No contactes a nadie, no publiques.</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Day</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>30</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/radar-rutas.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/radar-rutas.err</string>
+</dict></plist>

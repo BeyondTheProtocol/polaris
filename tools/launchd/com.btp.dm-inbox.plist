@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>BTP_AGENT</key>
+		<string>dm-inbox</string>
+		<key>BTP_MAX_TURNS</key>
+		<string>40</string>
+		<key>BTP_MODEL</key>
+		<string>sonnet</string>
+		<key>BTP_ORQUESTADOR</key>
+		<string>claude-suscripcion</string>
+		<key>MURO_PROFILE</key>
+		<string>privileged</string>
+		<key>PATH</key>
+		<string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>Label</key>
+	<string>com.btp.dm-inbox</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+		<string>Mina los DMs nuevos de Instagram y LinkedIn leyendo SOLO los avisos por email en el Gmail de {{TITULAR}} (no entres en las redes). Tría por relevancia-NED, deja el crudo en _PRIVADO_DMS/, sube un digest REDACTADO a la agenda y avisa de los 🔴 urgentes. Solo lectura; nunca respondas ni contactes. Tus herramientas de SOLO LECTURA: tu herramienta es Read sobre tools/state/correo/buzon.json (ya barrido por el recogedor correo-imap); está aprobada. NO necesitas Bash/Gmail MCP/correo_imap, NO pidas aprobación ni invoques a acceso-herramientas para leer — leer es tu trabajo y gastarías turnos en balde.</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/polaris/claudecode/tools/launchd/logs/dm-inbox.err</string>
+	<key>StandardOutPath</key>
+	<string>/Users/polaris/claudecode/tools/launchd/logs/dm-inbox.out</string>
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict>
+			<key>Hour</key>
+			<integer>9</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>14</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+		<dict>
+			<key>Hour</key>
+			<integer>20</integer>
+			<key>Minute</key>
+			<integer>30</integer>
+		</dict>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/polaris/claudecode</string>
+</dict>
+</plist>

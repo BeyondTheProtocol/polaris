@@ -1,0 +1,12 @@
+# Alelos HLA tipados (SINTETICO - no real). 4 dígitos. Uno por línea.
+# Equivalente real: salida de OptiType / HLA-LA / arcasHLA (Etapa B).
+HLA-A*02:01
+HLA-A*01:01
+HLA-B*07:02
+HLA-B*08:01
+HLA-C*07:01
+HLA-C*07:02
+# Clase II (desde germinal) — el wrapper actual MHCflurry cubre clase I;
+# la clase II queda lista para NetMHCIIpan (gated, ver docs).
+HLA-DRB1*15:01
+HLA-DRB1*03:01

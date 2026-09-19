@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# tools/polaris-daemons — enciende/apaga los 41 daemons launchd de Polaris EN EL AIR.
+# Por defecto van APAGADOS (el mini sigue de base 24/7; encenderlos en el Air a la vez duplicaría
+# correos/Telegram). Enciéndelos solo si decides que el Air sea el primario durante el viaje.
+#
+#   tools/polaris-daemons on | off | estado
+set -euo pipefail
+REPO="${BTP_REPO:-$HOME/claudecode}"
+LA="$HOME/Library/LaunchAgents"
+UID_N="$(id -u)"
+PLISTS="$REPO/tools/launchd"/com.btp.*.plist
+
+# Daemons que NUNCA se arman automáticamente con "on" (aunque exista su plist).
+# git-barrido = daemon prohibido hasta cerrar la causa raíz del borrado de git del 4-jul
+# (ver incident-perdida-git-claudecode-4jul / incident-git-barrido-reactivado-10jul).
+# "off" SÍ lo desactiva (higiene). Para armarlo a propósito: launchctl bootstrap a mano.
+EXCLUIR_ON=("com.btp.git-barrido")
+
+case "${1:-estado}" in
+  on)
+    mkdir -p "$LA"
+    for p in $PLISTS; do
+      [ -f "$p" ] || continue
+      n="$(basename "$p" .plist)"
+      if printf '%s\n' "${EXCLUIR_ON[@]}" | grep -qx "$n"; then
+        echo "  ⛔ EXCLUIDO (no se arma): $n"; continue
+      fi
+      cp "$p" "$LA/" && launchctl bootout "gui/$UID_N/$n" 2>/dev/null || true
+      launchctl bootstrap "gui/$UID_N" "$LA/$n.plist" 2>/dev/null \
+        && echo "  ✓ on  $n" || echo "  ⚠ falló $n"
+    done
+    echo "Daemons ENCENDIDOS en el Air. (Recuerda: si el mini también corre, habrá doble envío.)"
+    ;;
+  off)
+    for p in $PLISTS; do
+      [ -f "$p" ] || continue
+      n="$(basename "$p" .plist)"
+      launchctl bootout "gui/$UID_N/$n" 2>/dev/null || true
+      rm -f "$LA/$n.plist" 2>/dev/null || true
+      echo "  ✓ off $n"
+    done
+    echo "Daemons APAGADOS en el Air."
+    ;;
+  estado)
+    echo "Daemons btp cargados en el Air:"
+    launchctl list 2>/dev/null | grep -i com.btp || echo "  (ninguno cargado — apagados)"
+    ;;
+  *) echo "uso: polaris-daemons on | off | estado"; exit 2 ;;
+esac

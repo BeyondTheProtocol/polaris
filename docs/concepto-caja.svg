@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" font-family="Inter, -apple-system, 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FAF6F0"/>
+      <stop offset="55%" stop-color="#F7F1E9"/>
+      <stop offset="100%" stop-color="#FAF6F0"/>
+    </linearGradient>
+    <linearGradient id="goalband" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A855B5"/>
+      <stop offset="100%" stop-color="#8E4399"/>
+    </linearGradient>
+    <linearGradient id="boxfill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5EFE6"/>
+      <stop offset="100%" stop-color="#F0E8DC"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="16" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="14" flood-color="#2D1B3D" flood-opacity="0.13"/>
+    </filter>
+    <marker id="ar" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1 L10 6 L1 11" fill="none" stroke="#A855B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arw" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1 L10 6 L1 11" fill="none" stroke="#A855B5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g opacity="0.55">
+    <circle cx="1330" cy="140" r="240" fill="#E8D4ED" opacity="0.18"/>
+    <circle cx="240" cy="780" r="220" fill="#FFD9CF" opacity="0.16"/>
+  </g>
+
+  <!-- encabezado -->
+  <text x="90" y="98" fill="#2D1B3D" font-size="44" font-weight="700" letter-spacing="-0.6">Una caja</text>
+  <text x="90" y="140" fill="#3A3340" font-size="21">
+    Unidad de trabajo con un <tspan fill="#A855B5" font-weight="600">goal declarado encima</tspan>. El charter nombra a sus expertos y
+  </text>
+  <text x="90" y="170" fill="#3A3340" font-size="21">un comando los sienta, con ese goal como vara de éxito.</text>
+
+  <!-- 1. petición -->
+  <g filter="url(#soft)">
+    <rect x="80" y="392" width="168" height="96" rx="14" fill="#F5EFE6" stroke="#E0D2D8" stroke-width="1.4"/>
+  </g>
+  <text x="164" y="424" fill="#7A6A85" font-size="13" font-weight="600" letter-spacing="1.6" text-anchor="middle">ENTRA</text>
+  <text x="164" y="460" fill="#2D1B3D" font-size="22" font-weight="600" text-anchor="middle">petición</text>
+  <text x="164" y="524" fill="#8A7A94" font-size="14" text-anchor="middle">chat · voz · correo</text>
+
+  <line x1="256" y1="440" x2="330" y2="440" stroke="#A855B5" stroke-width="2.2" marker-end="url(#ar)"/>
+
+  <!-- cinta del goal -->
+  <g filter="url(#glow)">
+    <rect x="352" y="236" width="700" height="62" rx="31" fill="url(#goalband)"/>
+  </g>
+  <text x="702" y="268" fill="#FFFFFF" font-size="14" font-weight="700" letter-spacing="2" text-anchor="middle">GOAL</text>
+  <text x="702" y="288" fill="#F6EAF8" font-size="17" font-weight="600" text-anchor="middle">una línea en CAJA.md · la vara de éxito de cada asiento</text>
+  <path d="M702 300 L702 340" stroke="#A855B5" stroke-width="2.6" marker-end="url(#arw)" opacity="0.95"/>
+
+  <!-- 2. LA CAJA -->
+  <g filter="url(#soft)">
+    <rect x="352" y="344" width="700" height="300" rx="22" fill="url(#boxfill)" stroke="#A855B5" stroke-width="2" stroke-opacity="0.55"/>
+  </g>
+  <text x="384" y="382" fill="#A855B5" font-size="13" font-weight="700" letter-spacing="2">CAJA.md · el charter</text>
+
+  <text x="384" y="420" fill="#4A4152" font-size="15">dueno · expertos[] · arquetipo · presupuesto_usd · caduca · expira_si</text>
+  <line x1="384" y1="436" x2="1020" y2="436" stroke="#E0D2D8" stroke-width="1.2"/>
+
+  <text x="384" y="470" fill="#7A6A85" font-size="13" font-weight="600" letter-spacing="1.6">caja.py convocar --caja &lt;slug&gt;</text>
+
+  <!-- expertos -->
+  <g>
+    <rect x="384" y="486" width="196" height="64" rx="12" fill="#FBF7F1" stroke="#DCC9E4" stroke-width="1.3"/>
+    <circle cx="412" cy="518" r="7" fill="#A855B5"/>
+    <text x="432" y="513" fill="#2D1B3D" font-size="16" font-weight="600">dueño</text>
+    <text x="432" y="533" fill="#7A6A85" font-size="13">responde de la caja</text>
+
+    <rect x="596" y="486" width="196" height="64" rx="12" fill="#FBF7F1" stroke="#DCC9E4" stroke-width="1.3"/>
+    <circle cx="624" cy="518" r="7" fill="#FF6B47"/>
+    <text x="644" y="513" fill="#2D1B3D" font-size="16" font-weight="600">experto</text>
+    <text x="644" y="533" fill="#7A6A85" font-size="13">lo nombra el charter</text>
+
+    <rect x="808" y="486" width="212" height="64" rx="12" fill="#FBF7F1" stroke="#DCC9E4" stroke-width="1.3"/>
+    <circle cx="836" cy="518" r="7" fill="#FF6B47"/>
+    <text x="856" y="513" fill="#2D1B3D" font-size="16" font-weight="600">experto</text>
+    <text x="856" y="533" fill="#7A6A85" font-size="13">otra casa, otro sesgo</text>
+  </g>
+
+  <text x="384" y="592" fill="#4A4152" font-size="15">
+    Dueño y expertos son <tspan fill="#A855B5" font-weight="600">comités reales del registro</tspan>: uno inventado es FAIL (A7),
+  </text>
+  <text x="384" y="616" fill="#4A4152" font-size="15">y una caja activa sin dueño también (A11). Entran en plan["comites"]: el gate los exige.</text>
+
+  <line x1="1056" y1="494" x2="1104" y2="494" stroke="#A855B5" stroke-width="2.2" marker-end="url(#ar)"/>
+
+  <!-- 3. dossier -->
+  <g filter="url(#soft)">
+    <rect x="1112" y="378" width="248" height="232" rx="14" fill="#F5EFE6" stroke="#E0D2D8" stroke-width="1.4"/>
+  </g>
+  <text x="1236" y="408" fill="#7A6A85" font-size="11" font-weight="600" letter-spacing="1.2" text-anchor="middle">VUELVE, SEGÚN EL ARQUETIPO</text>
+  <text x="1236" y="448" fill="#2D1B3D" font-size="20" font-weight="600" text-anchor="middle">un dossier</text>
+  <text x="1236" y="472" fill="#4A4152" font-size="13" text-anchor="middle">decisiones de N asientos</text>
+  <text x="1236" y="492" fill="#8A7A94" font-size="12" text-anchor="middle">solo-lectura · redactor-borrador</text>
+  <line x1="1146" y1="510" x2="1326" y2="510" stroke="#E0D2D8" stroke-width="1.2"/>
+  <text x="1236" y="542" fill="#2D1B3D" font-size="20" font-weight="600" text-anchor="middle">o un artefacto</text>
+  <text x="1236" y="566" fill="#4A4152" font-size="13" text-anchor="middle">un fichero y su ruta</text>
+  <text x="1236" y="586" fill="#8A7A94" font-size="12" text-anchor="middle">productor</text>
+
+  <line x1="1368" y1="494" x2="1404" y2="494" stroke="#A855B5" stroke-width="2.2" marker-end="url(#ar)"/>
+
+  <!-- 4. gate -->
+  <g filter="url(#soft)">
+    <rect x="1412" y="422" width="108" height="144" rx="14" fill="#FFF1ED" stroke="#FF6B47" stroke-width="1.6"/>
+  </g>
+  <g transform="translate(1466,470)">
+    <rect x="-16" y="-4" width="32" height="24" rx="5" fill="none" stroke="#E5573A" stroke-width="2.4"/>
+    <path d="M-9 -4 v-9 a9 9 0 0 1 18 0 v9" fill="none" stroke="#E5573A" stroke-width="2.4"/>
+  </g>
+  <text x="1466" y="522" fill="#2D1B3D" font-size="15" font-weight="600" text-anchor="middle">gate</text>
+  <text x="1466" y="546" fill="#C4503A" font-size="13" text-anchor="middle">send()</text>
+
+  <!-- garantías -->
+  <line x1="90" y1="706" x2="1510" y2="706" stroke="#E0D2D8" stroke-width="1.2"/>
+  <text x="90" y="742" fill="#8A7A94" font-size="13" font-weight="700" letter-spacing="2">MECANISMO, NO PROMPT</text>
+
+  <g font-size="15">
+    <circle cx="98" cy="786" r="4" fill="#A855B5"/>
+    <text x="114" y="791" fill="#3A3340">Goal ilegible: rc=2. El dossier sale titulado con él, nunca degradado.</text>
+
+    <circle cx="98" cy="822" r="4" fill="#FF6B47"/>
+    <text x="114" y="827" fill="#3A3340">Todo el egress por un único send(); publish/contact/pay quedan en borrador.</text>
+
+    <circle cx="818" cy="786" r="4" fill="#E5573A"/>
+    <text x="834" y="791" fill="#3A3340">audit_constelacion: 14 cortafuegos por caja (A1-A14), fail-closed.</text>
+
+    <circle cx="818" cy="822" r="4" fill="#E5573A"/>
+    <text x="834" y="827" fill="#3A3340">El texto de una caja se compara con patrones; nunca se ejecuta.</text>
+  </g>
+
+  <text x="1510" y="866" fill="#9A8AA4" font-size="14" text-anchor="end">Polaris · AGPL-3.0 · software libre</text>
+</svg>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.evals</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- ARNES DE EVALS (auditoria 14-jul-26): estaba construido y NO corria nunca. Es la red que
+       avisa si un cambio (auto-mejora, un parche del muro, un cambio de router) rompio algo,
+       ANTES de que lo note {{TITULAR}}. Corre sin el flag judge, o sea determinista y GRATIS (cero
+       tokens): el borde y el router son reales, solo se finge la respuesta del cerebro.
+       Semanal, lunes 06:30, antes de que ella empiece. Invoca python directo, NO run_agent.sh. -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/evals.py</string>
+    <string>run</string>
+  </array>
+  <key>StartCalendarInterval</key><dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/evals.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/evals.err</string>
+</dict></plist>

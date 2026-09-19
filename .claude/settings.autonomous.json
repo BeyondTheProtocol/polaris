@@ -1,0 +1,19 @@
+{
+  "_comment": "Config del LAZO 24/7 (perfil privilegiado). La carga run_agent.sh, NO la sesion interactiva. El muro (hook) es la barrera; nunca usar --allow-dangerously-skip-permissions.",
+  "env": { "MURO_PROFILE": "privileged" },
+  "permissions": {
+    "_comment": "Desmudece el aviso (11-jul-2026): sin este allow, la sesion no-interactiva del lazo no puede confirmar el permiso de Bash y 'correo.py aviso' nunca llega a ejecutarse -> el vigia se queda mudo aunque el muro (muro_guard.py, checks de ALLOW_PRIV/PY_BINS) ya lo avale. SOLO este subcomando exacto -- jamas 'correo.py:*' ni Bash entero (el muro sigue siendo la barrera real; esto solo evita el bloqueo de la puerta externa de confirmacion).",
+    "allow": ["Bash(python3 tools/correo.py aviso:*)"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "_comment": "H2 (Fase 0): matcher '*' = TODAS las tools pasan por el muro, incluidas las de MCP (mcp__servidor__tool). muro_guard.py enruta: Bash→checks, Write/Edit→check_write, lecturas locales + MCP de investigación (biomcp/cbioportal)→permitido, y TODO lo demás (MCP de envío, Task, WebFetch/WebSearch)→DENY. Antes solo cubría Bash/Write → los MCP de envío salían sin muro.",
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/muro_guard.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

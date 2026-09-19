@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Antesala (staging privado): índice + relays por Tailscale 100.114.113.73:3010 (índice)
+     y :3011 (app). KeepAlive: revive si cae o tras reinicio. NO expone a internet (solo
+     tailnet) y NO despliega nada. Sustituye a com.btp.preview-web (relay de dev).
+     Activar con OK explícito de {{TITULAR}}:  bash ~/claudecode/tools/staging.sh on -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.staging</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/staging.py</string>
+    <string>_serve</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/staging.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/staging.err</string>
+</dict></plist>

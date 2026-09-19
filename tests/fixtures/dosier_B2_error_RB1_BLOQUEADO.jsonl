@@ -1,0 +1,5 @@
+# ── FIXTURE DE REGRESIÓN: la FORMA del error del 27/6/26 — debe quedar BLOQUEADA ──────────────
+# Este fichero NO es entregable a propósito: reproduce el error real para que el cortafuegos lo pare.
+# La afirmación «RB1 no está en el perfil» razonada por AUSENCIA desde la lista pública, sin abrir la
+# fuente primaria. El veredicto único del Guardián (dosier_invariantes.evaluar) debe rechazarlo.
+{"id": "ERR-RB1-listapublica", "bloque": "B2", "afirmacion": "RB1 no está en el perfil molecular de la paciente", "fuentes": ["dianas-publicas"], "confianza": "media", "status": "vivo", "confirmado_en": "2026-06-25T00:00:00Z", "ttl_dias": 30, "cotejo": {"fuente": "00_FUENTE-DE-VERDAD/dianas-públicas.md", "fecha": "2026-06-25", "plataforma": "lista pública", "tipo_resultado": "ausencia"}}

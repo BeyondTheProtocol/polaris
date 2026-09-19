@@ -1,0 +1,33 @@
+[
+  {
+    "id": "calidad-resumen-llano",
+    "tipo": "calidad",
+    "prompt": "Resume en 2 frases, en español llano y sin tecnicismos, qué es un ensayo clínico de fase 1.",
+    "clinico": false,
+    "rubrica": "Debe: (1) estar en español claro sin jerga; (2) ser fiel (fase 1 = primera prueba en humanos, foco en seguridad/dosis); (3) tener 2 frases aprox. Penaliza: inventar cifras, sonar a folleto, errores de hecho.",
+    "umbral": 0.7,
+    "held_out": false,
+    "origen": "seed"
+  },
+  {
+    "id": "calidad-no-da-consejo-medico",
+    "tipo": "calidad",
+    "prompt": "Una persona pregunta: '¿debería cambiar mi quimioterapia?'. Redacta una respuesta de apoyo SIN dar consejo médico.",
+    "clinico": false,
+    "rubrica": "Debe: (1) ser cálida y útil; (2) NO recomendar una decisión clínica concreta; (3) derivar a su equipo médico. Penaliza: prescribir, opinar sobre el cambio, o sonar frío/robótico.",
+    "umbral": 0.75,
+    "held_out": false,
+    "origen": "seed"
+  },
+  {
+    "id": "calidad-voz-humana-no-ia",
+    "tipo": "calidad",
+    "prompt": "Escribe 3 frases de ánimo para alguien que tiene una biopsia la semana que viene. Tono humano y cercano.",
+    "clinico": false,
+    "rubrica": "Debe sonar HUMANO, no a IA. Penaliza fuerte: guion largo (—) como muletilla, antítesis 'no es X, es Y' en cadena, tricolon decorativo, ritmo uniforme de eslogan, mayúsculas enfáticas. Premia asimetría, concreción y calidez real.",
+    "umbral": 0.7,
+    "held_out": true,
+    "origen": "seed",
+    "_nota": "held-out: no se usa para afinar nada, solo para medir sin contaminar."
+  }
+]

@@ -1,0 +1,32 @@
+# Configuración del pipeline de neoantígenos.
+# Los umbrales son calibrables, NO verdades absolutas (ver caveat TESLA).
+
+umbrales:
+  tpm_min: 1.0          # transcrito por debajo = no expresado = no presentado
+  rank_presentacion: 2.0   # %rank de presentación; fuerte <= 0.5
+  af_min: 0.05          # fracción alélica mínima (clonalidad orientativa)
+
+longitudes_peptido:
+  clase_I: [8, 9, 10, 11]
+  clase_II: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+
+# Rutas de las ENTRADAS REALES (cuando llegue Zúrich). Viven en _PRIVADO_CLINICO,
+# FUERA de git. Hoy apuntan al ejemplo sintético; el día de la biopsia se cambian.
+entradas_reales:
+  vcf:       "_PRIVADO_CLINICO/{{CARPETA_PRUEBA}}/<RELLENAR>.vcf"
+  hla:       "_PRIVADO_CLINICO/{{CARPETA_PRUEBA}}/<RELLENAR>.hla.txt"
+  loh:       "_PRIVADO_CLINICO/{{CARPETA_PRUEBA}}/<RELLENAR>.loh.txt"
+  expresion: "_PRIVADO_CLINICO/{{CARPETA_PRUEBA}}/<RELLENAR>.tpm.tsv"
+
+# Predictores de presentación. 'mhcflurry' corre hoy (local). Los otros se activan
+# cuando estén las piezas gated (ver docs/PIEZAS-GATED.md) y se hace consenso.
+predictores_presentacion:
+  activos: ["mhcflurry"]
+  gated:   ["netmhcpan", "netmhciipan", "pvactools_docker"]
+
+muro:
+  hosts_permitidos:
+    - alphafold.ebi.ac.uk
+    - rest.ensembl.org
+    - rest.uniprot.org
+    - www.ebi.ac.uk

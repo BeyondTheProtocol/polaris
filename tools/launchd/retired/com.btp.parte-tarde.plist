@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- CHECK vivo del día (tarde). Script DIRECTO (como enviar-hoy): determinista, gratis, NO
+     pasa por run_agent ni por el saldo; respeta silencio nocturno y HALT vía salida.py.
+     Activar = gate de {{TITULAR}}: launchctl bootstrap gui/$(id -u) este.plist -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.parte-tarde</string>
+  <key>WorkingDirectory</key><string>/Users/titular/claudecode</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/titular/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>ProgramArguments</key><array><string>/Users/titular/claudecode/.venv/bin/python</string><string>/Users/titular/claudecode/tools/seguimiento.py</string><string>check</string><string>tarde</string><string>--send</string></array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>30</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/titular/claudecode/tools/launchd/logs/parte-tarde.out</string>
+  <key>StandardErrorPath</key><string>/Users/titular/claudecode/tools/launchd/logs/parte-tarde.err</string>
+</dict></plist>

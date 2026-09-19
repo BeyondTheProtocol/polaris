@@ -1,0 +1,84 @@
+[
+  {
+    "_nota": "Golden set del SELLO DE EVIDENCIA (25-jul-26). Existía una asimetría difícil de defender: el muro tenía 17 casos y el sello de evidencia CERO, siendo las dos reglas inquebrantables de CLAUDE.md — y la que no tenía vara es la que ya falló en producción. Todos estos casos son DETERMINISTAS, OFFLINE y $0. Los textos salen de incidentes reales, no de ejemplos de laboratorio."
+  },
+
+  {
+    "id": "sello-relay-redteam-baifo",
+    "tipo": "sello",
+    "texto": "Según el red-team, Baifo es una caja negra con telemetría sin documentar.",
+    "espera": {"flags_min": 1},
+    "_por_que": "EL incidente del 28-jun-26 en su formulación literal: un juicio de un red-team relayado como HECHO. CLAUDE.md lo prohíbe con nombre y apellidos («nunca relayes como HECHO un juicio de un doc o de un red-team sin verificarlo»). Durante un tiempo el linter lo PERDONABA porque «según X» contaba como sello."
+  },
+  {
+    "id": "sello-relay-sin-prefijo",
+    "tipo": "sello",
+    "texto": "Baifo es una caja negra con telemetría sin documentar.",
+    "espera": {"flags_min": 1},
+    "_por_que": "La misma afirmación sin el «según». Va en pareja con la de arriba: si una pasa y la otra no, el sello está premiando la forma en vez del fondo."
+  },
+  {
+    "id": "sello-verificado-con-fuente",
+    "tipo": "sello",
+    "texto": "Auditado el repo entero: cero telemetria [verificado: github.com/achetronic/baifo].",
+    "espera": {"flags": 0},
+    "_por_que": "Falso positivo que importa: un claim VERIFICADO y citado no puede marcarse, o el linter se vuelve ruido y se aprende a ignorarlo."
+  },
+  {
+    "id": "sello-supuesto-declarado",
+    "tipo": "sello",
+    "texto": "El arnes tiene telemetria sin documentar [supuesto: no he abierto el repo].",
+    "espera": {"flags": 0},
+    "_por_que": "Decir «no lo sé» en voz alta es exactamente lo que {{TITULAR}} pide. Declarar el supuesto tiene que salir gratis, o nadie lo declara."
+  },
+  {
+    "id": "sello-backtick-palabra-suelta",
+    "tipo": "sello",
+    "texto": "Es una `caja` negra con telemetria sin documentar.",
+    "espera": {"flags_min": 1},
+    "_por_que": "Bastaba poner una palabra cualquiera entre backticks para callar la línea. Un backtick no es una fuente."
+  },
+  {
+    "id": "sello-backtick-ruta-comprobable",
+    "tipo": "sello",
+    "texto": "Todo el egress pasa por el borde (ver `tools/borde.py`).",
+    "espera": {"flags": 0},
+    "_por_que": "El otro lado de la moneda: una ruta de fichero SÍ es comprobable, y una afirmación fuerte apuntando a dónde mirar es auditable."
+  },
+  {
+    "id": "sello-frase-neutra",
+    "tipo": "sello",
+    "texto": "El arnes es local y corre en la terminal.",
+    "espera": {"flags": 0},
+    "_por_que": "Control: sin palabra-gatillo no hay flag. Mide el suelo de falsos positivos del linter."
+  },
+
+  {
+    "id": "citas-doi-en-bibliografia",
+    "tipo": "citas",
+    "cadena": "Perez J, et al. Lancet Oncol. 2025;26(4):e123. doi:10.1016/S1470-2045(25)00123-4",
+    "espera": {"clase": "doi", "id": "10.1016/S1470-2045(25)00123-4"},
+    "_por_que": "El agujero del 25-jul: una cita bibliografica NORMAL devolvia `no_resoluble`, y el agente `verificacion` tiene instruccion de NO acusar ante `no_resoluble` (lo trata como red caida). O sea que un DOI fabricado pasaba limpio con solo envolverlo en una bibliografia — el fallo numero uno de los buscadores LLM, que es para lo que nacio este tool."
+  },
+  {
+    "id": "citas-nct-en-prosa",
+    "tipo": "citas",
+    "cadena": "El ensayo NCT05098210 (fase I, {{CENTRO}}) sigue reclutando.",
+    "espera": {"clase": "nct", "id": "NCT05098210"},
+    "_por_que": "Mismo agujero con NCTs, que es como llegan las citas de ensayos en prosa. Este NCT concreto es una de las puertas vigiladas hacia la vacuna."
+  },
+  {
+    "id": "citas-pmid-etiquetado",
+    "tipo": "citas",
+    "cadena": "PMID: 38123456",
+    "espera": {"clase": "pmid", "id": "38123456"},
+    "_por_que": "Forma canonica de PubMed; si esta se rompe, se cae la via de literatura entera."
+  },
+  {
+    "id": "citas-sin-id-verificable",
+    "tipo": "citas",
+    "cadena": "Lo dijo un oncologo en una charla el ano pasado.",
+    "espera": {"clase": "desconocido", "estado": "no_parseable"},
+    "_por_que": "Aqui NO hay ninguna cita, y eso es informacion distinta de «no pude comprobarlo». Si llegara como `no_resoluble`, el agente `verificacion` tiene instruccion de no acusar — y una cita inventada se colaria con el mismo silencio que un corte de wifi. Este caso fija esa frontera."
+  }
+]

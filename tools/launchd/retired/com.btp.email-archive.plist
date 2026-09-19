@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Archivo LOCAL de TODO el correo (IMAP SOLO LECTURA) cada 4 h, en backfill gradual (tope por
+     pasada). CREADO, NO CARGADO: encenderlo es el gate de {{TITULAR}} Y requiere las App Passwords en el
+     Llavero (btp-gmail-app-password para titular.mgp, btp-gmail-app-password-2 para titular).
+     Sin clave, cada cuenta se OMITE (fail-soft). No envía; única salida IMAP gmail:993. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.email-archive</string>
+  <key>WorkingDirectory</key><string>/Users/titular/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/titular/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/titular/claudecode/.venv/bin/python</string>
+    <string>/Users/titular/claudecode/tools/email_archive.py</string>
+    <string>archive</string>
+  </array>
+  <key>StartInterval</key><integer>14400</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/titular/claudecode/tools/launchd/logs/email-archive.out</string>
+  <key>StandardErrorPath</key><string>/Users/titular/claudecode/tools/launchd/logs/email-archive.err</string>
+</dict></plist>

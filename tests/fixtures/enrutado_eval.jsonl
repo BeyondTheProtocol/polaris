@@ -1,0 +1,46 @@
+# Set de evaluación del decisor (tools/decide_peticion.py). 11-sep-2026.
+# Peticiones PARAFRASEADAS de la forma real en que escribe {{TITULAR}} (muestreo de 241 prompts de los
+# transcripts), sin PII ni cifras suyas. `nivel` admite alternativas con «|».
+# `incluye`: quién TIENE que estar. `excluye`: quién NO puede estar (falsos positivos ya vistos).
+{"prompt": "qué tal el día", "nivel": "directo"}
+{"prompt": "hazlo", "nivel": "directo"}
+{"prompt": "no entiendo el paso 3", "nivel": "directo"}
+{"prompt": "dejalo como tarea", "nivel": "directo"}
+{"prompt": "pero es a las 12", "nivel": "directo"}
+{"prompt": "si ya lo hice no hagas nada", "nivel": "directo"}
+{"prompt": "ahora dime como compruebo que funciona", "nivel": "directo"}
+{"prompt": "sobre polaris, cuando escribo una petición cual es el flujo que hace ahora mismo?", "nivel": "directo", "excluye": ["diseno", "finanzas-transparencia"]}
+{"prompt": "pero entonces el hook avisa pero no invoca a nadie, por qué? nunca se invoca?", "nivel": "directo", "excluye": ["comite-medico"]}
+{"prompt": "quiero que polaris decida qué LLM o comité responde mejor, aunque sea alguien experto en web, y que lo ejecute sin que yo diga nada; el coste lo decide él", "nivel": "directo|comite", "excluye": ["diseno", "finanzas-transparencia"]}
+{"prompt": "Pero por qué se gasta ese crédito?", "nivel": "directo", "excluye": ["finanzas-transparencia"]}
+{"prompt": "<task-notification>\n<task-id>abc</task-id>\n<summary>Agent finished: FGFR1 amplificado, tarea pendiente</summary></task-notification>", "nivel": "directo", "excluye": ["comite-medico", "asistente"]}
+{"prompt": "analiza el informe del panel molecular de hueso y dime qué dianas ves", "nivel": "comite|panel", "incluye": ["comite-medico", "verificacion"]}
+{"prompt": "interpreta el FoundationOne y dime qué opciones de tratamiento abre", "nivel": "comite|panel", "incluye": ["comite-medico", "verificacion"]}
+{"prompt": "busca qué se ha publicado esta semana sobre FGFR1 amplificado en mama HR+", "nivel": "comite|panel", "incluye": ["comite-medico", "verificacion"], "excluye": ["grok", "perplexity", "chatgpt", "gemini"]}
+{"prompt": "qué significa que el HRDsig salga bajo?", "nivel": "comite|panel", "incluye": ["comite-medico"]}
+{"prompt": "hay algún ensayo clínico fase 1 de vacuna personalizada en Europa para el que sea elegible?", "nivel": "comite|panel", "incluye": ["comite-medico", "consejero-acceso"], "excluye": ["grok", "perplexity"]}
+{"prompt": "el SUVmax de la lesión ósea ha bajado, qué quiere decir", "nivel": "comite|panel", "incluye": ["comite-medico", "verificacion"]}
+{"prompt": "y esto qué es?", "nivel": "comite|panel", "contexto_clinico": true, "incluye": ["comite-medico", "verificacion"]}
+{"prompt": "dame los papers más citados sobre inhibidores de CDK4/6 y resistencia", "nivel": "comite|panel", "incluye": ["comite-medico", "verificacion"], "excluye": ["grok"]}
+{"prompt": "mira qué se dice en X sobre Polaris esta semana", "nivel": "llm", "incluye": ["grok"]}
+{"prompt": "busca en twitter quién habla de agentes de IA para investigación en cáncer esta semana", "nivel": "llm|panel", "incluye": ["grok"]}
+{"prompt": "busca el mejor smartphone por menos de 300 euros que haya salido este mes", "nivel": "llm", "incluye": ["grok"]}
+{"prompt": "dame fuentes con referencias sobre cómo montar una asociación sin ánimo de lucro", "nivel": "llm|comite|panel", "incluye": ["legal-burocracia"]}
+{"prompt": "necesito que me contrastes con una segunda opinión si esta estrategia de arquitectura tiene sentido", "nivel": "llm|panel", "incluye": ["chatgpt"]}
+{"prompt": "redacta un post para linkedin contando el avance de la biopsia", "nivel": "comite|panel", "incluye": ["redes-contenido", "voz-titular"]}
+{"prompt": "prepárame un carrusel de instagram sobre el proyecto", "nivel": "comite|panel", "incluye": ["redes-contenido", "voz-titular"]}
+{"prompt": "me ha escrito un periodista de la radio para una entrevista, qué le digo", "nivel": "comite|panel", "incluye": ["prensa", "voz-titular"]}
+{"prompt": "cambia el hero de la web de helptitular", "nivel": "comite|panel", "incluye": ["diseno"]}
+{"prompt": "revisa la accesibilidad de la página nueva", "nivel": "comite|panel", "incluye": ["diseno"]}
+{"prompt": "hay que firmar el MTA para mandar las muestras a Estados Unidos", "nivel": "comite|panel", "incluye": ["legal-burocracia"]}
+{"prompt": "cuánto llevamos de donaciones y qué gastos ha tenido la asociación este mes", "nivel": "comite|panel", "incluye": ["finanzas-transparencia"]}
+{"prompt": "necesito contactar con un laboratorio en {{CIUDAD}} que haga inmunopeptidómica", "nivel": "comite|panel", "incluye": ["consejero-acceso", "comite-medico"]}
+{"prompt": "busca una beca para financiar la secuenciación", "nivel": "comite|panel", "incluye": ["consejero-acceso"]}
+{"prompt": "repasa el correo y dime todo lo que tengo que responder que voy atrasada", "nivel": "directo"}
+{"prompt": "que mas falta del viaje", "nivel": "directo"}
+{"prompt": "resérvame un hotel cerca del hospital para la cita del jueves", "nivel": "directo", "excluye": ["comite-medico"]}
+{"prompt": "la tarea de los filtros guárdala que ahora no puedo", "nivel": "directo"}
+{"prompt": "arregla el bug del test de correo que falla", "nivel": "directo"}
+{"prompt": "haz como si fueras mi astróloga", "nivel": "directo"}
+{"prompt": "busca en X qué se dice de la vacuna de BioNTech", "nivel": "llm|panel", "incluye": ["grok"]}
+{"prompt": "busca en X qué se dice de la vacuna de {{TITULAR}} {{APELLIDO}}", "nivel": "directo|comite", "excluye": ["grok", "perplexity"]}

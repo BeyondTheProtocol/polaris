@@ -1,0 +1,5 @@
+# Alelos perdidos por LOH-HLA (SINTETICO - no real).
+# Equivalente real: salida de LOHHLA (Etapa B).
+# REGLA DURA: estos alelos se EXCLUYEN de la predicción de presentación
+# (predecir binding para un alelo que el tumor ya no expresa = ruido).
+HLA-B*08:01

@@ -1,0 +1,8 @@
+# Expresión por gen en TPM (SINTETICO - no real).
+# Equivalente real: salida de Salmon/kallisto (Etapa C).
+# Filtro: un neoantígeno cuyo transcrito no se expresa NO se presenta.
+gene	tpm
+PIK3CA	45.2
+TP53	88.7
+ESR1	120.4
+SYNTH1	0.3

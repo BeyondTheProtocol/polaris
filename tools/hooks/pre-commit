@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hook del muro: delega en el guardián. Si toca CLAUDE.md sin BTP_MURO_OK=1, bloquea.
+exec python3 "$(dirname "$0")/muro_commit_guard.py"
