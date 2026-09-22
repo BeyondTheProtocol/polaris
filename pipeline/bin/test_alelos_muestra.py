@@ -17,6 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pysam
+
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "pipeline" / "bin"))
 
@@ -258,6 +260,28 @@ check(por.get("D", {}).get("estado_af") == "no_medido", "sin VAF -> no_medido, n
 check("E" not in por, "TPM bajo -> descartado")
 cand2, _ = cp.filtrar(vs[:1], None, U)
 check(cand2[0]["estado_expresion"] == "no_medido", "sin fichero de expresión -> no_medido")
+
+# Issue #11: serializar el VCF no debe cambiar la AF ni la decisión del filtro.
+for i, af_texto in enumerate(("0", "0.04999", "0.05", "0.05001", "0.123456789", "1", ".")):
+    entrada_af = vcf_vep(
+        f"precision_{i}.vcf",
+        [(1000, "C", ["G"], [csq("G", "missense_variant", "10", f"{r10}/W")], [af_texto])])
+    with pysam.VariantFile(entrada_af) as original:
+        af_original = next(original).samples["TUMOR"]["AF"][0]
+    salida_af = str(TMP / f"precision_{i}.prep.vcf")
+    pr.anotar_vcf(entrada_af, str(FASTA), salida_af)
+    variantes_af = ent.leer_variantes(salida_af)
+    check(bool(variantes_af) and all(v["af"] == af_original for v in variantes_af),
+          f"AF {af_texto}: preparar y releer conserva el valor (incluido ausente)")
+    referencia = [{**v, "af": af_original} for v in variantes_af]
+    esperados, _ = cp.filtrar(referencia, {"SINTA": 10.0}, U)
+    observados, _ = cp.filtrar(variantes_af, {"SINTA": 10.0}, U)
+    check([(v["peptide"], v["estado_af"], v["evaluacion"]) for v in observados]
+          == [(v["peptide"], v["estado_af"], v["evaluacion"]) for v in esperados],
+          f"AF {af_texto}: el intercambio de VCF conserva la decisión del filtro")
+    if af_original is None:
+        check(bool(observados) and all(v["estado_af"] == "no_medido" for v in observados),
+              "AF ausente conserva no_medido tras preparar y releer")
 
 print(f"\n=== {'TODO OK' if fallos == 0 else str(fallos) + ' FALLO(S)'} ===")
 sys.exit(1 if fallos else 0)

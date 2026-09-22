@@ -358,7 +358,8 @@ def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
         for chrom, pos, ref, alt, gene, aa, tx, ensp, conseq, peps, af in filas:
             info = (f"GENE={gene};AA={aa.replace(';', ',')};TX={tx};ENSP={ensp};"
                     f"CONSEQ={conseq.replace(';', ',')};PEP={','.join(peps)}")
-            afs = "." if af is None else f"{af:.4f}"
+            # VCF intermedio: redondear aquí puede cruzar af_min al releer (issue #11).
+            afs = "." if af is None else str(af)
             out.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\tPASS\t{info}\tAF\t{afs}\n")
     # Registro de descartes: cada ALT que no dio péptido, con su motivo. Local, junto a la
     # salida (misma carpeta privada), nunca sale de la máquina.
