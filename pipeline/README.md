@@ -58,6 +58,20 @@ de Ensembl** que el VEP; si no, el control de referencia aborta la corrida.
 
 Cubre missense e inframe indel. **Frameshift y stop_gained no**: se cuentan y se avisan.
 
+Desde el 22-sep-26 (auditoría externa, hallazgos 2.1-2.3):
+
+- **Alelo a alelo.** Cada ALT de un registro multialélico se procesa por separado y solo
+  con **su** consecuencia VEP (por `ALLELE_NUM` si existe; si no, por la cadena `Allele`
+  con la regla de recorte de VEP). Si un ALT no tiene CSQ propia, se descarta: nunca toma
+  la de otro. Cada descarte queda con su motivo en `<salida>.descartes.tsv`.
+- **Muestra tumoral, una sola regla** (`bin/muestras.py`, compartida con `leer_entradas`):
+  `--muestra-tumor` > `##tumor_sample` > única muestra. Con varias muestras y nada que
+  las distinga, **para**. La elegida y el motivo quedan en la cabecera de la salida.
+- **Config única.** `correr_pipeline.py` lee y valida `config/pipeline.yaml` (claves de
+  más, de menos o fuera de rango = para), aplica `af_min`, y escribe el hash en cada fila
+  y en `<salida>.manifiesto.json`. Sin TPM o sin VAF el candidato no se da por bueno: queda
+  `no_medido` y `evaluacion=incompleta`, separado al final de las completas.
+
 ## Correr con datos de EJEMPLO (lo que funciona hoy)
 
 ```bash
@@ -105,11 +119,16 @@ URLs, fechas, tamaños y sha256). `tests/test_all.sh` lo llama vía
 | Solo se usaba el primer péptido de cada variante; el resto se perdía en silencio | ✅ una fila por péptido |
 | `Protein_position` de VEP `--total_length` (`63/446`) rompía el cálculo | ✅ parseado; guardarraíl de discordancia lo cazó antes de escribir nada |
 | VEP `--per_gene` aguas arriba pierde variantes codificantes | ⚠️ no arreglable aquí: se avisa fuerte |
+| (22-sep) Solo `alts[0]` y CSQ de otro alelo como respaldo | ✅ alelo a alelo, sin respaldo cruzado |
+| (22-sep) Sin `##tumor_sample`, reglas opuestas (última / primera muestra) | ✅ una regla, fail-closed |
+| (22-sep) El YAML no se leía; `af_min` sin efecto; TPM ausente pasaba | ✅ config validada + hash + `no_medido` |
 
 ## Ficheros
 
 - `bin/correr_pipeline.py` — runner (CLI).
 - `bin/leer_entradas.py` — lectura local de VCF/HLA/LOH/expresión.
+- `bin/muestras.py` — la regla única de muestra tumoral.
+- `bin/test_alelos_muestra.py` — VCF sintéticos de 2.1-2.3 (en `tests/test_all.sh`).
 - `bin/presentacion_local.py` — Etapa D con MHCflurry (local, egress cero).
 - `bin/clientes_api.py` — clientes AlphaFold/Ensembl/UniProt (solo genérico).
 - `bin/muro.py` — guardián de privacidad (bloquea egress de crudo/PII).

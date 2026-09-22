@@ -4,8 +4,12 @@ leer_entradas.py — lectura LOCAL de las entradas del pipeline.
 Todo se lee y se queda en local. Nada de esto sale a ninguna API.
 """
 from __future__ import annotations
+import sys
 from pathlib import Path
 import pysam
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from muestras import MuestraAmbigua, muestra_tumoral  # noqa: E402,F401
 
 
 def leer_hla(ruta: str | Path) -> list[str]:
@@ -53,12 +57,17 @@ class EntradaNoAnotada(RuntimeError):
     que se leeria como 'no tienes neoantigenos' y seria mentira."""
 
 
-def leer_variantes(ruta_vcf: str | Path) -> list[dict]:
+def leer_variantes(ruta_vcf: str | Path, muestra_tumor: str | None = None) -> list[dict]:
+    """Compatibilidad: solo las variantes (ver `leer_variantes_meta`)."""
+    return leer_variantes_meta(ruta_vcf, muestra_tumor)[0]
+
+
+def leer_variantes_meta(ruta_vcf: str | Path,
+                        muestra_tumor: str | None = None) -> tuple[list[dict], dict]:
     """
-    Lee el VCF (local) y extrae candidatos. Espera los INFO sintéticos GENE/AA/PEP
-    del ejemplo; en producción el péptido mutante lo genera pVACseq desde el VCF
-    anotado (VEP) + la secuencia de proteína. Aquí lo tomamos del campo PEP si
-    existe (modo ejemplo) para poder cablear y probar la cadena completa.
+    Lee el VCF (local) y extrae candidatos. Espera los INFO GENE/AA/PEP (los escribe
+    preparar_reales.py desde un VCF anotado con VEP). Devuelve (variantes, meta); meta
+    lleva la muestra tumoral elegida y el MOTIVO, para el manifiesto de salida.
     """
     out: list[dict] = []
     vcf = pysam.VariantFile(str(ruta_vcf))
@@ -87,19 +96,27 @@ def leer_variantes(ruta_vcf: str | Path) -> list[dict]:
         )
 
     # 19-sep-26 (validación con datos reales de Sid): en un VCF Mutect2 tumor-normal la
-    # PRIMERA muestra suele ser la NORMAL. Antes se leía el AF de la primera -> VAF de la
-    # normal (~0) presentada como VAF del tumor. Se usa ##tumor_sample si existe.
-    tumor = None
-    for hrec in vcf.header.records:
-        if hrec.key == "tumor_sample":
-            tumor = hrec.value
-    muestras = list(vcf.header.samples)
-    if tumor not in muestras:
-        tumor = muestras[0] if muestras else None
+    # PRIMERA muestra suele ser la NORMAL; se leía el AF de la normal como VAF del tumor.
+    # 22-sep-26 (auditoría 2.2): la elección la hace `muestras.muestra_tumoral`, la MISMA
+    # que usa preparar_reales, y si hay varias muestras sin identificar, PARA.
+    try:
+        tumor, motivo = muestra_tumoral(vcf.header, muestra_tumor)
+    except MuestraAmbigua:
+        vcf.close()
+        raise
+    meta = {"muestra_tumor": tumor, "muestra_tumor_motivo": motivo}
 
     for rec in vcf:
         if rec.filter.keys() and "PASS" not in rec.filter.keys():
             continue
+        # 22-sep-26 (auditoría 2.1): PEP/AA son de UN alelo. En un registro multialélico
+        # no hay forma de saber de cuál: se para en vez de pegarle el péptido a todos.
+        if len(rec.alts or ()) > 1:
+            vcf.close()
+            raise EntradaNoAnotada(
+                f"Registro multialélico en {rec.chrom}:{rec.pos} ({rec.ref}>{','.join(rec.alts)}). "
+                "El péptido anotado no se puede atribuir a un alelo concreto. Pásalo antes "
+                "por preparar_reales.py (descompone por alelo) o por `bcftools norm -m-`.")
         info = rec.info
         gene = info.get("GENE")
         gene = gene[0] if isinstance(gene, tuple) else gene
@@ -121,4 +138,4 @@ def leer_variantes(ruta_vcf: str | Path) -> list[dict]:
                 "gene": gene, "aa": aa, "peptide": p_, "af": af,
             })
     vcf.close()
-    return out
+    return out, meta

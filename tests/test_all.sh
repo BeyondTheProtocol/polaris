@@ -142,6 +142,7 @@ runpy test_seguridad_sweep_daemon.py
 runpy test_seguridad_sweep.py
 runpy test_pipeline_vacuna.py
 runpy test_pipeline_datos_reales.py
+runpy test_pipeline_alelos_muestra.py
 runpy test_investigacion_fuga.py
 runpy test_vega_gate.py
 runpy test_centinela_ned.py

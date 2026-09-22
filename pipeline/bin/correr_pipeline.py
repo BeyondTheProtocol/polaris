@@ -23,6 +23,9 @@ MURO: apoyo a la decisión, NO consejo médico. Describe y equipa, no concluye.
 """
 from __future__ import annotations
 import argparse
+import datetime as _dt
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -31,8 +34,89 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import leer_entradas as ent  # noqa: E402
 
-UMBRAL_TPM = 1.0       # transcrito no expresado = no presentado
-UMBRAL_RANK = 2.0      # %rank de presentación; fuerte <= 0.5
+RAIZ = Path(__file__).resolve().parents[2]
+CONFIG_DEFECTO = RAIZ / "pipeline" / "config" / "pipeline.yaml"
+
+# 22-sep-26 (auditoría 2.3): antes había constantes aquí y el YAML no se leía nunca, así
+# que tocar pipeline.yaml no cambiaba nada y af_min no se aplicaba. Ahora los umbrales
+# salen SOLO del YAML, validados, y su hash va en cada salida. Rango permitido por clave:
+UMBRALES_VALIDOS = {
+    "tpm_min": (0.0, 1e6),             # transcrito por debajo = no expresado
+    "rank_presentacion": (0.0, 100.0),  # %rank de presentación
+    "af_min": (0.0, 1.0),               # VAF mínima
+}
+
+
+class ConfigInvalida(ValueError):
+    """La configuración no se puede usar tal cual. Se para: un umbral mal escrito que se
+    ignora en silencio es un filtro que nadie sabe que no está."""
+
+
+def cargar_config(ruta: str | Path) -> tuple[dict, str]:
+    """(umbrales validados, sha256 del fichero). Claves de más, de menos o fuera de
+    rango -> ConfigInvalida."""
+    import yaml
+    crudo = Path(ruta).read_bytes()
+    try:
+        cfg = yaml.safe_load(crudo) or {}
+    except yaml.YAMLError as e:
+        raise ConfigInvalida(f"{ruta}: YAML ilegible ({e})") from e
+    um = cfg.get("umbrales")
+    if not isinstance(um, dict):
+        raise ConfigInvalida(f"{ruta}: falta el bloque 'umbrales'")
+    faltan = sorted(set(UMBRALES_VALIDOS) - set(um))
+    sobran = sorted(set(um) - set(UMBRALES_VALIDOS))
+    if faltan or sobran:
+        raise ConfigInvalida(f"{ruta}: umbrales que faltan {faltan} / desconocidos {sobran}")
+    out = {}
+    for k, (lo, hi) in UMBRALES_VALIDOS.items():
+        v = um[k]
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ConfigInvalida(f"{ruta}: umbrales.{k} no es un número ({v!r})")
+        if not lo <= float(v) <= hi:
+            raise ConfigInvalida(f"{ruta}: umbrales.{k}={v} fuera de [{lo}, {hi}]")
+        out[k] = float(v)
+    return out, hashlib.sha256(crudo).hexdigest()
+
+
+def filtrar(variantes: list[dict], expr: dict[str, float] | None,
+            umbrales: dict) -> tuple[list[dict], list[tuple]]:
+    """Aplica expresión y VAF. Cada candidato lleva su estado EXPLÍCITO por filtro:
+      ok          medido y pasa el umbral
+      no_medido   no hay dato (sin fichero de expresión, gen ausente en él, o sin VAF)
+    Lo medido que no pasa se descarta con motivo. Lo no medido NO se descarta ni se da
+    por bueno: se queda como evaluación 'incompleta', separado de las completas.
+    (Antes un gen ausente del fichero de expresión pasaba como si estuviera expresado.)"""
+    candidatos, descartes = [], []
+    vistos: set = set()
+    for v in variantes:
+        if not v.get("peptide"):
+            continue
+        clave = (v.get("gene"), v.get("aa"))
+        tpm = expr.get(v.get("gene")) if expr is not None else None
+        if tpm is None:
+            est_expr = "no_medido"
+        elif tpm < umbrales["tpm_min"]:
+            if clave not in vistos:
+                descartes.append((*clave, f"expresión baja (TPM={tpm} < {umbrales['tpm_min']})"))
+            vistos.add(clave)
+            continue
+        else:
+            est_expr = "ok"
+        af = v.get("af")
+        if af is None:
+            est_af = "no_medido"
+        elif af < umbrales["af_min"]:
+            if clave not in vistos:
+                descartes.append((*clave, f"VAF baja (AF={af} < {umbrales['af_min']})"))
+            vistos.add(clave)
+            continue
+        else:
+            est_af = "ok"
+        candidatos.append({**v, "tpm": tpm, "estado_expresion": est_expr, "estado_af": est_af,
+                           "evaluacion": "completa" if est_expr == est_af == "ok"
+                           else "incompleta"})
+    return candidatos, descartes
 
 
 def main() -> int:
@@ -42,6 +126,10 @@ def main() -> int:
     ap.add_argument("--loh", default=None, help="alelos perdidos por LOH (se excluyen)")
     ap.add_argument("--expresion", default=None, help="TPM por gen (filtro de expresión)")
     ap.add_argument("--salida", required=True)
+    ap.add_argument("--config", default=str(CONFIG_DEFECTO),
+                    help="YAML de umbrales (por defecto pipeline/config/pipeline.yaml)")
+    ap.add_argument("--muestra-tumor", default=None,
+                    help="muestra tumoral del VCF; obligatoria si hay varias sin ##tumor_sample")
     ap.add_argument("--estructura", action="store_true",
                     help="anota estructura 3D vía AlphaFold-DB (solo terminología genérica)")
     ap.add_argument("--no-presentacion", action="store_true",
@@ -50,8 +138,20 @@ def main() -> int:
 
     print("== Pipeline de neoantígenos (local) ==", flush=True)
 
+    try:
+        umbrales, config_sha = cargar_config(args.config)
+    except ConfigInvalida as e:
+        print(f"  🛑 ABORTO — configuración inválida: {e}")
+        return 2
+    print(f"  config: {Path(args.config).name} sha256={config_sha[:12]}  umbrales={umbrales}")
+
     # --- Lectura local ---
-    variantes = ent.leer_variantes(args.vcf)
+    try:
+        variantes, meta = ent.leer_variantes_meta(args.vcf, args.muestra_tumor)
+    except ent.MuestraAmbigua as e:
+        print(f"  🛑 ABORTO — muestra tumoral ambigua: {e}")
+        return 2
+    print(f"  muestra tumoral: {meta['muestra_tumor']} ({meta['muestra_tumor_motivo']})")
     hla_todos = ent.leer_hla(args.hla)
     perdidos = ent.leer_hla(args.loh) if args.loh else []
     expr = ent.leer_expresion(args.expresion) if args.expresion else {}
@@ -63,6 +163,10 @@ def main() -> int:
     # --- Etapa B (filtro LOH) ---
     hla_c1 = ent.alelos_no_perdidos(ent.clase1(hla_todos), perdidos)
     print(f"  HLA-I tras filtro LOH: {hla_c1}")
+    if not hla_c1 and not args.no_presentacion:
+        print("  🛑 ABORTO — no queda ningún alelo HLA-I tras el filtro LOH: la presentación "
+              "saldría vacía y se leería como 'nada se presenta'.")
+        return 2
 
     # --- Filtro de expresión (Etapa C) ---
     # ── GUARDA CONTRA EL FALSO NEGATIVO SILENCIOSO (15-jul-26) ──────────────────
@@ -84,24 +188,14 @@ def main() -> int:
         print("        vacio se leeria como una respuesta, y seria MENTIRA.")
         return 2
 
-    candidatos = []
-    descartados: set = set()
-    for v in variantes:
-        if not v.get("peptide"):
-            continue
-        tpm = expr.get(v.get("gene"), None)
-        expresado = (tpm is None) or (tpm >= UMBRAL_TPM)
-        if expr and not expresado:
-            clave = (v.get("gene"), v.get("aa"))
-            if clave not in descartados:   # una línea por variante, no por péptido
-                print(f"  - descartado por expresión baja (TPM={tpm}): {v['gene']} {v['aa']}")
-            descartados.add(clave)
-            continue
-        v["tpm"] = tpm
-        candidatos.append(v)
-    print(f"  candidatos tras filtro de expresión: {len(candidatos)} péptidos "
+    candidatos, descartes = filtrar(variantes, expr if args.expresion else None, umbrales)
+    for gene, aa, motivo in descartes:
+        print(f"  - descartado por {motivo}: {gene} {aa}")
+    n_inc = len({(v['gene'], v['aa']) for v in candidatos if v["evaluacion"] == "incompleta"})
+    print(f"  candidatos tras filtros de expresión y VAF: {len(candidatos)} péptidos "
           f"({len({(v['gene'], v['aa']) for v in candidatos})} variantes; "
-          f"{len(descartados)} variantes descartadas por TPM<{UMBRAL_TPM})")
+          f"{len(descartes)} variantes descartadas; {n_inc} con evaluación INCOMPLETA "
+          "por falta de dato, separadas al final)")
 
     if not candidatos:
         print("  (sin candidatos) — nada que predecir.")
@@ -117,7 +211,7 @@ def main() -> int:
     else:
         from presentacion_local import predecir_presentacion
         peptidos = [v["peptide"] for v in candidatos]
-        pres = predecir_presentacion(peptidos, hla_c1, umbral_rank=UMBRAL_RANK)
+        pres = predecir_presentacion(peptidos, hla_c1, umbral_rank=umbrales["rank_presentacion"])
         pres_por_pep = {r["peptide"]: r for _, r in pres.iterrows()} if not pres.empty else {}
         for v in candidatos:
             r = pres_por_pep.get(v["peptide"], {})
@@ -145,14 +239,35 @@ def main() -> int:
         df["alphafold_pdb"] = df["gene"].map(af_urls)
 
     # --- Priorización (orden conceptual del doc) ---
+    # Las evaluaciones completas primero; las incompletas (falta expresión o VAF) al final,
+    # nunca mezcladas con ellas.
+    df["_inc"] = df["evaluacion"] != "completa"
+    orden = ["_inc"]
     if "presentation_score" in df.columns and df["presentation_score"].notna().any():
-        df = df.sort_values("presentation_score", ascending=False)
+        orden.append("presentation_score")
+    df = df.sort_values(orden, ascending=[True] + [False] * (len(orden) - 1)).drop(columns="_inc")
+    df["config_sha256"] = config_sha
 
     Path(args.salida).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.salida, sep="\t", index=False)
+    manifiesto = {
+        "generado": _dt.datetime.now().isoformat(timespec="seconds"),
+        "config": Path(args.config).name, "config_sha256": config_sha, "umbrales": umbrales,
+        "vcf": Path(args.vcf).name, **meta,
+        "expresion": Path(args.expresion).name if args.expresion else None,
+        "loh": Path(args.loh).name if args.loh else None,
+        "hla_clase1_usados": len(hla_c1),
+        "filas": len(df),
+        "filas_completas": int((df["evaluacion"] == "completa").sum()),
+        "filas_incompletas": int((df["evaluacion"] != "completa").sum()),
+        "variantes_descartadas": [{"gene": g, "aa": a, "motivo": m} for g, a, m in descartes],
+    }
+    Path(str(args.salida) + ".manifiesto.json").write_text(
+        json.dumps(manifiesto, ensure_ascii=False, indent=1, default=str))
     print(f"\n  DOSSIER escrito: {args.salida}  ({len(df)} filas)")
+    print(f"  manifiesto: {args.salida}.manifiesto.json")
     print("\n--- vista rápida ---")
-    cols = [c for c in ["gene", "aa", "peptide", "tpm", "best_allele",
+    cols = [c for c in ["gene", "aa", "peptide", "tpm", "evaluacion", "best_allele",
                         "presentation_score", "presentado", "alphafold_pdb"]
             if c in df.columns]
     # 19-sep-26: con datos reales hay miles de filas (una por péptido); se muestran

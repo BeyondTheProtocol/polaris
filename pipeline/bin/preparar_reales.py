@@ -36,6 +36,9 @@ from pathlib import Path
 
 import pysam
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from muestras import MuestraAmbigua, muestra_tumoral  # noqa: E402
+
 LONGITUDES = (8, 9, 10, 11)
 CONSEC_OK = ("missense_variant", "inframe_deletion", "inframe_insertion",
              "protein_altering_variant")
@@ -144,42 +147,95 @@ def _campos_csq(header) -> list[str]:
     return desc.split("Format:")[1].strip().strip('"').split("|")
 
 
-def _elegir_csq(entradas: list[dict], alelo: str) -> dict | None:
-    cand = [c for c in entradas
-            if any(k in c.get("Consequence", "") for k in CONSEC_OK)
-            and c.get("ENSP") and c.get("Protein_position") and c.get("Amino_acids")
-            and (not alelo or c.get("Allele") in (alelo, "-"))]
-    if not cand:
-        cand = [c for c in entradas
-                if any(k in c.get("Consequence", "") for k in CONSEC_OK)
-                and c.get("ENSP") and c.get("Protein_position") and c.get("Amino_acids")]
+def _es_proteica(c: dict) -> bool:
+    return (any(k in c.get("Consequence", "") for k in CONSEC_OK)
+            and bool(c.get("ENSP")) and bool(c.get("Protein_position"))
+            and bool(c.get("Amino_acids")))
+
+
+def _elegir_csq(entradas: list[dict]) -> dict | None:
+    """Elige la consecuencia proteica entre las de UN SOLO alelo (ya filtradas por
+    `_csq_del_alelo`). 22-sep-26 (auditoría 2.1): antes, si no había consecuencia del
+    alelo pedido, se aceptaba la de CUALQUIER alelo, y un ALT acababa con el péptido de
+    otro. Ya no hay segundo filtro: sin CSQ del alelo, no hay péptido.
+    Transcritos alternativos: MANE > canónico > el resto, y desempate por Feature para
+    que la elección no dependa del orden en que VEP escribió las entradas."""
+    cand = [c for c in entradas if _es_proteica(c)]
     if not cand:
         return None
-    cand.sort(key=lambda c: (not c.get("MANE_SELECT"), c.get("CANONICAL") != "YES"))
+    cand.sort(key=lambda c: (not c.get("MANE_SELECT"), c.get("CANONICAL") != "YES",
+                             c.get("Feature", "")))
     return cand[0]
 
 
+def _alelos_vep(ref: str, alts: tuple[str, ...] | list[str]) -> list[str]:
+    """Cómo escribe VEP cada ALT en el campo Allele de CSQ (su Parser/VCF.pm):
+      - bialélico con indel: quita la base de anclaje si REF y ALT la comparten;
+      - multialélico con algún indel: la quita de TODOS solo si REF y todos los ALT
+        empiezan por la misma base; si no, no toca ninguno;
+      - sin indel: el ALT tal cual.
+    Comprobado el 22-sep-26 contra el VCF real de Sid: C>(CA,CAA,A) sale
+    como 'CA', y GGT>(G,GGTGT) como '-'."""
+    alts = list(alts)
+    indel = any(len(a) != len(ref) for a in alts if a != "*")
+    if not indel:
+        return alts
+    if len(alts) == 1:
+        a = alts[0]
+        return [a[1:] or "-"] if ref[:1] == a[:1] else [a]
+    if len({x[:1] for x in [ref] + alts if x != "*"}) == 1:
+        return [a if a == "*" else (a[1:] or "-") for a in alts]
+    return alts
+
+
 def _alelo_vep(ref: str, alt: str) -> str:
-    """Representación del alelo en CSQ: VEP quita la base de anclaje común en indels."""
-    if len(ref) != len(alt) and ref[:1] == alt[:1]:
-        return alt[1:] or "-"
-    return alt
+    """Compatibilidad: representación VEP de un ALT en un registro bialélico."""
+    return _alelos_vep(ref, [alt])[0]
+
+
+def _csq_del_alelo(entradas: list[dict], idx: int, alelos_vep: list[str]) -> tuple[list[dict], str]:
+    """Las entradas CSQ que son de ESTE alelo (idx 0-based sobre rec.alts), sin mezclar.
+    Con ALLELE_NUM (VEP --allele_number) se usa el número; si no, la cadena Allele, y
+    si dos ALT se escriben igual, no hay forma de saber cuál es cuál: se descarta."""
+    if entradas and "ALLELE_NUM" in entradas[0]:
+        return [c for c in entradas if c.get("ALLELE_NUM") == str(idx + 1)], ""
+    mio = alelos_vep[idx]
+    if alelos_vep.count(mio) > 1:
+        return [], "alelo_ambiguo_en_csq"
+    return [c for c in entradas if c.get("Allele") == mio], ""
+
+
+def _af_de_alelo(muestra, idx: int, n_alts: int) -> tuple[float | None, str]:
+    """VAF del ALT idx. AF de Mutect2 es Number=A (una por ALT). Si viene un único valor
+    en un registro multialélico, no se sabe de qué ALT es: no se inventa."""
+    if muestra is None or "AF" not in muestra:
+        return None, "sin_af"
+    v = muestra["AF"]
+    if isinstance(v, tuple):
+        if len(v) == n_alts:
+            return v[idx], ""
+        if len(v) == 1 and n_alts == 1:
+            return v[0], ""
+        return None, "af_no_asignable_al_alelo"
+    if n_alts == 1:
+        return v, ""
+    return None, "af_no_asignable_al_alelo"
 
 
 def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
-               solo_pass: bool = True, longitudes: tuple[int, ...] = LONGITUDES) -> dict:
+               solo_pass: bool = True, longitudes: tuple[int, ...] = LONGITUDES,
+               muestra_tumor: str | None = None) -> dict:
     prot, _ = leer_proteoma(ruta_fasta)
     vin = pysam.VariantFile(ruta_vcf)
     if "CSQ" not in vin.header.info:
         raise SystemExit("ERROR: el VCF no trae anotación VEP (INFO CSQ). Anótalo con VEP antes.")
     campos = _campos_csq(vin.header)
-    tumor = None
-    for rec in vin.header.records:
-        if rec.key == "tumor_sample":
-            tumor = rec.value
-    muestras = list(vin.header.samples)
-    if tumor not in muestras:
-        tumor = muestras[-1] if muestras else None
+    # 22-sep-26 (auditoría 2.2): una sola regla, compartida con leer_entradas, y fail-closed.
+    try:
+        tumor, motivo_tumor = muestra_tumoral(vin.header, muestra_tumor)
+    except MuestraAmbigua as e:
+        vin.close()
+        raise SystemExit(f"ERROR: {e}")
 
     # 19-sep-26 (caso Sid): si el VEP corrió con --per_gene solo hay UNA consecuencia por
     # gen (la del transcrito elegido). Una variante que es intrónica en el MANE pero
@@ -197,6 +253,12 @@ def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
 
     cont: Counter = Counter()
     filas = []
+    descartes: list[tuple] = []   # (chrom, pos, ref, alt, motivo): nada se pierde en silencio
+
+    def descartar(rec, alt, motivo):
+        cont[motivo] += 1
+        descartes.append((rec.chrom, rec.pos, rec.ref, alt, motivo))
+
     for rec in vin:
         cont["registros"] += 1
         if solo_pass and (not rec.filter.keys() or "PASS" not in rec.filter.keys()):
@@ -204,49 +266,65 @@ def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
         cont["pass"] += 1
         csq_raw = rec.info.get("CSQ") or ()
         entradas = [dict(zip(campos, c.split("|"))) for c in csq_raw]
-        consecs = {k for c in entradas for k in c.get("Consequence", "").split("&")}
-        if not consecs & set(CONSEC_OK):
-            for k in CONSEC_NO_SOPORTADAS:
-                if k in consecs:
-                    cont["no_soportada:" + k] += 1
-                    break
-            continue
-        alt = (rec.alts or [""])[0]
-        csq = _elegir_csq(entradas, _alelo_vep(rec.ref, alt))
-        if not csq:
-            cont["sin_csq_proteica"] += 1
-            continue
-        ensp = csq["ENSP"].split(".")[0]
-        wt = prot.get(ensp)
-        if not wt:
-            cont["ensp_no_en_proteoma"] += 1
-            continue
-        cont["codificantes_evaluadas"] += 1
-        r = proteina_mutante(wt, csq["Protein_position"], csq["Amino_acids"])
-        if r is None:
-            cont["ref_discordante"] += 1
-            continue
-        mut, ini, fin = r
-        peps = ventanas_mutantes(wt, mut, ini, fin, longitudes)
-        if not peps:
-            cont["sin_ventanas"] += 1
-            continue
-        af = None
-        if tumor and "AF" in rec.samples[tumor]:
-            v = rec.samples[tumor]["AF"]
-            af = v[0] if isinstance(v, tuple) else v
-        # HGVSp viene VACÍO si VEP corrió --offline sin FASTA (caso Sid): se construye
-        # el cambio desde Amino_acids + Protein_position (quitando el "/longitud").
-        hgvsp = csq.get("HGVSp", "")
-        if ":" in hgvsp:
-            aa = hgvsp.split(":", 1)[1]
-        else:
-            r_, a_ = csq["Amino_acids"].split("/", 1)
-            aa = f"p.{r_}{csq['Protein_position'].split('/', 1)[0]}{a_}"
-        filas.append((rec.chrom, rec.pos, rec.ref, alt, csq.get("SYMBOL") or csq.get("Gene"),
-                      aa.replace("%3D", "="), csq["Feature"], ensp, csq["Consequence"], peps, af))
-        cont["con_peptidos"] += 1
-        cont["peptidos"] += len(peps)
+        alts = list(rec.alts or ())
+        if len(alts) > 1:
+            cont["registros_multialelicos"] += 1
+        alelos_vep = _alelos_vep(rec.ref, alts)
+        muestra = rec.samples[tumor] if tumor else None
+        # 22-sep-26 (auditoría 2.1): CADA ALT por separado. Antes solo alts[0]: los
+        # multialélicos perdían alelos, y el que quedaba podía llevarse la CSQ de otro.
+        for idx, alt in enumerate(alts):
+            cont["alelos"] += 1
+            if alt == "*" or alt.startswith("<"):
+                descartar(rec, alt, "alelo_simbolico")
+                continue
+            mias, motivo = _csq_del_alelo(entradas, idx, alelos_vep)
+            if motivo:
+                descartar(rec, alt, motivo)
+                continue
+            consecs = {k for c in mias for k in c.get("Consequence", "").split("&")}
+            if not consecs & set(CONSEC_OK):
+                no_sop = next((k for k in CONSEC_NO_SOPORTADAS if k in consecs), None)
+                if no_sop:
+                    descartar(rec, alt, "no_soportada:" + no_sop)
+                elif not mias and entradas:
+                    # hay CSQ en el registro, pero de OTRO alelo: nunca se toma prestada
+                    descartar(rec, alt, "sin_csq_del_alelo")
+                continue
+            csq = _elegir_csq(mias)
+            if not csq:
+                descartar(rec, alt, "sin_csq_proteica")
+                continue
+            ensp = csq["ENSP"].split(".")[0]
+            wt = prot.get(ensp)
+            if not wt:
+                descartar(rec, alt, "ensp_no_en_proteoma")
+                continue
+            cont["codificantes_evaluadas"] += 1
+            r = proteina_mutante(wt, csq["Protein_position"], csq["Amino_acids"])
+            if r is None:
+                descartar(rec, alt, "ref_discordante")
+                continue
+            mut, ini, fin = r
+            peps = ventanas_mutantes(wt, mut, ini, fin, longitudes)
+            if not peps:
+                descartar(rec, alt, "sin_ventanas")
+                continue
+            af, motivo_af = _af_de_alelo(muestra, idx, len(alts))
+            if motivo_af == "af_no_asignable_al_alelo":
+                cont[motivo_af] += 1
+            # HGVSp viene VACÍO si VEP corrió --offline sin FASTA (caso Sid): se construye
+            # el cambio desde Amino_acids + Protein_position (quitando el "/longitud").
+            hgvsp = csq.get("HGVSp", "")
+            if ":" in hgvsp:
+                aa = hgvsp.split(":", 1)[1]
+            else:
+                r_, a_ = csq["Amino_acids"].split("/", 1)
+                aa = f"p.{r_}{csq['Protein_position'].split('/', 1)[0]}{a_}"
+            filas.append((rec.chrom, rec.pos, rec.ref, alt, csq.get("SYMBOL") or csq.get("Gene"),
+                          aa.replace("%3D", "="), csq["Feature"], ensp, csq["Consequence"], peps, af))
+            cont["con_peptidos"] += 1
+            cont["peptidos"] += len(peps)
     vin.close()
 
     ev = cont["codificantes_evaluadas"]
@@ -262,7 +340,9 @@ def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
            "##source=pipeline/bin/preparar_reales.py (VEP CSQ + proteoma Ensembl local)",
            f"##preparar_reales_origen={Path(ruta_vcf).name}",
            f"##preparar_reales_proteoma={Path(ruta_fasta).name}",
-           f"##preparar_reales_muestra_tumor={tumor}"]
+           f"##preparar_reales_muestra_tumor={tumor}",
+           f"##preparar_reales_muestra_tumor_motivo={motivo_tumor}",
+           "##preparar_reales_alelos=uno por registro (multialélicos descompuestos, sin CSQ cruzada)"]
     cab += [f"##contig=<ID={c}>" for c in contigs]
     cab += ['##INFO=<ID=GENE,Number=1,Type=String,Description="Símbolo del gen (VEP SYMBOL)">',
             '##INFO=<ID=AA,Number=1,Type=String,Description="Cambio proteico (VEP HGVSp)">',
@@ -280,6 +360,14 @@ def anotar_vcf(ruta_vcf: str, ruta_fasta: str, ruta_salida: str,
                     f"CONSEQ={conseq.replace(';', ',')};PEP={','.join(peps)}")
             afs = "." if af is None else f"{af:.4f}"
             out.write(f"{chrom}\t{pos}\t.\t{ref}\t{alt}\t.\tPASS\t{info}\tAF\t{afs}\n")
+    # Registro de descartes: cada ALT que no dio péptido, con su motivo. Local, junto a la
+    # salida (misma carpeta privada), nunca sale de la máquina.
+    with open(str(ruta_salida) + ".descartes.tsv", "w") as out:
+        out.write("chrom\tpos\tref\talt\tmotivo\n")
+        for d in descartes:
+            out.write("\t".join(str(x) for x in d) + "\n")
+    cont["muestra_tumor"] = tumor
+    cont["muestra_tumor_motivo"] = motivo_tumor
     return dict(cont)
 
 
@@ -333,6 +421,9 @@ def main() -> int:
     a.add_argument("--proteoma", required=True)
     a.add_argument("--salida", required=True)
     a.add_argument("--incluir-no-pass", action="store_true")
+    a.add_argument("--muestra-tumor", default=None,
+                   help="nombre de la muestra tumoral; obligatorio si el VCF trae varias "
+                        "muestras y no tiene ##tumor_sample")
     a.add_argument("--longitudes", default=",".join(str(L) for L in LONGITUDES),
                    help="longitudes de péptido a generar (por defecto 8,9,10,11; "
                         "pVACseq clase I suele usar 9,10,11,12)")
@@ -348,7 +439,8 @@ def main() -> int:
     if args.cmd == "vcf":
         r = anotar_vcf(args.vcf, args.proteoma, args.salida,
                        solo_pass=not args.incluir_no_pass,
-                       longitudes=tuple(int(x) for x in args.longitudes.split(",")))
+                       longitudes=tuple(int(x) for x in args.longitudes.split(",")),
+                       muestra_tumor=args.muestra_tumor)
     elif args.cmd == "expresion":
         r = convertir_expresion(args.rsem, args.proteoma, args.salida)
     else:
