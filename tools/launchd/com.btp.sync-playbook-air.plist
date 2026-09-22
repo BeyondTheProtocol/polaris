@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.sync-playbook-air</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- Heartbeat del sync del playbook clínico EN LA AIR (Fase 2 pieza A, variante Air).
+       La Air alcanza al mini (polaris, 24/7); el mini NO alcanza a la Air (Remote Login OFF).
+       Por eso el heartbeat útil vive AQUÍ: cada 30 min la Air cose con el mini en ambos
+       sentidos de propagación (si cambió la Air → sube; si cambió el mini → baja). Conflict-safe
+       por hash-baseline. Solo corre mientras la Air está encendida (que es cuando importa).
+       Cargar (en la Air):  launchctl load ~/Library/LaunchAgents/com.btp.sync-playbook-air.plist -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/sync_playbook.py</string>
+    <string>--apply</string>
+    <string>--remoto</string>
+    <string>polaris</string>
+  </array>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/sync-playbook-air.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/sync-playbook-air.err</string>
+</dict></plist>

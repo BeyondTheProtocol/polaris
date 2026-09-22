@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "biomcp": {
+      "command": "/Users/polaris/claudecode/.venv-biomcp/bin/biomcp",
+      "args": ["run", "--mode", "stdio"]
+    },
+    "cbioportal": {
+      "command": "/Users/polaris/claudecode/.venv-cbioportal/bin/cbioportal-mcp",
+      "args": ["--transport", "stdio"]
+    },
+    "x": {
+      "command": "/usr/bin/python3",
+      "args": ["/Users/polaris/claudecode/tools/x_mcp_puente.py"]
+    }
+  }
+}

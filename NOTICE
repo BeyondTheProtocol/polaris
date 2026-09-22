@@ -1,0 +1,47 @@
+Polaris
+Copyright (C) 2026 la autora de Polaris, que opera bajo el nombre
+«Beyond the Protocol».
+
+Nota sobre la titularidad: bajo la ley española los derechos de autor
+nacen en la persona física que crea la obra. «Beyond the Protocol» es
+el nombre bajo el que se publica este proyecto; la titularidad de los
+derechos de explotación es de su autora, y se mantiene así con
+independencia de qué forma jurídica adopte el proyecto más adelante.
+
+Este programa es software libre: puedes redistribuirlo y/o modificarlo
+bajo los términos de la GNU Affero General Public License (AGPL) tal y
+como la publica la Free Software Foundation, en su versión 3 o, a tu
+elección, cualquier versión posterior. El texto completo está en
+LICENSE.
+
+Este programa se distribuye con la esperanza de que sea útil, pero SIN
+NINGUNA GARANTÍA, ni siquiera la garantía implícita de COMERCIABILIDAD
+o IDONEIDAD PARA UN FIN CONCRETO. Consulta la AGPL-3.0 para más
+detalle.
+
+--------------------------------------------------------------------------
+Licencia comercial
+
+La AGPL-3.0 obliga a publicar el código fuente de cualquier servicio
+que corra una versión modificada de este software y lo ofrezca en red
+a terceros. Si ese requisito no te encaja — por ejemplo, quieres
+integrar Polaris en un producto o servicio cerrado —, la titular de los
+derechos puede ofrecerte una licencia comercial
+distinta, bajo un acuerdo separado y a su discreción.
+
+Contacto para licencia comercial: beyondtheprotocolteam@gmail.com
+
+La disponibilidad de una licencia comercial no reduce en nada los
+derechos de quien prefiera usar Polaris bajo AGPL-3.0: esa vía sigue
+abierta y gratuita para todo el mundo, ahora y siempre, sobre el código
+ya publicado bajo esa licencia.
+
+--------------------------------------------------------------------------
+Contribuciones de terceros
+
+Todo el código, documentación o contenido de terceros incorporado a
+este repositorio se acepta bajo los términos de
+ACUERDO-CONTRIBUCION.md, que preserva la capacidad de la titular
+de seguir ofreciendo, además de la AGPL-3.0, una licencia
+comercial — sin tener que localizar y pedir permiso caso por caso a
+cada persona que haya contribuido código.

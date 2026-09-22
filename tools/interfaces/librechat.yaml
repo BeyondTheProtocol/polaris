@@ -1,0 +1,19 @@
+# tools/interfaces/librechat.yaml — LibreChat apuntando SOLO al borde_gateway de Polaris.
+# Un único "custom endpoint" OpenAI-compatible = el gateway (:8799). Sin proveedores externos directos.
+version: 1.2.1
+cache: true
+
+endpoints:
+  custom:
+    - name: "Polaris (gateway)"
+      apiKey: "${GATEWAY_TOKEN}"
+      baseURL: "http://host.docker.internal:8799/v1"
+      models:
+        default: ["polaris"]   # el gateway enruta por la centralita (ia.ask); el nombre es etiqueta
+        fetch: true            # intenta /v1/models del gateway; si no, usa el default de arriba
+      titleConvo: true
+      titleModel: "polaris"
+      modelDisplayLabel: "Polaris"
+# Nota muro: NO añadir aquí openAI/anthropic/google con claves propias. La única salida a un LLM
+# es el gateway, que pasa por el borde. Las funciones que llamen a internet (websearch, etc.) se
+# dejan desactivadas; la inteligencia y las herramientas las pone Polaris, no la cara.

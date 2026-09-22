@@ -1,0 +1,46 @@
+#!/bin/sh
+# tools/githooks/pre-push — Fix (A) 11-jul-26 (radar `_cajita/radar-mejoras-10jul/C-guard-merge-master.md`).
+# Gate BLANDO NATIVO de git: frena pushes que apuntan a la base (master/main) cuando la
+# sesion no tiene el gate humano. Complementa (no sustituye) el gate software del muro
+# (Fix c en `.claude/hooks/muro_guard.py`) — este hook actua incluso en sesiones
+# --allow-dangerously-skip-permissions, que se saltan los hooks de Claude pero NO los de git.
+#
+# INERTE por defecto: solo actua si existe el MISMO toggle que activa el Fix (c),
+# `.claude/hooks/.base_gate_on`. Sin el toggle, exit 0 inmediato.
+#
+# git invoca pre-push con $1=nombre-remoto $2=url-remoto, y por stdin una linea por cada
+# ref que se empuja: "<local_ref> <local_sha> <remote_ref> <remote_sha>". Miramos el
+# remote_ref (el destino), no la rama local, porque se puede empujar una rama local
+# cualquiera hacia refs/heads/master del remoto.
+#
+# Defensivo: cualquier fallo al resolver el repo/el toggle => exit 0 (nunca bloquear un
+# push legitimo por un fallo del propio hook).
+#
+# LIMITACION HONESTA: `git push --no-verify` se salta este hook. Ver README.md.
+
+toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -n "$toplevel" ] || exit 0
+
+toggle="$toplevel/.claude/hooks/.base_gate_on"
+[ -f "$toggle" ] || exit 0
+
+if [ "$BTP_GIT_BASE_OK" = "1" ]; then
+    exit 0
+fi
+
+blocked=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/heads/master|refs/heads/main)
+            blocked="$remote_ref"
+            ;;
+    esac
+done
+
+if [ -n "$blocked" ]; then
+    echo "BLOQUEADO (git hook nativo, fix A 11-jul-26): push a '$blocked' sin gate." >&2
+    echo "Trabaja en rama + PR, o exporta BTP_GIT_BASE_OK=1 con OK humano explicito." >&2
+    exit 1
+fi
+
+exit 0

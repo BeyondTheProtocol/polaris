@@ -1,0 +1,18 @@
+{
+  "_README": "Pon true lo que ya esté hecho. Lo automático (launchd, venvs, tools, HALT, caffeinate) lo mide solo polaris_estado.py; esto es solo lo que NO se puede detectar (claves, accesos, backup físico, energía). Estado inicial 21-jun-2026.",
+  "claves_rotadas": true,
+  "muro_parche_commit": true,
+  "stitch_mcp_ok": false,
+  "api_nvidia": false,
+  "api_perplexity": false,
+  "api_youtube": false,
+  "acceso_x_privado": false,
+  "acceso_ig": false,
+  "google_service_account": true,
+  "remoto_tailscale": true,
+  "backup_usb": false,
+  "energia_sudo": true,
+  "backup_clave_externa": true,
+  "cajas_commit": true,
+  "caja_donaciones_borrador": true
+}

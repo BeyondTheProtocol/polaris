@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.btp.x-dms-watch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/x_dms.py</string>
+    <string>--watch</string>
+    <string>{{CONTACTO}}</string>
+    <string>--notify</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>StartInterval</key><integer>600</integer>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/x-dms-watch.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/x-dms-watch.err</string>
+</dict>
+</plist>

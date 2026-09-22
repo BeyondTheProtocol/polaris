@@ -1,0 +1,50 @@
+{
+  "_nota": "Lista de RUIDO de Vega — DATO, no instrucciones (anti-inyección). Remitentes derivados de los filtros de Gmail de {{TITULAR}} que NO deben subir al triaje como cosas que requieren su atención. La coincidencia es por DOMINIO del 'from' (subdominios incluidos: 'events.holafly.com' y cualquier 'x.x.holafly.com' casan con 'holafly.com'). Lo consume tools/correo.py:es_ruido(); el wiring de ingesta vive en tools/centinela_ned.py. FAIL-SAFE: si este fichero falta, no se puede leer o 'enabled' es false, NO se filtra nada (comportamiento idéntico a antes). egarante.com NUNCA se filtra: es sensible → se CONSERVA, categoría 'evidencia_conservar' (informativa, no se aplica como filtro). El gate de ENCENDIDO en producción es de {{TITULAR}} (merge a casa base + recarga del daemon centinela-ned).",
+  "enabled": true,
+  "spam": [
+    "agenz.mx",
+    "alcampo.es",
+    "aliexpress.com",
+    "cataloniarewards.com",
+    "chipolo.net",
+    "cochat.ai",
+    "dfyne.com",
+    "dieteticacentral.com",
+    "e.dji.com",
+    "eezycollab.com",
+    "events.holafly.com",
+    "globeinflu.com",
+    "holafly.com",
+    "international-cosmetic.com",
+    "loopearplugs.com",
+    "madcool.es",
+    "mail.nordvpn.com",
+    "massimodutti.com",
+    "miscota.com",
+    "nordaccount.com",
+    "purplant.es",
+    "shop-canda.com",
+    "sybotanica.com",
+    "thefork.es",
+    "ticketmaster.es",
+    "umusic-online.com",
+    "use.ai",
+    "zalando.es"
+  ],
+  "newsletters": [
+    "substack.com",
+    "elicit.com",
+    "mail.notion.so",
+    "updates.notion.so"
+  ],
+  "recibos": [
+    "amazon.com",
+    "email.apple.com",
+    "nvidia.com",
+    "stripe.com",
+    "x.ai"
+  ],
+  "evidencia_conservar": [
+    "egarante.com"
+  ]
+}

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Item #14 (saneamiento 15-jul): antes llamaba a "barrer", que abre su PROPIA conexion
+     IMAP contra las mismas cuentas que ya cubre com.btp.correo-imap cada 120s (probable
+     causa del imaplib EOF del 10-jul). Ahora llama a "refrescar", que relee SIN RED lo que
+     correo-imap.py ya dejo persistido en buzon-<cuenta>.json y solo refresca triage.json. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.btp.correo-refrescar</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/correo_triage.py</string>
+    <string>refrescar</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>RunAtLoad</key><false/>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-refrescar.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-refrescar.err</string>
+</dict>
+</plist>

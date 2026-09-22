@@ -1,0 +1,19 @@
+# ── B2 (dianas) — FIXTURE EN BORRADOR. NO es la B2 real. ──────────────────────────────────────
+# Vehículo del test del cortafuegos de cotejo. Todo aquí es SINTÉTICO y de demostración:
+#   · símbolos de gen = PÚBLICOS (ya lo son: FGFR1/{{LOCUS}}/CDK2/{{DIANA}}/TMB, ref. dianas-publicas).
+#   · las rutas `cotejo.fuente` son PLACEHOLDERS a _PRIVADO_CLINICO/ (no apuntan a un informe real).
+#   · fechas/plataformas son de EJEMPLO.
+# ⚠️ LA B2 REAL LA VALIDA TITULAR: la FIDELIDAD de cada cotejo (que el informe primario diga de verdad
+#    lo que la pieza afirma, con su fecha y plataforma correctas) es su gate. Este fichero NO se da por
+#    bueno: demuestra el MECANISMO (qué bloquea / qué pasa), no el contenido clínico.
+# El muro: solo afirmaciones estructuradas + PUNTEROS a fuente (rutas). Nunca secuencias/VCF/HLA crudos.
+
+# ── PIEZAS QUE PASAN EL COTEJO (presencia con fuente primaria + fecha + plataforma) ────────────
+{"id": "B2-RB1-ctdna", "bloque": "B2", "afirmacion": "RB1 alterado (variantes detectadas)", "fuentes": ["{{FUENTE_B}}"], "confianza": "media", "status": "vivo", "confirmado_en": "2026-04-15T00:00:00Z", "ttl_dias": 180, "cotejo": {"fuente": "_PRIVADO_CLINICO/{{FUENTE_B}}/guardant-informe.pdf", "fecha": "2026-04-15", "plataforma": "ctDNA Guardant360 2026", "tipo_resultado": "presencia"}}
+{"id": "B2-FGFR1", "bloque": "B2", "afirmacion": "FGFR1 amplificado (región {{LOCUS}})", "fuentes": ["panel-tejido"], "confianza": "media", "status": "vivo", "confirmado_en": "2026-04-15T00:00:00Z", "ttl_dias": 180, "cotejo": {"fuente": "_PRIVADO_CLINICO/panel-{{FUENTE_A}}/informe.pdf", "fecha": "2024-03-10", "plataforma": "panel tejido 2024", "tipo_resultado": "presencia"}}
+
+# ── AUSENCIA LEGÍTIMA: negativo REAL, atado a SU plataforma/fecha (no «no existe» en absoluto) ─
+{"id": "B2-RB1-tejido", "bloque": "B2", "afirmacion": "RB1 no detectado en el panel de tejido de 2024", "fuentes": ["panel-tejido"], "confianza": "media", "status": "superado", "confirmado_en": "2024-03-10T00:00:00Z", "ttl_dias": 3650, "cotejo": {"fuente": "_PRIVADO_CLINICO/panel-{{FUENTE_A}}/informe.pdf", "fecha": "2024-03-10", "plataforma": "panel tejido 2024", "tipo_resultado": "ausencia"}}
+# NOTA de versionado: B2-RB1-tejido va `superado` (es el estado VIEJO 2024) y B2-RB1-ctdna `vivo`
+# (el estado actual 2026). Así el sistema NO colapsa los dos en uno: la ausencia de 2024 queda como
+# histórico, no como «RB1 no existe». Distintos id a propósito (no es contradicción, es versionado).

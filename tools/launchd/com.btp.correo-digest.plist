@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Digest INTRADÍA de correo (Fase 1, pieza "al rato, resumen de lo que ha entrado"): 3
+     pasadas cortas y DETERMINISTAS (sin LLM, $0) que avisan por Telegram SOLO si hay correo
+     NUEVO no-urgente de una persona real que aún no se ha mostrado (tools/correo_triage.py
+     digest-enviar). Si no hay nada que merezca, NO manda nada — silencio real, no un "sin
+     novedades". Complementa, no sustituye: lo urgente lo cubre com.btp.correo-urgente (cada
+     hora) y com.btp.correo-imap (cada 2 min); el gestor completo (triaje + borradores) es
+     com.btp.correo (8:20/14:00) — este job NO barre buzón (lo hace correo-imap cada 2 min),
+     solo LEE lo ya barrido y decide si avisar. NO ENVÍA correo, solo notifica a {{TITULAR}}.
+     CREADO, NO CARGADO: encenderlo es el gate de {{TITULAR}}
+     (`launchctl bootstrap gui/$(id -u) este.plist`). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.correo-digest</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/correo_triage.py</string>
+    <string>digest-enviar</string>
+  </array>
+  <!-- 3 pasadas: media mañana, media tarde, primera noche — fuera de las horas del gestor
+       completo (8:20/14:00) y del silencio nocturno (23-8, que salida.py respeta igual). -->
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Hour</key><integer>10</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>16</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-digest.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-digest.err</string>
+</dict></plist>

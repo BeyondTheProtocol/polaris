@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Captura del buzón de YouTube (comentarios + menciones) — DETERMINISTA, sin LLM/sin tokens,
+     mismo patrón que com.btp.correo-imap. python3 directo → tools/yt_inbox.py, que dedupe por id
+     en 00_FUENTE-DE-VERDAD/_PRIVADO_YT/.seen.json y vuelca a _PRIVADO_YT/yt-<fecha>.md (gitignored).
+     SOLO LECTURA (Data API v3); nunca publica ni responde. El triaje (qué importa) lo hace Vega
+     (agente `asistente`) minando ese volcado, igual que ya hace con WhatsApp y las menciones de X.
+     Clave en el Llavero (btp-youtube-api); si falta, yt_inbox.py avisa y sale limpio (fail-soft).
+     RunAtLoad false: NO arranca hasta el OK de {{TITULAR}} (gate de encendido, NO instalado por defecto). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.yt-inbox</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>/Users/polaris/claudecode/tools/yt_inbox.py</string></array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>35</integer></dict>
+    <dict><key>Hour</key><integer>20</integer><key>Minute</key><integer>35</integer></dict>
+  </array>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/yt-inbox.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/yt-inbox.err</string>
+</dict></plist>

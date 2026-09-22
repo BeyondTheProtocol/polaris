@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Gestor de correo: triaje + etiquetado + organización (anti-spam reversible) + borradores
+     DE RESPUESTA a-un-clic (Fase 1 componente B, tools/correo_responder.py — carril de
+     confianza Claude + voz humana + dedup + anti-inyección, DRAFT-ONLY) + prioridades al
+     seguimiento. NO ENVÍA NUNCA. CREADO, NO CARGADO: encenderlo es el gate de {{TITULAR}}
+     (`launchctl bootstrap gui/$(id -u) este.plist`). Reglas duras en tools/correo.py. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.correo</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>BTP_ORQUESTADOR</key><string>claude-suscripcion</string>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MURO_PROFILE</key><string>privileged</string>
+    <key>BTP_AGENT</key><string>asistente</string>
+    <key>BTP_HEARTBEAT_NAME</key><string>correo-triaje</string>
+    <key>BTP_MODEL</key><string>sonnet</string>
+    <!-- 23-jul: correo hace triaje+etiquetas+borradores+prioridades 2×/día; con el default (25) moría
+         por max_turns a media faena (exit 1 → falsa alarma de daemon_fallando). 45 como asistente/dm-inbox. -->
+    <key>BTP_MAX_TURNS</key><string>45</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+    <string>Gestiona el correo de {{TITULAR}} según tu runbook de CORREO y tools/correo.py: triaje + etiquetado (allowlist; nunca TRASH) + anti-spam reversible (no archivar NED) + lista de bajas + borradores SOLO al remitente + prioridades a seguimiento.py + monitor de urgentes. Inbox primero, en muestra si es la primera vez. NUNCA envíes ni des de baja (gate de {{TITULAR}}). ADEMÁS, capa de RESPUESTA (Fase 1 componente B): tras el triaje, corre `python3 tools/correo_triage.py avisos` y, para cada hilo que aparezca marcado ✍️ (espera su respuesta/firma) — SOLO esos, nunca en masa ni por cada correo del inbox — lee el cuerpo real del hilo con el conector MCP de Gmail (get_thread/search_threads) y genera el borrador con `python3 tools/correo_responder.py draft` pasando --account, --from-email, --from-name, --subject y --body-file (fichero con el cuerpo del hilo) y --intencion (una frase corta de qué contestaría {{TITULAR}}, dedúcelo del hilo: confirmar, agradecer, pedir tiempo, etc), o llama a `correo_responder.dejar_borrador_respuesta(...)` en Python si te resulta más directo. Ese script YA deduplica solo (no genera un segundo borrador si ya dejó uno para ese mismo hilo — no necesitas comprobarlo tú antes) y YA pasa por el carril de confianza (Claude) + voz humana + anti-inyección + destinatario-solo-al-remitente: no reescribas ni edites el texto que devuelve, solo repórtalo. Si ok=False, no es un error a corregir: respeta el motivo (ya había borrador, o el hilo es sospechoso, etc.) y sigue con el siguiente.</string>
+  </array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>20</integer></dict>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo.err</string>
+</dict></plist>

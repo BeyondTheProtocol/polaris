@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- El Observatorio en el móvil: relay PRIVADO por Tailscale 100.114.113.73:8788 -> localhost:8787.
+     Reusa tools/preview_remoto.py. Solo tu tailnet lo alcanza (no internet). Requiere Tailscale ON
+     y el servidor (com.btp.observatorio) en marcha. KeepAlive: revive solo. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.observatorio-remoto</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/preview_remoto.py</string>
+    <string>8787</string>
+    <string>8788</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio-remoto.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio-remoto.err</string>
+</dict></plist>

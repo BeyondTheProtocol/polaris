@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "Si usas Polaris en tu trabajo, cítalo así."
+title: "Polaris"
+type: software
+authors:
+  - name: "Beyond the Protocol"
+url: "https://github.com/BeyondTheProtocol/polaris"
+repository-code: "https://github.com/BeyondTheProtocol/polaris"
+license: "AGPL-3.0-or-later"
+abstract: >
+  Un sistema personal para sostener investigación clínica dirigida por
+  objetivo: cajas con un goal declarado, expertos convocados por
+  contrato, y un único punto de salida al mundo.
+keywords:
+  - agentic-ai
+  - clinical-research
+  - patient-directed-research
+
+# Nota (no forma parte del CFF, quítala al copiar):
+# Falta "date-released" a propósito — no verifiqué una fecha real de
+# release/tag. Añádela (formato AAAA-MM-DD) cuando se etiquete la
+# primera versión pública, o el propio CFF quedará inconsistente.

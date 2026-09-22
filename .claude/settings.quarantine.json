@@ -1,0 +1,15 @@
+{
+  "_comment": "Config del agente CUARENTENA (lee contenido NO confiable: email/web/X/PubMed). Allowlist pura de lectura; sin red, sin python, sin git, sin secretos. Emite solo JSON estructurado a la cola POR RETORNO (nunca escribe).",
+  "env": { "MURO_PROFILE": "quarantine" },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "_comment": "V1 (item #4, 16-jul-26): matcher '*' = TODAS las tools pasan por el muro, IGUAL que el perfil privilegiado (settings.autonomous.json). ANTES el matcher era solo 'Bash' + 'Write|Edit|...' -> Read/Grep/Glob/WebFetch/WebSearch/MCP/Task NO disparaban el hook en cuarentena: check_read (bloqueo clinico) nunca corria y WebFetch/MCP/Task salian sin muro (boca de red/exfil). La cuarentena estaba MENOS protegida que el lazo privilegiado. Con '*': Read->check_read (clinico vedado), WebFetch/MCP/Task->DENY fail-closed en muro_guard.main(). Verificado por ejecucion.",
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/muro_guard.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

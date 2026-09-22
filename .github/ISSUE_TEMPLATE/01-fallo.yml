@@ -1,0 +1,27 @@
+name: 🐛 Algo está mal
+description: Un fallo, una decisión discutible o algo que se puede hacer mejor
+labels: ["fallo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por mirarlo. 🙏 Esto es lo que más ayuda al proyecto, aunque no traigas el arreglo.
+        ⚠️ **No pegues datos reales de nadie** (correos, teléfonos, informes). Invéntatelos.
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas y qué ocurre en su lugar
+    validations: {required: true}
+  - type: textarea
+    id: donde
+    attributes:
+      label: Dónde
+      description: Fichero, tool o comando. Si tienes traza, pégala en un bloque de código
+  - type: dropdown
+    id: zona
+    attributes:
+      label: ¿Toca el muro?
+      description: El muro es el gate de salida, los hooks y los detectores. Se revisa aparte
+      options: ["No lo sé", "No", "Sí: gate de salida / hooks / detectores"]
+    validations: {required: true}

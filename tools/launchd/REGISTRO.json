@@ -1,0 +1,345 @@
+{
+ "_nota": "Fuente unica de daemons launchd. Lee esto ANTES de crear un plist nuevo (que trabajo ya esta cubierto?). Lo usa activar_daemon.py. concern = el TRABAJO, no el label; dos daemons con el mismo concern = duplicado. Regenera con tools/launchd/registro.py regenera (desde casa base).",
+ "daemons": {
+  "com.btp.asistente-recordatorio": {
+   "script": "run_agent.sh",
+   "concern": "asistente-recordatorio",
+   "nota": ""
+  },
+  "com.btp.asistente": {
+   "script": "run_agent.sh",
+   "concern": "asistente",
+   "nota": ""
+  },
+  "com.btp.auto-mejora": {
+   "script": "run_agent.sh",
+   "concern": "auto-mejora",
+   "nota": ""
+  },
+  "com.btp.avisos-flush": {
+   "script": "avisos_flush.py",
+   "concern": "avisos-flush",
+   "nota": ""
+  },
+  "com.btp.backup": {
+   "script": "backup.sh",
+   "concern": "backup",
+   "nota": ""
+  },
+  "com.btp.borde-gateway": {
+   "script": "borde_gateway.py",
+   "concern": "borde-gateway",
+   "nota": ""
+  },
+  "com.btp.bot-telegram": {
+   "script": "bot_telegram.py",
+   "concern": "bot-telegram",
+   "nota": ""
+  },
+  "com.btp.caffeinate": {
+   "script": "-dimsu",
+   "concern": "caffeinate",
+   "nota": ""
+  },
+  "com.btp.calendar-sync": {
+   "script": "calendar_sync.py",
+   "concern": "calendar-sync",
+   "nota": ""
+  },
+  "com.btp.centinela-ned": {
+   "script": "centinela_ned.py",
+   "concern": "centinela-ned",
+   "nota": ""
+  },
+  "com.btp.correo-digest": {
+   "script": "correo_triage.py",
+   "concern": "correo-digest",
+   "nota": ""
+  },
+  "com.btp.correo-imap": {
+   "script": "correo_imap.py",
+   "concern": "correo-poll",
+   "nota": ""
+  },
+  "com.btp.correo-pendientes": {
+   "script": "pendientes.py",
+   "concern": "correo-reply-nudge",
+   "nota": ""
+  },
+  "com.btp.correo-refrescar": {
+   "script": "correo_triage.py",
+   "concern": "correo-refresh",
+   "nota": ""
+  },
+  "com.btp.correo-urgente": {
+   "script": "run_agent.sh",
+   "concern": "correo-urgent",
+   "nota": ""
+  },
+  "com.btp.correo": {
+   "script": "run_agent.sh",
+   "concern": "correo-triage",
+   "nota": ""
+  },
+  "com.btp.cronica-narrar": {
+   "script": "run_agent.sh",
+   "concern": "cronica-narrar",
+   "nota": ""
+  },
+  "com.btp.cronica": {
+   "script": "cronica.py",
+   "concern": "cronica",
+   "nota": ""
+  },
+  "com.btp.dedup-hilos": {
+   "script": "dedup_hilos.py",
+   "concern": "dedup-hilos",
+   "nota": ""
+  },
+  "com.btp.dispatcher": {
+   "script": "btp_dispatcher.sh",
+   "concern": "dispatcher",
+   "nota": ""
+  },
+  "com.btp.dm-inbox": {
+   "script": "run_agent.sh",
+   "concern": "dm-inbox",
+   "nota": ""
+  },
+  "com.btp.enviar-hoy": {
+   "script": "enviar_hoy.py",
+   "concern": "enviar-hoy",
+   "nota": ""
+  },
+  "com.btp.espejo-investigacion": {
+   "script": "espejo_nudge.py",
+   "concern": "espejo-investigacion",
+   "nota": ""
+  },
+  "com.btp.git-barrido": {
+   "script": "run_agent.sh",
+   "concern": "git-barrido",
+   "nota": ""
+  },
+  "com.btp.healthcheck": {
+   "script": "healthcheck.py",
+   "concern": "healthcheck",
+   "nota": ""
+  },
+  "com.btp.hoy-compose": {
+   "script": "hoy_compose.sh",
+   "concern": "hoy-compose",
+   "nota": ""
+  },
+  "com.btp.instagram": {
+   "script": "instagram.py",
+   "concern": "instagram",
+   "nota": ""
+  },
+  "com.btp.kb-reindex": {
+   "script": "kb.py",
+   "concern": "kb-reindex",
+   "nota": ""
+  },
+  "com.btp.notif-flush": {
+   "script": "salida.py",
+   "concern": "notif-flush",
+   "nota": ""
+  },
+  "com.btp.observatorio-kiosk": {
+   "script": "observatorio.py",
+   "concern": "observatorio-kiosk",
+   "nota": ""
+  },
+  "com.btp.observatorio-parte": {
+   "script": "observatorio.py",
+   "concern": "observatorio-parte",
+   "nota": ""
+  },
+  "com.btp.observatorio-remoto": {
+   "script": "preview_remoto.py",
+   "concern": "observatorio-remoto",
+   "nota": ""
+  },
+  "com.btp.observatorio": {
+   "script": "observatorio.py",
+   "concern": "observatorio",
+   "nota": ""
+  },
+  "com.btp.persecucion": {
+   "script": "persecucion.py",
+   "concern": "persecucion",
+   "nota": ""
+  },
+  "com.btp.polaris-estado": {
+   "script": "polaris_estado.py",
+   "concern": "polaris-estado",
+   "nota": ""
+  },
+  "com.btp.prensa": {
+   "script": "run_agent.sh",
+   "concern": "prensa",
+   "nota": ""
+  },
+  "com.btp.preview-web": {
+   "script": "preview_remoto.py",
+   "concern": "preview-web",
+   "nota": ""
+  },
+  "com.btp.radar-lit": {
+   "script": "run_agent.sh",
+   "concern": "radar-lit",
+   "nota": ""
+  },
+  "com.btp.radar-rutas": {
+   "script": "run_agent.sh",
+   "concern": "radar-rutas",
+   "nota": ""
+  },
+  "com.btp.reconciliador": {
+   "script": "reconciliar_estado.py",
+   "concern": "reconciliador",
+   "nota": ""
+  },
+  "com.btp.seguridad-sweep": {
+   "script": "seguridad_sweep_daemon.py",
+   "concern": "seguridad-sweep",
+   "nota": ""
+  },
+  "com.btp.staging": {
+   "script": "staging.py",
+   "concern": "staging",
+   "nota": ""
+  },
+  "com.btp.vigia": {
+   "script": "vigia.py",
+   "concern": "vigia",
+   "nota": ""
+  },
+  "com.btp.wa-tracker": {
+   "script": "wa_tracker.py",
+   "concern": "wa-tracker",
+   "nota": ""
+  },
+  "com.btp.x-centinela": {
+   "script": "x_centinela.py",
+   "concern": "x-centinela",
+   "nota": ""
+  },
+  "com.btp.x-dms-watch": {
+   "script": "x_dms.py",
+   "concern": "x-dms-watch",
+   "nota": ""
+  },
+  "com.btp.x-dms": {
+   "script": "x_dms.py",
+   "concern": "x-dms",
+   "nota": ""
+  },
+  "com.btp.x-guardados": {
+   "script": "x_guardados.py",
+   "concern": "x-guardados",
+   "nota": ""
+  },
+  "com.btp.x-mentions": {
+   "script": "x_mentions.py",
+   "concern": "x-mentions",
+   "nota": ""
+  },
+  "com.btp.x-radar": {
+   "script": "x_radar.py",
+   "concern": "x-radar",
+   "nota": ""
+  },
+  "com.btp.yt-inbox": {
+   "script": "yt_inbox.py",
+   "concern": "yt-inbox",
+   "nota": ""
+  },
+  "com.btp.evals": {
+   "script": "evals.py",
+   "concern": "evals",
+   "nota": "Arnes de evals semanal (lunes 06:30). Corre sin el flag judge: determinista y GRATIS. Es la red que avisa si un cambio rompio el muro o el router ANTES de que lo note {{TITULAR}}. Enchufado el 14-jul-26 tras la auditoria: estaba construido y no corria nunca."
+  },
+  "com.btp.living-context": {
+   "script": "rituales.py",
+   "concern": "living-context",
+   "nota": "Ritual de LUNES (rituales.py), lee seguimiento.json (ya presente en el mini). Encontrado SIN registrar y con rutas de portatil en el repo (sed a /Users/polaris el 15-jul, saneamiento). Sin justificacion de Air-only en el plist, candidato legitimo para el mini. NO cargado (gate de activar_daemon.py)."
+  },
+  "com.btp.org-wrap": {
+   "script": "rituales.py",
+   "concern": "org-wrap",
+   "nota": "Ritual de VIERNES (rituales.py), mismo caso que living-context: sed a /Users/polaris el 15-jul. NO cargado (gate de activar_daemon.py)."
+  },
+  "com.btp.sync-playbook-air": {
+   "script": "sync_playbook.py",
+   "concern": "sync-playbook-air",
+   "nota": "Heartbeat del sync Air-mini, documentado en el propio plist como CORRE EN LA AIR (el mini no alcanza la Air por Remote Login apagado). Rutas /Users/titular son correctas ahi (ese es el HOME real en la Air), no tocar. Vive cargado en la Air, no en el mini; se registra aqui solo como inventario/anti-duplicado. Confirmado VIVO por project-sync-playbook-air-mini.md (11-jul); NO es un plist muerto pese a la caracterizacion del item 23 de la auditoria, contrastado y corregido el 15-jul."
+  },
+  "com.btp.vigia-sesiones": {
+   "script": "vigia_sesiones.py",
+   "concern": "vigia-sesiones",
+   "nota": "Aviso de higiene de sesiones (vigia_sesiones.py), escanea el ~/.claude/projects del host donde corre, senal propia, legitimo tambien en el mini. Sed a /Users/polaris el 15-jul. NO cargado (gate de activar_daemon.py)."
+  },
+  "com.btp.wa-tareas": {
+   "script": "cosecha_whatsapp.py",
+   "concern": "wa-tareas",
+   "nota": "cosecha_whatsapp.py --stage. Ya tenia rutas /Users/polaris en el repo y ya esta CARGADO en el mini (verificado 15-jul, launchctl list). Solo faltaba el registro; no se toco el plist ni launchd."
+  },
+  "com.btp.sync-playbook-nudge": {
+   "script": "sync_playbook.py",
+   "concern": "sync-playbook-nudge",
+   "nota": "Nudge de frescura diario del playbook clinico, ya cargado en el mini con rutas /Users/polaris correctas. No se toco el plist salvo arreglar un bug de XML invalido preexistente en el comentario (dos guiones seguidos delante de un nombre de flag rompia plistlib.load, por eso regenera() lo saltaba en silencio); solo se reformulo el texto del comentario, cero cambio de comportamiento."
+  },
+  "com.btp.sync-playbook": {
+   "script": "sync_playbook.py",
+   "concern": "sync-playbook",
+   "nota": "Heartbeat SOLO-mini del sync Air-mini. {{TITULAR}} decidio explicitamente (11-jul, project-sync-playbook-air-mini.md) dejarlo desplegado SIN cargar y no reabrirlo como pendiente (el heartbeat en la Air mas el pull-al-abrir mas el nudge del mini ya cubren el caso; cargar este exigiria encender Remote Login en la Air, decision suya). El item 23 de la auditoria lo daba por plist muerto a borrar; contrastado y NO es asi, tiene dueno vivo y decision explicita, NO borrado. Rutas /Users/titular intactas (nunca se ha desplegado). Se arreglo el mismo bug de XML invalido del comentario que sync-playbook-nudge."
+  },
+  "com.btp.rotar-logs": {
+   "script": "rotar_logs.py",
+   "concern": "rotar-logs",
+   "nota": "Higiene mensual de logs (dia 1, 04:00). Creado 15-jul-26 con OK de {{TITULAR}} como EXCEPCION al \"NUNCA a launchd\" del docstring: configurado para NO tocar trazas de auditoria (BTP_ROT_DIAS_BORDE/OUTBOX=99999 => ledger/audit nunca caducan). Solo trunca logs .out/.err gordos y archiva observabilidad vieja (>14d) a archive/, jamas borra. RunAtLoad=false."
+  },
+  "com.btp.cuidado-ventana": {
+   "script": "run_agent.sh",
+   "concern": "cuidado-ventana",
+   "nota": "Item #20. Pase SEMANAL (miercoles 10:00) del cuidado-integral (\"Tu Nucleo\") via opus: cuida a {{TITULAR}}-la-persona en la ventana de espera de resultados. Respeta el charter: CUIDA no vigila, por defecto SUAVE y en SILENCIO, opt-out; solo deja UNA nota calida en Gestion/HOY.md si de verdad le aligera la espera. Creado 15-jul-26. RunAtLoad=false: es opt-in de {{TITULAR}}, NO cargado (gate de activar_daemon.py)."
+  },
+  "com.btp.aeo": {
+   "script": "aeo.py",
+   "concern": "aeo",
+   "nota": "Item #26. AEO mensual (dia 1, 05:00, detras de rotar-logs): vigila COMO describen a {{TITULAR}} y a BTP los asistentes de IA (Perplexity/Grok/ChatGPT/Gemini). Corre el script DIRECTO (no via run_agent.sh) => sin muro/agente. SOLO LECTURA, preguntas publicas (cero PII/clinico), respuestas tratadas como dato externo no confiable (anti-inyeccion). Creado 15-jul-26. RunAtLoad=false: NO cargado (gate de activar_daemon.py)."
+  },
+  "com.btp.nct-cache": {
+   "script": "actualizar_nct_cache.py",
+   "concern": "nct-estado",
+   "nota": "Refresca el cache de overallStatus de los ensayos vigilados (clinicaltrials.gov API v2 publica: sin clave, sin LLM, sin PII, stdlib puro, TTL propio de 6h). Diario 07:40, antes del barrido del asistente. Concern 'nct-estado' y NO 'centinela-ned' a proposito: refrescar el dato y vigilarlo son trabajos distintos, y el guardian de duplicados tiene que verlo asi. Creado 25-jul-26 tras la auditoria: la tool existia y funcionaba desde hacia meses pero NADIE la invocaba (0 plists, 0 cron), asi que el cache llevaba 29 dias congelado y centinela_ned comparaba fosil contra fosil sin enterarse. RunAtLoad=false: NO cargado (gate de {{TITULAR}}, y activar_daemon.py rechaza worktrees)."
+  },
+  "com.btp.anatomia-push": {
+   "script": "anatomia_push.py",
+   "concern": "anatomia-push",
+   "nota": "Empuja el mapa cifrado al panel cada 5 min (panel.helptitular.com). Polaris SALE, nadie entra: sin tunel ni puerto abierto. PREPARADO Y APAGADO a proposito: no se enciende hasta que el panel responda, o estaria empujando a un sitio que aun no sirve."
+  },
+  "com.btp.anatomia": {
+   "script": "anatomia.py",
+   "concern": "anatomia",
+   "nota": "El mapa vivo del sistema en 127.0.0.1:8791 (solo loopback). Concern propio y distinto del de El Observatorio (8787): aquel es la sala de control (todo a la vez, para vigilar), este es el mapa (una capa cada vez, para entender y para ensenar). CARGADO el 25-jul-26 con OK de {{TITULAR}}. Al encenderlo choco con un servidor de pruebas que ya tenia el 8791: KeepAlive lo reintentaba en bucle con exit 1. Se libero el puerto y quedo sano (HTTP 200). Alcanzable desde el movil por tailscale serve --http=9093."
+  },
+  "com.btp.historial-sync": {
+   "script": "historial_sync.py",
+   "concern": "historial-sync",
+   "nota": "Drive → local → ingerir → reindexar el historial clínico. Una sola dirección: NO sube. Con HALT se salta la pata de Drive y hace el resto."
+  },
+  "com.btp.publicar-sync": {
+   "script": "publicar_sync.py",
+   "concern": "publicar-sync",
+   "nota": "Espejo publico (BeyondTheProtocol/polaris) al dia: deriva con publicar.py, exige overlay + barrido limpio + que compile, no toca nada con HALT. Dispara al MOVERSE master (WatchPaths sobre su ref y su reflog, throttle 120 s) + diario 6:20 de red."
+  },
+  "com.btp.radar-ned-diario": {
+   "script": "radar_ned_dia.sh",
+   "concern": "radar-ned-diario",
+   "nota": ""
+  }
+ }
+}

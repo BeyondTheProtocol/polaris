@@ -1,0 +1,312 @@
+{
+ "_nota": "Registro ESTÁTICO de cerebros de la centralita (tools/ia.py). Rutas estáticas para PHI (plan typed-swinging-wand). 'destino' es la etiqueta que ve el BORDE: solo 'cleared:'/'local:' pueden recibir contenido sensible; todo endpoint de nube es untrusted. 'orden' menor = se prueba antes (dentro de su grupo de confianza). 'para' = para qué CLASE de tarea es el especialista (el perfil que calcula ia.perfil_de_tarea a partir del mapa del stack); promociona, no filtra. 'solo_perfil' = NO entra en el relevo general, solo cuando su perfil lo reclama. Editable sin tocar código.  · `generativo` (12-sep-26): false = NO es un LLM, es una herramienta con API (consensus, scite: devuelven papers con DOI, no generan texto). Existe porque contar las dos cosas juntas como «modelos» infla la cifra, y ya se publicó mal una vez.",
+ "_mapa": "Las etiquetas 'para' vienen de 00_FUENTE-DE-VERDAD/04 · IA/Stack-IA-Recalibrado-2026-06-22.md (10 filas revisadas por 3 comités el 28/6). Si cambias el mapa, cambia también aquí — y al revés.",
+ "cerebros": [
+  {
+   "name": "local-ollama",
+   "kind": "openai_local",
+   "destino": "local:ollama",
+   "url": "http://127.0.0.1:11434/v1/chat/completions",
+   "model": "qwen3:8b",
+   "trusted": true,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 4,
+   "generativo": true,
+   "orden": 5,
+   "enabled": true,
+   "_nota": "Suelo LOCAL de confianza (egress 0). CORREGIDO 12-sep-26: el registro declaraba llama3.2:3b y tools/local.py lleva tiempo corriendo qwen3:8b (verificado con `ollama list`); la centralita decidía con un dato falso. capability 4 se deja A PROPÓSITO (por debajo del listón sustantivo=5): un 8B en 16GB extrae, clasifica y de-identifica bien, razonar no. Subirlo a 5 es decisión de {{TITULAR}}."
+  },
+  {
+   "name": "consensus",
+   "kind": "cli_chain",
+   "bin": "evidencia.py",
+   "flags": [
+    "consensus"
+   ],
+   "destino": "consensus",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 6,
+   "generativo": false,
+   "orden": 6,
+   "enabled": true,
+   "solo_perfil": true,
+   "para": [
+    "evidencia"
+   ],
+   "_nota": "Fila 2 del mapa: evidencia/literatura = herramienta ESPECIALIZADA (papers reales con PMID/DOI) → síntesis Claude; los buscadores LLM solo dan leads. Va por su MCP propio con OAuth cacheado (consensus_mcp.py en .venv-consensus); si falta el venv o el token, sale rc=1 y la centralita releva. Sin marginal por llamada (entra en el plan Pro) → free:true. El resultado es DATO a cotejar contra fuente primaria.",
+   "salud_fichero": "tools/state/consensus/tokens.json",
+   "timeout": 95
+  },
+  {
+   "name": "scite",
+   "kind": "cli_chain",
+   "bin": "evidencia.py",
+   "flags": [
+    "scite"
+   ],
+   "destino": "scite",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 5,
+   "generativo": false,
+   "orden": 7,
+   "enabled": true,
+   "solo_perfil": true,
+   "para": [
+    "evidencia"
+   ],
+   "_nota": "Respaldo del carril de evidencia y el único que dice si un paper fue APOYADO o CONTRADICHO después. MCP propio (scite_mcp.py).",
+   "salud_fichero": "tools/state/scite/tokens.json",
+   "timeout": 95
+  },
+  {
+   "name": "perplexity",
+   "kind": "cli_chain",
+   "bin": "perplexity.py",
+   "destino": "perplexity",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 3.0,
+   "capability": 6,
+   "generativo": true,
+   "orden": 8,
+   "enabled": true,
+   "solo_perfil": true,
+   "para": [
+    "descubrir"
+   ],
+   "secret": "btp-perplexity-api",
+   "models": [
+    "sonar-pro",
+    "sonar"
+   ],
+   "_nota": "Fila 3 del mapa: primaria para DESCUBRIR lo último (preprints, ensayo recién soltado, congreso). FUERA del relevo general a propósito (solo_perfil): es un buscador, no un razonador; colarlo en la cadena daría respuestas con forma de búsqueda a preguntas que no lo son. RADAR, NO ORÁCULO: sus citas se cotejan SIEMPRE contra fuente primaria (feedback-evidencia-grok-no-perplexity). Apunta su gasto solo en gasto.py.",
+   "timeout": 180
+  },
+  {
+   "name": "nvidia-free",
+   "kind": "carril_gratis",
+   "destino": "nvidia",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 3,
+   "generativo": true,
+   "orden": 10,
+   "enabled": true,
+   "secret": "btp-nvidia-api",
+   "para": [
+    "volumen"
+   ]
+  },
+  {
+   "name": "nvidia-deepseek",
+   "kind": "carril_gratis",
+   "model": "deepseek-ai/deepseek-v4-pro",
+   "destino": "nvidia",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 4,
+   "generativo": true,
+   "orden": 11,
+   "enabled": true,
+   "secret": "btp-nvidia-api",
+   "para": [
+    "volumen"
+   ],
+   "_nota": "Fila 7 del mapa: volumen barato = Nemotron gratis, con DeepSeek V4 como el mejor ratio. GRATIS vía NIM (la corrección del comité del 28/6: los $0.43/$0.87 son la API directa, no lo que paga {{TITULAR}}). Modelo verificado en el catálogo de NIM el 27/7/26. capability 4 A PROPÓSITO = por debajo del listón SUSTANTIVO (5), así que sirve rutina/volumen y NO le quita a Gemini el trabajo que importa. NUNCA clínico/PII (untrusted: lo niega el borde)."
+  },
+  {
+   "name": "nvidia-kimi",
+   "kind": "carril_gratis",
+   "model": "moonshotai/kimi-k3",
+   "destino": "nvidia",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 7,
+   "generativo": true,
+   "orden": 16,
+   "enabled": true,
+   "secret": "btp-nvidia-api",
+   "para": [
+    "volumen"
+   ],
+   "_nota": "AÑADIDO 12-sep-26. Kimi K3 (Moonshot) servido por NVIDIA NIM: entra con la clave que YA existe, sin alta ni gasto nuevo. Verificado en el catálogo de NIM hoy. capability 7 = llega al listón sustantivo, así que da un gratis de gama alta que antes no había. ORDEN 16 (corregido 12-sep-26): entra DESPUÉS de Gemini. Con orden 12 y capability 7 le quitaba a Gemini el default del trabajo sustantivo, y el roster (test_centralita_cerebros.py) lo cazó. Sigue disponible para quien lo pida y como relevo; convertirlo en default gratis es decisión de {{TITULAR}}, no un efecto colateral."
+  },
+  {
+   "name": "nvidia-nemotron-ultra",
+   "kind": "carril_gratis",
+   "model": "nvidia/nemotron-3-ultra-550b-a55b",
+   "destino": "nvidia",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 7,
+   "generativo": true,
+   "orden": 17,
+   "enabled": true,
+   "secret": "btp-nvidia-api",
+   "para": [
+    "volumen"
+   ],
+   "_nota": "AÑADIDO 12-sep-26. Nemotron 3 Ultra 550B (MoE, 55B activos) por NIM, misma clave. El open-weight más grande al que se llega gratis desde aquí. Verificado en el catálogo hoy. ORDEN 17 (corregido 12-sep-26): entra DESPUÉS de Gemini. Con orden 12 y capability 7 le quitaba a Gemini el default del trabajo sustantivo, y el roster (test_centralita_cerebros.py) lo cazó. Sigue disponible para quien lo pida y como relevo; convertirlo en default gratis es decisión de {{TITULAR}}, no un efecto colateral."
+  },
+  {
+   "name": "gemini",
+   "kind": "gemini",
+   "destino": "gemini",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 1.0,
+   "capability": 7,
+   "generativo": true,
+   "orden": 15,
+   "enabled": true,
+   "secret": "btp-gemini-api",
+   "models": [
+    "gemini-pro-latest",
+    "gemini-3.1-pro-preview",
+    "gemini-2.5-pro"
+   ],
+   "_nota": "Cerebro por defecto del trabajo SUSTANTIVO no-sensible ({{TITULAR}} 23/6). orden 15 = DESPUÉS del suelo gratis (local/nvidia), ANTES de Claude. En RUTINA (sin listón) va primero lo gratis; en SUSTANTIVO (listón cap>=5) el 3B/nvidia no llegan y entra Gemini (capaz y más barato que Claude). Lo CLÍNICO/sensible NUNCA (untrusted: el borde lo niega -> Claude). ALIAS PRIMERO (12-sep-26): gemini-pro-latest apunta siempre al pro vigente, así el registro deja de envejecer solo; detrás, 3.1-pro-preview y 2.5-pro como caída estable. Coste no contabilizado aún en cost_guard (problema 6)."
+  },
+  {
+   "name": "glm",
+   "kind": "cli_chain",
+   "destino": "glm",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 0.6,
+   "capability": 7,
+   "generativo": true,
+   "orden": 18,
+   "enabled": true,
+   "secret": "btp-glm-api",
+   "models": [
+    "glm-5.3",
+    "glm-5.2",
+    "glm-5.1"
+   ],
+   "para": [
+    "web-frontend"
+   ],
+   "_nota": "Fila 4 del mapa: diseño web/frontend = GLM-5.2 (#2 mundial en WebDev Arena, confirmado por el comité el 28/6) y mucho más barato que un flagship. orden 18 = DESPUÉS de Gemini a propósito: su ventaja es el frontend, no el razonamiento general, así que en la cadena normal no le quita el sitio al default sustantivo; cuando la tarea ES frontend, el perfil lo promociona. Modelos verificados por API el 12-sep-26: la punta es glm-5.3 (había glm-5.2)."
+  },
+  {
+   "name": "openrouter",
+   "kind": "cli_chain",
+   "bin": "openrouter.py",
+   "destino": "openrouter",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 0.5,
+   "capability": 8,
+   "generativo": true,
+   "orden": 19,
+   "enabled": false,
+   "secret": "btp-openrouter-api",
+   "models": [
+    "openrouter/auto",
+    "deepseek/deepseek-chat",
+    "nvidia/nemotron-3-ultra-550b-a55b:free"
+   ],
+   "_nota": "AÑADIDO 12-sep-26, CABLEADO Y APAGADO a la espera de la clave. Pasarela: UNA clave y 445 modelos de muchas casas (verificado leyendo su catálogo hoy, que se consulta sin clave: `python3 tools/openrouter.py --listar`), 27 de ellos gratis. Resuelve el problema de raíz: cada proveedor nuevo ya no pide alta + clave + cliente. PARA ENCENDERLO: crear la clave en openrouter.ai (lo hace {{TITULAR}}, yo no doy de alta cuentas), guardarla con `security add-generic-password -U -a \"$USER\" -s btp-openrouter-api -w`, y poner enabled:true aquí. orden 19 = detrás de Gemini y GLM: alcanza lo que no tiene cuenta propia, no reemplaza a los clientes directos, que salen más baratos. NUNCA clínico (untrusted: lo niega el borde)."
+  },
+  {
+   "name": "claude",
+   "kind": "claude",
+   "destino": "cleared:claude",
+   "trusted": true,
+   "free": false,
+   "cost_per_1k": 5.0,
+   "capability": 9,
+   "generativo": true,
+   "orden": 20,
+   "enabled": true,
+   "secret": "btp-anthropic-api",
+   "models": [
+    "fable",
+    "sonnet",
+    "haiku"
+   ],
+   "models_clinico": [
+    "fable",
+    "opus",
+    "sonnet",
+    "haiku"
+   ],
+   "para": [
+    "codigo"
+   ],
+   "_nota": "Filas 1 y 6 del mapa: el ÚNICO al que el muro deja acercarse a lo clínico/sensible, y la primaria de razonamiento duro y código. FABLE AÑADIDO 12-sep-26: claude-fable-5-1 está en el catálogo de Anthropic y es el de índice más alto, pero no figuraba en el registro, así que la centralita nunca lo elegía aunque run_agent.sh ya degradaba fable->opus->sonnet."
+  },
+  {
+   "name": "openai",
+   "kind": "cli_chain",
+   "bin": "chatgpt.py",
+   "destino": "openai",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 1.25,
+   "capability": 9,
+   "generativo": true,
+   "orden": 25,
+   "enabled": true,
+   "secret": "btp-openai-api",
+   "models": [
+    "gpt-5.6-sol",
+    "gpt-5.5-pro",
+    "gpt-5.4-pro",
+    "gpt-5.2"
+   ],
+   "para": [
+    "segunda-opinion"
+   ],
+   "_nota": "El 2º par de ojos de gama alta y el respaldo capaz cuando Claude no está (era el hueco real: por debajo de Claude solo quedaba un 3B). NO se etiqueta 'codigo' a propósito: en código manda Claude (fila 6), este es el respaldo. Modelos verificados por API el 12-sep-26: el registro se había quedado en gpt-5.2 y el catálogo ya sirve 5.4/5.5/5.6. Cadena: 5.6-sol (punta) -> 5.5-pro -> 5.4-pro -> 5.2 estable."
+  },
+  {
+   "name": "grok",
+   "kind": "cli_chain",
+   "destino": "grok",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 3.0,
+   "capability": 8,
+   "generativo": true,
+   "orden": 30,
+   "enabled": true,
+   "secret": "btp-grok-api",
+   "models": [
+    "grok-4.6",
+    "grok-4.5",
+    "grok-4.3"
+   ],
+   "para": [
+    "osint-x",
+    "descubrir"
+   ],
+   "_nota": "Fila 5 del mapa: en X manda Grok (acceso nativo en tiempo real), y es el respaldo de 'descubrir' detrás de Perplexity. Sus citas NO se dan por buenas sin cotejar (feedback-evidencia-grok-no-perplexity). Modelos verificados por API el 12-sep-26: la punta es grok-4.6 (el registro se había quedado en 4.5)."
+  },
+  {
+   "name": "fugu",
+   "kind": "fugu",
+   "destino": "fugu",
+   "trusted": false,
+   "free": false,
+   "cost_per_1k": 10.0,
+   "capability": 8,
+   "generativo": true,
+   "orden": 90,
+   "enabled": false,
+   "secret": "btp-fugu-api",
+   "_nota": "APAGADO, y AHORA CON EL MOTIVO ESCRITO (12-sep-26; antes no lo tenía y por eso nadie sabía si podía levantarse). {{TITULAR}} pidió levantarlo: se intentó y la API devuelve 403 Forbidden con la clave guardada (btp-fugu-api, 69 chars, presente). El healthcheck lo daba por vivo porque solo mira el registro, no la llamada. Un proveedor que contesta 403 en cada intento solo añade latencia y un relevo silencioso, así que se queda enabled:false hasta que la clave funcione. PARA LEVANTARLO: renovar/validar la clave en sakana.ai (api.sakana.ai/v1) y reintentar `python3 tools/fugu.py \"di vivo\"`; si sigue en 403 con VPN activa, probar sin ella (el comité del 28/6 ya le detectó caída bajo NordVPN). Es además el más caro del registro: 10 USD/1k, el doble que Claude."
+  }
+ ],
+ "_glosario": "Términos estándar ↔ palabra de la casa (regla de {{TITULAR}} 27/7/26): 'cerebro' = PROVEEDOR/BACKEND de inferencia registrado (una entrada de este service registry, no un proceso vivo) · 'centralita' = ROUTER (tools/ia.py) · 'relevo/cadena' = FAILOVER sobre la fallback chain que ordenan 'orden'/'capability' · 'para' = etiqueta de INTENT ROUTING · 'destino' = etiqueta de política del gate de egress."
+}

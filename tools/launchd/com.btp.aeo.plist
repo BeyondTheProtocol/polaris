@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- AEO mensual (aeo.py): vigila COMO describen a {{TITULAR}} y a "Beyond the Protocol" los
+     asistentes de IA (Perplexity, Grok, ChatGPT, Gemini). SOLO LECTURA: no envia, no corrige,
+     no contacta. Las preguntas son PUBLICAS (nombre publico + proyecto, cero PII/clinico). Lo que
+     devuelven los modelos se trata como DATO EXTERNO NO CONFIABLE (anti-inyeccion): se archiva
+     como texto plano, no se ejecuta ni se persiste a memoria. Corre el script DIRECTO (no via
+     run_agent.sh) => sin muro/agente; el analisis de banderas es local y determinista.
+     Cadencia: dia 1 de cada mes, 05:00 (detras de rotar-logs a las 04:00).
+     RunAtLoad false: NO arranca hasta el OK de {{TITULAR}} (gate de encendido). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.aeo</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+  </dict>
+  <key>ProgramArguments</key><array><string>/Users/polaris/claudecode/.venv/bin/python</string><string>/Users/polaris/claudecode/tools/aeo.py</string></array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Day</key><integer>1</integer>
+    <key>Hour</key><integer>5</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/aeo.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/aeo.err</string>
+</dict></plist>

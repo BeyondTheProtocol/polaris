@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.asistente</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>BTP_ORQUESTADOR</key><string>claude-suscripcion</string>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MURO_PROFILE</key><string>privileged</string>
+    <key>BTP_AGENT</key><string>asistente</string>
+    <!-- Ahorro 3/7 (auditoría de coste, Vega=54% del gasto): el barrido rutinario (recordar
+         plazos/triar hilos sobre datos YA deterministas de seguimiento.py) no necesita Sonnet.
+         Haiku 4.5 basta para clasificar/formatear. Reversible: sonnet aquí. -->
+    <key>BTP_MODEL</key><string>sonnet</string>
+    <!-- El barrido completo (correo + seguimiento + perseguir + anticipa) revienta el default de
+         25 turnos y termina en 'error_max_turns' → 'fallo'. Buena parte de los turnos se pierden
+         porque el muro deniega comandos con 2>/dev/null (causa raíz, pendiente de OK). Interino:
+         40 turnos para que COMPLETE su barrido diario. Con el muro arreglado, 25 sobraría. -->
+    <key>BTP_MAX_TURNS</key><string>40</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+    <string>Haz tu barrido diario de hilos abiertos priorizado por impacto-NED (usa tools/seguimiento.py como base determinista) y deja tu sección lista para que el orquestador la funda en 00_FUENTE-DE-VERDAD/Gestion/HOY.md. NO envíes nada por Telegram tú (el parte de HOY lo manda la rutina enviar-hoy). Si algún hilo amenaza el goal (NED), dispara código rojo. Solo informa y deja borradores; nunca contactes, envíes, pagues ni publiques.</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>55</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/asistente.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/asistente.err</string>
+</dict></plist>

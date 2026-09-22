@@ -1,0 +1,194 @@
+# ── Claves y secretos (NUNCA versionar) ──
+tools/.telegram_secrets.json
+tools/.grok_secrets.json
+tools/.*_secrets.json
+# Cualquier variante con sufijo (.bak, .sobra.bak, .old...): el 31-jul-26
+# quedaron tres .sobra.bak con las claves dentro y `*_secrets.json` NO los cubria.
+*_secrets.json.*
+*_secrets.json
+
+# ── Cerebro de texto + datos clínicos/PII: NO en git (lo respalda restic, lo indexa kb.py) ──
+# git versiona CÓDIGO y CONFIG del sistema; el contenido (fuente de verdad, informes,
+# biopsia, historiales) vive en disco + backup, NUNCA en el historial git.
+# (Lección durable: «clínico en el historial» fue el fallo de una copia anterior.)
+/00_FUENTE-DE-VERDAD/
+/{{CARPETA_PRUEBA}}/
+/docu enviada a nova/
+/informes/
+**/.claude/worktrees/
+.claude/settings.local.json
+# Sesiones locales de Claude Code (metadata de runtime por máquina, no código)
+.claude/projects/
+
+# ── Entornos virtuales + dependencias + MCP de terceros (regenerables) ──
+.venv/
+.venv-biomcp/
+.venv-cbioportal/
+.venv-voz/
+.venv-pipeline/
+.venv-imagen/
+.venv-consensus/
+.venv-embed/
+**/node_modules/
+
+# ── kb.py: capa vectorial (búsqueda híbrida BM25+embeddings) — binario regenerable ──
+# Modelo ONNX (~134MB, ver tools/kb_embed.py para la descarga one-time) y el índice de
+# vectores derivado del corpus (igual que .kb_index.db, nunca se versiona el índice).
+tools/models/
+00_FUENTE-DE-VERDAD/.kb_index.vectors.npy
+
+# ── Pipeline de neoantígenos: binarios licenciados + salidas (pueden derivar de PII) ──
+# El código y los datos SINTÉTICOS de ejemplo SÍ se versionan; lo demás NO.
+pipeline/vendor/
+pipeline/salidas/*
+!pipeline/salidas/.gitkeep
+/.mcp-servers/
+
+# ── Estado de runtime del lazo 24/7: cola, coste, outbox/auditoría (NO en git) ──
+# Lo genera la máquina en marcha (jobs, borradores «a un clic», logs de salida);
+# puede contener PII/destinatarios → vive en disco + backup, nunca en el historial.
+tools/state/
+!tools/state/herramientas.json
+tools/.gasto_ledger.jsonl
+
+# ── Índice / caché / temporales (regenerables) ──
+00_FUENTE-DE-VERDAD/.kb_index.json
+tools/manifest-archivado.csv
+tools/.radar_seen.json
+tools/launchd/logs/
+*.tmp
+__pycache__/
+*.pyc
+.DS_Store
+
+# ── Carpetas de volcados crudos (ya digeridos; viven en disco/iCloud, no en git) ──
+00 · Bandeja de entrada/
+**/DICOM_export/
+**/ChatExport*/
+**/voice_messages/
+**/stickers/
+
+# ── Binarios pesados: se quedan en disco/iCloud, NO en git ──
+# git versiona el cerebro de TEXTO y el CÓDIGO, no los gigas de imágenes médicas.
+*.dcm
+*.DCM
+*.nii
+*.nii.gz
+*.zip
+*.7z
+*.rar
+*.gz
+*.tar
+*.mov
+*.mp4
+*.m4a
+*.wav
+*.opus
+*.ogg
+*.ogv
+*.webm
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.gif
+*.webp
+*.tif
+*.tiff
+*.svs
+*.psd
+*.ai
+*.pdf
+*.pptx
+*.docx
+*.xlsx
+*.key
+*.numbers
+*.traineddata
+*.woff
+*.woff2
+*.ttf
+*.otf
+*.bin
+*.app/
+
+# Volcados privados de WhatsApp - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_WHATSAPP/
+
+# Capturas privadas de X (menciones/guardados/DMs) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_X/
+
+# Digests privados de Instagram (publicaciones/comentarios/menciones) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_INSTAGRAM/
+
+# DMs privados de IG/LinkedIn (vía avisos por email) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_DMS/
+
+# Buzón privado de YouTube (comentarios/menciones) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_YT/
+
+# Núcleo: datos de cuidado/bienestar (red de apoyo, diario, directiva) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_NUCLEO/
+
+# Correo: archivo local de TODO el correo (IMAP solo lectura) - nunca subir
+00_FUENTE-DE-VERDAD/_PRIVADO_CORREO/
+
+# Clínico privado (informes/biopsia detallada) - nunca subir. Cinturón-y-tirantes:
+# ya cubierto por /00_FUENTE-DE-VERDAD/, explícito por si esa línea se estrechara.
+**/_PRIVADO_CLINICO/
+
+# Expediente legal/fiscal del caso (DNI, denuncias, contratos, impuestos) - nunca subir
+**/_PRIVADO_EXPEDIENTE/
+
+# --- Copias en la RAÍZ del repo (fuera de 00_FUENTE-DE-VERDAD/) - nunca subir ---
+# Las reglas de arriba anclaban los _PRIVADO_* SOLO bajo 00_FUENTE-DE-VERDAD/, dejando
+# las copias en la raíz expuestas si esto se convirtiera en repo git. Catch-all anclado
+# a cualquier profundidad + carpetas clínicas de coordinación de la raíz (clínico NUNCA a git).
+**/_PRIVADO_*/
+/_PRIVADO_CORREO/
+/_PRIVADO_DMS/
+/_PRIVADO_NUCLEO/
+/01 · Tratamiento/
+
+# Estado vivo del Tablero/gestión de tareas (no es fuente de verdad versionable)
+/Gestion/
+
+# Transcripciones/estado de sesiones de Claude Code (local, puede llevar texto suyo)
+/.claude/projects/
+
+# Cajita de trabajo (audio descargado, no se versiona)
+_cajita/
+
+# Config local de ElevenLabs (voice_id) - no a git
+tools/.elevenlabs*.json
+
+# Bandeja de entrada local (intenciones sueltas + espejo del lazo) - puede llevar texto suyo, no a git
+/BANDEJA.md
+
+# Informes AEO (borradores locales, solo lectura; la titular decide si actúa)
+tools/aeo_informe_*.md
+tools/aeo_informe_*.json
+
+# Tablas de referencia públicas (grandes, no versionar)
+_data/
+
+# Índice RAG SQLite FTS5 (local, se reconstruye) + logs de Claude
+00_FUENTE-DE-VERDAD/.kb_index.db
+00_FUENTE-DE-VERDAD/.kb_index.db-*
+.claude/logs/
+.venv-omica/
+
+# Overlay local del detector de zonas clínicas: lleva nombre y fecha de nacimiento.
+.claude/hooks/zonas_clinicas.local.json
+
+# Identidad de la titular (DOB, DNI, NHC): la lee subir_historial_drive.py.
+tools/identidad.local.json
+
+# Nombres de terceros que redacta el detector de PII.
+tools/nombres.local.json
+
+# Perfil clínico del caso (dianas, cifras, variantes): lo lee tools/publicar.py.
+tools/perfil.local.json
+
+# Terminos identificativos del muro del pipeline (nombre propio, terminos vetados en publico)
+pipeline/config/vetados.local.json

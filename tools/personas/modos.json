@@ -1,0 +1,32 @@
+{
+  "_nota": "Modos seleccionables de Polaris (el desplegable de Open WebUI = el botón de modo, estilo Los Sims). El MODO lo elige {{TITULAR}} (el tema); el CEREBRO real lo sigue eligiendo el borde bajo el muro (el poder). 'persona' es un .md en tools/personas/ que se antepone como system prompt. 'nivel'/'prefer' son pistas de routing opcionales para ia.ask. 'deteccion' = palabras clave para la AUTO-DETECCIÓN del modo (heurística barata/determinista en borde_gateway): si {{TITULAR}} NO elige modo a mano, el borde clasifica la intención del mensaje y aplica el modo con más señal; el override manual SIEMPRE gana. Datos, no código: editable sin tocar el .py. Modo desconocido -> el que tenga default=true (Vivir) = comportamiento actual.",
+  "modos": [
+    {
+      "name": "polaris-vivir",
+      "label": "🛋️ Vivir · la usuaria",
+      "persona": "vivir.md",
+      "default": true,
+      "deteccion": []
+    },
+    {
+      "name": "polaris-mision",
+      "label": "🎯 Misión · hacia NED",
+      "persona": "mision.md",
+      "nivel": "sustantivo",
+      "deteccion": ["ensayo", "ensayos", "biopsia", "diana", "dianas", "mutaci", "oncolog", "contacto", "tumor", "metasta", "nct", "vacuna", "tratamiento", "trial", "lab", "laboratorio", "contacto", "contactos", "acceso", "fondos", "donaci", "prensa", "periodista", "medio", "entrevista", "paper", "estudio", "evidencia", "experto", "carlos roca", "contacto", "{{CIUDAD}}", "ned"]
+    },
+    {
+      "name": "polaris-cuidar",
+      "label": "💜 Cuidar · Tu Núcleo",
+      "persona": "cuidar.md",
+      "deteccion": ["cansad", "cansancio", "agotad", "energia", "energía", "descans", "dormir", "sueño", "ansiedad", "ansios", "miedo", "asustad", "angustia", "triste", "tristeza", "abrumad", "sobrepasad", "no puedo más", "agobi", "estres", "estrés", "emocion", "animo", "ánimo", "respirar", "calma", "cuidarme", "cuidar de mi", "me siento", "estoy mal", "bajón", "bajon", "llorar", "sola", "frágil", "fragil", "entera"]
+    },
+    {
+      "name": "polaris-construir",
+      "label": "🔨 Construir · la arquitecta",
+      "persona": "construir.md",
+      "nivel": "sustantivo",
+      "deteccion": ["construye", "construir", "monta", "montar", "crea una tool", "crea un agente", "crea una caja", "nueva caja", "nuevo agente", "nueva tool", "nueva rutina", "añade al sistema", "modifica el sistema", "cambia el sistema", "mejora polaris", "mejorar polaris", "constructor", "constelaci", "daemon", "launchd", "script", "refactor", "código", "codigo", "el repo", "borde_gateway", "seguimiento.py", "una rutina", "automatiza", "automatizar", "pipeline", "deploy", "diseña una", "diseñar el sistema"]
+    }
+  ]
+}

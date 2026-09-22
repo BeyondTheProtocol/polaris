@@ -1,0 +1,45 @@
+{
+  "_nota": "Registro de ARQUITECTOS (orquestadores) = cajas intercambiables. El arquitecto es quien arranca y razona el gabinete. run_agent.sh lee la caja elegida por BTP_ORQUESTADOR (default 'claude') y de ella toma: cmd (binario), secret (nombre en el Llavero) y auth_env (variable donde inyectar la clave). El MURO es ESTRUCTURAL (borde.py + cost_guard.py + HALT) y NO depende de quien orqueste: toda salida pasa por el borde. Editable sin tocar codigo. Consumer-first como peripheries.json: anadir una caja NO la autodespliega; hay que fusionar a casa base y recargar antes de seleccionarla. Fallback robusto: si este registro falta o es ilegible, run_agent.sh usa los defaults de Claude de siempre.",
+  "_nota_principal_por_nivel": "CEREBRO PRINCIPAL de una tarea = se DERIVA del nivel + capability + trusted (ver ia.principal_para), NO se cablea a 'claude'. nivel_min/capability fijan el liston: lo critico/clinico exige el mejor cerebro de CONFIANZA (hoy = claude); lo no sensible puede resolverlo otro. Regla (plan polished-swimming-deer): una ACCION espera a su cerebro principal (si no esta, run_agent.sh aplaza, exit 75); una PREGUNTA la responde un relevo de menor rango en SOLO-LECTURA con los datos (tools/responder_con_datos.py, via ia.ask -> borde) mientras el principal vuelve, sin enmudecer y sin servir juicio clinico con un cerebro flojo.",
+  "orquestadores": [
+    {
+      "name": "claude",
+      "kind": "claude-code",
+      "cmd": "claude",
+      "secret": "btp-anthropic-api",
+      "auth_env": "ANTHROPIC_API_KEY",
+      "trusted": true,
+      "capability": 9,
+      "nivel_min": "critico",
+      "enabled": true,
+      "_nota": "Arquitecto por defecto y de maxima fidelidad. HOY el unico apto para lo clinico/critico. Su CLI (flags --settings/--agent/--permission-mode/--output-format) es la interfaz que run_agent.sh sabe invocar; por eso otro arquitecto NO entra por aqui, entra por el gateway (ver gateway-openai).",
+      "medido": true
+    },
+    {
+      "name": "claude-suscripcion",
+      "kind": "claude-code",
+      "cmd": "claude",
+      "secret": "btp-claude-oauth-token",
+      "auth_env": "CLAUDE_CODE_OAUTH_TOKEN",
+      "trusted": true,
+      "capability": 9,
+      "nivel_min": "rutina",
+      "enabled": true,
+      "_nota": "MISMO binario Claude Code, pero auth por SUSCRIPCION Max (token largo de 'claude setup-token', ~1 ano) en vez de la API MEDIDA. Fin: gastar de la cuota del plan y no del tope mensual de API. SOLO rutinario (nivel_min=rutina) — NUNCA clinico/critico (esos siguen en 'claude'/API por el muro clinico de run_agent.sh:170). Secreto en el Llavero: btp-claude-oauth-token. SALVAGUARDA en run_agent.sh: si ese secreto falta/caduca, el daemon NO se rompe -> cae a 'claude' (API) y avisa. Consumer-first: anadir esto NO lo autodespliega; un plist lo elige con BTP_ORQUESTADOR=claude-suscripcion tras fusionar+recargar desde casa base.",
+      "medido": false
+    },
+    {
+      "name": "gateway-openai",
+      "kind": "openai-gateway",
+      "endpoint": "http://127.0.0.1:8799/v1",
+      "secret": "btp-gateway-token",
+      "trusted": false,
+      "capability": 6,
+      "nivel_min": "rutina",
+      "enabled": false,
+      "_nota": "Arquitecto ABIERTO enjaulado (Fase 3, post-biopsia): un runner externo (OpenCode/Goose) habla con borde_gateway (:8799) -> ia.ask -> borde. NO se invoca por run_agent.sh (es otra interfaz); su muro es el gateway. Solo tareas NO criticas al principio. Apagado hasta pilotarlo.",
+      "medido": true
+    }
+  ],
+  "_nota_medido": "medido=true => API por uso (dinero real, lo gatean los topes de cost_guard). medido=false => cuota de un plan ya pagado (Max): el € marginal es 0, así que no consume el presupuesto de dinero; se anota aparte en cuota_suscripcion_usd. FAIL-CLOSED: si falta el campo, run_agent.sh lo trata como MEDIDO (dinero)."
+}
