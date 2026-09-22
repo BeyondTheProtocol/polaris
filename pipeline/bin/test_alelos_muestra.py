@@ -221,6 +221,35 @@ try:
 except ent.EntradaNoAnotada:
     check(True, "leer_entradas: multialélico con un solo PEP -> PARA")
 
+# Issue #8: una muestra única no permite contradecir su etiqueta de normal.
+normal_pep = vcf_pep("normal_unica_pep.vcf", ("NORMAL",),
+                     extra=("##normal_sample=NORMAL",))
+try:
+    ent.leer_variantes_meta(normal_pep)
+    check(False, "leer_entradas: muestra única marcada normal debería PARAR")
+except MuestraAmbigua as e:
+    check("##normal_sample" in str(e),
+          "leer_entradas: muestra única normal -> error que identifica la contradicción")
+
+normal_vep = vcf_vep(
+    "normal_unica_vep.vcf",
+    [(1000, "C", ["G"], [csq("G", "missense_variant", "10", f"{r10}/W")], ["0.40"])],
+    muestras=("NORMAL",), cabecera_extra=("##normal_sample=NORMAL",))
+normal_salida = TMP / "normal_unica.prep.vcf"
+try:
+    pr.anotar_vcf(normal_vep, str(FASTA), str(normal_salida))
+    check(False, "preparar_reales: muestra única marcada normal debería PARAR")
+except SystemExit as e:
+    check("##normal_sample" in str(e),
+          "preparar_reales: muestra única normal -> error que identifica la contradicción")
+check(not normal_salida.exists() and not Path(str(normal_salida) + ".descartes.tsv").exists(),
+      "preparar_reales: contradicción de muestra no genera salidas")
+
+# El nombre no determina el papel: sin metadata, se conserva el contrato de muestra única.
+vs_unica, meta_unica = ent.leer_variantes_meta(vcf_pep("unica_sin_etiqueta.vcf", ("NORMAL",)))
+check(meta_unica["muestra_tumor"] == "NORMAL" and len(vs_unica) == 1,
+      "leer_entradas: muestra única sin etiqueta conserva el comportamiento documentado")
+
 # ─────────────────────────────────────────────────────────────── 2.3 config
 print("== 2.3: configuración y estados de no medido ==")
 um, sha = cp.cargar_config(cp.CONFIG_DEFECTO)
