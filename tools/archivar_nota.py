@@ -214,12 +214,33 @@ def archivar(titulo, contenido, tema=TEMA_DEFECTO, estado="BORRADOR", reindex=Tr
     return ruta, rel, reindexado
 
 
+# Espera máxima al PRIMER byte de stdin (22-sep-26). Desde el Bash de Claude, stdin es un socket que
+# puede no cerrarse nunca: `archivar_nota.py --help` se quedó 2 h y 7 h colgado en `read()`. Un pipe
+# o un heredoc de verdad entregan el contenido al instante; si en este plazo no llega nada, no hay
+# contenido y se dice.
+ESPERA_STDIN_S = float(os.environ.get("BTP_ARCHIVAR_ESPERA_STDIN", "10"))
+
+
+def _leer_stdin(espera=None):
+    if sys.stdin.isatty():
+        return ""
+    import select
+    try:
+        listo, _, _ = select.select([sys.stdin], [], [], ESPERA_STDIN_S if espera is None else espera)
+    except (OSError, ValueError):
+        listo = [sys.stdin]                       # fichero normal u otro sin select: leer sin más
+    return sys.stdin.read() if listo else ""
+
+
 def main(argv):
+    if any(a in ("-h", "--help") for a in argv):
+        print(__doc__)
+        return 0
     opts = _parse_args(argv)
     if not opts["titulo"]:
         print(__doc__, file=sys.stderr)
         return 2
-    contenido = sys.stdin.read() if not sys.stdin.isatty() else ""
+    contenido = _leer_stdin()
     if not contenido.strip():
         print("error: sin contenido (pásalo por stdin). Ej: echo \"texto\" | archivar_nota.py \"Título\"",
               file=sys.stderr)

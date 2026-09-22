@@ -3020,6 +3020,18 @@
    "nota": "20-sep-2026: tomé por colgado un visor3d sano (HTTP 200, 9,5 s de CPU en 20 h) por su edad y propuse matarlo. Misma clase que feedback-log-sin-fecha-no-es-prueba. Candidata a gate_salida: «colgado»/«zombie» + kill sin ps ni curl en la sesión."
   },
   {
+   "slug": "feedback-matar-tools-colgados-stdin",
+   "que": "Los tools colgados esperando un stdin que nadie cierra se matan sin preguntar (por huella, nunca por edad)",
+   "clase": "lint-doc",
+   "mecanismo": "tools/vigia.py::detectar_colgados_stdin",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Regla de {{TITULAR}} 22-sep-26. El vigía (launchd 5 min) los termina solo; la huella vive en tools/colgados_stdin.py y la fija tests/test_colgados_stdin.py."
+  },
+  {
    "slug": "feedback-buscar-sesion-hermana-antes-de-suponer-intencion",
    "que": "Si {{TITULAR}} cuenta una accion suya sin contexto, leer la sesion que la origino antes de suponer su intencion o proponer deshacerla",
    "clase": "contexto",

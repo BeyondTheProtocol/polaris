@@ -88,6 +88,7 @@ runpy test_cosecha_correcciones.py
 runpy test_cosecha_hilos.py
 runpy test_cosecha_entregables.py
 runpy test_archivar_nota.py
+runpy test_colgados_stdin.py
 runpy test_raices_casa_base.py
 runpy test_radar_no_silenciar.py
 runpy test_deuda_disponibilidad.py

@@ -169,6 +169,23 @@ def detectar_bucles():
     return out
 
 
+def detectar_colgados_stdin():
+    """Tools colgados esperando un stdin que el Bash de Claude no cierra (22-sep-26, regla de {{TITULAR}}:
+    «cuando haya procesos así hay que matarlos»). La huella completa vive en colgados_stdin.py; la
+    edad sola NUNCA basta. Se matan como arreglo seguro: no hacían nada ni lo iban a hacer."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import colgados_stdin as _cs
+        lista = _cs.colgados()
+    except Exception:
+        return []
+    return [{"tipo": "tool_colgado_stdin", "clase": "auto_arreglable",
+             "key": "colgado:%d:%s" % (p["pid"], p["cmd"][-80:]),
+             "detalle": "pid %d lleva %.0f min esperando stdin: %s" % (p["pid"], p["edad_s"] / 60,
+                                                                      p["cmd"][-120:]),
+             "accion": ("matar_colgado", p["pid"])} for p in lista]
+
+
 def detectar_crash_loop():
     lineas = _tail(os.path.join(LOGS, "bot-telegram.err"), 80)
     arranques = sum(1 for ln in lineas if "daemon arriba" in ln)
@@ -284,6 +301,13 @@ def auto_arreglar(anom):
     if acc[0] == "retirar_job":
         ok = _retirar_job(acc[1], anom.get("detalle", ""))
         return ok, ("retirado job %s" % acc[1]) if ok else ("no pude retirar job %s" % acc[1])
+    if acc[0] == "matar_colgado":
+        # Se re-comprueba la huella JUSTO antes de matar: el pid pudo morir y reutilizarse.
+        import colgados_stdin as _cs
+        if acc[1] not in {p["pid"] for p in _cs.colgados()}:
+            return False, "pid %s ya no tiene la huella: no se toca" % acc[1]
+        ok = _cs.matar(acc[1])
+        return ok, ("terminado tool colgado pid %s" % acc[1]) if ok else ("pid %s sigue vivo" % acc[1])
     return False, "acción desconocida: %s" % (acc[0],)
 
 
@@ -512,7 +536,7 @@ def run(avisar=False):
 
     anomalias = (detectar_flojas() + detectar_bucles()
                  + detectar_crash_loop() + detectar_errores()
-                 + detectar_healthcheck_parado())
+                 + detectar_healthcheck_parado() + detectar_colgados_stdin())
     seen = _cargar_seen()
     nuevas, arreglos = [], []
     for a in anomalias:
