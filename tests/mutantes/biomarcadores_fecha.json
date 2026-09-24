@@ -1,0 +1,18 @@
+{
+  "_por_que": "24-sep-26. La fecha de cada analítica es la de su extracción (Fecha Recepción), no la de envío del informe; si no, dos informes del mismo envío se pisan y una analítica desaparece del panel público /datos.",
+  "objetivo": "tools/biomarcadores.py",
+  "test": ["python3", "tests/test_biomarcadores_fecha_extraccion.py"],
+  "env": "BTP_BIOMARCADORES",
+  "mutaciones": [
+    {
+      "etiqueta": "la fecha de recepción deja de leerse (vuelve la fecha de envío)",
+      "viejo": "    m = _RE_RECEPCION.search(texto[:6000])\n    if m:",
+      "nuevo": "    m = _RE_RECEPCION.search(texto[:6000])\n    if False:"
+    },
+    {
+      "etiqueta": "una fecha imposible del OCR se publica igual",
+      "viejo": "        except ValueError:\n            pass  # fecha imposible",
+      "nuevo": "        except ValueError:\n            return \"%04d-%02d-%02d\" % (a, mes, d)  # fecha imposible"
+    }
+  ]
+}

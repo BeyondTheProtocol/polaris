@@ -122,5 +122,31 @@ class ContraElContenidoRealDeLaWeb(unittest.TestCase):
                           "%s.yml debería ser rechazado: está lleno de datos clínicos" % nombre)
 
 
+class LaExcepcionDelPanelDatos(unittest.TestCase):
+    """24-sep-2026. El panel /datos publica dato clínico A PROPÓSITO (lo pidió {{TITULAR}}), por la
+    puerta `revisar_caso()`. Aquí se fija que esa puerta relaja lo clínico y las instituciones,
+    y NADA más: terceros con nombre, claves administrativas y marca siguen cerrados."""
+
+    def _caso(self, **extra):
+        dato = {"valor": "Bloque del primario", "fuente": "ap", "sello": "verificado"}
+        dato.update(extra)
+        return {"fuentes": {"ap": {"publico": "Informes de anatomía patológica"}},
+                "material": [dato]}
+
+    def test_clinico_e_institucion_pasan_dentro_del_caso(self):
+        self.assertEqual(W.revisar_caso(self._caso(donde="{{CENTRO}}", gen="ESR1 p.{{VARIANTE}}")), [])
+
+    def test_terceros_admin_y_marca_siguen_cerrados(self):
+        for extra, clase in (({"nota": "Lo corta la Dra. Pérez"}, "terceros"),
+                             ({"nota": "episodio 12345678"}, "pii"),
+                             ({"nota": "escribe a nadie@caso.example"}, "pii"),
+                             ({"nota": "según la ingeniera"}, "marca")):
+            self.assertIn(clase, {c for c, _ in W.revisar_caso(self._caso(**extra))}, extra)
+
+    def test_sin_estructura_no_hay_excepcion(self):
+        self.assertTrue(W.revisar_caso({"texto": "ESR1 p.{{VARIANTE}} en plasma"}))
+        self.assertIn("estructura", {c for c, _ in W.revisar_caso(self._caso(sello="seguro"))})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -30,6 +30,7 @@ Uso:
   python3 tools/web_lint.py "texto de la novedad"      # rc=0 publicable · rc=1 no
   python3 tools/web_lint.py --fichero <ruta>           # audita un fichero de contenido
   python3 tools/web_lint.py --json "…"
+  python3 tools/web_lint.py --caso <caso.json>        # la excepción auditada del panel /datos
 """
 import json
 import os
@@ -137,10 +138,108 @@ def publicable(texto, *, repo=None):
     return not revisar(texto, repo=repo)
 
 
+# ── Excepción auditada: el panel clínico /datos (24-sep-2026) ───────────────────────────────
+# {{TITULAR}} pidió un panel público con todo lo que ayude a quien ayuda al caso («nos importa poco
+# la privacidad»). Eso es, por definición, contenido clínico, y `revisar()` lo bloquea entero.
+# La excepción NO es apagar el freno: lo clínico se permite SOLO dentro de la estructura que
+# genera `tools/caso_publico.py`, donde cada dato lleva su fuente y su sello. Fuera de ella
+# (una novedad, un post, prosa suelta) `revisar()` sigue igual. Lo que NO se relaja aquí:
+# identificadores duros, claves administrativas, nombres de terceros y léxico de marca.
+# Las INSTITUCIONES sí pasan: decir dónde está cada bloque de tejido es justo lo que pidió.
+
+SELLOS_CASO = ("verificado", "inferido", "dicho", "sin_verificar", "extraido")
+
+# El título, sin distinguir mayúsculas; el nombre, con mayúscula («la doctora que…» no es nadie).
+RE_PERSONA = re.compile(r"\b(?i:dr|dra|doctor|doctora|prof)\.?\s+[A-ZÁÉÍÓÚÑ]\w+")
+
+# Claves administrativas: no cuentan nada del caso y sirven para suplantarla ante el hospital.
+RE_ADMIN = re.compile(
+    r"\b(?:cip|cipa|nuhsa|tarjeta\s+sanitaria|episodio|n[º°o]?\s*de\s+petici[oó]n|petici[oó]n)"
+    r"\s*(?:n[º°o.]*)?\s*[:#]?\s*[A-Z]*\d[\w-]{3,}", re.I)
+
+# Claves de datos cuyo valor NO es texto a revisar (URLs y fechas ISO).
+_CASO_SIN_TEXTO = {"enlace", "desde", "hasta", "f", "fecha", "inicio", "fin", "generado",
+                   "actualizado", "rango", "key", "id", "precision", "clase", "sello", "fuente"}
+
+
+def _strings(x, ruta="$"):
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k in _CASO_SIN_TEXTO and not isinstance(v, (dict, list)):
+                continue
+            yield from _strings(v, "%s.%s" % (ruta, k))
+    elif isinstance(x, list):
+        for i, v in enumerate(x):
+            yield from _strings(v, "%s[%d]" % (ruta, i))
+    elif isinstance(x, str):
+        yield ruta, x
+
+
+def _datos_con_sello(payload):
+    """Cada dict con `valor` es un dato: tiene que traer sello válido y una fuente declarada."""
+    fuentes = payload.get("fuentes") or {}
+    fallos = []
+
+    def rec(x, ruta):
+        if isinstance(x, dict):
+            if "valor" in x:
+                if x.get("sello") not in SELLOS_CASO:
+                    fallos.append(("estructura", "%s: dato sin sello válido" % ruta))
+                if x.get("fuente") not in fuentes:
+                    fallos.append(("estructura", "%s: dato sin fuente declarada" % ruta))
+            for k, v in x.items():
+                if k != "fuentes":
+                    rec(v, "%s.%s" % (ruta, k))
+        elif isinstance(x, list):
+            for i, v in enumerate(x):
+                rec(v, "%s[%d]" % (ruta, i))
+
+    rec(payload, "$")
+    return fallos
+
+
+def revisar_caso(payload):
+    """[(clase, motivo)] para el caso.json público. Vacío = publicable. Fail-closed."""
+    if not isinstance(payload, dict) or not isinstance(payload.get("fuentes"), dict):
+        return [("estructura", "no es un caso.json: falta `fuentes`")]
+    fallos = _datos_con_sello(payload)
+    import seguimiento as seg  # deny-list de terceros: la misma que usa el muro
+    nombres = seg._NOMBRES_DENY
+    for ruta, texto in _strings(payload):
+        norm, low = borde._normalizar(texto)
+        for rx, etq in borde._ID_DURO:
+            if rx.search(norm):
+                fallos.append(("pii", "%s: identificador directo (%s)" % (ruta, etq)))
+        if RE_ADMIN.search(texto):
+            fallos.append(("pii", "%s: clave administrativa («%s»)"
+                           % (ruta, RE_ADMIN.search(texto).group(0))))
+        if RE_PERSONA.search(texto):
+            fallos.append(("terceros", "%s: persona nombrada («%s»)"
+                           % (ruta, RE_PERSONA.search(texto).group(0))))
+        palabras = set(re.findall(r"[a-zñ]+", low))
+        if palabras & nombres:
+            # sin eco del nombre: el mensaje de error también acaba en logs
+            fallos.append(("terceros", "%s: nombre de un tercero de la deny-list" % ruta))
+        for rx, motivo in MARCA:
+            if rx.search(texto):
+                fallos.append(("marca", "%s: %s" % (ruta, motivo)))
+    return fallos
+
+
 def main():
     args = sys.argv[1:]
     as_json = "--json" in args
     args = [a for a in args if a != "--json"]
+    if args and args[0] == "--caso":
+        if len(args) < 2:
+            print("uso: web_lint.py --caso <caso.json>", file=sys.stderr)
+            return 2
+        with open(args[1], encoding="utf-8") as f:
+            fallos = revisar_caso(json.load(f))
+        for clase, motivo in fallos:
+            print("  · [%s] %s" % (clase, motivo))
+        print("✅ caso.json publicable" if not fallos else "⛔ caso.json NO publicable")
+        return 1 if fallos else 0
     if args and args[0] == "--fichero":
         if len(args) < 2:
             print("uso: web_lint.py --fichero <ruta>", file=sys.stderr)

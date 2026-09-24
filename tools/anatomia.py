@@ -220,7 +220,9 @@ FAMILIAS = [
                           "bot_", "report", "=digest")),
     ("correo", ("correo", "gmail", "imap", "outbox", "email_")),
     # helptitular.com: el carril que la actualiza sola, su lint y su marcha atrás (20-sep-26)
-    ("la web pública", ("web_novedad", "web_lint", "web_revertir", "web_")),
+    ("la web pública", ("web_novedad", "web_lint", "web_revertir", "web_",
+                        # el panel clínico público /datos: caso.json con fuente y sello (24-sep-26)
+                        "caso_publico")),
     ("redes y prensa", ("x_", "wa_", "ig_", "dm_", "yt_", "instagram",
                         "youtube", "prensa", "umami", "redes", "reel_")),
     ("buscar y verificar", ("grok", "perplexity", "nvidia", "consensus",

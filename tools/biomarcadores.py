@@ -271,7 +271,25 @@ _RE_FRONT_DATE = re.compile(r'^date:\s*"?(\d{4}-\d{2}-\d{2})', re.M)
 _RE_FNAME_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 
 
+# La fecha de la ANALÍTICA es la de la extracción, no la de emisión del informe. El nombre del
+# fichero y el `date:` del frontmatter llevan la «Fecha Envío», y dos informes enviados el mismo
+# día se pisaban en el acumulador (un punto por fecha): la analítica del 18-mar-2024 desaparecía
+# y la del 15-mar salía como del 18 (lo cazó `verificacion` cotejando /datos, 24-sep-2026; 10 de
+# 75 informes cambian 1-4 días). Recepción en el laboratorio = día de la extracción.
+_RE_RECEPCION = re.compile(
+    r"Fecha\s+(?:Recepci[oó]n|de\s+obtenci[oó]n\s+de\s+las\s+muestras)\s*:\s*(\d{1,2})/(\d{1,2})/(\d{2,4})",
+    re.I)
+
+
 def fecha_de(path, texto):
+    m = _RE_RECEPCION.search(texto[:6000])
+    if m:
+        d, mes, a = (int(x) for x in m.groups())
+        a += 2000 if a < 100 else 0
+        try:
+            return datetime.date(a, mes, d).isoformat()
+        except ValueError:
+            pass  # fecha imposible en el OCR: se cae a la del informe, no se inventa
     m = _RE_FRONT_DATE.search(texto[:1500])
     if m:
         return m.group(1)
@@ -356,7 +374,10 @@ def build():
                 fechas_all.add(p["fecha"])
             analitos_out.append(dict(
                 key=ent["key"], nombre=ent["nombre"], unidad=ent["unidad"], ref=ref,
-                puntos=[{k: p[k] for k in ("fecha", "valor", "fuera", "confianza", "fuente")}
+                # ref_low/ref_high de SU informe: el panel /datos normaliza a ×LSN punto a
+                # punto; con la banda «más frecuente» un lab con otro rango saldría desplazado.
+                puntos=[dict({k: p[k] for k in ("fecha", "valor", "fuera", "confianza", "fuente")},
+                             ref_low=p.get("ref_low"), ref_high=p.get("ref_high"))
                         for p in puntos_ok]))
         if analitos_out:
             grupos_out[g_key] = {"nombre": g_nombre, "analitos": analitos_out}

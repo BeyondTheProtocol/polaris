@@ -137,6 +137,7 @@ runpy test_decision_alto_riesgo.py
 runpy test_fuente_clinica.py
 runpy test_biomarcadores_vhio.py
 runpy test_biomarcadores_ggt_alias.py
+runpy test_biomarcadores_fecha_extraccion.py
 runpy test_frescura_dosier.py
 runpy test_dosier_invariantes.py
 runpy test_cotejo_invariante.py
@@ -155,6 +156,7 @@ runpy test_dedup_hilos.py
 runpy test_esquema_estado.py
 runpy test_web_novedad.py
 runpy test_web_lint.py
+runpy test_caso_publico.py
 runpy test_seguridad_sweep_daemon.py
 runpy test_seguridad_sweep.py
 runpy test_pipeline_vacuna.py
@@ -278,6 +280,14 @@ echo "── mutantes: tests/mutantes/biomarcadores.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-biomarcadores.log 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes biomarcadores (log: /tmp/rojo-mutantes-biomarcadores.log)"; }
+echo "── mutantes: tests/mutantes/biomarcadores_fecha.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores_fecha.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-biomarcadores-fecha.log 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes biomarcadores_fecha (log: /tmp/rojo-mutantes-biomarcadores-fecha.log)"; }
+echo "── mutantes: tests/mutantes/caso_publico.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-caso-publico.log 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes caso_publico (log: /tmp/rojo-mutantes-caso-publico.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
