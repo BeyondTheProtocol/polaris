@@ -102,6 +102,7 @@ runpy test_raices_casa_base.py
 runpy test_radar_no_silenciar.py
 runpy test_deuda_disponibilidad.py
 runpy test_deuda_cerrar_ejecuta.py
+runpy test_atribucion.py   # 24-sep · regla de {{TITULAR}}: todo lo que alguien aporta, con su nombre y en «Gracias»
 runpy test_clave_deuda_una_forma.py   # 24-sep · una sola forma de clave (backticks) + la alerta resumen exige su hallazgo concreto
 runpy test_ramas_fusionar.py
 runpy test_ocr_layout.py

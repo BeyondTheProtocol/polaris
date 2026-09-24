@@ -270,6 +270,22 @@ Las cuatro corren solas, sin que nadie tenga que acordarse.
 | 👥 **Los agentes** | Cada ficha declara **cada cuánto** se espera que trabaje (`ritmo:`), y un test lo exige. Así un cero se puede leer: en un `a-demanda` es normal, en un `permanente` es alarma | `tests/test_agentes_ritmo.py` |
 | 🔁 **El espejo** | Regenera este repo cada vez que cambia el sistema, y **no publica** si el barrido encuentra algo o el árbol no compila | `tools/publicar_sync.py` |
 
+## 🙏 Gracias
+
+Polaris mejora con lo que otras personas traen. Quien aporta algo sale aquí con su nombre, y
+también en el código, junto a la pieza que nació de su idea.
+
+- **[Marc Recio](https://github.com/Marc-Recio-Celda)**: la idea de que el modelo solo conteste
+  preguntas de sí o no, una por señal, y que la jerarquía la decida el código. De ahí sale el
+  nivel de evidencia determinista (`tools/tier_evidencia.py`).
+- **Marcos Gorgojo**: una auditoría externa de arquitectura, seguridad y rigor clínico
+  (22-sep-2026) que midió la distancia entre lo que Polaris promete y lo que el código
+  demuestra. De ahí salen, entre otros, el permiso de envío firmado, el panel de alto riesgo
+  que abre la fuente clínica en vez de fiarse de la cita (`tools/fuente_clinica.py`) y la
+  entrega que no se repite (`tools/salida.py`).
+
+¿Has aportado algo y no sales? Escribe a `beyondtheprotocolteam@gmail.com`.
+
 ## 📊 Estado
 
 En producción y en movimiento. A septiembre de 2026: unos 530 commits al mes, ~90.000 líneas

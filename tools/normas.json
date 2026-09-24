@@ -3149,6 +3149,18 @@
    "auditable": true,
    "repetida": false,
    "nota": "24-sep-2026: el commit 36a26a6 pasó 26 tests y ~26.000 comandos de replay con 0 diferencias, y metió dos bypass que solo vio el adversarial."
+  },
+  {
+   "slug": "feedback-atribuir-todo-aporte",
+   "que": "Todo lo que alguien aporta se atribuye con nombre y enlace, en el código y en «🙏 Gracias» del README",
+   "clase": "lint-doc",
+   "mecanismo": "tests/test_atribucion.py",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace de Marc Recio (24-sep-26): su idea salía en el código sin su nombre. Nombrar en público a quien no lo pidió sigue siendo criterio (muro)."
   }
  ]
 }
