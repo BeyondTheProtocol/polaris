@@ -45,9 +45,10 @@ check(time.time() - t0 < 30, "  y no se queda colgada esperando")
 # 2) el glotón está DOS niveles abajo: shell → python que reserva ~2,5 GB y espera
 import tempfile  # noqa: E402
 glot = tempfile.NamedTemporaryFile("w", suffix="_glotonazo.py", delete=False)
-glot.write("import time\n"
-           "b = bytearray(2_600_000_000)\n"            # ~2,6 GB, y se TOCAN para que existan
-           "for i in range(0, len(b), 4096): b[i] = 1\n"
+# Bytes ALEATORIOS: una página casi vacía la comprime macOS. Con la huella (no el RSS) ya no
+# importa si acaban en swap, pero así el caso mide memoria de verdad y no un truco del compresor.
+glot.write("import os, time\n"
+           "b = bytearray(os.urandom(64_000_000)) * 41\n"   # ~2,6 GB incompresibles, ya tocados
            "time.sleep(120)\n")
 glot.close()
 # dos niveles: shell → python. Si la guarda solo mirase al hijo directo (el shell), no vería nada.
@@ -76,6 +77,62 @@ check(pico < 2.0, "  y el pico medido es el uso real, no la reserva (%.1f GB < 2
 os.unlink(virgen.name)
 
 os.unlink(glot.name)
+
+# 5-6) Dobles de la medida (24-sep-2026): lo que la máquina real solo enseña bajo presión o con GPU.
+#      Árbol real y tranquilo (`sleep`); lo que se falsea es lo que la guarda LEE de él.
+_orig = (G._huella_gb, G._metal_gb, G._swap_gb, G._rss_gb)
+
+
+def con_medida(huella, metal, swap_nuevo=0.0, rss=0.05, tope_swap=3.0):
+    base = [None]
+
+    def swap():
+        if base[0] is None:
+            base[0] = 10.0
+            return 10.0
+        return 10.0 + swap_nuevo
+    G._huella_gb = lambda pids: huella
+    G._metal_gb = lambda pids: metal
+    G._swap_gb = swap
+    G._rss_gb = lambda pids: rss
+    try:
+        return G.corre(["/bin/sleep", "3"], tope_gb=1.0, intervalo=0.2, verbose=False,
+                       tope_swap_gb=tope_swap)
+    finally:
+        G._huella_gb, G._metal_gb, G._swap_gb, G._rss_gb = _orig
+
+
+codigo, pico = con_medida(huella=3.0, metal=2.8)
+check(codigo == 0, "5) huella alta pero casi toda Metal y la máquina tranquila: NO mata (código %s)" % codigo)
+check(pico < 1.0, "   y el pico es el uso sin Metal (%.1f GB)" % pico)
+codigo, _p = con_medida(huella=3.0, metal=2.8, swap_nuevo=5.0)
+check(codigo == 99, "5b) la misma huella con la máquina YA empujando swap: mata (código %s)" % codigo)
+codigo, _p = con_medida(huella=0.3, metal=0.0, swap_nuevo=5.0)
+check(codigo == 0, "5c) swap de OTROS con un árbol pequeño: no lo mata (código %s)" % codigo)
+codigo, _p = con_medida(huella=3.0, metal=0.0, rss=0.05)
+check(codigo == 99, "6) huella alta, sin Metal, con RSS mínimo (proceso en swap): mata (código %s)" % codigo)
+
+# 7) Metal DE VERDAD: 2 GB en MPS, liberados sin vaciar la caché. Es lo que mató cinco corridas el
+#    20-sep por la huella de `top`. Techo de 1 GB y swap aislado: no puede matar.
+VENV = os.path.join(RAIZ, ".venv-imagen", "bin", "python")
+metal_py = tempfile.NamedTemporaryFile("w", suffix="_metal.py", delete=False)
+metal_py.write("import sys, time\n"
+               "try:\n    import torch\nexcept Exception:\n    sys.exit(77)\n"
+               "if not torch.backends.mps.is_available():\n    sys.exit(77)\n"
+               "x = torch.ones(500_000_000, device='mps'); torch.mps.synchronize()\n"
+               "del x; torch.mps.synchronize(); time.sleep(8)\n")
+metal_py.close()
+if not os.path.exists(VENV):
+    print("  ⏭️  7) sin .venv-imagen: el caso Metal real no se puede probar aquí")
+else:
+    codigo, pico = G.corre([VENV, metal_py.name], tope_gb=1.0, intervalo=0.5, verbose=False,
+                           tope_swap_gb=10_000)
+    if codigo == 77:
+        print("  ⏭️  7) sin torch/MPS en .venv-imagen: el caso Metal real no se puede probar aquí")
+    else:
+        check(codigo == 0, "7) 2 GB de MPS liberados (reserva de Metal) con techo de 1: NO mata (código %s)" % codigo)
+        check(pico < 1.0, "   y el pico es el uso sin Metal (%.1f GB < 1)" % pico)
+os.unlink(metal_py.name)
 
 print("\nVEREDICTO: %s" % ("TODO CORRECTO" if not fallos else "%d FALLOS" % len(fallos)))
 sys.exit(1 if fallos else 0)
