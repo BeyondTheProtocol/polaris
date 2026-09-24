@@ -76,7 +76,23 @@ _CAMPOS_DESTINO = ("to", "cc", "bcc", "recipient", "recipients")
 _DRAFT = re.compile(r"__(create_draft|update_draft)$")
 
 
+# Lo que el harness y los hooks PEGAN al mensaje: recordatorios de worktree, contexto del lazo,
+# memorias recordadas, avisos de tareas. Llega dentro del mismo campo `prompt`, así que sin quitarlo
+# el emisor estaría juzgando texto que ella no ha escrito (visto en vivo el 24-sep-26: el permiso
+# que había abierto otra sesión llevaba de motivo un `<system-reminder>` del harness). Una frase de
+# envío dentro de uno de estos bloques —o en una memoria que la cite— NO es una orden suya.
+INYECTADO = re.compile(
+    r"<(system-reminder|task-notification|scheduled-task|ci-monitor-event)\b.*?</\1>|"
+    r"<(?:task-notification|scheduled-task|ci-monitor-event)\b[^>]*/?>", re.S | re.I)
+
+
+def solo_suyo(texto):
+    """El texto sin los bloques que pega el harness: lo que de verdad escribió ella."""
+    return INYECTADO.sub(" ", texto or "").strip()
+
+
 def es_orden(texto):
+    texto = solo_suyo(texto)
     return bool(texto) and not FRENA.search(texto) and bool(ORDEN.search(texto))
 
 
@@ -252,7 +268,9 @@ def texto_prompt(entrada):
         c = "\n".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
     if not isinstance(c, str):
         return None
-    return re.sub(r"^(\s*<system-reminder>.*?</system-reminder>)+", "", c, flags=re.S).lstrip()
+    # Se quitan TODOS los bloques inyectados, no solo los del principio (24-sep-26): una orden
+    # pegada al FINAL por un hook colaba igual, y el test la reprodujo.
+    return solo_suyo(c)
 
 
 def _es_humano(e):
