@@ -133,6 +133,7 @@ runpy test_codigo_rojo.py
 runpy test_codigo_rojo_repeticion.py
 runpy test_decision_alto_riesgo.py
 runpy test_fuente_clinica.py
+runpy test_biomarcadores_vhio.py
 runpy test_frescura_dosier.py
 runpy test_dosier_invariantes.py
 runpy test_cotejo_invariante.py
@@ -270,6 +271,10 @@ echo "── mutantes: tests/mutantes/soporte_cita.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/soporte_cita.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-soporte.log 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes soporte_cita (log: /tmp/rojo-mutantes-soporte.log)"; }
+echo "── mutantes: tests/mutantes/biomarcadores.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-biomarcadores.log 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes biomarcadores (log: /tmp/rojo-mutantes-biomarcadores.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
