@@ -24,6 +24,7 @@ MURO: apoyo a la decisión, NO consejo médico. Describe y equipa, no concluye.
 from __future__ import annotations
 import argparse
 import datetime as _dt
+import math
 import hashlib
 import json
 import sys
@@ -79,14 +80,26 @@ def cargar_config(ruta: str | Path) -> tuple[dict, str]:
     return out, hashlib.sha256(crudo).hexdigest()
 
 
+def _valido(x: float, lo: float, hi: float) -> bool:
+    """Un número presente pero no finito o fuera de dominio NO es un dato: es basura.
+    (24-sep-26, issue #10 del repo público: AF NaN/inf/1.2 o TPM NaN/inf acababan en
+    `evaluacion=completa` si el otro campo era válido.)"""
+    return isinstance(x, (int, float)) and not isinstance(x, bool) \
+        and math.isfinite(x) and lo <= float(x) <= hi
+
+
 def filtrar(variantes: list[dict], expr: dict[str, float] | None,
             umbrales: dict) -> tuple[list[dict], list[tuple]]:
     """Aplica expresión y VAF. Cada candidato lleva su estado EXPLÍCITO por filtro:
-      ok          medido y pasa el umbral
+      ok          medido, válido y pasa el umbral
       no_medido   no hay dato (sin fichero de expresión, gen ausente en él, o sin VAF)
     Lo medido que no pasa se descarta con motivo. Lo no medido NO se descarta ni se da
     por bueno: se queda como evaluación 'incompleta', separado de las completas.
-    (Antes un gen ausente del fichero de expresión pasaba como si estuviera expresado.)"""
+    (Antes un gen ausente del fichero de expresión pasaba como si estuviera expresado.)
+    Un valor PRESENTE pero inválido (NaN, inf, AF fuera de [0,1], TPM negativo) no es ni
+    lo uno ni lo otro: se descarta con su motivo, nunca se cuenta como medido. No aborta
+    la corrida entera — un valor corrupto en una variante no debe tirar el dossier —,
+    pero queda contado en el manifiesto y avisado por pantalla."""
     candidatos, descartes = [], []
     vistos: set = set()
     for v in variantes:
@@ -96,6 +109,11 @@ def filtrar(variantes: list[dict], expr: dict[str, float] | None,
         tpm = expr.get(v.get("gene")) if expr is not None else None
         if tpm is None:
             est_expr = "no_medido"
+        elif not _valido(tpm, 0.0, math.inf):
+            if clave not in vistos:
+                descartes.append((*clave, f"TPM inválido ({tpm!r}): no es un número finito >= 0"))
+            vistos.add(clave)
+            continue
         elif tpm < umbrales["tpm_min"]:
             if clave not in vistos:
                 descartes.append((*clave, f"expresión baja (TPM={tpm} < {umbrales['tpm_min']})"))
@@ -106,6 +124,11 @@ def filtrar(variantes: list[dict], expr: dict[str, float] | None,
         af = v.get("af")
         if af is None:
             est_af = "no_medido"
+        elif not _valido(af, 0.0, 1.0):
+            if clave not in vistos:
+                descartes.append((*clave, f"AF inválida ({af!r}): no es un número finito en [0, 1]"))
+            vistos.add(clave)
+            continue
         elif af < umbrales["af_min"]:
             if clave not in vistos:
                 descartes.append((*clave, f"VAF baja (AF={af} < {umbrales['af_min']})"))
@@ -191,6 +214,10 @@ def main() -> int:
     candidatos, descartes = filtrar(variantes, expr if args.expresion else None, umbrales)
     for gene, aa, motivo in descartes:
         print(f"  - descartado por {motivo}: {gene} {aa}")
+    n_inval = sum(1 for _, _, m in descartes if "inválid" in m)
+    if n_inval:
+        print(f"  ⚠️  {n_inval} variante(s) con un valor PRESENTE pero inválido (NaN, inf o fuera "
+              "de rango). No se cuentan como medidas ni entran en el dossier.")
     n_inc = len({(v['gene'], v['aa']) for v in candidatos if v["evaluacion"] == "incompleta"})
     print(f"  candidatos tras filtros de expresión y VAF: {len(candidatos)} péptidos "
           f"({len({(v['gene'], v['aa']) for v in candidatos})} variantes; "

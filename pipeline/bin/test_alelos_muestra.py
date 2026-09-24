@@ -17,6 +17,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pysam
+
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / "pipeline" / "bin"))
 
@@ -221,6 +223,35 @@ try:
 except ent.EntradaNoAnotada:
     check(True, "leer_entradas: multialélico con un solo PEP -> PARA")
 
+# Issue #8: una muestra única no permite contradecir su etiqueta de normal.
+normal_pep = vcf_pep("normal_unica_pep.vcf", ("NORMAL",),
+                     extra=("##normal_sample=NORMAL",))
+try:
+    ent.leer_variantes_meta(normal_pep)
+    check(False, "leer_entradas: muestra única marcada normal debería PARAR")
+except MuestraAmbigua as e:
+    check("##normal_sample" in str(e),
+          "leer_entradas: muestra única normal -> error que identifica la contradicción")
+
+normal_vep = vcf_vep(
+    "normal_unica_vep.vcf",
+    [(1000, "C", ["G"], [csq("G", "missense_variant", "10", f"{r10}/W")], ["0.40"])],
+    muestras=("NORMAL",), cabecera_extra=("##normal_sample=NORMAL",))
+normal_salida = TMP / "normal_unica.prep.vcf"
+try:
+    pr.anotar_vcf(normal_vep, str(FASTA), str(normal_salida))
+    check(False, "preparar_reales: muestra única marcada normal debería PARAR")
+except SystemExit as e:
+    check("##normal_sample" in str(e),
+          "preparar_reales: muestra única normal -> error que identifica la contradicción")
+check(not normal_salida.exists() and not Path(str(normal_salida) + ".descartes.tsv").exists(),
+      "preparar_reales: contradicción de muestra no genera salidas")
+
+# El nombre no determina el papel: sin metadata, se conserva el contrato de muestra única.
+vs_unica, meta_unica = ent.leer_variantes_meta(vcf_pep("unica_sin_etiqueta.vcf", ("NORMAL",)))
+check(meta_unica["muestra_tumor"] == "NORMAL" and len(vs_unica) == 1,
+      "leer_entradas: muestra única sin etiqueta conserva el comportamiento documentado")
+
 # ─────────────────────────────────────────────────────────────── 2.3 config
 print("== 2.3: configuración y estados de no medido ==")
 um, sha = cp.cargar_config(cp.CONFIG_DEFECTO)
@@ -258,6 +289,46 @@ check(por.get("D", {}).get("estado_af") == "no_medido", "sin VAF -> no_medido, n
 check("E" not in por, "TPM bajo -> descartado")
 cand2, _ = cp.filtrar(vs[:1], None, U)
 check(cand2[0]["estado_expresion"] == "no_medido", "sin fichero de expresión -> no_medido")
+
+# Issue #11: serializar el VCF no debe cambiar la AF ni la decisión del filtro.
+for i, af_texto in enumerate(("0", "0.04999", "0.05", "0.05001", "0.123456789", "1", ".")):
+    entrada_af = vcf_vep(
+        f"precision_{i}.vcf",
+        [(1000, "C", ["G"], [csq("G", "missense_variant", "10", f"{r10}/W")], [af_texto])])
+    with pysam.VariantFile(entrada_af) as original:
+        af_original = next(original).samples["TUMOR"]["AF"][0]
+    salida_af = str(TMP / f"precision_{i}.prep.vcf")
+    pr.anotar_vcf(entrada_af, str(FASTA), salida_af)
+    variantes_af = ent.leer_variantes(salida_af)
+    check(bool(variantes_af) and all(v["af"] == af_original for v in variantes_af),
+          f"AF {af_texto}: preparar y releer conserva el valor (incluido ausente)")
+    referencia = [{**v, "af": af_original} for v in variantes_af]
+    esperados, _ = cp.filtrar(referencia, {"SINTA": 10.0}, U)
+    observados, _ = cp.filtrar(variantes_af, {"SINTA": 10.0}, U)
+    check([(v["peptide"], v["estado_af"], v["evaluacion"]) for v in observados]
+          == [(v["peptide"], v["estado_af"], v["evaluacion"]) for v in esperados],
+          f"AF {af_texto}: el intercambio de VCF conserva la decisión del filtro")
+    if af_original is None:
+        check(bool(observados) and all(v["estado_af"] == "no_medido" for v in observados),
+              "AF ausente conserva no_medido tras preparar y releer")
+
+# Issue #10: un valor PRESENTE pero inválido no es «medido» ni «ausente»: se descarta.
+import math  # noqa: E402
+
+for af_mal, tpm_mal, campo in [(float("nan"), 10.0, "AF"), (float("inf"), 10.0, "AF"),
+                               (1.2, 10.0, "AF"), (-0.1, 10.0, "AF"),
+                               (0.3, float("nan"), "TPM"), (0.3, float("inf"), "TPM"),
+                               (0.3, -1.0, "TPM")]:
+    v_mal = {"gene": "SYN", "aa": "p.K10W", "peptide": "AAAAAAAA", "af": af_mal}
+    c_mal, d_mal = cp.filtrar([v_mal], {"SYN": tpm_mal}, U)
+    check(not c_mal and any(campo.lower() in m.lower() and "inválid" in m for _, _, m in d_mal),
+          f"{campo} inválido ({af_mal if campo == 'AF' else tpm_mal}) -> descartado con motivo, "
+          "nunca 'completa'")
+c_ok, _ = cp.filtrar([{"gene": "SYN", "aa": "p.1", "peptide": "AAAAAAAA", "af": 0.0}],
+                     {"SYN": 0.0}, {"tpm_min": 0.0, "rank_presentacion": 2.0, "af_min": 0.0})
+check(c_ok and c_ok[0]["evaluacion"] == "completa",
+      "el cero válido sigue siendo un dato medido (no se confunde con inválido)")
+check(not math.isfinite(float("nan")), "control: NaN no es finito")
 
 print(f"\n=== {'TODO OK' if fallos == 0 else str(fallos) + ' FALLO(S)'} ===")
 sys.exit(1 if fallos else 0)

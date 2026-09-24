@@ -10,7 +10,7 @@ La regla, fail-closed:
   1. Si quien llama la nombra (--muestra-tumor), manda; tiene que existir en el VCF.
   2. Si hay `##tumor_sample=X`, X tiene que existir en el VCF. Si no existe, se PARA:
      una cabecera que apunta a una muestra que no está es un fichero incoherente.
-  3. Si hay una sola muestra, es esa.
+  3. Si hay una sola muestra, es esa, salvo que esté marcada como normal.
   4. Si hay varias y nada las distingue, se PARA. Nunca se adivina por posición.
 
 Devuelve también el MOTIVO de la elección, para dejarlo escrito en el manifiesto.
@@ -60,6 +60,11 @@ def muestra_tumoral(header, explicita: str | None = None) -> tuple[str | None, s
     if not muestras:
         return None, "el VCF no trae columnas de muestra (sin VAF)"
     if len(muestras) == 1:
+        # Ser la única columna no invalida una identificación explícita como normal.
+        if normal and muestras[0] == normal:
+            raise MuestraAmbigua(
+                f"La única muestra del VCF ({muestras[0]!r}) está marcada como "
+                "##normal_sample. No se puede usar como muestra tumoral.")
         return muestras[0], "única muestra del VCF"
     raise MuestraAmbigua(
         f"El VCF trae {len(muestras)} muestras ({muestras}) y ninguna cabecera "

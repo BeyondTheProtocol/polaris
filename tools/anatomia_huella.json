@@ -129,6 +129,7 @@
     "relevo"
   ],
   "guardas": [
+    "casa_base_guard",
     "clinico_guard",
     "contrato_asiento",
     "cosecha_panel",
