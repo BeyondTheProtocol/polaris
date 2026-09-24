@@ -332,26 +332,23 @@ def cerrar(apply=False, scope=None, podar=True):
         # VIVOS (esperan su firma: archivarlos los sacaría del outbox) y un rescate que falle.
         perdible = _ramas._trabajo_vivo(wt)
         if perdible:
-            vivos = [r for r in perdible
-                     if r.startswith(tuple(_ramas._RUTAS_TRABAJO_VIVO))]
-            if vivos:
+            cajon = os.path.join(BASE, "tools", "state", "rescate-poda",
+                                 "%s-%s" % (os.path.basename(wt.rstrip("/")),
+                                            __import__("time").strftime("%Y%m%d-%H%M%S")))
+            r = _ramas.rescatar(wt, BASE, cajon, copiar=bool(apply and limpio and seguro))
+            if r["bloquean"]:
                 seguro = False
-                acciones.append("poda: NO — %d borrador(es)/encargo(s) VIVOS dentro: %s"
-                                % (len(vivos), ", ".join(vivos[:4])))
-            elif apply and limpio and seguro:
-                rescatados = _ramas.rescatar(wt, si=True)
-                fallaron = [rel for rel, _destino, hecho in rescatados if not hecho]
-                if fallaron:
-                    seguro = False
-                    acciones.append("poda: NO — no se pudo rescatar %d fichero(s): %s"
-                                    % (len(fallaron), ", ".join(fallaron[:4])))
-                else:
-                    perdible = []
-                    acciones.append("rescate: %d ignorado(s) archivados a casa base antes de podar"
-                                    % len(rescatados))
+                acciones.append(
+                    "poda: NO — %d fichero(s) son trabajo vivo o no se pudieron guardar: %s%s"
+                    % (len(r["bloquean"]), ", ".join(r["bloquean"][:4]),
+                       " y %d más" % (len(r["bloquean"]) - 4) if len(r["bloquean"]) > 4 else ""))
             else:
-                acciones.append("poda: al aplicar se rescatarían %d ignorado(s) a casa base y se podaría"
-                                % len(perdible))
+                perdible = []
+                acciones.append(
+                    "rescate: %d ignorado(s) ya repetidos en casa base; %d con algo propio %s"
+                    % (len(r["repetidos"]), len(r["rescatados"]),
+                       ("guardados en " + os.path.relpath(cajon, BASE)) if (apply and r["rescatados"])
+                       else "(se guardarían en tools/state/rescate-poda/ al aplicar)"))
         if apply and limpio and seguro:
             # Candado COMPARTIDO "git-mutex" — MISMO nombre que la fusión de arriba (A1, 10-jul-26,
             # hallazgo B): antes esta poda mutaba `.git/worktrees/` SIN candado, así que una fusión
