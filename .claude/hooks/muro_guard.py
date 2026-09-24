@@ -52,8 +52,10 @@ ARQUITECTÓNICA — el privilegiado se confía por no ver NUNCA texto crudo no c
 (eso corre en cuarentena, sin python/red), + (futuro) firewall saliente. El choke-point
 de salida es la barrera final de «nada fuera sin OK», en CÓDIGO, no en instrucción.
 """
+import glob
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -928,6 +930,95 @@ def check_read(data):
             deny("patron de busqueda sobre datos clinicos fuera del comite clinico: %s" % pat)
 
 
+# ── Un secreto impreso está QUEMADO (norma feedback-secreto-impreso-esta-quemado) ──────────
+# Clase BLOQUEO. `SECRET_HINTS` ya deniega NOMBRAR un fichero de secretos (check_subcommand y
+# check_write), así que `cat .env` o `base64 tools/.telegram_secrets.json` ya caían. Lo que
+# faltaba es lo que la shell IMPRIME sin que el guard llegue a verlo, porque lo expande DESPUÉS
+# de que él haya tokenizado. Dos formas, las dos hermanas de `$(...)` — por eso este check vive
+# pegado a esa comprobación y no más abajo, entre las reglas por binario:
+#
+#   · `echo $ANTHROPIC_API_KEY` → el guard ve un literal `$ANTHROPIC_API_KEY`; bash escribe la
+#     clave en stdout, y stdout es la transcripción, que se guarda.
+#   · `cat tools/.tele*.json` → el patrón no casa con ningún SECRET_HINT como literal, pero
+#     resuelve al fichero de secretos. Se juzga por ARGUMENTO RESUELTO, no por la cadena
+#     (norma feedback-muro-soak-antes-de-fusionar, segunda mitad).
+#
+# POR QUÉ MIRA EL NOMBRE DE LA VARIABLE Y NO EL `$`: denegar toda expansión tumbaría `echo $PATH`
+# y medio lazo. El intento del 17-sep-26 se revirtió por denegar `ls -la` y `git status`; ninguno
+# de los dos lleva `$` ni glob, y los dos son ahora regresión fija en
+# tests/test_muro_secreto_stdout.py.
+SECRET_VAR_HINTS = ("KEY", "TOKEN", "SECRET", "PASS", "CRED", "AUTH", "BEARER", "PRIVATE")
+# `$VAR`, `${VAR}`, `${VAR:-x}`. `$1`/`$@`/`$?` no casan (exigimos identificador).
+_VAR_RE = re.compile(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)")
+_GLOB_CHARS = "*?["
+# Un fichero de CÓDIGO no es un almacén de claves aunque se llame como uno: `tools/_secrets.py`
+# es el módulo que LEE los secretos. Sin esta talla, `ls tools/*.py` (comando cotidiano del lazo:
+# 2 apariciones en los logs reales de launchd) se denegaba — exactamente la clase de falso
+# positivo que obligó a revertir el intento del 17-sep. Se juzga por la ruta RESUELTA, así que
+# aquí basta mirar su extensión; el camino por LITERAL de SECRET_HINTS no cambia.
+_EXT_NO_SECRETO = (".py", ".sh", ".bash", ".zsh", ".js", ".ts", ".rb", ".pl", ".go", ".md", ".rst")
+_GLOB_MAX = 500          # techo de expansión: un patrón absurdo no cuelga el hook
+_GLOB_MAX_PATRONES = 20  # ídem para el número de palabras-patrón que se expanden
+
+
+def _var_secreta(nombre):
+    """¿El NOMBRE de la variable delata un secreto? (mayúsculas: KEY/TOKEN/SECRET/…)"""
+    up = nombre.upper()
+    return any(h in up for h in SECRET_VAR_HINTS)
+
+
+def _globs_a_secreto(command):
+    """Expande los patrones del comando y devuelve el primer resultado que sea un secreto.
+
+    Fail-OPEN a propósito (devuelve None si algo revienta al expandir): este check es defensa
+    ADICIONAL sobre la que ya hace SECRET_HINTS por la cadena, y el resto del muro sigue
+    aplicándose entero después. Hacerlo fail-closed convertiría cualquier rareza del sistema de
+    ficheros en un DENY de comandos legítimos — que es exactamente cómo se rompió el muro el
+    17-sep. Lo que este check añade no se pierde: lo que no se pueda expandir, no se abre.
+    """
+    patrones = 0
+    for palabra in command.split():
+        if not any(ch in palabra for ch in _GLOB_CHARS):
+            continue
+        palabra = palabra.strip("\"'")
+        if "$" in palabra:
+            continue  # lleva variable dentro: no es expandible aquí, lo juzga el check de arriba
+        patrones += 1
+        if patrones > _GLOB_MAX_PATRONES:
+            return None
+        pat = os.path.expanduser(palabra)
+        bases = [""] if os.path.isabs(pat) else list(_CWDS)
+        for base in bases:
+            entero = pat if not base else os.path.join(base, pat)
+            try:
+                vistos = 0
+                for hit in glob.iglob(entero):       # sin recursive=True: `**` no baja el árbol
+                    vistos += 1
+                    if vistos > _GLOB_MAX:
+                        break
+                    low = hit.lower()
+                    if low.endswith(_EXT_NO_SECRETO):
+                        continue
+                    if any(h in low for h in SECRET_HINTS):
+                        return hit
+            except Exception:
+                continue
+    return None
+
+
+def check_secreto_a_stdout(command):
+    """Nada que imprima un secreto: la transcripción se guarda y lo deja quemado."""
+    for nombre in _VAR_RE.findall(command):
+        if _var_secreta(nombre):
+            deny("un secreto impreso queda QUEMADO en la transcripcion: expansion de $%s. "
+                 "Las claves salen por el portapapeles o por un comando que corra {{TITULAR}}, "
+                 "nunca por stdout." % nombre)
+    hit = _globs_a_secreto(command)
+    if hit:
+        deny("el patron del comando resuelve a un fichero de secretos (%s): imprimirlo lo "
+             "QUEMA en la transcripcion." % os.path.basename(hit))
+
+
 def main():
     raw = sys.stdin.read()
     try:
@@ -975,6 +1066,8 @@ def main():
     # un `git branch -d` denegado. Global de un solo uso por invocación (ver _SANDBOX_ESCALADO).
     global _SANDBOX_ESCALADO
     _SANDBOX_ESCALADO = bool(ti.get("dangerouslyDisableSandbox"))
+
+    check_secreto_a_stdout(command)
 
     if "$(" in command or "`" in command or "<(" in command or ">(" in command:
         deny("substitucion de comandos/procesos prohibida ($()/`/<()).")

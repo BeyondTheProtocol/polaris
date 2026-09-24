@@ -36,6 +36,9 @@ runpy() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((ski
 run   test_fuga.sh
 run   test_halt.sh
 runpy test_muro_fase0.py
+runpy test_muro_clase_plantar.py
+runpy test_token_rotacion.py
+runpy test_terminos_carril.py
 runpy test_f1_opus_supervision.py
 runpy test_cola.py
 runpy test_cola_diario.py
@@ -270,6 +273,7 @@ runpy test_muro_hook.py
 runpy test_muro_base_gate.py
 runpy test_muro_costura_rm.py
 runpy test_muro_a1_sandbox_escalada.py
+runpy test_muro_secreto_stdout.py
 runpy test_clinico_guard.py
 runpy test_log_auditoria_casa_base.py
 runpy test_lector_clinico_binario.py
@@ -285,6 +289,7 @@ runpy test_visor3d_carga.py
 runpy test_sonda_silencio.py
 runpy test_vigia_latidos.py
 runpy test_cola_ruido.py
+runpy test_worktree_guard.py
 runpy test_zonas_clinicas.py
 runpy test_drive_gate.py
 runpy test_audit_constelacion.py
@@ -306,6 +311,13 @@ runpy test_cosecha_checklists.py
 runpy test_cronica.py
 runpy test_elicit.py
 runpy test_git_mutex.py
+runpy test_singleton_guard.py
+runpy test_rama_vista_guard.py
+runpy test_copy_web_guard.py
+runpy test_reservas_decision.py
+runpy test_identidad_paciente.py
+runpy test_borrador_unico.py
+runpy test_web_i18n.py
 runpy test_paso_consolidacion.py
 runpy test_caja.py
 runpy test_cosecha_panel.py

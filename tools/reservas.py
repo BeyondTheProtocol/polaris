@@ -52,6 +52,40 @@ CATEGORIAS = ("viaje", "compra", "cita", "suscripcion", "otros")
 RIESGOS = ("verde", "ambar", "rojo")
 ESTADOS = ("pendiente", "a_un_clic", "auto_listo", "reservado", "cancelado")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 🛒 UN CARRITO NO ES UNA DECISIÓN (norma `feedback-carrito-no-es-decidido`, clase BLOQUEO).
+# {{TITULAR}}: «el carrito/lista de deseos de Amazon (o cualquier "guardado") NO significa decidido —
+# no reservar/comprar algo solo porque esté ahí».
+#
+# `clasificar()` ya exigía `decision_tomada` para el carril verde, así que el freno EXISTÍA…
+# pero se fiaba del booleano que le pasaran. Y el estado vivo del 18-sep-26 enseña que ese
+# booleano no era de fiar: de 24 encargos, **14 declaraban `decision_tomada=True` desde un
+# origen que no es una decisión suya** —
+#     1 · `amazon-carrito`        ← la norma, literal: el carrito marcado como decidido
+#     6 · `propuesta-conserje`    ← una propuesta MÍA contada como decisión SUYA
+#     7 · `estudio-viaje-julio`   ← un estudio contado como decisión
+# frente a 9 de `agencia-viajes`, que sí es una confirmación suya (así lo manda su charter).
+#
+# Ninguno llegó a comprarse porque en F1 `AUTO_PAGO_ACTIVO=False` apaga hasta lo verde: el daño
+# era LATENTE, esperando a F3 — que es exactamente el momento en que ese booleano decidiría si
+# algo se paga solo. Por eso el arreglo no es "avisar": es que la PROCEDENCIA mande sobre el
+# booleano. Un origen que es un guardado, una propuesta o un estudio NO puede sostener
+# `decision_tomada`, lo pase quien lo pase.
+ORIGENES_NO_DECIDEN = (
+    "carrito", "cart", "wishlist", "lista-deseos", "lista_deseos", "deseos",
+    "guardado", "guardados", "saved", "favorito", "favoritos",
+    "propuesta", "sugerencia", "estudio", "radar", "borrador", "idea", "candidato",
+)
+
+
+def decision_no_vale(origen):
+    """(True, motivo) si ese ORIGEN no puede sostener `decision_tomada`. Fail-closed."""
+    o = (origen or "").strip().lower()
+    for marca in ORIGENES_NO_DECIDEN:
+        if marca in o:
+            return True, ("origen '%s' es un guardado/propuesta, no una decisión suya" % origen)
+    return False, None
+
 # Sobre 🟢 por defecto: CONSERVADOR a propósito. Editarlo es el gate de {{TITULAR}} (`sobre set`).
 SOBRE_DEFAULT = {
     "tope_verde_eur": 60.0,        # auto-candidato solo por debajo de esto
@@ -132,6 +166,12 @@ def clasificar(enc, sobre=None):
     reemb = enc.get("reembolsable")          # True / False / None
     decidida = bool(enc.get("decision_tomada"))
     cat = enc.get("categoria")
+    # La procedencia manda sobre el booleano. Va aquí y no solo en `crear()` a propósito: así
+    # los encargos que YA están guardados con la contradicción tampoco pueden colarse al verde,
+    # sin tener que reescribir el estado vivo por debajo.
+    mal_origen, motivo_origen = decision_no_vale(enc.get("origen"))
+    if mal_origen:
+        decidida = False
 
     # 🔴 ROJO — irreversibles y desconocidos NO se tocan sin firma.
     if enc.get("irreversible") is True:
@@ -150,7 +190,7 @@ def clasificar(enc, sobre=None):
     if sobre["solo_reembolsable"] and reemb is not True:
         falla.append("no consta reembolsable/cancelable")
     if not decidida:
-        falla.append("la decisión no la has confirmado tú aún")
+        falla.append(motivo_origen if mal_origen else "la decisión no la has confirmado tú aún")
     if not falla:
         return "verde", ["dentro del sobre (%.2f€, %s, reembolsable)" % (importe, cat)]
 
@@ -174,11 +214,17 @@ def crear(titulo, categoria, *, importe_eur=None, reembolsable=None, decision_to
     eid, n = base, 2
     while eid in ids:
         eid, n = "%s-%d" % (base, n), n + 1
+    # Un guardado/propuesta no sostiene una decisión: se REBAJA al registrarlo, y queda dicho
+    # por qué (si no, el encargo mentiría en el estado vivo y nadie lo vería nunca).
+    mal_origen, motivo_origen = decision_no_vale(origen)
+    if mal_origen and decision_tomada:
+        decision_tomada = False
     enc = {
         "id": eid, "titulo": titulo, "categoria": categoria,
         "importe_eur": (float(importe_eur) if isinstance(importe_eur, (int, float)) else None),
         "reembolsable": (bool(reembolsable) if reembolsable is not None else None),
         "decision_tomada": bool(decision_tomada),
+        "decision_rebajada": (motivo_origen if mal_origen else None),
         "irreversible": bool(irreversible),
         "url": (url or "").strip(), "origen": (origen or "manual").strip(),
         "ned": (ned or "").strip(), "datos": (datos or {}),
@@ -266,6 +312,22 @@ def listar(estado=None):
     return [e for e in data["encargos"] if estado is None or e.get("estado") == estado]
 
 
+def auditar():
+    """Encargos que DECLARAN decisión suya desde un origen que no puede sostenerla.
+
+    Existe porque el freno nuevo no reescribe el estado vivo: los encargos ya guardados con la
+    contradicción siguen ahí, y `clasificar()` ya no se los cree, pero ella tiene derecho a
+    VERLOS. Sin esto, la norma se aplicaría en silencio sobre 14 registros que dicen otra cosa.
+    """
+    out = []
+    for e in _load()["encargos"]:
+        mal, motivo = decision_no_vale(e.get("origen"))
+        if mal and e.get("decision_tomada"):
+            out.append({"id": e["id"], "titulo": e["titulo"], "origen": e.get("origen"),
+                        "estado": e.get("estado"), "riesgo": e.get("riesgo"), "motivo": motivo})
+    return out
+
+
 # ── CLI (inspección / operación manual) ──────────────────────────────────────
 def _main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
@@ -276,6 +338,7 @@ def _main(argv):
         print("  sobre [show]               — muestra el sobre verde")
         print("  sobre set campo=valor ...  — edita el sobre (gate de {{TITULAR}})")
         print("  clasificar <importe> <categoria> [reembolsable] [decidida]  — prueba la regla")
+        print("  auditar                    — encargos que dicen 'decidido' desde un carrito/propuesta")
         print("  estado <id>      AUTO_PAGO_ACTIVO=%s" % AUTO_PAGO_ACTIVO)
         return 0
     cmd, rest = argv[0], argv[1:]
@@ -284,6 +347,17 @@ def _main(argv):
         for e in listar(estado):
             print("%-6s %s %-9s %s" % (e.get("estado"), _ICONO.get(e.get("riesgo"), " "),
                                        e.get("riesgo") or "-", e["titulo"]))
+        return 0
+    if cmd == "auditar":
+        malos = auditar()
+        if not malos:
+            print("✅ ningún encargo declara decisión desde un guardado/propuesta")
+            return 0
+        print("🛒 %d encargo(s) dicen 'decidido' desde un origen que no lo sostiene:" % len(malos))
+        for m in malos:
+            print("  %-34s origen=%-22s %s" % (m["titulo"][:34], m["origen"], m["estado"]))
+        print("\nNinguno puede entrar al carril verde (clasificar() ya no se cree el booleano).")
+        print("Si alguno SÍ lo decidiste tú, vuelve a emitirlo con el origen real.")
         return 0
     if cmd == "procesar":
         ch = procesar()

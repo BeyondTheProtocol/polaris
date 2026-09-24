@@ -107,6 +107,57 @@ def _limpio(x):
     return str(x).replace("\\", "\\\\").replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n")
 
 
+# La verificación de identidad vive en `tools/identidad_paciente.py` (testable sin datos
+# clínicos y reutilizable por el comité). Si no se puede importar, la ventanilla NO sirve nada:
+# una ventanilla que no sabe de quién es el informe es exactamente lo que la norma prohíbe.
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import identidad_paciente as _ID
+except Exception as _e:          # pragma: no cover
+    _ID = None
+    _ID_ERR = _e
+
+
+def _sirve(veredicto):
+    """¿Se puede servir con ese veredicto? Sin módulo → NO (fail-closed, no AttributeError)."""
+    return bool(_ID) and _ID.SIRVE.get(veredicto, False)
+
+
+def _pide_aviso(veredicto):
+    return bool(_ID) and veredicto in _ID.PIDE_AVISO
+
+
+def _verificar_identidad(texto, ruta=None):
+    if _ID is None:
+        return "sin_modulo", ("no pude cargar identidad_paciente.py (%s)" % _ID_ERR)
+    try:
+        return _ID.verificar(texto, ruta)
+    except Exception as e:
+        return "error", ("la verificación de identidad falló (%s)" % type(e).__name__)
+
+
+def _identidad_ok(agent, path, texto):
+    """(True, veredicto) si se puede servir; (False, veredicto) si hay que RECHAZAR ya.
+
+    Un único sitio para las 3 puertas de salida de contenido (main() default, y las dos ramas
+    de sirve_texto): sidecar OCR y pdftotext. Imprime el rechazo/aviso por stderr y loguea;
+    no toca stdout — quien llama decide qué escribir ahí."""
+    veredicto, detalle = _verificar_identidad(texto, path)
+    if not _sirve(veredicto):
+        _log(agent, "RECHAZADO-identidad-%s" % veredicto, path)
+        print("RECHAZADO (identidad): %s.\n"
+              "Estar en su carpeta NO prueba que sea suyo. Si de verdad necesitas este "
+              "documento, ábrelo tú y confirma la filiación antes de usar un solo dato."
+              % detalle, file=sys.stderr)
+        return False, veredicto
+    if _pide_aviso(veredicto):
+        print("⚠️  IDENTIDAD NO ACREDITADA: %s.\n"
+              "    Estar en su carpeta no prueba que sea suyo: verifica nombre y fecha de "
+              "nacimiento antes de usar cualquier dato de este documento." % detalle,
+              file=sys.stderr)
+    return True, veredicto
+
+
 def _log(agent, result, path):
     try:
         os.makedirs(os.path.dirname(LOG), exist_ok=True)
@@ -439,7 +490,11 @@ def sirve_texto(agent, path):
         if al_dia:
             with open(real, "rb") as f:
                 datos = f.read()
-            _log(agent, "LEIDO-texto-sidecar-ocr", real)   # lo que se sirvió DE VERDAD
+            # ¿de quién es este informe? (feedback-verificar-identidad-paciente-en-informe)
+            ok, veredicto = _identidad_ok(agent, path, datos.decode("utf-8", errors="ignore"))
+            if not ok:
+                return 1
+            _log(agent, "LEIDO-texto-sidecar-ocr-%s" % veredicto, real)   # lo que se sirvió DE VERDAD
             print("⚠️  Esto es el sidecar OCR (%s), NO el original. Para cotejar bytes: --a"
                   % os.path.basename(sidecar), file=sys.stderr)
             sys.stdout.buffer.write(datos)
@@ -471,7 +526,11 @@ def sirve_texto(agent, path):
               "    python3 tools/lector_clinico.py procesa ocr_informes -- --apply --dir "
               "\"%s\"\ny vuelve a pedirlo." % os.path.dirname(path), file=sys.stderr)
         return 1
-    _log(agent, "LEIDO-texto-pdftotext", path)
+    # ¿de quién es este informe? (feedback-verificar-identidad-paciente-en-informe)
+    ok, veredicto = _identidad_ok(agent, path, r.stdout.decode("utf-8", errors="ignore"))
+    if not ok:
+        return 1
+    _log(agent, "LEIDO-texto-pdftotext-%s" % veredicto, path)
     print("⚠️  Esto es la capa de texto del PDF (pdftotext -layout), NO el original byte a "
           "byte. Para cotejar el original: --a <destino en zona clínica>.", file=sys.stderr)
     sys.stdout.buffer.write(r.stdout)
@@ -655,8 +714,19 @@ def main(argv):
                   "o `--binario` si lo vas a tubear a un programa (pdftoppm, pdftotext…)."
                   % path, file=sys.stderr)
             return 1
-        _log(agent, "LEIDO-binario" if binario else "LEIDO", path)
-        _vuelca(f, sys.stdout.buffer, cabecera)
+        resto = f.read()                          # el fichero ya cupo en memoria para el chequeo utf8
+        # ── ¿de quién es este informe? (norma `feedback-verificar-identidad-paciente-en-informe`,
+        # rescatada 24-sep-26 de norma-identidad-paciente). Hasta aquí solo se comprobaba QUE la
+        # ruta es zona clínica, nunca DE QUIÉN es el documento — y esa carpeta no contiene solo
+        # informes suyos (el caso de su padre, PDFs de terceros que entran por correo). La única
+        # señal fiable está DENTRO: la filiación. La ruta no lo es.
+        ok, veredicto = _identidad_ok(agent, path, (cabecera + resto).decode("utf-8", errors="ignore"))
+        if not ok:
+            return 1
+        _log(agent, "LEIDO-binario" if binario else "LEIDO-%s" % veredicto, path)
+        sys.stdout.buffer.write(cabecera)
+        sys.stdout.buffer.write(resto)
+        sys.stdout.buffer.flush()
     return 0
 
 

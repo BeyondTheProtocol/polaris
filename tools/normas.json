@@ -535,13 +535,13 @@
    "slug": "feedback-borrador-mejorado-borra-el-anterior",
    "que": "Al rehacer/mejorar un borrador de correo, BORRAR el anterior — nunca dejar dos versiones del mismo correo en Borradores.",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/borrador_unico_guard.py::clave",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-borrador-unico. El registro la daba por NO mecanizable ('Mecanizable: parcial. Propuesta: no') y si lo era: hook PreToolUse sobre las tools MCP de borrador. MEDIDO antes de escribirlo: 47 llamadas a create_draft en los transcripts reales y 8 pares (destinatario, asunto) con mas de un borrador — uno de ellos SEIS veces ('Possible candidate — NCT06691035') — o sea 14 borradores redundantes de 47, casi un tercio; y update_draft, que es la salida correcta, ya se usaba 19 veces. Lleva una libreta local (tools/state/borradores_correo.json) de que hilos tienen borrador nuestro y deniega el create_draft repetido, ofreciendo las dos salidas: update_draft sobre el que ya hay, o borrar el anterior. La clave es el threadId si viene y si no (destinatario, asunto NORMALIZADO sin Re:/RE:/RV:/Fwd:/[Extern]): sin normalizar los prefijos se colaban justo los casos reales medidos ('Sample at {{CENTRO}}' vs 'Re: Sample at {{CENTRO}}' vs 'RE: [Extern] RE: ...'). Caduca a 30 dias, por si ella borro el borrador a mano en Gmail y la libreta se queda desfasada. FAIL-OPEN, escotilla BTP_BORRADOR_OK=1. Test: tests/test_borrador_unico.py (21 casos). RESIDUAL: la libreta no sabe el id del borrador (el hook corre ANTES de crearlo), asi que el mensaje manda a list_drafts para encontrarlo; y si alguien crea el borrador por fuera del MCP (navegador), no se entera."
   },
   {
    "slug": "feedback-buscar-fuera-del-repo-antes-de-decir-no-existe",
@@ -595,13 +595,13 @@
    "slug": "feedback-carrito-no-es-decidido",
    "que": "El carrito/lista de deseos de Amazon (o cualquier \\\"guardado\\\") NO significa decidido — no reservar/comprar algo solo porque esté ahí",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "tools/reservas.py::decision_no_vale",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: fail-closed en reservas.py: sin decision_tomada explícita no entra carril verde"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-carrito-no-es-decision. EL FRENO YA EXISTIA Y NO CONTACTO, que es el hallazgo: `clasificar()` exigia `decision_tomada` para el carril verde desde siempre, pero se fiaba del booleano que le pasaran. El estado vivo del 18-sep-26 lo desmiente: de 24 encargos, 14 declaraban decision_tomada=True desde un origen que no es una decision suya — 1 de `amazon-carrito` (la norma, literal), 6 de `propuesta-conserje` (una propuesta mia contada como decision suya) y 7 de `estudio-viaje-julio`; frente a 9 de `agencia-viajes`, que si es una confirmacion suya segun su charter. Ninguno se compro porque en F1 AUTO_PAGO_ACTIVO=False apaga hasta lo verde: el dano era LATENTE, esperando a F3 — justo el momento en que ese booleano decidiria si algo se paga solo. ARREGLO: la PROCEDENCIA manda sobre el booleano. `decision_no_vale(origen)` rechaza carrito/wishlist/guardados/favoritos/propuesta/sugerencia/estudio/radar/borrador/idea/candidato, y se aplica en DOS puntos: `crear()` rebaja la afirmacion al registrar (y deja escrito el motivo en `decision_rebajada`, sin rechazar el encargo), y `clasificar()` no se cree el booleano — esto ultimo es lo que protege a los 14 que YA estan guardados, sin reescribir el estado vivo por debajo. Nuevo `reservas.py auditar` los lista para que ella los vea en vez de que la norma se aplique en silencio sobre registros que dicen otra cosa. Test: tests/test_reservas_decision.py (32 casos; incluye que `agencia-viajes` SIGUE pudiendo declarar la decision y que rojo/ambar mandan por encima). RESIDUAL: `origen` es autodeclarado — un llamante que etiquete mal la procedencia ('manual' leyendo del carrito) se lo salta; eso ya no es mecanizable aqui. Y no se han tocado los charters de los agentes que emitieron esos origenes: el guard actua diga lo que diga el charter."
   },
   {
    "slug": "feedback-cebo-de-mentira-puede-parar-el-sistema",
@@ -889,7 +889,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate PreToolUse verifica cuenta Gmail del hilo antes de adjuntar"
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. REVISADA el 18-sep-26 y sigue SIN mecanismo, pero ahora con el BLOQUEO identificado en vez de una propuesta: (a) el MCP de Gmail no acepta la cuenta por llamada — create_draft y reply operan sobre 'the authenticated user's Gmail account', asi que no hay parametro que verificar; (b) tools/state/correo/buzon.json NO guarda de que cuenta viene cada mensaje (claves: asunto, fecha, flags, inyeccion, message_id, ned_critico, remitente, remitente_email, uid, urgente), asi que el sistema tampoco SABE donde vive el hilo; (c) un hook PreToolUse solo ve la ENTRADA de la tool, nunca el resultado, asi que no puede enlazar el messageId de un reply con el get_thread que lo produjo. El sistema conoce CUATRO cuentas (titular.mgp@, titular@, titular@, beyondtheprotocolteam@), asi que el riesgo es real. PRIMER PASO si se quiere cerrar: que correo_imap.py anote la cuenta en cada entrada del buzon. Hasta entonces, mecanizarla seria teatro."
   },
   {
    "slug": "feedback-correos-formato-html",
@@ -1459,13 +1459,13 @@
    "slug": "feedback-muro-clase-plantar-ejecutar",
    "que": "Al endurecer el muro (allowlist de comandos), barrer la CLASE \\\"plantar fichero + binario permitido lo auto-ejecuta\\\" sobre TODOS los escritores y TODOS los disparadores",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/muro_guard.py + tests/test_muro_clase_plantar.py",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: hook PreToolUse: allowlist binarios cubriendo escritores/disparadores"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-clase-plantar-ejecutar. LA PROTECCION YA EXISTIA Y NADIE LA VIGILABA: muro_guard.py v3 (B1/B2/B3) cerro la clase entera y lo dice en su cabecera, pero esta norma tenia mecanismo null y NINGUN test recorria la clase COMO CLASE — test_muro_fase0 cubre H1/H2/H4/C1/C2 y test_muro_costura_rm la costura de rm/mv. Una clase barrida una vez y sin regresion se reabre en el siguiente endurecimiento, que es justo lo que la norma pide evitar. Verificado EJECUTANDO el guard real: 17 de 17 vias denegadas en el sondeo, y el test las fija como matriz ESCRITORES x DISPARADORES (33 vias): plantar por Write/Edit/MultiEdit, cp, mv, tee, ln -s, touch, dd, install, rsync, curl -O y wget, sobre .py/.sh/.command, dotfiles de shell, .git/hooks, plists de launchd y .claude/agents; disparar por python3 de fuera del repo, python3 -c/-m, bash -c, sh -c, git config a clave que ejecuta, git -c alias, git -p, ruta relativa, ruta absoluta fuera de /usr/bin, $() y comillas invertidas. Incluye 4 casos de trabajo legitimo que no se pueden romper. Cada via NUEVA de plantar o disparar se anade a ese fichero: eso es lo que convierte la norma en auditable."
   },
   {
    "slug": "feedback-muro-egress-no-nacionalidad",
@@ -1519,13 +1519,13 @@
    "slug": "feedback-neoantigeno-restringido-solo-marketing",
    "que": "Los términos protegidos (vacuna/neoantígeno) se vetan SOLO en marketing/público; en INVESTIGACIÓN/clínico son términos científicos normales y SÍ se usan",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "tools/borde.py::clasificar(veto_publico) + tests/test_terminos_carril.py",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: veto de terminos en salida.py solo en carril marketing/publico"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-terminos-carril. LA PROTECCION YA EXISTIA Y NADIE LA VIGILABA — cuarta vez que pasa en esta tanda. tools/borde.py tiene `veto_publico` como parametro y `clasificar_consulta()` lo apaga a proposito; su propio docstring dice 'NO aplica el veto publico (vacuna/neoantig) porque la ciencia generica es legitima'. Pero la norma estaba con mecanismo null y NINGUN test fijaba la DISTINCION, que es lo unico que importa aqui: un endurecimiento futuro del veto la borraria sin que nada se pusiera rojo, y el sistema dejaria de poder buscar literatura sobre su propio tratamiento. El test no prueba el veto, prueba el CARRIL: el MISMO texto tiene que caer en publico y pasar en consulta, y se ejecuta contra los dos. Verificado ejecutando borde.py: 12 de 12. Incluye que apagar el veto NO abre la puerta a lo demas — 'una vacuna de neoantigenos para {{TITULAR}}' sigue bloqueada en consulta, pero por PII y por hablar de su caso, no por la palabra. Salta (rc=77) sin los overlays *.local.json, como el resto de tests del borde."
   },
   {
    "slug": "feedback-no-agentes-web-paralelos",
@@ -1675,13 +1675,13 @@
    "slug": "feedback-no-tocar-copy-web-sin-ok",
    "que": "Cambiar copy EXISTENTE de la web (sobre todo el hero/H1) NO es zona autónoma — requiere OK explícito y bien entendido de {{TITULAR}}; páginas/secciones NUEVAS sí son autónomas",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/copy_web_guard.py::revisa_commit",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: hook PreToolUse bloquea merge de copy publicado sin OK"
+   "nota": "Mecanizada PARCIAL el 18-sep-26 (capa 1 del plan de normas), rama norma-copy-web-necesita-ok. EL GATE VA EN `git commit`, NO EN Write/Edit, y es el hallazgo que cambio el diseno: medido sobre TODOS los transcripts hay 0 llamadas a Write/Edit contra i18n/locales o content/, y 23 comandos Bash que las tocan con `python3 - <<EOF` y `sed`. Un gate sobre la tool escritora vigilaria una puerta por la que no pasa nadie; sobre el diff de git da igual como se escribio el fichero (y el registro ya lo proponia asi: 'bloquea merge de copy publicado sin OK'). TRES NIVELES, calibrados replicando los 86 commits DIRECTOS del repo web: FRENA (27) si cambia una clave de HERO/H1 o si BORRA una clave publicada; AVISA sin bloquear (32) si cambia otro copy existente, listando las claves en el momento de commitear; PASA en silencio (27) si solo anade claves, paginas o lineas — paginas y secciones NUEVAS son zona autonoma por la propia norma. Por eso es PARCIAL: solo el hero/H1 y los borrados frenan de verdad. Denegar todo cambio de copy existente habria saltado en 59 de 86 commits y un gate que se esquiva siempre ensena a esquivarlo; `ask` tampoco sirve — este repo lo probo el 25-jul-26 y quedo escrito en regla_en_accion.py: 'con ask, la escritura paso… el ask se resolvio solo sin que nadie viera nada'; lo que si esta comprobado alli es que exit 2 frena un Bash, que es donde vive este gate. PRECEDENTE en su propio historial: el hero se cambio y hubo que revertirlo DOS veces (26514d8->02ccb94 y 4187131->4084efa); el guard frena los cuatro commits. Ambito: cualquier clon del repo web, reconocido por nuxt.config.ts + i18n/locales (cubre los ~/projects/.mgc-staging/*). FAIL-OPEN, escotilla BTP_COPY_OK=1. Test: tests/test_copy_web_guard.py (23 casos). RESIDUAL: el copy de las paginas legales (aviso-legal.vue, cookies.vue, privacidad.vue) esta a mano en el .vue, no en i18n, y ahi no llega — meter app/**/*.vue entero haria saltar el gate en cada cambio de codigo."
   },
   {
    "slug": "feedback-nombrar-tecnico-no-solo-metafora",
@@ -1903,13 +1903,13 @@
    "slug": "feedback-refresh-token-es-de-un-solo-uso",
    "que": "Canjear un refresh token es una operación DESTRUCTIVA (rotación de un solo uso) — nunca lo hagas como diagnóstico \\\"de solo lectura\\\" sin guardar el par nuevo",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/token_rotacion_guard.py::canjea",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no"
+   "nota": "Mecanizada PARCIAL el 18-sep-26 (capa 1 del plan de normas), rama norma-token-rotacion. El registro la daba por no mecanizable ('Propuesta: no'). Hook PreToolUse sobre Bash que deniega un canje crudo y nombra la puerta. POR QUE DUELE, con su precedente escrito en tools/_oauth_refresh.py: un grant_type=refresh_token devuelve un par nuevo E INVALIDA el viejo, asi que hacerlo 'para ver si sigue vivo' sin guardar lo que vuelve QUEMA el token guardado y obliga a un login humano con navegador — Consensus estuvo 28 DIAS sin responder con el panel en verde justo por no poder renovarse solo, y scite tiene 15 minutos de vida por token. La puerta que canjea Y GUARDA el par nuevo a 0600 ya existia: _oauth_refresh.renovar(state_dir, server_url). EL MARCADOR NO ES HEURISTICA: es `grant_type=refresh_token`, el parametro del estandar OAuth 2.0 (RFC 6749 §6), y aparece 0 veces en los ~2.900 comandos Bash reales de los transcripts — o sea que no puede romper nada que se estuviera haciendo, y aun asi merece la pena porque el error es de una sola vez y se paga en dias de carril muerto. Test: tests/test_token_rotacion.py (21 casos, centrados en las FORMAS de escribirlo: curl -d, JSON, comillas, espacios, mayusculas, urllib; y en que la puerta no se bloquee a si misma). PARCIAL: un canje hecho DENTRO de un .py que el comando solo invoca no se ve — el guard lee `python3 x.py` y no sabe que hace dentro."
   },
   {
    "slug": "feedback-registrar-info-de-mails-big-picture",
@@ -1975,13 +1975,13 @@
    "slug": "feedback-secreto-impreso-esta-quemado",
    "que": "Un secreto que imprimo por pantalla queda escrito en la transcripción del chat, que se guarda: está quemado. Las claves salen por el portapapeles o por un comando que corre ella, nunca por stdout",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/muro_guard.py::check_secreto_a_stdout",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: test_anatomia_push que asserta secreto no sale por stdout"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama muro-secreto-no-a-stdout. SECRET_HINTS ya denegaba NOMBRAR un fichero de secretos (cat .env caía desde antes, verificado ejecutando el guard); el hueco era lo que la shell expande DESPUES de que el guard tokenice: $API_KEY y globs que resuelven al fichero de secretos. Test: tests/test_muro_secreto_stdout.py (10 deny + 12 allow, con ls -la y git status como regresion fija del intento revertido del 17-sep). RESIDUAL: no cubre volcar CONTENIDO secreto desde un fichero que no se llama como un secreto (~/.zshrc, .git/config, grep -r sobre un arbol con claves) — eso pide un check de contenido, no de nombre."
   },
   {
    "slug": "feedback-secretos-solo-llavero",
@@ -2023,13 +2023,13 @@
    "slug": "feedback-sesion-paralela-seguridad-primero",
    "que": "Sesión paralela = NORMAL (forma de trabajar de {{TITULAR}}): aíslate en tu propia rama/worktree y SIGUE; solo paras/serializas en los 3 singletons (activar launchd, fusionar a base, control de pantalla)",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/singleton_guard.py::clasifica",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: hook/test: git add rutas explicitas; serializar 3 singletons"
+   "nota": "Mecanizada PARCIAL el 18-sep-26 (capa 1 del plan de normas), rama norma-sesion-paralela-singletons. La mitad 'aislate y SIGUE' NO se mecaniza: es criterio, ningun hook puede obligarme a no pararme a preguntar. La que si: hook PreToolUse sobre Bash que ENRUTA los singletons a su puerta con candado en vez de dejar la forma cruda. Las puertas existen desde el 10-jul-26 (tools/git_mutex.py, candado 'git-mutex'; tools/activar_daemon.py, candado 'launchd') y el charter .claude/agents/git.md ya prohibia por escrito el git crudo — MEDIDO con clasificador tokenizado sobre los transcripts reales: 107 de 112 fusiones a base, 46 de 46 launchctl mutantes y 79 de 83 `git add` en bloque fueron por Bash a pelo. El texto no era enforcement. Un grep inflaba esas cifras (contaba `git merge-base`, `git merge-tree` y `git add -A <rutas>` como infracciones), por eso el clasificador tokeniza. Sobre los 2581 comandos reales del lazo 24/7 solo se denegarian 25, todos `git merge`/`git branch -d` crudos sobre casa base. Cubre S1 launchd y S2 fusionar a base + `git add` en bloque; NO cubre `commit` ni `push` (a proposito). RESIDUAL: el TERCER singleton, control de pantalla, no tiene puerta con candado que nombrar (no hay tools/pantalla.py) — enrutar no es posible todavia y no se inventa. FAIL-OPEN, escotilla BTP_SINGLETON_OK=1. Test: tests/test_singleton_guard.py (43 casos, con la lista ALLOW mas larga que la DENY a proposito)."
   },
   {
    "slug": "feedback-sesiones-abiertas-lectura-efimera-como-miembro",
@@ -2263,13 +2263,13 @@
    "slug": "feedback-verificar-identidad-paciente-en-informe",
    "que": "Antes de usar datos de un informe clínico, verificar nombre+fecha de nacimiento: estar en su carpeta NO prueba que sea suyo",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "parcial: tools/identidad_paciente.py::verificar",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: test/hook que exige verificar DOB+nombre antes de usar dato"
+   "nota": "Mecanizada PARCIAL el 18-sep-26 (capa 1 del plan de normas), rama norma-identidad-paciente. `tools/identidad_paciente.py` verifica la filiacion DENTRO del documento y `tools/lector_clinico.py` la exige antes de servir: la ventanilla comprobaba QUE la ruta es clinica, no DE QUIEN es el documento — y ahi vive tambien el caso de su padre (Bellvitge) y PDFs de terceros que entran por correo. Veredictos: coincide -> sirve; otro_paciente (filiacion etiquetada ajena Y el documento NO la nombra en ninguna parte) -> RECHAZA sin reproducir nunca el dato ajeno; ambiguo (encabezado ajeno pero SI la menciona) / parcial / no_consta / no_textual -> sirve CON aviso; sin_overlay -> rechaza (fail-closed). Solo cuenta la filiacion ETIQUETADA: un informe esta lleno de fechas de prueba y de visita. CALIBRADO sobre sus 920 ficheros del historial real con barridos de SOLO RECUENTO (ni una ruta ni un byte impreso), y hubo que rehacerlo TRES veces: (1) el primer barrido uso zonas_clinicas.raices() y se salto el historial entero — raices() devuelve 3 carpetas, pero el historial casa por PREFIJO (_PRIVADO) y no es raiz, asi que se midio contra un volcado DICOM y salio 'inerte'; (2) medido ya contra el historial, 170 de 498 transcripciones .md salian otro_paciente: exigir nombre Y apellido en el mismo campo marcaba como ajenas 53 suyas, y etiquetas genericas ('nombre', 'apellidos', 'filiacion') casaban con 'Nombre del estudio'; (3) aun asi quedaban 110, 93 de ellas en «03 · Imagen» — sus PET-TC. De esas 110, 41 SI la mencionan en el cuerpo y 69 no la nombran en absoluto, asi que solo las 69 se rechazan y las 41 pasan con aviso. Rechazar las 110 habria cerrado 41 informes suyos de imagen. FINAL: 69 de 920 (8%) se rechazan. El apellido NO basta para acreditar y es deliberado: su padre comparte apellido, asi que un informe suyo casaria y se serviria como si fuera de ella — el nombre de pila es lo que los distingue. Test: tests/test_identidad_paciente.py (22 casos, titular INVENTADO e informes escritos a mano; ni un dato clinico real). PARCIAL: los 413 PDF no se juzgan (harian falta extraerles el texto, y son el 45% del historial) y la ventanilla no es el unico canal, como dice su propia cabecera."
   },
   {
    "slug": "feedback-versionar-historico-no-sobrescribir",
@@ -2311,25 +2311,25 @@
    "slug": "feedback-web-repo-checkout-compartido",
    "que": "Cuidado — el repo web (~/projects/titular-{{APELLIDO}}-case) NO está worktree-aislado; sesiones paralelas cambian la rama bajo tus pies. Verifica la rama justo antes de cada commit/push",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/rama_vista_guard.py::main",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: hook PreToolUse git commit/push verifica rama esperada"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-rama-no-cambia-bajo-los-pies (sobre norma-egreso-necesita-ok: reusa el tokenizador de singleton_guard). Es un TOCTOU, no un descuido: entre mirar la rama y commitear hay una ventana y otra sesion hace checkout en ella. El hook apunta por SESION la ultima rama que esa sesion vio en cada repo y deniega commit/push si la actual no es esa; un checkout PROPIO actualiza el apunte y, si el destino no se lee sin ambiguedad (checkout -- fichero, --detach, commit suelto), se BORRA el apunte en vez de inventarlo. VIGILA CUALQUIER REPO, no solo el web, y el motivo es medido: sobre 366 eventos git con sello de tiempo de 41 sesiones, los 28 candidatos de deriva (otra sesion hizo checkout entre tu ultimo git y tu commit) estan TODOS en casa base y NINGUNO en el repo web. La norma nombra el web porque es donde le mordio; el dano ocurre en casa base. La medicion es COTA SUPERIOR: aproxima el repo por el texto del comando y no distingue un worktree del checkout principal (el hook si, via `git rev-parse --show-toplevel`). Uno de los 28 cae el 3-jul-26 a las 23:53, la vispera del incidente del 4-jul que el hallazgo A1 nunca pudo explicar — INFERENCIA, no prueba. Sin apunte previo se PERMITE: detecta que la rama cambio, no exige haber mirado (exigirlo denegaria el primer commit de cada sesion sin cazar nada mas). FAIL-OPEN, escotilla BTP_RAMA_OK=1. Test: tests/test_rama_vista_guard.py (24 casos, con la carrera SIMULADA de verdad: otra sesion hace checkout sobre el mismo arbol entre el mirar y el commitear). LIMITE: si abre una sesion con el repo web COMO proyecto el hook no se cargaria, porque ~/projects/titular-{{APELLIDO}}-case no tiene su propio .claude/settings.json; hoy no ocurre (las 10 sesiones que lo tocan son de claudecode y entran por cd)."
   },
   {
    "slug": "feedback-web-workflow",
    "que": "Standard workflow for web/code changes to helptitular.com — branch → PR → Netlify preview → {{TITULAR}} reviews/merges",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/salida_guard.py::_push_publica + tests/test_web_i18n.py",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: hook PreToolUse bloquea push/merge a main sin OK; test i18n"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-web-workflow; reconciliada 24-sep-26 en el triaje de las 13 ramas norma-*. El registro proponia DOS mecanismos; existen los dos, pero NO por el camino original. (1) 'hook PreToolUse bloquea push/merge a main sin OK': esa rama lo escribio como .claude/hooks/egreso_guard.py, pero NO se rescato en el triaje — .claude/hooks/salida_guard.py (POSTERIOR, 20-sep-26, escrito para feedback-si-puedo-adjuntar-correos) ya cubre el mismo terreno con mas casos reales medidos: push a main/master o desde casa base, gh pr merge, netlify/vercel deploy — y deja pasar el push de RAMA, que es justo el paso que genera el preview con el que ella decide. Cherry-pick descartado por duplicado, no por defecto; egreso_guard.py no existe en el arbol. (2) 'test i18n': tests/test_web_i18n.py — mismas claves en es y en (902 hoy), ningun valor vacio, y placeholders emparejados entre las dos lenguas. Este check encontro un BUG REAL DE PRODUCCION el mismo dia de escribirlo: home.s3_summary usa {neuroendocrino} en es y {neuroendocrine} en en, mientras app/pages/index.vue pasa los slots #luminal y #neuroendocrino — en la home EN ese hueco no se rellena. Arreglo de una palabra en en.json, PENDIENTE DE SU OK porque es copy publicado (feedback-no-tocar-copy-web-sin-ok). El test es un TRINQUETE: pasa con ese desparejado y solo con ese, y se pone rojo con cualquiera nuevo; ademas avisa si se arregla, para quitarlo de la lista. Salta (rc=77) si no esta el repo web, que es otro repo y no viaja con este. RESIDUAL: el paso 'preview de Netlify' no se comprueba — no hay forma de verificar desde aqui que ella lo haya mirado."
   },
   {
    "slug": "feedback-whatsapp-monitor-silencioso-vega-saca-tareas",
@@ -2371,13 +2371,13 @@
    "slug": "feedback-worktree-editar-rutas-del-worktree",
    "que": "En sesión con worktree, editar SIEMPRE rutas DENTRO del worktree, no rutas absolutas de casa base",
    "clase": "bloqueo",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/worktree_guard.py::_veredicto",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: hook PreToolUse veta Write a ~/claudecode desde sesion con worktree"
+   "nota": "Mecanizada el 18-sep-26 (capa 1 del plan de normas), rama norma-worktree-no-escribe-casa-base. Hook PreToolUse propio sobre Write/Edit/MultiEdit/NotebookEdit, registrado en .claude/settings.json. MEDIDO antes de disenarlo, sobre los transcripts reales de las 56 sesiones con worktree: de 1122 escrituras, 245 salieron del worktree hacia casa base y 117 cayeron en el worktree de OTRA sesion viva. El corte NO es 'todo casa base': el contenido (00_FUENTE-DE-VERDAD), los informes y el estado vivo (tools/state/cost) no estan versionados y solo existen alli, asi que bloquearlos romperia 51 de esas 245. Criterio: el directorio de destino existe TAMBIEN dentro de mi worktree -> es arbol versionado -> DENY. Coincide con 'esta versionado en git' en los 245 casos reales sin pagar un subproceso de git por Write. FAIL-OPEN a proposito (al reves que el muro): atrapa un despiste en interactivo, y fallar cerrado la dejaria sin editar. Escotilla BTP_CASA_BASE_OK=1. Test: tests/test_worktree_guard.py (22 casos). RESIDUAL: no cubre Bash — `cd ~/claudecode && git commit` sigue pasando; esa es feedback-sesion-paralela-seguridad-primero, que pide verificar la RAMA, no la ruta."
   },
   {
    "slug": "feedback-yo-pregunto-ella-confirma",

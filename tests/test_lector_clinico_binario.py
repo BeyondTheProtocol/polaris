@@ -29,6 +29,7 @@ que hace que desde un worktree se pruebe el código de ESA rama y no el de casa 
 """
 import hashlib
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -95,6 +96,16 @@ try:
     fuera = os.path.join(tmp, "fuera")
     os.makedirs(zona)
     os.makedirs(fuera)
+    # Overlay sintético del titular (norma feedback-verificar-identidad-paciente-en-informe,
+    # rescatada 24-sep-26): sin `tools/perfil.local.json` la ventanilla ahora es fail-closed
+    # (veredicto `sin_overlay`, NO se sirve nada) — correcto en producción, pero este test corre
+    # con `BTP_REPO=tmp` y sin overlay real. Un titular de mentira, cero dato de la paciente,
+    # para que los fixtures SIN filiación etiquetada caigan en `no_consta` (SÍ se sirve, con
+    # aviso) en vez de `sin_overlay` (rechazo). Mismo patrón que test_identidad_paciente.py.
+    os.makedirs(os.path.join(tmp, "tools"), exist_ok=True)
+    with io.open(os.path.join(tmp, "tools", "perfil.local.json"), "w", encoding="utf-8") as fh:
+        json.dump({"titular": {"nombre": "Prueba", "apellidos": ["Sintetica"],
+                                "nacimiento": ["01/01/1900"]}}, fh)
     pdf = os.path.join(zona, "informe-sintetico.pdf")
     with io.open(pdf, "wb") as f:
         f.write(PDF)
