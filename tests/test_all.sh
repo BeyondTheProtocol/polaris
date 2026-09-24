@@ -385,3 +385,6 @@ echo
 [ "$skip" -gt 0 ] && echo "⏭️  $skip batería(s) saltada(s): falta el contenido, el estado vivo, los overlays locales o el lazo (HALT activo)"
 [ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos"
 exit "$fail"
+
+# temporal de test_deuda_cerrar_ejecuta
+runpy test_zz_con_nieto_BORRAR.py

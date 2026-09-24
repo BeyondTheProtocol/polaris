@@ -111,6 +111,44 @@ with open(LIBRETA, "w", encoding="utf-8") as fh:
     json.dump(libro, fh)
 check("un borrador de hace meses ya no bloquea (caduca a 30 días)", _rc(CREATE, A)[0] == 0)
 
+# ── borrar libera (24-sep-26: la respuesta a Penguin se quedó bloqueada tras borrar) ────────
+DELETE = "mcp__gmail__delete_draft"
+
+
+def _post(tool, ti, resp=None):
+    return subprocess.run([_sys.executable, GUARD], capture_output=True, text=True, timeout=20,
+                          env=ENV, input=json.dumps({"hook_event_name": "PostToolUse",
+                                                     "tool_name": tool, "tool_input": ti,
+                                                     "tool_response": resp})).returncode
+
+
+_reset()
+P = {"to": ["contacto@editorial.example"], "cc": ["agente@x.example"],
+     "subject": "Re: Propuesta editorial", "replyToMessageId": "m1"}
+check("crear el borrador de la respuesta → PASA", _rc(CREATE, P)[0] == 0)
+# Gmail MCP devuelve bloques de texto con JSON dentro: el caso real
+_post(CREATE, P, [{"type": "text", "text": json.dumps({"id": "r111", "threadId": "t1"})}])
+check("   …PostToolUse apunta el id del borrador",
+      any(v.get("draft") == "r111" for v in json.load(open(LIBRETA)).values()))
+check("repetirlo sin borrar → DENIEGA", _rc(CREATE, P)[0] == 2)
+rc, msg = _rc(CREATE, P)
+check("   …y el aviso avisa de que update_draft saca del hilo",
+      "replyToMessageId" in msg and "saca el borrador del hilo" in msg)
+check("borrar OTRO borrador no libera este",
+      _post(DELETE, {"draftId": "r999"}) == 0 and _rc(CREATE, P)[0] == 2)
+check("delete_draft de ESE id (PostToolUse) → libera",
+      _post(DELETE, {"draftId": "r111"}) == 0 and _rc(CREATE, P)[0] == 0)
+check("respuesta como dict plano también sirve",
+      _post(CREATE, P, {"id": "r222"}) == 0
+      and any(v.get("draft") == "r222" for v in json.load(open(LIBRETA)).values()))
+check("delete_draft en PreToolUse no bloquea nunca",
+      _rc(DELETE, {"draftId": "r222"})[0] == 0)
+check("update_draft con solo draftId refresca SU entrada, sin clave vacía",
+      _rc(UPDATE, {"draftId": "r222", "body": "v2"})[0] == 0
+      and not any(k.startswith("asunto:|") for k in json.load(open(LIBRETA))))
+check("respuesta ilegible en PostToolUse → PASA y no apunta nada",
+      _post(CREATE, {"to": "z@x.example", "subject": "otro"}, "basura") == 0)
+
 for desc, ok in casos:
     print(("  ✅ " if ok else "  ❌ ") + desc)
 shutil.rmtree(_TMP, ignore_errors=True)

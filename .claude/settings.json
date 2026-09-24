@@ -160,6 +160,17 @@
     ],
     "PostToolUse": [
       {
+        "_comment": "Borrar libera (24-sep-26). La otra mitad de borrador_unico_guard: tras create_draft apunta el id que devuelve Gmail, y tras delete_draft suelta la entrada de ese id. Sin esto, borrar el borrador viejo (lo que el propio aviso pide) no contacto: la libreta seguia bloqueando el nuevo. FAIL-OPEN, nunca bloquea.",
+        "matcher": "mcp__.*__(create|delete)_draft",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/borrador_unico_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "_comment": "Cuaderno de bitacora de sub-agentes (25-jul-26). run_agent.sh ya trazaba los comites que corren como daemon, pero los 29 que se invocan DENTRO de una sesion no dejaban ni una linea: el sistema no sabia a quien habia usado. Este hook apunta solo el NOMBRE del comite, la hora y si fue bien; nunca el prompt ni la respuesta. Fail-open: no puede bloquear nada.",
         "matcher": "Agent|Task",
         "hooks": [
