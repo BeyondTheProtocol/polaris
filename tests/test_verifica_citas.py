@@ -1,107 +1,167 @@
 #!/usr/bin/env python3
-"""test_verifica_citas.py — el primer filtro contra citas fabricadas.
+"""Tests para verifica_citas.verificar_doi() con respuestas simuladas."""
 
-Este tool existe para cazar el fallo nº1 de los buscadores LLM: citar papers y ensayos que NO
-existen. Y tenía un agujero que lo dejaba ciego justo donde más se usa: el DOI solo se extraía
-si la cadena venía «pelada» (empezando por 10./doi/http), así que una referencia bibliográfica
-normal caía a `desconocido` → `no_resoluble`, y `.claude/agents/verificacion.md` instruye
-explícitamente NO acusar ante `no_resoluble` (lo trata como red caída). Un DOI fabricado dentro
-de una bibliografía pasaba limpio.
-
-HERMÉTICO: los comprobadores se mockean, así que no toca la red ni depende de Crossref.
-"""
-import os
+import json
 import sys
+import os
+import unittest
+from unittest.mock import patch, Mock
+from urllib.error import HTTPError, URLError
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "tools"))
-import verifica_citas as v  # noqa: E402
-
-_pass = _fail = 0
-
-
-def check(name, cond):
-    global _pass, _fail
-    if cond:
-        _pass += 1
-    else:
-        _fail += 1
-        print("  ✗ %s" % name)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tools.verifica_citas import verificar_doi, verificar_citas
 
 
-def main():
-    # ── clasificación: de dónde se saca el id ───────────────────────────────────────
-    casos = [
-        # (cadena, tipo esperado, id esperado)
-        ("Pérez J, et al. Lancet Oncol. 2025;26(4):e123. doi:10.1016/j.annonc.2025.01.001",
-         "doi", "10.1016/j.annonc.2025.01.001"),
-        ("Smith A. Nature. 2024. https://doi.org/10.1038/s41586-024-07123-4",
-         "doi", "10.1038/s41586-024-07123-4"),
-        ("10.1016/j.annonc.2025.01.001", "doi", "10.1016/j.annonc.2025.01.001"),
-        ("Estudio CONTACTO-1 (NCT07222267), fase II, {{CENTRO}}", "nct", "NCT07222267"),
-        ("PMID: 38472196", "pmid", "38472196"),
-        ("38472196", "pmid", "38472196"),
-    ]
-    for cadena, tipo, cid in casos:
-        t, i = v.clasifica(cadena)
-        check("clasifica %-6s en «%s…»" % (tipo, cadena[:34]), t == tipo and i == cid)
+class TestVerificarDOI(unittest.TestCase):
+    """Tests con respuestas simuladas para no depender de red."""
 
-    # Un DOI dentro de una cita larga NO puede seguir cayendo a «desconocido»: ese era el bug.
-    t, _ = v.clasifica("Autor X. Revista Y. 2025. doi:10.1234/abcd.efgh")
-    check("DOI embebido ya no cae a desconocido", t == "doi")
+    def _mock_response(self, status=200, data=None):
+        mock = Mock()
+        mock.status = status
+        mock.read.return_value = json.dumps(data).encode("utf-8") if data else b"{}"
+        mock.__enter__ = lambda self: self
+        mock.__exit__ = lambda self, *args: None
+        return mock
 
-    # Falsos positivos: una dosis clínica no es un DOI (10. seguido de <4 dígitos).
-    t, _ = v.clasifica("Dosis de 10.5/mg cada 12h")
-    check("una dosis clínica NO se toma por DOI", t != "doi")
-    t, _ = v.clasifica("Ratio 10.25/kg en el protocolo")
-    check("otro decimal con barra tampoco", t != "doi")
+    def test_doi_valido_en_doior(self):
+        """DOI válido encontrado en doi.org (primera agencia)."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            mock_urlopen.return_value = self._mock_response(200, {"type": "handle"})
+            resultado = verificar_doi("10.1000/abc123")
+            self.assertEqual(resultado["estado"], "valido")
+            self.assertEqual(resultado["agencia"], "doi.org")
 
-    # ── estados: lo ilegible NO se disfraza de «la red falló» ────────────────────────
-    r = v.verifica(["esto no es una cita, es una frase suelta"])[0]
-    check("cadena sin id → no_parseable", r["estado"] == v.NO_PARSE)
-    check("no_parseable ≠ no_resoluble", v.NO_PARSE != v.NO_RES)
-    check("el detalle dice que NO es la red",
-          "red" in r["detalle"].lower() and "mano" in r["detalle"].lower())
+    def test_doi_valido_en_crossref(self):
+        """DOI válido encontrado en Crossref (doi.org da 404)."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                if "doi.org" in req.full_url:
+                    raise HTTPError(req.full_url, 404, "Not Found", {}, None)
+                elif "crossref" in req.full_url:
+                    return self._mock_response(200, {"type": "work"})
+                raise URLError("no deberia llegar aqui")
 
-    # ── el veredicto llega entero desde el comprobador ───────────────────────────────
-    orig = dict(v._CHECKERS)
-    try:
-        v._CHECKERS["doi"] = lambda cid: (v.FABRICADA, "no está en Crossref", "crossref")
-        r = v.verifica(["Pérez J. Lancet. 2025. doi:10.1016/S1470-2045(25)99999-9"])[0]
-        check("DOI fabricado DENTRO de una cita → FABRICADA", r["estado"] == v.FABRICADA)
-        check("y conserva el id extraído", r["id"].startswith("10.1016/"))
+            mock_urlopen.side_effect = side_effect
+            resultado = verificar_doi("10.1000/xyz789")
+            self.assertEqual(resultado["estado"], "valido")
+            self.assertEqual(resultado["agencia"], "Crossref")
 
-        v._CHECKERS["doi"] = lambda cid: (v.EXISTE, "ok", "crossref")
-        r = v.verifica(["Pérez J. Lancet. 2025. doi:10.1016/j.real.2025.01.001"])[0]
-        check("DOI que existe → existe", r["estado"] == v.EXISTE)
+    def test_doi_valido_en_datacite(self):
+        """DOI válido encontrado en DataCite (las primeras dos dan 404)."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                if "doi.org" in req.full_url or "crossref" in req.full_url:
+                    raise HTTPError(req.full_url, 404, "Not Found", {}, None)
+                elif "datacite" in req.full_url:
+                    return self._mock_response(200, {"type": "dataset"})
+                raise URLError("no deberia llegar aqui")
 
-        v._CHECKERS["doi"] = lambda cid: (v.NO_RES, "timeout", "—")
-        r = v.verifica(["doi:10.1016/j.x.2025.01.001"])[0]
-        check("la red caída SÍ es no_resoluble", r["estado"] == v.NO_RES)
-    finally:
-        v._CHECKERS.clear()
-        v._CHECKERS.update(orig)
+            mock_urlopen.side_effect = side_effect
+            resultado = verificar_doi("10.5000/dataset1")
+            self.assertEqual(resultado["estado"], "valido")
+            self.assertEqual(resultado["agencia"], "DataCite")
 
-    # Varias citas de golpe: cada una con su veredicto, sin contaminarse.
-    orig = dict(v._CHECKERS)
-    try:
-        v._CHECKERS["doi"] = lambda cid: (v.FABRICADA, "no existe", "crossref")
-        v._CHECKERS["nct"] = lambda cid: (v.EXISTE, "ok", "clinicaltrials.gov")
-        # DOI con prefijo realista (4+ dígitos): «10.1/x» NO es un DOI y el clasificador hace
-        # bien en rechazarlo — es la misma guarda que evita confundir una dosis con una cita.
-        res = v.verifica(["Autor. Rev. 2025. doi:10.1016/j.xxxx.2025.01.001",
-                          "Ensayo (NCT07222267)",
-                          "frase sin id"])
-        check("cada cita conserva su veredicto",
-              [r["estado"] for r in res] == [v.FABRICADA, v.EXISTE, v.NO_PARSE])
-    finally:
-        v._CHECKERS.clear()
-        v._CHECKERS.update(orig)
+    def test_doi_no_encontrado_en_todas(self):
+        """DOI que no existe en ninguna agencia → no_encontrado."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                raise HTTPError(req.full_url, 404, "Not Found", {}, None)
 
-    print("RESULTADO verifica_citas: %d OK, %d fallos" % (_pass, _fail))
-    print("✅ FILTRO DE CITAS EN VERDE" if _fail == 0 else "❌ revisar fallos")
-    return _fail
+            mock_urlopen.side_effect = side_effect
+            resultado = verificar_doi("10.9999/noexiste")
+            self.assertEqual(resultado["estado"], "no_encontrado")
+            self.assertIn("doi.org", resultado["detalle"])
+            self.assertIn("Crossref", resultado["detalle"])
+            self.assertIn("DataCite", resultado["detalle"])
+
+    def test_fallo_red_en_todas(self):
+        """Fallo de red en todas las agencias → indeterminado."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                raise URLError("network error")
+
+            mock_urlopen.side_effect = side_effect
+            resultado = verificar_doi("10.1000/ejemplo")
+            self.assertEqual(resultado["estado"], "indeterminado")
+
+    def test_mixto_404_y_error_red(self):
+        """Mixto: algunas 404, otras error de red → indeterminado (fail-safe)."""
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                if "doi.org" in req.full_url:
+                    raise HTTPError(req.full_url, 404, "Not Found", {}, None)
+                elif "crossref" in req.full_url:
+                    raise URLError("network error")
+                elif "datacite" in req.full_url:
+                    raise HTTPError(req.full_url, 404, "Not Found", {}, None)
+                raise URLError("no deberia llegar aqui")
+
+            mock_urlopen.side_effect = side_effect
+            resultado = verificar_doi("10.1000/ejemplo2")
+            self.assertEqual(resultado["estado"], "indeterminado")
+
+    def test_doi_invalido_formato(self):
+        """DOI mal formado → invalido sin llamar a red."""
+        resultado = verificar_doi("not-a-doi")
+        self.assertEqual(resultado["estado"], "invalido")
+
+        resultado = verificar_doi("")
+        self.assertEqual(resultado["estado"], "invalido")
+
+    def test_doi_sin_doi(self):
+        """DOI vacío → invalido."""
+        resultado = verificar_doi(None)
+        self.assertEqual(resultado["estado"], "invalido")
+
+
+class TestVerificarCitas(unittest.TestCase):
+    """Tests para verificar_citas() con lista de citas."""
+
+    def test_lista_con_doi_valido(self):
+        """Lista con DOI válido."""
+        citas = [{"doi": "10.1000/abc", "titulo": "Ejemplo"}]
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            mock_urlopen.return_value = Mock(
+                status=200,
+                read=lambda: b'{"type": "handle"}',
+                __enter__=lambda self: self,
+                __exit__=lambda self, *args: None,
+            )
+            resultados = verificar_citas(citas)
+            self.assertEqual(len(resultados), 1)
+            self.assertEqual(resultados[0]["estado_doi"], "valido")
+
+    def test_lista_sin_doi(self):
+        """Cita sin DOI → estado sin_doi."""
+        citas = [{"titulo": "Sin DOI"}]
+        resultados = verificar_citas(citas)
+        self.assertEqual(len(resultados), 1)
+        self.assertEqual(resultados[0]["estado_doi"], "sin_doi")
+
+    def test_lista_mixta(self):
+        """Lista mixta: válido, no encontrado, sin DOI."""
+        citas = [
+            {"doi": "10.1000/valido"},
+            {"doi": "10.9999/noexiste"},
+            {"titulo": "sin doi"},
+        ]
+        with patch("tools.verifica_citas.urlopen") as mock_urlopen:
+            def side_effect(req, **kwargs):
+                if "valido" in req.full_url:
+                    return Mock(
+                        status=200,
+                        read=lambda: b'{"type": "handle"}',
+                        __enter__=lambda self: self,
+                        __exit__=lambda self, *args: None,
+                    )
+                raise HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+            mock_urlopen.side_effect = side_effect
+            resultados = verificar_citas(citas)
+            self.assertEqual(resultados[0]["estado_doi"], "valido")
+            self.assertEqual(resultados[1]["estado_doi"], "no_encontrado")
+            self.assertEqual(resultados[2]["estado_doi"], "sin_doi")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    unittest.main()
