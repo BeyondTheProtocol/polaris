@@ -28,7 +28,8 @@ def correr(payload, tmpdir):
     # auditoría, y con la raíz real cada pasada de tests metía 30 entradas falsas en
     # `.claude/logs/regla-en-accion.log`. Un log de auditoría con ruido de test no
     # sirve para auditar nada.
-    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=tmpdir)
+    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=tmpdir,
+                   BTP_REGLA_LOG=os.path.join(tmpdir, "regla-en-accion.log"))
     p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                        capture_output=True, text=True, env=entorno)
     if not p.stdout.strip():
@@ -44,7 +45,10 @@ def correr_desde_worktree(payload, tmpdir, wt):
     `_en_worktree()` era SIEMPRE False y la rama de worktree de `launchd-desde-worktree`
     no se había ejecutado nunca en un test. Una regla que solo aplica dentro de un worktree,
     probada solo fuera de uno, es una regla sin probar."""
-    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=wt)
+    # BTP_REGLA_LOG: sin esto el hook escribía su log DENTRO del worktree simulado, que cuelga del
+    # repo real (`.claude/worktrees/prueba-freno`), y cada pasada dejaba allí un directorio huérfano.
+    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=wt,
+                   BTP_REGLA_LOG=os.path.join(tmpdir, "regla-en-accion.log"))
     p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                        capture_output=True, text=True, env=entorno)
     if not p.stdout.strip():
@@ -392,6 +396,16 @@ def main():
     check(p.returncode == 0, "con entrada corrupta sale 0 y no estorba")
 
     import shutil
+    # El worktree simulado cuelga del repo REAL: la batería no puede dejar NADA dentro (24-sep-26).
+    print("── el worktree simulado queda limpio ──")
+    sucio = []
+    for raiz, _d, ficheros in os.walk(os.path.join(RAIZ.split("/.claude/worktrees/")[0],
+                                                   ".claude", "worktrees", "prueba-freno")):
+        sucio += [os.path.join(raiz, f) for f in ficheros]
+    check(not sucio, "la batería no escribe dentro de .claude/worktrees/prueba-freno (%r)" % sucio[:3])
+    check(os.path.isfile(os.path.join(tmp, "regla-en-accion.log")),
+          "…porque el log de auditoría va al tmp (BTP_REGLA_LOG)")
+
     shutil.rmtree(tmp, ignore_errors=True)
 
     print()

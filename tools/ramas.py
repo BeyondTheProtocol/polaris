@@ -11,7 +11,7 @@ Uso:
   python3 tools/ramas.py conflictos      # ficheros que tocan DOS ramas a la vez (exit 1 si hay)
   python3 tools/ramas.py limpia          # git worktree prune + LISTA las ramas limpias y vacías
   python3 tools/ramas.py limpia --si     # además elimina esas ramas limpias y vacías
-  python3 tools/ramas.py autopoda        # = limpia --si --avisar (rutina diaria git-barrido):
+  python3 tools/ramas.py autopoda        # = limpia --si --avisar --rescatar (rutina diaria):
                                          #   poda lo fusionado y limpio (el residuo de tests no
                                          #   cuenta como trabajo) y avisa, sin spam, de lo dudoso
   python3 tools/ramas.py json            # salida JSON (la usa El Observatorio)
@@ -249,6 +249,76 @@ def _es_copia_de_casa_base(fichero, rel):
         return False
 
 
+# RESCATE (24-sep-2026). Cuando el fichero del worktree NO es copia ni residuo, tiene contenido
+# que solo existe ahí: 222 líneas de audit clínico en dos worktrees, porque casa base ROTÓ su log
+# (las viejas se fueron a .claude/logs/archivo/) y la copia dejó de ser prefijo. Bloquear para
+# siempre no es una solución: se COPIA a casa base primero —el mismo gesto, y el mismo nombre, que
+# se hizo a mano el 20 y el 22-sep— y solo entonces el worktree se puede podar. Copiar antes de
+# borrar: si el rescate falla, no se poda.
+_ARCHIVO_REL = os.path.join(".claude", "logs", "archivo")
+
+
+def _nombre_rescate(path, rel):
+    return "worktree-%s-%s--%s" % (os.path.basename(path.rstrip("/")),
+                                   datetime.now().strftime("%Y%m%d"),
+                                   rel.replace(os.sep, "_"))
+
+
+def _dir_archivo():
+    import _casa
+    return os.path.join(_casa.casa_base(), _ARCHIVO_REL)
+
+
+def _mismo_contenido(a, b):
+    try:
+        if os.path.getsize(a) != os.path.getsize(b):
+            return False
+        with open(a, "rb") as fa, open(b, "rb") as fb:
+            while True:
+                x = fa.read(_TROZO)
+                if x != fb.read(len(x) or 1):
+                    return False
+                if not x:
+                    return True
+    except OSError:
+        return False
+
+
+def _ya_rescatado(path, rel):
+    """¿Hay ya en el archivo de casa base una copia BYTE A BYTE de este fichero? Entonces podarlo
+    no pierde nada. Se compara el contenido, no el nombre: un nombre con la fecha de otro día
+    sigue valiendo si el contenido es el mismo."""
+    d = _dir_archivo()
+    sufijo = "--" + rel.replace(os.sep, "_")
+    f = os.path.join(path, rel)
+    try:
+        nombres = os.listdir(d)
+    except OSError:
+        return False
+    for n in nombres:
+        if n.endswith(sufijo) and _mismo_contenido(f, os.path.join(d, n)):
+            return True
+    return False
+
+
+def rescatar(path, si=False):
+    """Copia al archivo de casa base lo que solo existe en este worktree. [(rel, destino, hecho)]."""
+    import shutil
+    out = []
+    for rel in _trabajo_vivo(path):
+        destino = os.path.join(_dir_archivo(), _nombre_rescate(path, rel))
+        hecho = False
+        if si:
+            try:
+                os.makedirs(os.path.dirname(destino), exist_ok=True)
+                shutil.copy2(os.path.join(path, rel), destino)
+                hecho = _mismo_contenido(os.path.join(path, rel), destino)
+            except (OSError, shutil.Error):
+                hecho = False
+        out.append((rel, destino, hecho))
+    return out
+
+
 def _motivo_residuo(path, rel):
     """Por qué este fichero ignorado del worktree se puede perder sin pena, o None si no se sabe."""
     f = os.path.join(path, rel)
@@ -256,6 +326,8 @@ def _motivo_residuo(path, rel):
         return "residuo de tests"
     if _es_copia_de_casa_base(f, rel):
         return "copia de casa base"
+    if _ya_rescatado(path, rel):
+        return "ya rescatado al archivo de casa base"
     return None
 
 
@@ -671,6 +743,23 @@ def dudosos():
     return out
 
 
+def dirs_huerfanos():
+    """Directorios dentro de `.claude/worktrees/` que git ya NO registra: restos de un worktree
+    que se fue dejando algo dentro (24-sep-2026: cuatro, uno con 95 KB del log del hook de reglas
+    que la batería escribía en un worktree simulado). NO se borran solos —puede haber trabajo—;
+    se cuentan y se avisan. [{dir, path, ficheros}]."""
+    d = os.path.join(ROOT, ".claude", "worktrees")
+    registrados = {os.path.realpath(w["path"]) for w in worktrees()}
+    out = []
+    for n in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        p = os.path.join(d, n)
+        if not os.path.isdir(p) or os.path.realpath(p) in registrados:
+            continue
+        out.append({"dir": n, "path": p,
+                    "ficheros": sum(len(f) for _r, _d, f in os.walk(p))})
+    return out
+
+
 def _avisar_dudosos(lista):
     """Una línea operativa (no Telegram) por worktree dudoso NUEVO. Anti-spam: se recuerda qué
     se avisó y no se repite mientras siga igual; si se resuelve, se olvida."""
@@ -702,8 +791,10 @@ def _avisar_dudosos(lista):
     return nuevos
 
 
-def limpia(si=False, avisar=False):
+def limpia(si=False, avisar=False, rescatar_antes=False):
     """Poda los worktrees limpios, fusionados y sin sesión; dice (y con `avisar`, avisa) lo dudoso.
+    Con `rescatar_antes`, lo que solo existe en un worktree ya fusionado se COPIA al archivo de
+    casa base y entonces sí se poda (copiar antes de borrar; si la copia falla, no se poda).
     MUTA `.git/worktrees/` → candado compartido "git-mutex" (fail-closed: si no se puede tomar,
     se avisa y NO se poda a ciegas; ver cerrar_sesion.py, mismo candado)."""
     try:
@@ -717,19 +808,31 @@ def limpia(si=False, avisar=False):
     # queda ahí sin que nadie sepa que existe.
     _ocupadas = {x["rama"] for x in sesiones()
                  if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
+    base = _rama_base()
     for w in worktrees():
         if w["es_base"]:
             continue
         if w.get("branch") in _ocupadas:
             print("⏸️  %s NO se poda: tienes una sesión trabajando dentro" % w.get("branch", "?"))
             continue
+        # Rescate SOLO de lo ya fusionado: en una rama con commits propios el trabajo se decide
+        # fusionando, no archivando ficheros sueltos.
+        if rescatar_antes and _trabajo_vivo(w["path"]) and _ahead_ref(_ref_de(w), base) == 0:
+            for rel, destino, hecho in rescatar(w["path"], si=True):
+                print("  %s %s → %s" % ("📥 rescatado:" if hecho else "‼️ NO se pudo rescatar:",
+                                        rel, os.path.basename(destino)))
         vivo = _trabajo_vivo(w["path"])
         if vivo:
             print("⏸️  %s NO se poda: tiene %d fichero(s) sin ejecutar/firmar (%s)"
                   % (w.get("branch", "?"), len(vivo), ", ".join(vivo[:3])))
+    restos = [{"rama": "(resto) " + h["dir"], "path": h["path"],
+               "motivo": "directorio huérfano con %d fichero(s): git ya no lo registra" % h["ficheros"]}
+              for h in dirs_huerfanos()]
+    for r in restos:
+        print("🧹 %s" % r["motivo"].replace("directorio huérfano", r["rama"]))
     cand = _candidatas_vacias()
     if avisar:
-        _avisar_dudosos(dudosos())
+        _avisar_dudosos(dudosos() + restos)
     if not cand:
         print("No hay ramas limpias y vacías que podar.")
         return 0
@@ -792,7 +895,8 @@ def main(argv):
     elif cmd in ("limpia", "autopoda"):
         # `autopoda` = `limpia --si --avisar`: lo que corre la rutina diaria com.btp.git-barrido.
         auto = cmd == "autopoda"
-        return limpia(si=auto or "--si" in argv, avisar=auto or "--avisar" in argv)
+        return limpia(si=auto or "--si" in argv, avisar=auto or "--avisar" in argv,
+                      rescatar_antes=auto or "--rescatar" in argv)
     else:
         print(__doc__)
         return 2

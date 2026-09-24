@@ -53,8 +53,14 @@ MARCA_WT = "/.claude/worktrees/"
 # Misma clase que el log clínico (20-sep-2026): un worktree tiene `.git` como FICHERO, y
 # resolver el log contra él partía la traza por sesión, en un directorio gitignored que la
 # poda se lleva sin que `git status` diga nada. El log va a casa base.
-LOG = os.path.join(
-    os.path.expanduser("~/claudecode") if os.path.isfile(os.path.join(REPO, ".git")) else REPO,
+# `BTP_REGLA_LOG` lo redirige (los tests lo apuntan a su tmp). Y el worktree se detecta también
+# por la RUTA: un `.git` fichero no basta — `tests/test_regla_en_accion.py` monta un worktree
+# simulado (`.claude/worktrees/prueba-freno`) que no tiene `.git` ninguno, así que el log de cada
+# pasada de test_all se quedaba allí dentro y dejaba un directorio huérfano con pinta de worktree
+# (95 KB acumulados a 24-sep-2026).
+_EN_WT = MARCA_WT in REPO or os.path.isfile(os.path.join(REPO, ".git"))
+LOG = os.environ.get("BTP_REGLA_LOG") or os.path.join(
+    os.path.expanduser("~/claudecode") if _EN_WT else REPO,
     ".claude", "logs", "regla-en-accion.log")
 # Anti-ruido: cada regla se recuerda UNA vez por sesión. Repetirla en cada llamada
 # la convertiría en ruido de fondo, que es justo como se pierden las reglas.

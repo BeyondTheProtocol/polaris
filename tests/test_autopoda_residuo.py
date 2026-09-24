@@ -131,15 +131,24 @@ escribe(wt_real, bloque("2026-09-21T09:00:00", "cc1") + bloque("2026-09-21T09:20
 open(os.path.join(wt_sin, "nuevo.txt"), "w").write("x\n")
 git(wt_sin, "add", "-A"); git(wt_sin, "commit", "-qm", "sin fusionar")
 open(os.path.join(wt_sin, "suelto.txt"), "w").write("y\n")   # y encima algo sin commitear
+# …y un panel de verdad dentro: aun así NO se rescata, porque su trabajo se decide fusionando.
+escribe(wt_sin, bloque("2026-09-21T18:00:00", "ss1") + bloque("2026-09-21T18:30:00", "ss2"))
 
 env = dict(os.environ)
-r = subprocess.run([sys.executable, RAMAS, "autopoda"], cwd=base, capture_output=True,
-                   text=True, env=env, timeout=120)
-ok("autopoda termina bien", r.returncode == 0, "-> rc=%d %s" % (r.returncode, r.stderr[-300:]))
+
+
+def ramas_cli(*a):
+    return subprocess.run([sys.executable, RAMAS] + list(a), cwd=base, capture_output=True,
+                          text=True, env=env, timeout=120)
+
+
+# `limpia --si --avisar` (sin rescate): lo dudoso se queda, se dice y se avisa.
+r = ramas_cli("limpia", "--si", "--avisar")
+ok("limpia termina bien", r.returncode == 0, "-> rc=%d %s" % (r.returncode, r.stderr[-300:]))
 ok("poda el worktree fusionado que solo tenía residuo", not os.path.isdir(wt_res), r.stdout[-400:])
 ok("la rama se conserva (podar un worktree no borra commits)",
    git(base, "rev-parse", "--verify", "r-residuo").returncode == 0)
-ok("NO poda el que tiene un panel de verdad", os.path.isfile(os.path.join(wt_real, REL)))
+ok("sin rescate NO poda el que tiene un panel de verdad", os.path.isfile(os.path.join(wt_real, REL)))
 ok("NO poda el que tiene commits sin fusionar", os.path.isdir(wt_sin))
 
 avisados = os.path.join(state, "autopoda_avisados.json")
@@ -152,10 +161,69 @@ ok("el dudoso queda anotado como avisado", any("wt-panel-real" in p for p in mar
 ok("el de commits sin fusionar no es «dudoso» (va por huerfanas)",
    not any("wt-sin-fusionar" in p for p in marcados))
 
-sys.path.insert(0, os.path.join(ROOT, "tools"))
 ok("el aviso no se repite mientras siga igual", ramas._avisar_dudosos(ramas.dudosos()) == [])
 
-git(base, "worktree", "remove", "--force", wt_real)
+# ── Rescate: copiar a casa base antes de podar (24-sep-2026) ───────────────────────────
+ARCHIVO = os.path.join(base, ".claude", "logs", "archivo")
+antes = open(os.path.join(wt_real, REL), "rb").read()
+r = ramas_cli("autopoda")
+ok("autopoda termina bien", r.returncode == 0, "-> rc=%d %s" % (r.returncode, r.stderr[-300:]))
+copias = [f for f in os.listdir(ARCHIVO)] if os.path.isdir(ARCHIVO) else []
+esperado = [f for f in copias if f.endswith("--00_FUENTE-DE-VERDAD_Gestion_PANEL-LAZO.md")
+            and f.startswith("worktree-wt-panel-real-")]
+ok("rescata el panel de verdad al archivo de casa base", len(esperado) == 1, "-> %r" % copias)
+ok("la copia es byte a byte", bool(esperado) and
+   open(os.path.join(ARCHIVO, esperado[0]), "rb").read() == antes)
+ok("y ENTONCES poda el worktree", not os.path.isdir(wt_real), r.stdout[-500:])
+ok("lo que tiene commits sin fusionar sigue sin rescatarse ni podarse",
+   os.path.isdir(wt_sin) and not [f for f in copias if f.startswith("worktree-wt-sin-fusionar-")])
+
+# Restos: un directorio que git ya no registra se cuenta y se avisa, pero NO se borra.
+resto = os.path.join(base, ".claude", "worktrees", "resto-de-otra-sesion")
+os.makedirs(os.path.join(resto, "tools", "state"), exist_ok=True)
+open(os.path.join(resto, "tools", "state", "algo.json"), "w").write("{}")
+r = ramas_cli("autopoda")
+ok("cuenta el directorio huérfano", "resto-de-otra-sesion" in r.stdout, "-> %s" % r.stdout[-400:])
+ok("y NO lo borra", os.path.isfile(os.path.join(resto, "tools", "state", "algo.json")))
+wt_dentro = os.path.join(base, ".claude", "worktrees", "registrado")
+git(base, "worktree", "add", "-q", "-b", "r-dentro", wt_dentro)
+open(os.path.join(wt_dentro, "suyo.txt"), "w").write("x\n")
+ok("un worktree REGISTRADO que vive ahí dentro no se cuenta como resto",
+   not any(h["dir"] == "registrado" for h in ramas.dirs_huerfanos()),
+   "-> %r" % ramas.dirs_huerfanos())
+git(base, "worktree", "remove", "--force", wt_dentro)
+try:
+    marcados2 = json.load(open(avisados))
+except (OSError, ValueError):
+    marcados2 = {}
+ok("el resto queda avisado", any("resto-de-otra-sesion" in p for p in marcados2),
+   "-> %r" % list(marcados2))
+shutil.rmtree(resto)
+
+# Idempotencia: una copia byte a byte en el archivo (aunque el nombre lleve otra fecha) ya vale.
+wt_otra = os.path.join(tmp, "wt-otra")
+git(base, "worktree", "add", "-q", "-b", "r-otra", wt_otra)
+escribe(wt_otra, antes.decode())
+os.rename(os.path.join(ARCHIVO, esperado[0]),
+          os.path.join(ARCHIVO, "worktree-wt-otra-19990101--" + REL.replace(os.sep, "_")))
+ok("una copia ya archivada (con otra fecha en el nombre) lo hace podable",
+   ramas._trabajo_vivo(wt_otra) == [], "-> %r" % ramas._trabajo_vivo(wt_otra))
+escribe(wt_otra, antes.decode() + bloque("2026-09-21T21:00:00", "hh1"))
+ok("si el worktree tiene MÁS de lo archivado, vuelve a ser trabajo vivo",
+   REL in ramas._trabajo_vivo(wt_otra))
+
+# Si el rescate FALLA, no se poda (copiar antes de borrar).
+wt_falla = os.path.join(tmp, "wt-falla")
+git(base, "worktree", "add", "-q", "-b", "r-falla", wt_falla)
+escribe(wt_falla, bloque("2026-09-21T20:00:00", "gg1") + bloque("2026-09-21T20:30:00", "gg2"))
+os.chmod(ARCHIVO, 0o500)
+r = ramas_cli("autopoda")
+os.chmod(ARCHIVO, 0o700)
+ok("si el rescate falla, el worktree NO se poda", os.path.isdir(wt_falla), r.stdout[-400:])
+ok("y lo dice en claro", "NO se pudo rescatar" in r.stdout, "-> %s" % r.stdout[-300:])
+git(base, "worktree", "remove", "--force", wt_falla)
+git(base, "worktree", "remove", "--force", wt_otra)
+
 git(base, "worktree", "remove", "--force", wt_sin)
 shutil.rmtree(tmp, ignore_errors=True)
 print(("FALLOS: " + ", ".join(FALLOS)) if FALLOS
