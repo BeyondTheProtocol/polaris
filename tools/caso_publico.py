@@ -71,7 +71,9 @@ LISTAS = {
     "enfermedad_medible": ("recist", "volumen", "lesiones", "pet"),
     "molecular": ("muestras", "alteraciones", "firmas", "falta"),
 }
-RAIZ_LISTAS = ("lineas", "material", "se_busca")
+# `reservorio` (24-sep-26, v2 del panel): la longitud del catéter en cada TC, para enseñar que
+# no se ha movido. Cada medida es un dato {valor, fecha, longitud_mm, margen_mm, fuente, sello}.
+RAIZ_LISTAS = ("lineas", "material", "se_busca", "reservorio")
 RAIZ_SIMPLES = ("nunca_recibido",)
 
 # Etiquetas de la cronología web que son curso clínico. Divulgación, IA y Equipo no lo son:
@@ -83,6 +85,10 @@ TAGS_CLINICOS = {
     "Ensayos clínicos": "tratamiento",
 }
 TAGS_NO_CLINICOS = {"Divulgación", "IA", "Equipo"}
+
+# Se curan y validan igual, pero NO salen al público: van solo al privado. El perfil molecular
+# ya lo enseña /ciencia y /datos se quedó en la clínica ({{TITULAR}}, 24-sep-2026, v2 del panel).
+SOLO_PRIVADO = ("molecular",)
 
 
 class ErrorCaso(Exception):
@@ -474,8 +480,9 @@ def construir(fuente, bio, web):
         "avisos": avisos,
     }
     privado = dict(comun, fuentes=fuente["fuentes"])
-    publico = dict(comun, fuentes={k: {"publico": v["publico"]}
-                                   for k, v in fuente["fuentes"].items()})
+    publico = dict({k: v for k, v in comun.items() if k not in SOLO_PRIVADO},
+                   fuentes={k: {"publico": v["publico"]}
+                            for k, v in fuente["fuentes"].items()})
     import web_lint  # el freno de contenido de la web; aquí, su excepción auditada
     fallos = web_lint.revisar_caso(publico)
     if fallos:

@@ -140,6 +140,8 @@ FUENTE = {
     "material": [{"muestra": "Bloque del primario", "codigo": "24B-1043 A1",
                   "donde": "Vall d'Hebron", "valor": "bloque", "fuente": "ap",
                   "sello": "inferido"}],
+    "reservorio": [{"fecha": "2026-03-24", "longitud_mm": 150.8, "margen_mm": 5, "valor": 150.8,
+                    "fuente": "ap", "sello": "verificado"}],
 }
 
 BIO = {
@@ -203,6 +205,15 @@ class Construye(unittest.TestCase):
         for fu in pub["fuentes"].values():
             self.assertNotIn("ruta", fu)
         self.assertNotIn("informes-privados", json.dumps(pub, ensure_ascii=False))
+
+    def test_molecular_solo_en_el_privado_y_reservorio_en_ambos(self):
+        """v2 (24-sep-26): lo molecular ya está en /ciencia; /datos se queda en la clínica."""
+        with open(cp.PRIVADO, encoding="utf-8") as f:
+            priv = json.load(f)
+        self.assertIn("molecular", priv)
+        self.assertNotIn("molecular", self.pub)
+        self.assertNotIn("p.{{VARIANTE}}", json.dumps(self.pub, ensure_ascii=False))
+        self.assertEqual(self.pub["reservorio"][0]["longitud_mm"], 150.8)
 
     def test_precision_de_las_fechas_de_la_cronologia(self):
         ev = {e["titulo"]["es"]: e for e in self.pub["eventos"]}

@@ -1,7 +1,10 @@
 {
   "_por_que": "24-sep-26. tools/caso_publico.py es la única puerta de dato clínico a la web pública (/datos). Si al quitar una de estas piezas test_caso_publico.py sigue verde, esa pieza no está defendida.",
   "objetivo": "tools/caso_publico.py",
-  "test": ["python3", "tests/test_caso_publico.py"],
+  "test": [
+    "python3",
+    "tests/test_caso_publico.py"
+  ],
   "env": "BTP_CASO_PUBLICO",
   "mutaciones": [
     {
@@ -26,8 +29,8 @@
     },
     {
       "etiqueta": "las rutas privadas de las fuentes salen en el público",
-      "viejo": "    publico = dict(comun, fuentes={k: {\"publico\": v[\"publico\"]}\n                                   for k, v in fuente[\"fuentes\"].items()})",
-      "nuevo": "    publico = dict(comun, fuentes=fuente[\"fuentes\"])"
+      "viejo": "                   fuentes={k: {\"publico\": v[\"publico\"]}\n                            for k, v in fuente[\"fuentes\"].items()})",
+      "nuevo": "                   fuentes=fuente[\"fuentes\"])"
     },
     {
       "etiqueta": "un informe sin rango deja el punto sin LSN (clave presente a None)",
@@ -38,6 +41,11 @@
       "etiqueta": "sin rango propio, el punto se dibuja a 2× LSN pero «dentro»",
       "viejo": "                if not fuera and not propio:",
       "nuevo": "                if False:"
+    },
+    {
+      "etiqueta": "lo que es solo del privado (molecular) sale al público",
+      "viejo": "    publico = dict({k: v for k, v in comun.items() if k not in SOLO_PRIVADO},",
+      "nuevo": "    publico = dict(comun,"
     },
     {
       "etiqueta": "una clave fuera del esquema se publica",
