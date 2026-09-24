@@ -16,8 +16,9 @@ EL PATRÓN (el que importa, más que este fichero):
   fija. Consecuencias: (a) el resultado es reproducible y explicable señal a señal;
   (b) cuando una señal falta se ve, en vez de quedar tapada por una etiqueta confiada;
   (c) la jerarquía se revisa y se testea como código, no como prosa en un prompt.
-  Idea recibida por DM de otro constructor (sept-2026) y adaptada; él la usaba para subir
-  la precisión de un modelo pequeño, aquí sirve además para quitarle la decisión al modelo.
+  Idea de Marc Recio (https://github.com/Marc-Recio-Celda), recibida por DM en sept-2026 y
+  adaptada; él la usaba para subir la precisión de un modelo pequeño, aquí sirve además para
+  quitarle la decisión al modelo.
 
 DE DÓNDE SALEN LAS SEÑALES, por orden de autoridad:
   1. REGISTRO (PubMed efetch): PublicationType + MeSH. Es un hecho catalogado por NLM,
