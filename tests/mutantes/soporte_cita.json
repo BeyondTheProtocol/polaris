@@ -40,8 +40,8 @@
     },
     {
       "etiqueta": "red: registro mudo se trata como sin abstract",
-      "viejo": "    if abstract is None:",
-      "nuevo": "    if False:"
+      "viejo": "    if abstract is None:\n        return {\"estado\": PENDIENTE, \"tipo\": tipo",
+      "nuevo": "    if False:\n        return {\"estado\": PENDIENTE, \"tipo\": tipo"
     },
     {
       "etiqueta": "CLI: NO_RESPALDA sale con 0",
@@ -72,6 +72,26 @@
       "etiqueta": "juez: veredicto desconocido aceptado",
       "viejo": "d.get(\"veredicto\") not in (\"respalda\", \"contradice\", \"parcial\", \"no_sabe\")",
       "nuevo": "False"
+    },
+    {
+      "etiqueta": "fragmento: no exige las cifras en la frase",
+      "viejo": "    if faltan:\n        return {\"estado\": FRAG_SIN_CIFRAS,",
+      "nuevo": "    if False:\n        return {\"estado\": FRAG_SIN_CIFRAS,"
+    },
+    {
+      "etiqueta": "fragmento: no comprueba que esté en el abstract",
+      "viejo": "    if nf in _norm_cita(abstract):",
+      "nuevo": "    if True:"
+    },
+    {
+      "etiqueta": "fragmento: acepta frases cortas",
+      "viejo": "    if len(nf) < 20:\n        return {\"estado\": FRAG_CORTO,",
+      "nuevo": "    if False:\n        return {\"estado\": FRAG_CORTO,"
+    },
+    {
+      "etiqueta": "fragmento: registro mudo tratado como ausente",
+      "viejo": "    if abstract is None:                     # registro mudo",
+      "nuevo": "    if False:                     # registro mudo"
     }
   ]
 }

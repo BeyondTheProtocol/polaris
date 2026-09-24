@@ -83,6 +83,40 @@ class Cotejo(unittest.TestCase):
         self.assertEqual(sc.cotejar("41 % de respuesta", "")[0], sc.NO_EVALUABLE)
 
 
+class Fragmento(unittest.TestCase):
+    F = lambda self, a, frag, tc=None: sc.cotejar_fragmento(
+        a, "PMID:1", frag, fetch=lambda c: ("pmid", "1", ABSTRACT),
+        texto_completo=(lambda t, i: tc) if tc else (lambda t, i: None))
+
+    def test_frase_literal_con_las_cifras(self):
+        r = self.F("mediana de 9,9 frente a 5,1 meses",
+                   "Median progression-free survival was 9.9 months with T-DXd versus 5.1 months")
+        self.assertEqual(r["estado"], sc.FRAG_OK)
+
+    def test_frase_inventada(self):
+        r = self.F("mediana de 9,9 meses", "median overall survival was 9.9 months in all patients")
+        self.assertEqual(r["estado"], sc.FRAG_AUSENTE)
+
+    def test_frase_sin_la_cifra(self):
+        r = self.F("mediana de 9,9 meses", "In this phase 3 trial, 557 patients were randomized")
+        self.assertEqual(r["estado"], sc.FRAG_SIN_CIFRAS)
+
+    def test_frase_corta(self):
+        self.assertEqual(self.F("9,9 meses", "9.9 months")["estado"], sc.FRAG_CORTO)
+
+    def test_frase_del_texto_completo(self):
+        r = self.F("estomatitis en el 6,4 %", "grade 3 stomatitis occurred in 6.4% of patients",
+                   tc=("PMC9", "Results. Grade 3 stomatitis occurred in 6.4% of patients overall."))
+        self.assertEqual(r["estado"], sc.FRAG_OK)
+        self.assertIn("PMC9", r["cotejado_contra"])
+
+    def test_registro_mudo_pendiente(self):
+        r = sc.cotejar_fragmento("mediana de 9,9 meses", "PMID:1",
+                                 "the median progression-free survival was 9.9 months",
+                                 fetch=lambda c: ("pmid", "1", None))
+        self.assertEqual(r["estado"], sc.PENDIENTE)
+
+
 class Red(unittest.TestCase):
     def test_registro_mudo_pendiente(self):
         r = sc.soporte("41 % de respuesta", "PMID:1", fetch=lambda c: ("pmid", "1", None))

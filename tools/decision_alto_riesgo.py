@@ -231,6 +231,9 @@ _COMPROBADOR = None
 # Si no se puede importar o el registro no responde, se comporta como antes (solo existencia): el
 # hallazgo que bloquea es NO_RESPALDA, que exige haber leído el abstract y no encontrar la cifra.
 _SOPORTE = None
+# El comprobador señala la frase literal de la fuente externa (`soporte_cita.cotejar_fragmento`).
+# Inyectable: `_FRAGMENTO(afirmacion, cita, fragmento) -> dict`.
+_FRAGMENTO = None
 
 
 def _resolver_soporte():
@@ -403,6 +406,29 @@ def _resolver_verificado(v, comprobador=None):
                            "(tools/soporte_cita.py, fase 2)" % (contra, sop.get("motivo", "")))
         if sop.get("estado") == "PARCIAL":
             v["cotejo"]["aviso"] = "respaldo PARCIAL: " + (sop.get("motivo") or "")[:160]
+    # …y el comprobador SEÑALA la frase de la fuente que trae esas cifras (24-sep-26). Sin frase no
+    # hay cotejo de cohorte/endpoint/brazo que nadie pueda revisar: solo «existe y las cifras salen».
+    try:
+        import soporte_cita as _sc
+        cifras = _sc.numeros(afirma, "es") if afirma.strip() else []
+        frag_fn = _FRAGMENTO or _sc.cotejar_fragmento
+    except Exception:
+        cifras, frag_fn = [], None
+    if cifras and frag_fn is not None:
+        frag = comp.get("fragmento")
+        if not isinstance(frag, str) or not frag.strip():
+            return False, ("cita externa con cifras (%s) sin `comprobacion.fragmento`: copia la frase "
+                           "LITERAL de %s que las trae, para que se vea a qué cohorte, endpoint y brazo "
+                           "corresponden" % (", ".join(cifras), contra))
+        try:
+            rf = frag_fn(afirma, contra, frag) or {}
+        except Exception as e:
+            rf = {"estado": "PENDIENTE", "motivo": "fallo del cotejo del fragmento (%s)" % str(e)[:60]}
+        v["cotejo"]["fragmento"] = rf.get("estado")
+        if rf.get("estado") == "FRAGMENTO_OK":
+            v["cotejo"]["fragmento_fuente"] = frag.strip()[:400]      # fuente PÚBLICA: va al acta
+        elif rf.get("estado") != "PENDIENTE":
+            return False, "fragmento de %s no válido (%s): %s" % (contra, rf.get("estado"), rf.get("motivo", ""))
     return True, "confirmado por «%s» contra %s (existe en su registro)" % (por, contra)
 
 
@@ -581,6 +607,11 @@ def render(decision, contexto, vers, discrepancias, bloqueos, confianza_final, e
                           " · sha256 fuente %s…" % cot["sha256"][:12] if cot.get("sha256") else "",
                           " · huella del fragmento %s…" % cot["sha256_fragmento"][:12]
                           if cot.get("sha256_fragmento") else ""))
+            if cot.get("fragmento_fuente"):
+                # Solo con fuente PÚBLICA (cita externa): la frase se enseña para que el cotejo de
+                # cohorte, endpoint y brazo lo pueda revisar quien lea el acta.
+                out.append("- Frase de la fuente que lo sostiene (pública, cotejada): «%s»"
+                           % cot["fragmento_fuente"])
 
     out.append("\n## Dónde discrepan (el debate, no solo la conclusión)")
     if discrepancias:

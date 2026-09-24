@@ -46,6 +46,10 @@ def _stub_soporte(afirmacion, cita):
 
 
 dar._SOPORTE = _stub_soporte
+_ABS_14 = "Objective response rate was 14% in the HER2-low cohort of 120 patients."
+dar._FRAGMENTO = lambda afirmacion, cita, fragmento: _sc.cotejar_fragmento(
+    afirmacion, cita, fragmento, fetch=lambda c: ("pmid", "11111111", _ABS_14),
+    texto_completo=lambda t, i: None)
 
 # Bóveda clínica DE PEGA (auditoría Gorgojo 1.1): desde el 24-sep el panel abre la fuente y busca
 # dentro el fragmento citado, así que las pruebas necesitan un informe que exista de verdad. Es
@@ -352,12 +356,38 @@ _, _, vers_sop, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
      "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111"}},
     {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": "PMID:11111111",
      "porque": "La tasa de respuesta fue del 14 % en HER2-low",
-     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111"}}]})
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111",
+                      "fragmento": "Objective response rate was 14% in the HER2-low cohort"}}]})
 check("SOPORTE: cita real con cifra que NO dice (41 %) → no verificado",
       not vers_sop[0]["verificado"] and "NO respalda" in vers_sop[0]["verificado_motivo"])
 check("SOPORTE: la misma cita con su cifra real (14 %) → verificado", vers_sop[1]["verificado"])
 check("SOPORTE: el acta anota el estado del cotejo de soporte",
       vers_sop[1].get("cotejo", {}).get("soporte") == "RESPALDA_LITERAL")
+
+# FRASE DE LA FUENTE (24-sep-26): con cifras y cita externa, el comprobador señala la frase literal.
+def _con_frag(frag):
+    c = {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111"}
+    if frag is not None:
+        c["fragmento"] = frag
+    return dar.evaluar({"decision": "x", "veredictos": [
+        {"lente": "comite-medico", "postura": "a_favor", "fuente": "PMID:11111111",
+         "porque": "La tasa de respuesta fue del 14 % en HER2-low", "comprobacion": c},
+        {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()}]})
+
+
+_v = _con_frag(None)[2][0]
+check("FRASE: cita externa con cifras SIN fragmento → no verificado",
+      not _v["verificado"] and "fragmento" in _v["verificado_motivo"])
+_v = _con_frag("Objective response rate was 14% in the HER2-low cohort")[2][0]
+check("FRASE: fragmento literal con la cifra → verificado", _v["verificado"])
+check("FRASE: el acta enseña la frase pública cotejada",
+      "Objective response rate was 14%" in dar.render(*_con_frag("Objective response rate was 14% in the HER2-low cohort")))
+_v = _con_frag("Objective response rate was 41% in the HER2-low cohort")[2][0]
+check("FRASE: fragmento que NO está en la fuente → no verificado",
+      not _v["verificado"] and "FRAGMENTO" in _v["verificado_motivo"])
+_v = _con_frag("in the HER2-low cohort of 120 patients enrolled")[2][0]
+check("FRASE: fragmento real pero SIN la cifra de la afirmación → no verificado",
+      not _v["verificado"] and "SIN_CIFRAS" in _v["verificado_motivo"])
 
 # FASE 2 (24-sep-26): el juez semántico dice CONTRADICE → no verificado; PARCIAL → verificado con aviso.
 _, _, vers_j, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [

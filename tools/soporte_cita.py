@@ -493,6 +493,50 @@ def bench(ruta, responder=None):
     return met, filas
 
 
+# ── el comprobador señala la FRASE de la fuente (panel de alto riesgo, 24-sep-26) ─────────────
+# El juez local no discrimina (benchmark). En el panel, quien coteja es `verificacion`, y para que
+# no dependa de su palabra: pega la frase LITERAL de la fuente en la que se apoya, y aquí se
+# comprueba que está en la fuente y que contiene TODAS las cifras de la afirmación. Eso no juzga
+# la cohorte ni el endpoint, pero los deja a la vista en el acta junto a la frase: «Among all
+# patients… 9.9» debajo de «cohorte HR+… 9,9» se ve.
+FRAG_OK = "FRAGMENTO_OK"
+FRAG_AUSENTE = "FRAGMENTO_AUSENTE"
+FRAG_SIN_CIFRAS = "FRAGMENTO_SIN_CIFRAS"
+FRAG_CORTO = "FRAGMENTO_CORTO"
+
+
+def cotejar_fragmento(afirmacion, cita, fragmento, fetch=None, texto_completo=None):
+    """dict {estado, motivo, cotejado_contra}. PENDIENTE si no se puede leer la fuente."""
+    nf = _norm_cita(fragmento)
+    if len(nf) < 20:
+        return {"estado": FRAG_CORTO, "motivo": "el fragmento tiene menos de 20 caracteres: no es un cotejo"}
+    faltan = [n for n in numeros(afirmacion, "es") if n not in set(numeros(fragmento, "en"))]
+    if faltan:
+        return {"estado": FRAG_SIN_CIFRAS,
+                "motivo": "la frase citada no contiene %s: señala la frase que trae las cifras" % ", ".join(faltan)}
+    if halt_activo() and fetch is None:
+        return {"estado": PENDIENTE, "motivo": "HALT activo: no se consulta el registro"}
+    try:
+        tipo, ident, abstract = (fetch or resolver)(cita)
+    except Exception as e:
+        return {"estado": PENDIENTE, "motivo": "fallo consultando el registro (%s)" % str(e)[:60]}
+    if abstract is None:                     # registro mudo: no se sabe, no se acusa
+        return {"estado": PENDIENTE, "motivo": "el registro no respondió"}
+    if nf in _norm_cita(abstract):
+        return {"estado": FRAG_OK, "motivo": "frase encontrada en el abstract", "cotejado_contra": "abstract"}
+    tc_fn = texto_completo or (None if fetch else texto_completo_oa)
+    try:
+        tc = tc_fn(tipo, ident) if tc_fn else None
+    except Exception:
+        tc = None
+    if tc and nf in _norm_cita(tc[1]):
+        return {"estado": FRAG_OK, "motivo": "frase encontrada en el texto completo %s" % tc[0],
+                "cotejado_contra": "texto completo " + tc[0]}
+    return {"estado": FRAG_AUSENTE,
+            "motivo": "la frase no está en %s" % ("el abstract ni en el texto completo OA" if tc
+                                                   else "el abstract (sin texto completo OA)")}
+
+
 def _rc(res):
     return 2 if any(r["estado"] in (NO_RESPALDA, CONTRADICE) for r in res) else 0
 
