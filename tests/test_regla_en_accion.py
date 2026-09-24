@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from _entorno import exige as _exige
-_exige("estado")
+# Sin `_exige`: este test solo manda payloads con rutas como cadenas, no toca el estado vivo, y
+# con el gate hacía SKIP en un worktree — o sea, el hook de la RAMA no se probaba nunca antes de
+# fusionarlo (lo cazó `verificacion` el 24-sep-26). Lo que necesita casa base se salta caso a caso.
 # -*- coding: utf-8 -*-
 """Tests del hook PreToolUse que recuerda la regla en el momento de actuar.
 
@@ -311,6 +312,79 @@ def main():
     r = correr({"session_id": "buc5", "tool_name": "Bash",
                 "tool_input": {"command": "python3 - <<'EOF'\nimport time\nwhile True:\n    time.sleep(30)\nEOF"}}, tmp)
     check(r is None, "un `while` de Python en un heredoc NO es un bucle de shell")
+
+    print("── git que mueve el árbol vivo de casa base (22-sep-26) ──")
+    base = os.path.expanduser("~/claudecode")
+    wt = os.path.join(base, ".claude", "worktrees", "prueba-freno")
+    for cmd, cwd in (("git checkout 6f0f89e --", base), ("git -C ~/claudecode reset --hard", wt),
+                     ("cd ~/claudecode && git stash", wt), ("git switch -", base),
+                     ("git restore tools/x.py", base), ("git pull", base),
+                     ("git reset HEAD~1", base), ("git reset --hard", base),
+                     ("git restore --staged --worktree f", base), ("git stash pop", base),
+                     ("git checkout HEAD -- .", base), ("git switch -qc rama-nueva", base),
+                     # pruebas adversariales del 22-sep: otras formas de llegar a casa base
+                     ("git -c core.x=y checkout master", base),
+                     ("git --git-dir=%s/.git --work-tree=%s checkout master" % (base, base), wt),
+                     ("GIT_DIR=%s/.git git checkout master" % base, wt),
+                     ("env GIT_DIR=%s/.git git checkout master" % base, wt),
+                     ("pushd ~/claudecode && git checkout master", wt),
+                     ("cd %s && cd - && git stash" % wt, base),
+                     ("sh -c 'git checkout master'", base),
+                     ("bash -c \"cd ~/claudecode && git reset --hard\"", wt),
+                     ("(cd ~/claudecode; git checkout master)", wt),
+                     ("git -C %s/tools checkout master" % base, wt),
+                     ("git --no-pager -C ~/claudecode checkout master", wt),
+                     # ronda de verificacion del 24-sep: formas que se colaban
+                     ("git -C ~/claudecode/.claude/worktrees checkout master", wt),
+                     ("GIT_DIR=\"%s/.git\" git checkout master" % base, wt),
+                     ("git chec''kout master", base), ("Git checkout master", base),
+                     ("env -i PATH=/usr/bin git checkout master", base),
+                     ("command git checkout master", base),
+                     ("if true; then git checkout master; fi", base),
+                     ("x=$(git checkout master)", base),
+                     ("bash -lc 'cd ~/claudecode && git reset --hard'", wt),
+                     ("bash <<'EOF'\ncd ~/claudecode\ngit checkout master\nEOF", wt),
+                     ("cd $HOME/claudecode && git checkout master", wt),
+                     ("git reset feature-x", base), ("git bisect start HEAD HEAD~10", base),
+                     ("git apply x.patch", base), ("git update-ref refs/heads/master HEAD~1", base),
+                     ("git symbolic-ref HEAD refs/heads/otra", base)):
+        r = correr({"session_id": "gmc-" + cmd[:12], "tool_name": "Bash", "cwd": cwd,
+                    "tool_input": {"command": cmd}}, tmp)
+        check(r and r.get("permissionDecision") == "deny", "deniega en casa base: %s" % cmd)
+    for cmd, cwd in [("git show 6f0f89e:tools/x.py", base), ("git diff A B -- tools", base),
+                     ("git log --oneline -3", base), ("git status", base),
+                     ("git checkout -b x", wt), ("git -C %s reset --hard" % wt, base),
+                     ("echo 'git checkout master'", base),
+                     ("python3 tools/deuda.py abrir x 'hice git checkout en casa base'", base),
+                     # replay del 22-sep: solo leen o solo tocan el índice, no el árbol vivo
+                     ("git stash list", base), ("git restore --staged tools/x.json", base),
+                     ("git reset HEAD tools/x.json", base), ("git reset tools/x.json", base),
+                     ("git -C %s/tools checkout -b y" % wt, base), ("sh -c 'git status'", base),
+                     ("GIT_DIR=%s/.git git log -3" % base, wt), ("GIT_PAGER=cat git log -3", base),
+                     # repo anidado con su propio .git, y la cadena dentro de un python -c
+                     # el repo anidado solo existe en casa base; en un clon, este caso se salta
+                     ] + ([("cd %s/_cajita/publico && git checkout -- ." % base, wt)]
+                          if os.path.exists(os.path.join(base, "_cajita", "publico", ".git")) else []) + [
+                     ("python3 -c \"print('GIT_DIR=%s/.git git checkout master')\"" % base, wt),
+                     # ronda de verificacion del 24-sep: no son movimientos
+                     ("pushd ~/claudecode; git log -1; popd; git checkout -b foo", wt),
+                     ("(cd ~/claudecode && git log -1); git checkout -b foo", wt),
+                     ("git clean -n", base), ("git checkout --help", base),
+                     ("git merge claude/x", base), ("git stash show -p", base),
+                     ("git symbolic-ref --short HEAD", base),
+                     ("git symbolic-ref refs/remotes/origin/HEAD", base)]:
+        r = correr({"session_id": "gmc-ok-" + cmd[:12], "tool_name": "Bash", "cwd": cwd,
+                    "tool_input": {"command": cmd}}, tmp)
+        check(not (r and r.get("permissionDecision") == "deny"), "permite: %s" % cmd)
+    for _ in range(2):   # un freno no se gasta: la segunda vez en la misma sesión también deniega
+        r = correr({"session_id": "gmc-mismo", "tool_name": "Bash", "cwd": base,
+                    "tool_input": {"command": "git checkout master"}}, tmp)
+    check(r and r.get("permissionDecision") == "deny", "sigue denegando a la segunda en la misma sesión")
+    entorno = dict(os.environ, TMPDIR=tmp, CLAUDE_PROJECT_DIR=tmp, BTP_ALLOW_CASA_BASE="1")
+    p = subprocess.run([sys.executable, HOOK], env=entorno, capture_output=True, text=True,
+                       input=json.dumps({"session_id": "gmc-esc", "tool_name": "Bash", "cwd": base,
+                                         "tool_input": {"command": "git checkout master"}}))
+    check("deny" not in p.stdout, "BTP_ALLOW_CASA_BASE=1 es la vía de escape deliberada")
 
     print("── fail-open ──")
     p = subprocess.run([sys.executable, HOOK], input="esto no es json",
