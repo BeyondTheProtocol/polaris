@@ -882,6 +882,13 @@ def _check_recursos():
              % (swap_gb, libre_txt, quien)], info)
 
 
+# Sonda del cerebro (24-sep-26): primer intento corto; si falla por algo TRANSITORIO (timeout,
+# no se puede crear el proceso), espera y reintenta más largo antes de avisar.
+CEREBRO_TIMEOUT_S = 30
+CEREBRO_REINTENTO_TIMEOUT_S = 60
+CEREBRO_ESPERA_S = float(os.environ.get("BTP_CEREBRO_ESPERA_S", "15"))
+
+
 def _check_cerebro_alcanzable():
     """Canario del CEREBRO: ¿puede el LAZO ejecutar de verdad un cerebro? Devuelve (alertas, info).
 
@@ -913,6 +920,46 @@ def _check_cerebro_alcanzable():
                         "clínicas van a PARARSE y la caché de salud no lo detecta (nunca ejecuta el "
                         "binario). Revisa el PATH de los plists o reinstala Claude Code." % binario))
         return alertas, info
+
+    # ROTO vs AHOGADO (24-sep-2026, deuda cerebro_inalcanzable 4x). Medido en healthcheck.out:
+    # 8 fallos en 3.293 lecturas y los 8 TRANSITORIOS (5 TimeoutExpired, 3 BlockingIOError = no
+    # se podía ni crear un proceso), ninguno de binario roto. El de hoy coincidió con 21,8 GB de
+    # swap. Un solo intento los contaba como «no puede ejecutarlo», abría deuda con cada uno y
+    # dejaba test_all rojo para todas las sesiones, mientras la causa (memoria) ya la avisa
+    # _check_recursos. Ahora: lo transitorio se reintenta una vez, y si sigue es `cerebro_lento`;
+    # `cerebro_inalcanzable` queda solo para lo roto, y siempre dice POR QUÉ.
+    def _probar(timeout):
+        try:
+            r = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=timeout)
+        except (subprocess.TimeoutExpired, BlockingIOError) as e:
+            return "transitorio", repr(e)[:120]
+        except Exception as e:
+            return "roto", repr(e)[:120]
+        if r.returncode != 0:
+            return "roto", "rc=%d %s" % (r.returncode, (r.stderr or r.stdout or "").strip()[:120])
+        info["version"] = (r.stdout or "").strip()[:60]
+        return "ok", ""
+
+    estado, motivo = _probar(CEREBRO_TIMEOUT_S)
+    if estado == "transitorio":
+        info["transitorio"] = motivo
+        time.sleep(CEREBRO_ESPERA_S)
+        estado, motivo2 = _probar(CEREBRO_REINTENTO_TIMEOUT_S)
+        motivo = "%s; reintento: %s" % (motivo, motivo2 or "ok")
+    if estado == "ok":
+        return alertas, info
+    info["error"] = motivo
+    if estado == "transitorio":
+        alertas.append(("cerebro_lento",
+                        "`claude --version` no responde en %d+%d s (%s). Suele ser la máquina "
+                        "ahogada: mira el aviso de memoria. El binario está; si persiste, las "
+                        "tareas del lazo se retrasan."
+                        % (CEREBRO_TIMEOUT_S, CEREBRO_REINTENTO_TIMEOUT_S, motivo)))
+    else:
+        alertas.append(("cerebro_inalcanzable",
+                        "El LAZO encuentra el binario del cerebro (%s) pero NO puede ejecutarlo "
+                        "(%s). Las tareas clínicas van a PARARSE." % (ruta, motivo)))
+    return alertas, info
     try:
         r = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=30)
         info["version"] = (r.stdout or "").strip()[:60]
