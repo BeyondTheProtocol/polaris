@@ -3527,6 +3527,23 @@ def run():
     except Exception:
         pass
 
+    # 5c. CANARIOS del muro (24-sep-2026): el borde bloquea y escala si aparece un canario sembrado,
+    # pero durante meses `canarios.json` no existía — un tripwire sin munición, y en silencio. Si se
+    # queda a cero otra vez, se avisa: esto es exactamente lo que nadie vio.
+    try:
+        _canarios = os.path.join(STATE, "borde", "canarios.json")
+        _n_can = 0
+        if os.path.exists(_canarios):
+            with open(_canarios, encoding="utf-8") as _f:
+                _n_can = len([x for x in json.load(_f) if isinstance(x, str) and x.strip()])
+        if _n_can == 0:
+            alertas.append(("canarios_sin_sembrar",
+                            "El muro no tiene NINGÚN canario sembrado: si algo exfiltrara datos, el "
+                            "tripwire no podría dispararse. Se siembra con "
+                            "`python3 tools/canarios.py sembrar`."))
+    except Exception:
+        pass
+
     # 6. Separar alertas en dos categorías:
     #    · operativo: fontanería que el sistema resolvió solo (cola_reap, heartbeat corrupto auto-curado).
     #      → va al log de operativo, no al chat de {{TITULAR}}.
