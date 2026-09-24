@@ -287,6 +287,7 @@ runpy test_guarda_memoria.py
 runpy test_visor3d_malla_recorte.py
 runpy test_visor3d_ficha.py
 runpy test_visor3d_carga.py
+runpy test_visor3d_marcas.py
 runpy test_sonda_silencio.py
 runpy test_vigia_latidos.py
 runpy test_cola_ruido.py
