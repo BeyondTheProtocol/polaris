@@ -22,6 +22,7 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -123,6 +124,43 @@ class LaCadenaTruncadaNoPasaPorIntegra(unittest.TestCase):
         ok, det = borde.verificar_cadena()
         self.assertFalse(ok, det)
         self.assertIn("no coincide con la cabecera", det)
+
+    def test_verificar_espera_a_una_escritura_a_medias(self):
+        """Revisión del PR #24: `_sellar` añade el evento y DESPUÉS mueve la cabecera, bajo
+        `_Lock`. Si `verificar_cadena` lee sin ese lock, en ese hueco una traza sana sale como
+        atrasada (o como truncada, si la cabecera cambia entre leer el ledger y leerla).
+        Aquí un escritor se queda parado a mitad; el verificador tiene que esperarle."""
+        path = self._sellar_n()
+        a_medias, seguir = threading.Event(), threading.Event()
+
+        def escritor():
+            with borde._Lock():
+                seq, prev = borde._read_head()
+                rec = {"evento": "prueba", "seq": seq + 1, "ts": "2026-01-01T00:00:00Z",
+                       "prev": prev}
+                rec["hash"] = borde._hash_rec(rec)
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(rec, ensure_ascii=False, sort_keys=True) + "\n")
+                a_medias.set()
+                seguir.wait(5)
+                open(borde.HEAD_FILE, "w", encoding="utf-8").write("%d %s" % (seq + 1, rec["hash"]))
+
+        res = {}
+        w = threading.Thread(target=escritor)
+        w.start()
+        self.assertTrue(a_medias.wait(5), "el escritor no llegó a escribir")
+        v = threading.Thread(target=lambda: res.update(r=borde.verificar_cadena()))
+        v.start()
+        v.join(0.3)
+        esperaba = v.is_alive()
+        seguir.set()
+        w.join(5)
+        v.join(5)
+        self.assertTrue(esperaba, "verificar_cadena no esperó al lock del escritor: %s"
+                        % (res.get("r"),))
+        ok, det = res["r"]
+        self.assertTrue(ok, "tras la escritura completa la traza es sana: %s" % det)
+        self.assertIn("%d eventos" % (N + 1), det)
 
     def test_instalacion_limpia_es_integra(self):
         ok, det = borde.verificar_cadena()

@@ -691,7 +691,19 @@ def verificar_cadena():
     Al final coteja lo recorrido contra la cabecera (`head.txt`): sin eso, borrar los
     ÚLTIMOS eventos deja una cadena más corta pero bien encadenada, y se daba por íntegra
     (issue #15). «Truncada» se distingue de «rota» en el mensaje. Si no hay cabecera y sí
-    hay eventos, falla: no se puede probar que no falte nada."""
+    hay eventos, falla: no se puede probar que no falte nada.
+
+    Lee bajo el mismo `_Lock` que `_sellar`: el escritor añade el evento y luego mueve la
+    cabecera, y leer en medio daba una traza sana por atrasada o truncada.
+
+    LÍMITE: la cadena no lleva clave ni ancla externa. Quien pueda reescribir a la vez el
+    ledger y `head.txt` (o borrar los dos) deja una traza coherente y esto no lo ve. Detecta
+    borrados que no tocan la cabecera, no a quien controla ambos ficheros."""
+    with _Lock():
+        return _verificar_cadena_sin_lock()
+
+
+def _verificar_cadena_sin_lock():
     files = sorted(f for f in os.listdir(BORDE_DIR) if f.startswith("ledger-")) \
         if os.path.isdir(BORDE_DIR) else []
     prev, esperado = "GENESIS", 1
