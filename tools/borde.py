@@ -27,7 +27,8 @@ Invariantes ROCA (F0 — fijos, simples, testeados en tests/test_borde.py):
      por API externa — los vectores se pueden invertir y reconstruir el texto. Solo modelo
      LOCAL (BGE-M3) a destino local.
   4. TRAZA append-only HASH-CHAINED: cada decisión se sella encadenada; un borrado/alteración
-     rompe la cadena (`verificar_cadena()` lo detecta por salto de secuencia o sello roto). La
+     rompe la cadena (`verificar_cadena()` lo detecta por salto de secuencia, sello roto o
+     desacuerdo con la cabecera, que es lo que delata un borrado del final). La
      traza guarda METADATOS, NUNCA el contenido (logs minimizados; solo un sello sha256).
   5. REVOCABILIDAD + anti-replay: una sesión/intención revocada no vuelve a pasar (persistente).
   6. CANARIOS: si un canario sembrado aparece en una salida → exfiltración → DENY + ALARMA
@@ -670,10 +671,27 @@ def _sellar(evento):
         return None
 
 
+def _read_head_estricto():
+    """(seq, hash) de la cabecera, o None si no existe. A diferencia de `_read_head`, una
+    cabecera ilegible NO se hace pasar por GENESIS: lanza ValueError (fail-closed)."""
+    if not os.path.exists(HEAD_FILE):
+        return None
+    try:
+        seq, h = open(HEAD_FILE, encoding="utf-8").read().strip().split(" ", 1)
+        return int(seq), h
+    except Exception as e:
+        raise ValueError("cabecera ilegible (%r)" % e)
+
+
 def verificar_cadena():
     """(ok, detalle). Re-camina TODAS las trazas en orden y comprueba: secuencia contigua
     (sin saltos = sin borrados), enlace prev correcto, y hash recalculado. Detecta borrado,
-    reordenado y alteración. Devuelve (False, motivo) al primer fallo."""
+    reordenado y alteración. Devuelve (False, motivo) al primer fallo.
+
+    Al final coteja lo recorrido contra la cabecera (`head.txt`): sin eso, borrar los
+    ÚLTIMOS eventos deja una cadena más corta pero bien encadenada, y se daba por íntegra
+    (issue #15). «Truncada» se distingue de «rota» en el mensaje. Si no hay cabecera y sí
+    hay eventos, falla: no se puede probar que no falte nada."""
     files = sorted(f for f in os.listdir(BORDE_DIR) if f.startswith("ledger-")) \
         if os.path.isdir(BORDE_DIR) else []
     prev, esperado = "GENESIS", 1
@@ -693,6 +711,23 @@ def verificar_cadena():
             if h != rec.get("hash"):
                 return False, "sello alterado en seq=%d" % esperado
             prev, esperado, total = rec["hash"], esperado + 1, total + 1
+    try:
+        head = _read_head_estricto()
+    except ValueError as e:
+        return False, "cabecera: %s" % e
+    if head is None:
+        if total:
+            return False, "falta la cabecera con %d eventos en la traza — no se puede " \
+                          "comprobar si está truncada" % total
+        return True, "cadena íntegra (0 eventos)"
+    head_seq, head_hash = head
+    if head_seq > total:
+        return False, "cadena TRUNCADA: la cabecera dice %d eventos y solo hay %d — " \
+                      "posible borrado del final" % (head_seq, total)
+    if head_seq < total:
+        return False, "cabecera atrasada: dice %d eventos y hay %d" % (head_seq, total)
+    if head_hash != prev:
+        return False, "el último evento (seq=%d) no coincide con la cabecera" % total
     return True, "cadena íntegra (%d eventos)" % total
 
 

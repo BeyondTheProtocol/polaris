@@ -191,6 +191,7 @@ runpy test_instagram_dm.py
 runpy test_dm_inbox_buzones.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_borde.py
+runpy test_borde_cadena_truncada.py   # issue #15 · borrar el final de la traza no pasa por íntegro
 runpy test_canarios.py
 runpy test_cerebro_enlace.py
 runpy test_reescribe_consulta.py
