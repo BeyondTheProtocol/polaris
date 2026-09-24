@@ -3137,6 +3137,18 @@
    "auditable": false,
    "repetida": false,
    "nota": "24-sep-2026: tres códigos rojos que se habrían evitado leyendo el correo del 7-sep y el WhatsApp del 21-sep. Un grep normal NO lee la zona clínica (clinico_guard), y su resultado vacío parece «no existe»."
+  },
+  {
+   "slug": "feedback-replay-no-ve-bypass-solo-falsos-positivos",
+   "que": "El replay de comandos reales mide falsos positivos, no bypass: un endurecimiento del muro puede abrir un agujero con 0 diferencias. Tocar un hook del muro exige replay Y verificacion adversarial con payloads",
+   "clase": "lint-doc",
+   "mecanismo": "tests/test_casa_base_guard.py fija los payloads de las dos regresiones (nice se come el git; la sustitución leída donde está escrita) y las dos listas, cubierto y declarado sin cubrir",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "24-sep-2026: el commit 36a26a6 pasó 26 tests y ~26.000 comandos de replay con 0 diferencias, y metió dos bypass que solo vio el adversarial."
   }
  ]
 }

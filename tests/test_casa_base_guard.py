@@ -68,6 +68,95 @@ class CaminoHastaCasaBase(unittest.TestCase):
             self.assertEqual(correr(cmd), "deny", cmd)
 
 
+class HuecosHeredados(unittest.TestCase):
+    """Los que `verificacion` declaró sin cubrir el 24-sep (deuda camino-git-huecos-heredados) y
+    que ahora SÍ se siguen. Cada uno pasaba antes de este commit."""
+
+    def test_se_cierran(self):
+        for cmd, cwd in (("env -C %s git checkout abc1234 --" % CASA, "/tmp"),
+                         ("env --chdir=%s git stash" % CASA, "/tmp"),
+                         ("export GIT_DIR=%s/.git; git stash" % CASA, "/tmp"),
+                         ("GIT_DIR=%s/.git command git reset --hard" % CASA, "/tmp"),
+                         ("GIT_DIR=%s/.git /usr/bin/git reset --hard" % CASA, "/tmp"),
+                         ("export GIT_DIR=%s/.git && git stash" % CASA, "/tmp"),
+                         ("GIT_DIR=%s/.git nice -n 5 git stash" % CASA, "/tmp"),
+                         ('echo "$(git checkout abc1234 --)"', CASA),
+                         ("echo `git checkout abc1234 --`", CASA),
+                         ("cd -P %s && git stash" % CASA, "/tmp"),
+                         ("sudo -E git checkout abc1234 --", CASA),
+                         ("nice -n 5 git checkout abc1234 --", CASA),
+                         ("timeout 10 git reset --hard", CASA),
+                         ("sudo -u root git stash", CASA),
+                         ("sudo -D %s git stash" % CASA, "/tmp"),
+                         ("caffeinate -t 60 git stash", CASA),
+                         ("nice -5 git stash", CASA),
+                         ("timeout -k 5 10 git stash", CASA),
+                         ("exec -a x git stash", CASA),
+                         ("if git stash; then echo ok; fi", CASA)):
+            self.assertEqual(correr(cmd, cwd=cwd), "deny", cmd)
+
+    def test_el_wrapper_no_se_come_el_git(self):
+        """`nice` no lleva argumento posicional: comerle uno a ciegas se tragaba el propio `git` y
+        dejaba pasar la orden entera (regresión que cazó `verificacion` el 24-sep-26)."""
+        for cmd in ("nice git checkout abc1234 --", "nice git stash", "sudo nice git reset --hard"):
+            self.assertEqual(correr(cmd), "deny", cmd)
+
+    def test_la_marca_de_la_sustitucion_no_se_pierde(self):
+        """Sacar el `$( )` del texto para analizarlo aparte abrió ocho agujeros de golpe: el troceo
+        del shell descarta las redirecciones, las asignaciones del principio y el cuerpo del
+        heredoc, y con ellos se iba la marca. Lo que el troceo se coma se mira igual, con el
+        directorio de arranque (segunda ronda de `verificacion`, 24-sep-26)."""
+        for cmd in ("echo x > $(git stash)", "cat < $(git stash)", "echo x 2>$(git stash)",
+                    'x="$(git stash)"', 'X="$(git stash)" echo hi',
+                    "cat <<EOF\n$(git stash)\nEOF", "bash <<'EOF'\necho $(git stash)\nEOF",
+                    "git --work-tree=$(pwd) stash", "cat <(git stash)",
+                    "bash -c 'cd %s && echo $(git stash)'" % CASA):
+            self.assertEqual(correr(cmd), "deny", cmd)
+
+    def test_entre_comillas_simples_no_se_ejecuta(self):
+        """Bash no expande ahí dentro: frenarlo sería freno de más. La excepción es el script que
+        se le pasa a `bash -c`, que sí se ejecuta (y va en el test de arriba)."""
+        for cmd in ("cd %s && echo '$(git stash)'" % CASA, "echo 'git checkout abc1234 --'"):
+            self.assertEqual(correr(cmd, cwd="/tmp"), "allow", cmd)
+
+    def test_la_sustitucion_se_lee_donde_esta_escrita(self):
+        """El contenido de un `$( )` se ejecuta en el directorio vigente DONDE aparece: analizarlo
+        con el del principio se colaba en un sentido y frenaba de más en el otro (24-sep-26)."""
+        for cmd in ("cd %s && echo $(git stash)" % CASA,
+                    "cd %s; echo `git stash`" % CASA,
+                    "cd %s && x=$(git stash)" % CASA):
+            self.assertEqual(correr(cmd, cwd="/tmp"), "deny", cmd)
+        for cmd in ("cd %s && echo $(git checkout abc1234 --)" % WT,
+                    "cd /tmp && echo $(git stash)",
+                    "cd %s && (cd /tmp && echo $(git stash))" % CASA):
+            self.assertEqual(correr(cmd), "allow", cmd)
+
+    def test_lo_declarado_sin_cubrir_sigue_sin_cubrirse(self):
+        """Fijar lo que NO se cubre es parte de ser honesto: si algún día pasa a denegarse, que
+        sea una decisión y no un accidente. Alias y `eval` exigirían interpretar el shell."""
+        # Estos, ejecutados EN casa base: si estuvieran cubiertos, se denegarían.
+        for cmd in ("git -c alias.co=checkout co",
+                    "c='git checkout abc1234 --'; eval \"$c\"",
+                    "echo 'git checkout abc1234 --' | bash",
+                    "echo abc1234 | xargs git checkout",
+                    "bash %s/s.sh" % CASA,
+                    "python3 -c \"import subprocess; subprocess.run(['git','stash'])\"",
+                    "$(which git) checkout abc1234 --",
+                    "env -S 'git stash'"):
+            self.assertEqual(correr(cmd), "allow", cmd)
+        # Y estos, desde fuera: llevan la ruta de casa base escrita y aun así no se siguen.
+        for cmd in ("export GIT_DIR=%s/.git; echo hola; git stash" % CASA,
+                    "env -C%s git stash" % CASA):
+            self.assertEqual(correr(cmd, cwd="/tmp"), "allow", cmd)
+
+    def test_no_se_pasa_de_frenada(self):
+        for cmd, cwd in (("env -C /tmp git checkout abc1234 --", CASA),
+                         ("sudo -E ls -la", CASA), ("timeout 10 python3 x.py", CASA),
+                         ('echo "$(git log --oneline -1)"', CASA),
+                         ("cd -P /tmp && git stash", CASA)):
+            self.assertEqual(correr(cmd, cwd=cwd), "allow", cmd)
+
+
 class NoSonMovimientos(unittest.TestCase):
     """Lo legítimo que NO puede bloquearse (falsos positivos reales del replay y de verificacion)."""
 
