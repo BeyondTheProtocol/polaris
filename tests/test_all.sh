@@ -54,6 +54,7 @@ runpy test_nvidia_tope.py
 runpy test_readme_modelos.py
 runpy test_stdin_canalizado.py
 runpy test_bash_return_explicito.py
+runpy test_casa_base_guard.py
 runpy test_gate_etiqueta.py
 runpy test_gate_citas.py
 runpy test_gate_preclinico.py

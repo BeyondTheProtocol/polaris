@@ -633,8 +633,10 @@ def roster_tests():
     hc._daemons_roster = lambda: {"com.btp.ka", "com.btp.iv", "com.btp.run", "com.btp.fail", "com.btp.instagram"}
     hc._kickstart_daemon = lambda label: False           # el KeepAlive caído NO revive
 
-    # ka KeepAlive ausente (caído); iv interval ausente (bootout); run cargado ok; fail cargado exit 75.
-    hc._launchctl_estado = lambda: {"com.btp.run": ("321", "0"), "com.btp.fail": ("-", "75")}
+    # ka KeepAlive ausente (caído); iv interval ausente (bootout); run cargado ok; fail cargado exit 1.
+    # (Era 75, pero 75 = EX_TEMPFAIL = aplazo deliberado de run_agent, que desde el 22-sep-26 ya no
+    # cuenta como fallo. Aquí lo que se prueba es «exit>0 sin PID», así que va un código de fallo real.)
+    hc._launchctl_estado = lambda: {"com.btp.run": ("321", "0"), "com.btp.fail": ("-", "1")}
     al, _ = hc._check_roster_daemons()
     claves = [a[0] for a in al]
     ok("daemon_roster_caido:com.btp.ka" in claves, "KeepAlive caído y no revive → alerta humana")

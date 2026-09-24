@@ -3068,14 +3068,14 @@
   {
    "slug": "feedback-nunca-checkout-en-casa-base",
    "que": "Nunca checkout/switch/reset/restore/stash en ~/claudecode para inspeccionar historia: git show <commit>:ruta o git diff",
-   "clase": "contexto",
-   "mecanismo": "",
+   "clase": "bloqueo",
+   "mecanismo": ".claude/hooks/casa_base_guard.py",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "22-sep-2026 15:11: un checkout para comparar la carga fija desacopló HEAD ~40 s y devolvió run_agent.sh con marcadores de conflicto al árbol vivo. Candidata a bloqueo (hook PreToolUse): deuda checkout-en-casa-base-sin-freno."
+   "nota": "22-sep-2026 15:11: un checkout para comparar la carga fija desacopló HEAD ~40 s y devolvió run_agent.sh con marcadores de conflicto al árbol vivo. Candidata a bloqueo (hook PreToolUse): deuda checkout-en-casa-base-sin-freno. | 22-sep tarde: freno casa_base_guard.py (PreToolUse Bash, sesiones interactivas; el lazo lo cubre muro_guard). Replay de 16.880 órdenes interactivas: 62 denegadas, todas de la clase (checkout/switch/stash/restore/reset en casa base)."
   },
   {
    "slug": "feedback-gestion-de-sesion-la-hago-yo",
