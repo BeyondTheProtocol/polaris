@@ -29,7 +29,10 @@ import importlib.util
 import inspect
 import json
 import os
+import re
+import shutil
 import sys
+import tempfile
 import time
 
 # ─── techo del heap de Metal ───────────────────────────────────────────────────────────────
@@ -161,7 +164,22 @@ def cache_vale(out, receta):
         s = json.load(open(_sello_de(out)))
     except (OSError, ValueError):
         return False
-    return s.get("receta") == receta and s.get("sha256") == _sha256(out)
+    if s.get("sha256") != _sha256(out):
+        return False
+    return s.get("receta") == receta or _receta_colab_casa(s.get("receta"), receta)
+
+
+def _receta_colab_casa(sellada, pedida):
+    """True si `sellada` es una segmentación hecha en Colab (importa-colab) equivalente a la que
+    `segmenta` pediría: misma versión de TotalSegmentator, misma tarea, mismos parámetros. El
+    dispositivo y la huella del código local no aplican: no corrió aquí. Va en cache_vale y no en
+    segmenta() porque la receta lleva la huella del código de segmenta: tocarlo invalidaría todas
+    las segmentaciones ya hechas."""
+    if not isinstance(sellada, dict) or sellada.get("origen") != "colab" or not isinstance(pedida, dict):
+        return False
+    return (sellada.get("totalsegmentator") == pedida.get("totalsegmentator") is not None
+            and sellada.get("tarea") == pedida.get("tarea")
+            and sellada.get("kw") == pedida.get("kw"))
 
 
 def sella_cache(out, receta):
@@ -511,6 +529,252 @@ def _cmd_segmenta(a):
     for serie in a.series:
         hechas = segmenta(a.raices, serie, tareas=a.tareas, device=a.device)
         print(serie, json.dumps({k: os.path.basename(v) for k, v in hechas.items()}))
+    return 0
+
+
+# ─── vía Colab: segmentar fuera lo que el Mac no aguanta (24-sep-2026) ───────────────────
+#
+# La segmentación del esqueleto pidió 20 GB en el mini de 16 (20-sep) y la guarda la corta. En
+# junio ya se hizo en Colab (GPU) a mano y no quedó código. Esto lo deja montado sin romper el
+# muro: el DICOM es N2 (nombre, fecha, hospital en cabeceras) y NO sale; sale un NIfTI sin
+# cabeceras, sin cabeza salvo decisión expresa, comprobado contra la PII real de la serie. La
+# SUBIDA la hace {{TITULAR}} (o con su OK): es un acto hacia fuera. Lo que vuelve se valida y se sella
+# como `origen: colab`, y `cache_vale` lo acepta si casa versión, tarea y parámetros.
+
+COLAB_VOLUMEN = "volumen.nii.gz"
+COLAB_MANIFIESTO = "manifiesto.json"
+# Campos DICOM que identifican. Se leen de la serie SOLO para buscarlos en lo que sale.
+_PII_DICOM = ("PatientName", "PatientID", "OtherPatientIDs", "PatientBirthDate",
+              "InstitutionName", "InstitutionAddress", "ReferringPhysicianName",
+              "AccessionNumber", "StudyDate", "SeriesDate", "AcquisitionDate", "StudyID",
+              "StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID", "FrameOfReferenceUID")
+
+
+def _sha256_completo(ruta):
+    h = hashlib.sha256()
+    with open(ruta, "rb") as f:
+        for trozo in iter(lambda: f.read(1 << 20), b""):
+            h.update(trozo)
+    return h.hexdigest()
+
+
+def _colab_dir(serie):
+    d = os.path.join(SALIDA_RAIZ, "colab", serie)
+    exige_zona_clinica(d)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def plan_colab(meta, preset="higado", tareas=None):
+    """[(t, tarea, kw)] con EXACTAMENTE los parámetros que `segmenta` usaría (misma lógica). Si
+    divergen, cache_vale no casa y segmenta recalcula en local: el test lo comprueba."""
+    cfg = PRESETS[preset]
+    tareas = list(tareas or cfg["tareas"])
+    if meta.get("modalidad") == "MR":
+        tareas = [t + "_mr" if t in ("liver_segments", "liver_lesions") else t for t in tareas
+                  if t not in ("liver_vessels",)]
+        tareas = ["total_mr" if t == "total" else t for t in tareas]
+    plan = []
+    for t in tareas:
+        kw = {}
+        if t in ("total", "total_mr"):
+            kw["roi_subset"] = sorted(set(cfg["roi_total"] + ROI_FASE))
+        tarea = "total" if t == "total_completo" else t
+        plan.append((t, tarea, dict(sorted(dict(ml=True, **kw).items()))))
+    return plan
+
+
+def _pii_de_serie(raices, serie):
+    """Valores identificativos REALES de la serie (para buscarlos, nunca para mostrarlos)."""
+    import pydicom
+    import SimpleITK as sitk
+    carpeta, uid = _localiza_serie(raices, serie)
+    ds = pydicom.dcmread(sitk.ImageSeriesReader.GetGDCMSeriesFileNames(carpeta, uid)[0],
+                         stop_before_pixels=True)
+    return _trozos_pii([ds.get(k) for k in _PII_DICOM])
+
+
+def _trozos_pii(valores):
+    """Cadenas a buscar: cada valor entero y cada trozo de nombre (Apellido^Nombre)."""
+    fuera = set()
+    for v in valores:
+        for x in (v if isinstance(v, (list, tuple)) else [v]):
+            t = str(x or "").strip()
+            if len(t) >= 4:
+                fuera.add(t)
+            for trozo in re.split(r"[\\^\s,]+", t):
+                if len(trozo) >= 4:
+                    fuera.add(trozo)
+    return sorted(fuera)
+
+
+def verifica_sin_pii(ruta_nii, pii):
+    """Fail-closed: cabecera NIfTI sin texto (descrip/aux/intent/db_name), sin extensiones, y
+    ninguno de los valores identificativos de la serie en los bytes de la cabecera. Solo se
+    descomprime la cabecera (vox_offset), no el volumen."""
+    import gzip
+    import nibabel as nib
+    img = nib.load(ruta_nii)
+    h = img.header
+    for campo in ("descrip", "aux_file", "intent_name", "db_name"):
+        if bytes(h[campo].tobytes()).strip(b"\x00 "):
+            raise SystemExit("ABORTA: el NIfTI lleva texto en %s" % campo)
+    if len(h.extensions):
+        raise SystemExit("ABORTA: el NIfTI lleva %d extensión(es)" % len(h.extensions))
+    abre = gzip.open if ruta_nii.endswith(".gz") else open
+    with abre(ruta_nii, "rb") as f:
+        cabecera = f.read(int(h["vox_offset"]) or 352)
+    baja = cabecera.lower()
+    for v in pii:
+        if v.lower().encode("utf-8", "ignore") in baja:
+            raise SystemExit("ABORTA: la cabecera del NIfTI contiene un valor identificativo de "
+                             "la serie (no se muestra cuál)")
+    return True
+
+
+def recorta_por_encima(datos, afin, corta_z_mm):
+    """Quita los cortes axiales por ENCIMA de z = corta_z_mm (RAS: +z es craneal). Devuelve
+    (datos, afín nuevo, k0). Aborta si el eje 3 no es craneo-caudal o si no queda nada."""
+    import numpy as np
+    afin = np.asarray(afin, dtype=float)
+    eje = afin[:3, 2]
+    if abs(eje[2]) < 0.9 * np.linalg.norm(eje):
+        raise SystemExit("ABORTA: el tercer eje del volumen no es craneo-caudal; no sé recortar "
+                         "la cabeza con seguridad. Exporta con --con-cabeza solo si lo decides.")
+    zs = np.array([(afin @ np.array([0, 0, k, 1.0]))[2] for k in range(datos.shape[2])])
+    dentro = np.where(zs <= corta_z_mm)[0]
+    if not len(dentro):
+        raise SystemExit("ABORTA: con ese corte no queda ningún plano (z va de %.0f a %.0f mm)"
+                         % (zs.min(), zs.max()))
+    k0, k1 = int(dentro.min()), int(dentro.max())
+    nuevo = afin.copy()
+    nuevo[:3, 3] = (afin @ np.array([0, 0, k0, 1.0]))[:3]
+    return datos[:, :, k0:k1 + 1], nuevo, k0
+
+
+def exporta_colab(raices, serie, corta_z_mm=None, con_cabeza=False, preset="higado", tareas=None):
+    """NIfTI limpio + manifiesto en zona clínica, listo para subir a Colab. No sube nada."""
+    import nibabel as nib
+    import numpy as np
+    if corta_z_mm is None and not con_cabeza:
+        raise SystemExit("ABORTA: di dónde cortar la cabeza (--corta-z-mm, mira `cobertura`) o "
+                         "exporta con --con-cabeza sabiendo que con la cabeza se puede "
+                         "reconstruir la cara. Sin decisión no sale nada.")
+    imagen, meta = convierte(raices, serie)
+    if meta.get("texto_quemado"):
+        raise SystemExit("ABORTA: la serie tiene texto quemado en la imagen (puede llevar el "
+                         "nombre en los píxeles); esta no sale.")
+    pii = _pii_de_serie(raices, serie)
+    img = nib.load(imagen)
+    datos, afin = np.asanyarray(img.dataobj), img.affine
+    forma_original, afin_original, k0 = list(datos.shape), afin.tolist(), 0
+    if corta_z_mm is not None:
+        datos, afin, k0 = recorta_por_encima(datos, afin, float(corta_z_mm))
+    d = _colab_dir(serie)
+    out = os.path.join(d, COLAB_VOLUMEN)
+    nib.save(nifti_limpio(datos, afin, datos.dtype), out)
+    try:
+        verifica_sin_pii(out, pii)
+    except SystemExit:
+        os.remove(out)
+        raise
+    manif = {
+        "serie": serie,
+        "sha256_volumen": _sha256_completo(out),   # entero: lo recalcula el cuaderno
+        "totalsegmentator": _version_ts(),
+        "forma": list(datos.shape), "afin": np.asarray(afin).tolist(),
+        "forma_original": forma_original, "afin_original": afin_original,
+        "k0": k0, "corta_z_mm": corta_z_mm, "con_cabeza": bool(con_cabeza and corta_z_mm is None),
+        "tareas": [{"t": t, "tarea": tarea, "kw": kw}
+                   for t, tarea, kw in plan_colab(meta, preset, tareas)],
+        "exportado": time.strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    txt = json.dumps(manif, ensure_ascii=False, indent=1)
+    if any(v.lower() in txt.lower() for v in pii):
+        os.remove(out)
+        raise SystemExit("ABORTA: el manifiesto contendría un valor identificativo")
+    open(os.path.join(d, COLAB_MANIFIESTO), "w").write(txt)
+    return out, manif
+
+
+def importa_colab(raices, serie, zip_ruta):
+    """Máscaras de Colab → caché de segmentación, validadas y selladas como `origen: colab`.
+    El zip es dato de fuera: solo se aceptan los nombres del manifiesto y se valida todo."""
+    import zipfile
+    import nibabel as nib
+    import numpy as np
+    d = _colab_dir(serie)
+    manif = json.load(open(os.path.join(d, COLAB_MANIFIESTO)))
+    if manif.get("serie") != serie:
+        raise SystemExit("ABORTA: el manifiesto es de otra serie")
+    local = _version_ts()
+    if manif.get("totalsegmentator") != local:
+        raise SystemExit("ABORTA: exportado con TotalSegmentator %s y aquí hay %s; re-exporta"
+                         % (manif.get("totalsegmentator"), local))
+    esperadas = {x["t"] + ".nii.gz": x for x in manif["tareas"]}
+    segdir = os.path.join(_cache(serie), "seg")
+    os.makedirs(segdir, exist_ok=True)
+    hechas = {}
+    with zipfile.ZipFile(zip_ruta) as z:
+        nombres = set(z.namelist())
+        try:
+            ver = json.loads(z.read("version.json"))
+        except KeyError:
+            raise SystemExit("ABORTA: el zip no trae version.json")
+        if ver.get("totalsegmentator") != local:
+            raise SystemExit("ABORTA: Colab segmentó con TotalSegmentator %s y aquí hay %s"
+                             % (ver.get("totalsegmentator"), local))
+        if ver.get("sha256_volumen") != manif["sha256_volumen"]:
+            raise SystemExit("ABORTA: Colab segmentó OTRO volumen (el sha256 no casa)")
+        extra = nombres - set(esperadas) - {"version.json"}
+        if extra:
+            raise SystemExit("ABORTA: el zip trae ficheros que no se pidieron: %s" % sorted(extra))
+        tmp = tempfile.mkdtemp(prefix="colab_", dir=segdir)
+        try:
+            for nombre, x in sorted(esperadas.items()):
+                if nombre not in nombres:
+                    raise SystemExit("ABORTA: falta %s en el zip" % nombre)
+                crudo = os.path.join(tmp, nombre)
+                with open(crudo, "wb") as f:
+                    f.write(z.read(nombre))
+                m = nib.load(crudo)
+                datos = np.asanyarray(m.dataobj)
+                if list(datos.shape) != manif["forma"]:
+                    raise SystemExit("ABORTA: %s tiene forma %s y el volumen exportado %s"
+                                     % (nombre, list(datos.shape), manif["forma"]))
+                if not np.allclose(m.affine, np.asarray(manif["afin"]), atol=1e-3):
+                    raise SystemExit("ABORTA: %s no está en la geometría del volumen exportado" % nombre)
+                if not np.issubdtype(datos.dtype, np.integer) and not np.all(np.mod(datos, 1) == 0):
+                    raise SystemExit("ABORTA: %s no es una máscara de etiquetas" % nombre)
+                lleno = np.zeros(manif["forma_original"], dtype=np.uint16 if datos.max() > 255 else np.uint8)
+                k0 = int(manif["k0"])
+                lleno[:, :, k0:k0 + datos.shape[2]] = datos
+                out = os.path.join(segdir, nombre)
+                nib.save(nifti_limpio(lleno, np.asarray(manif["afin_original"]), lleno.dtype), out)
+                receta = {"totalsegmentator": local, "tarea": x["tarea"], "origen": "colab",
+                          "kw": x["kw"]}
+                sella_cache(out, receta)
+                hechas[x["t"]] = out
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return hechas
+
+
+def _cmd_exporta_colab(a):
+    out, manif = exporta_colab(a.raices, a.serie, corta_z_mm=a.corta_z_mm,
+                               con_cabeza=a.con_cabeza, preset=a.organo, tareas=a.tareas)
+    tam = os.path.getsize(out) / 1e6
+    print("listo para subir (lo sube {{TITULAR}} o con su OK): %s (%.0f MB)" % (os.path.dirname(out), tam))
+    print("  forma %s · recorte k0=%s · con cabeza: %s · TotalSegmentator %s · tareas: %s"
+          % (manif["forma"], manif["k0"], "SÍ" if manif["con_cabeza"] else "no",
+             manif["totalsegmentator"], ", ".join(x["t"] for x in manif["tareas"])))
+    print("  cuaderno: tools/colab/visor3d_totalseg.ipynb · al volver: visor3d importa-colab")
+    return 0
+
+
+def _cmd_importa_colab(a):
+    hechas = importa_colab(a.raices, a.serie, a.zip)
+    print(a.serie, json.dumps({k: os.path.basename(v) for k, v in hechas.items()}))
     return 0
 
 
@@ -4921,6 +5185,19 @@ def main(argv=None):
             ps.add_argument("--tareas", nargs="*")
             ps.add_argument("--device", default="mps")
         ps.set_defaults(fn=fn)
+    pxc = sub.add_parser("exporta-colab", help="NIfTI sin cabeceras ni cabeza para segmentar en Colab")
+    pxc.add_argument("--raiz", dest="raices", action="append", required=True)
+    pxc.add_argument("serie")
+    corte = pxc.add_mutually_exclusive_group()
+    corte.add_argument("--corta-z-mm", type=float, help="quita todo lo que quede por encima de esta z (mira `cobertura`)")
+    corte.add_argument("--con-cabeza", action="store_true", help="decisión expresa: sale con la cabeza")
+    pxc.add_argument("--tareas", nargs="*")
+    pxc.set_defaults(fn=_cmd_exporta_colab)
+    pic = sub.add_parser("importa-colab", help="máscaras de Colab → caché de segmentación, selladas")
+    pic.add_argument("--raiz", dest="raices", action="append", required=True)
+    pic.add_argument("serie")
+    pic.add_argument("zip")
+    pic.set_defaults(fn=_cmd_importa_colab)
     pcb = sub.add_parser("cobertura", help="hasta dónde llega cada serie, en mm del mundo")
     pcb.add_argument("--raiz", dest="raices", action="append", required=True)
     pcb.add_argument("series", nargs="+")
