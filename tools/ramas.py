@@ -68,11 +68,17 @@ def worktrees():
         if ln.startswith("worktree "):
             if cur:
                 wts.append(cur)
-            cur = {"path": ln[len("worktree "):], "branch": "(detached)", "head": ""}
+            cur = {"path": ln[len("worktree "):], "branch": "(detached)", "head": "", "locked": ""}
         elif ln.startswith("branch "):
             cur["branch"] = ln[len("branch "):].replace("refs/heads/", "")
         elif ln.startswith("HEAD "):
             cur["head"] = ln[len("HEAD "):][:10]
+        elif ln.startswith("locked"):
+            # git bloquea el worktree de un agente MIENTRAS trabaja (`locked claude agent … pid …`).
+            # El 24-sep-2026 `autopoda` propuso podar uno: `sesiones()` no lo vio porque un
+            # subagente no es una sesión de la app, y lo único que lo salvó fue que git se negó.
+            # Un freno que depende de que otro freno funcione no es un freno.
+            cur["locked"] = ln[len("locked"):].strip() or "sí"
     if cur:
         wts.append(cur)
     for w in wts:
@@ -421,7 +427,7 @@ def _candidatas_vacias():
     for w in worktrees():
         if w["es_base"]:
             continue
-        if w.get("branch") in ocupadas:
+        if w.get("branch") in ocupadas or w.get("locked"):
             continue
         # `_run` devuelve "" también si git FALLA (timeout, árbol roto): eso no es «limpio».
         sucio = _run_rc(["git", "-C", w["path"], "status", "--porcelain"])
@@ -689,7 +695,7 @@ def dudosos():
                 if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
     out = []
     for w in worktrees():
-        if w["es_base"] or w.get("branch") in ocupadas:
+        if w["es_base"] or w.get("branch") in ocupadas or w.get("locked"):
             continue
         if _ahead_ref(_ref_de(w), base) != 0:
             continue                  # sin fusionar: eso lo decide {{TITULAR}} por otra vía (huerfanas)
@@ -778,6 +784,10 @@ def limpia(si=False, avisar=False, rescatar_antes=False):
             continue
         if w.get("branch") in _ocupadas:
             print("⏸️  %s NO se poda: tienes una sesión trabajando dentro" % w.get("branch", "?"))
+            continue
+        if w.get("locked"):
+            print("⏸️  %s NO se poda: git lo tiene BLOQUEADO (%s)"
+                  % (w.get("branch", "?"), w["locked"]))
             continue
         # Rescate SOLO de lo ya fusionado: en una rama con commits propios el trabajo se decide
         # fusionando, no archivando ficheros sueltos.

@@ -186,6 +186,23 @@ ok("y ENTONCES poda el worktree", not os.path.isdir(wt_real), r.stdout[-500:])
 ok("lo que tiene commits sin fusionar sigue sin rescatarse ni podarse",
    os.path.isdir(wt_sin) and not [d for d in cajones if d.startswith("wt-sin-fusionar-")])
 
+# Un worktree BLOQUEADO por git (así marca la app el de un subagente vivo) no se toca (24-sep-2026:
+# autopoda propuso podar uno y solo lo salvó que git se negara).
+wt_lock = os.path.join(tmp, "wt-bloqueado")
+git(base, "worktree", "add", "-q", "-b", "r-lock", wt_lock)
+git(base, "worktree", "lock", wt_lock, "--reason", "claude agent fulanito (pid 999)")
+real = os.path.realpath(wt_lock)          # /var vs /private/var: comparar realpath o no compara nada
+ok("un worktree bloqueado no es candidato a poda",
+   not any(os.path.realpath(w["path"]) == real for w in ramas._candidatas_vacias()),
+   "-> %r" % [w["path"] for w in ramas._candidatas_vacias()])
+r = ramas_cli("autopoda")
+ok("autopoda no lo poda y dice por qué", os.path.isdir(wt_lock) and "BLOQUEADO" in r.stdout,
+   "-> %s" % r.stdout[-300:])
+ok("tampoco lo lista como dudoso",
+   not any(os.path.realpath(d["path"]) == real for d in ramas.dudosos()))
+git(base, "worktree", "unlock", wt_lock)
+git(base, "worktree", "remove", "--force", wt_lock)
+
 # Restos: un directorio que git ya no registra se cuenta y se avisa, pero NO se borra.
 resto = os.path.join(base, ".claude", "worktrees", "resto-de-otra-sesion")
 os.makedirs(os.path.join(resto, "tools", "state"), exist_ok=True)
