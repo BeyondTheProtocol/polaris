@@ -19,6 +19,10 @@ import sys
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOK = os.path.join(RAIZ, ".claude", "hooks", "regla_en_accion.py")
+# Casa base ESCRITA para el analizador del push (`_git_camino`), no deducida de `~/claudecode`: en
+# el runner del repo público el repo vive en /home/runner/work/…, y sin esto los nueve casos del
+# push fallaban allí desde que el test dejó de saltarse (24-sep-26). En local es la de siempre.
+CASA_TEST = RAIZ.split("/.claude/worktrees/")[0]
 
 fallos = []
 
@@ -28,7 +32,7 @@ def correr(payload, tmpdir):
     # auditoría, y con la raíz real cada pasada de tests metía 30 entradas falsas en
     # `.claude/logs/regla-en-accion.log`. Un log de auditoría con ruido de test no
     # sirve para auditar nada.
-    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=tmpdir,
+    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=tmpdir, BTP_CASA_BASE=CASA_TEST,
                    BTP_REGLA_LOG=os.path.join(tmpdir, "regla-en-accion.log"))
     p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                        capture_output=True, text=True, env=entorno)
@@ -47,7 +51,7 @@ def correr_desde_worktree(payload, tmpdir, wt):
     probada solo fuera de uno, es una regla sin probar."""
     # BTP_REGLA_LOG: sin esto el hook escribía su log DENTRO del worktree simulado, que cuelga del
     # repo real (`.claude/worktrees/prueba-freno`), y cada pasada dejaba allí un directorio huérfano.
-    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=wt,
+    entorno = dict(os.environ, TMPDIR=tmpdir, CLAUDE_PROJECT_DIR=wt, BTP_CASA_BASE=CASA_TEST,
                    BTP_REGLA_LOG=os.path.join(tmpdir, "regla-en-accion.log"))
     p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                        capture_output=True, text=True, env=entorno)

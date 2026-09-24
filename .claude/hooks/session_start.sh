@@ -19,7 +19,9 @@ PY="$(command -v python3 || echo /usr/bin/python3)"
 # (atendidas); las autónomas tienen SessionStart vacío → NUNCA toca la sesión en el lazo 24/7. En una
 # máquina sin Chrome-IG la descarga falla y se difiere (⏳ intacto). Ver tools/reel_digest.py.
 DRAIN_STAMP="${TMPDIR:-/tmp}/.btp_reel_drain.stamp"
-if [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(stat -f %m "$DRAIN_STAMP" 2>/dev/null || echo 0) ))" -gt 900 ]; then
+# `date -r <fichero>` vale en macOS y en Linux; `stat -f %m` era solo de Mac, y en Linux no falla:
+# devuelve basura, la cuenta de abajo revienta y el hook sale con 1 (CI público rojo, 24-sep-26).
+if [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$DRAIN_STAMP" +%s 2>/dev/null || echo 0) ))" -gt 900 ]; then
   touch "$DRAIN_STAMP" 2>/dev/null
   [ -f "$REPO/tools/reel_digest.py" ] && ( "$PY" "$REPO/tools/reel_digest.py" --drain --remote polaris --max 5 >/dev/null 2>&1 & )
 fi

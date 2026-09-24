@@ -118,7 +118,9 @@ rc, _ = _rc("git merge rama", cwd=CASA)
 casos.append(("sesión en casa base → DENIEGA", rc == 2))
 rc, _ = _rc("cd /Users/polaris/projects/titular-{{APELLIDO}}-case && git merge r", cwd=CASA)
 casos.append(("cd HACIA fuera y fusionar → PASA (no es este singleton)", rc == 0))
-rc, _ = _rc("cd ~/claudecode && git merge r", cwd=OTRO_REPO)
+# La ruta ESCRITA de casa base, no `~/claudecode`: en el runner del repo público `~` no es
+# /Users/polaris y el caso fallaba por el test, no por el hook (24-sep-26).
+rc, _ = _rc("cd %s && git merge r" % CASA, cwd=OTRO_REPO)
 casos.append(("cd HACIA casa base desde otro repo → DENIEGA", rc == 2))
 rc, _ = _rc("echo hola", tool="Write")
 casos.append(("tool que no es Bash → PASA", rc == 0))
