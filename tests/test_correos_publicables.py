@@ -58,7 +58,10 @@ EXPLICITAS = {
 # (`a@b.com`, `x@x.com`…). Se aceptan por NOMBRE COMPLETO para que un correo real nuevo no se
 # cuele por parecerse: la lista es corta a propósito y no debería crecer.
 FIXTURES = {
-    "a@b.com", "c@d.com", "t@t.com", "x@x.com", "y@h.com",
+    # `@x.com` y `@hospital.org` se usan en varias baterías como buzones de pega, siempre con
+    # local-parts de una palabra («a», «otra», «clinica-a»): no son de nadie.
+    "a@b.com", "c@d.com", "t@t.com", "x@x.com", "y@h.com", "a@x.com", "otra@x.com",
+    "otra@hospital.org",
     "alguien@x.com", "nueva@x.com", "ext@x.com", "clinica-a@x.com", "clinica-b@x.com",
     "attacker@bad.com", "mal@evil.com", "post@baseline.com", "auditor@externo.com",
     "cuenta-que-no-existe@nowhere.com", "no-existo@otrodominio.com", "news@vieja.com",

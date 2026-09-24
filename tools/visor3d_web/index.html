@@ -31,6 +31,8 @@
   tbody tr { cursor:pointer } tbody tr:hover { background:color-mix(in srgb,var(--sel) 15%,transparent) }
   tbody tr.sel { background:color-mix(in srgb,var(--sel) 35%,transparent) }
   tbody tr:focus-visible { outline:2px solid var(--coral); outline-offset:-2px }
+  tbody tr.marca th { color:#2f8f80 }
+  @media (prefers-color-scheme: dark) { tbody tr.marca th { color:#78cdbe } }
   .aviso { font-size:.75rem; background:var(--linea); border-radius:4px; padding:0 4px }
   details { margin:12px 0 } summary { cursor:pointer; font-weight:600 }
   @media (max-width: 900px) { .visor { grid-template-columns:1fr; height:auto } .visor > div { height:52vh } }
@@ -43,6 +45,7 @@
   <div class="aviso-caja" role="note">
     <b>Reconstrucción automática sin validación radiológica. No es un informe ni un diagnóstico.</b>
     Las medidas oficiales son las del informe del radiólogo, que se muestran al lado cuando existen.
+    Las marcas de la revisión informal de un radiólogo (sin informe firmado) se distinguen por su procedencia en cada fila.
   </div>
 </header>
 <main>
@@ -56,16 +59,17 @@
   <div id="resumen"></div>
   <div class="visor">
     <div><small>Cortes TC · convención radiológica (derecha del paciente a la izquierda) · regla 10 cm</small><canvas id="gl2" aria-label="Cortes del TC con lesiones y vasos superpuestos"></canvas></div>
-    <div><small>3D · hígado translúcido, lesiones, porta y vasos</small><canvas id="gl3" aria-label="Reconstrucción 3D del hígado"></canvas></div>
+    <div><small>3D · hígado translúcido · <span style="color:#ff6b47">●</span> malla de Polaris · <span style="color:#78cdbe">●</span> marca puntual del radiólogo (esfera de su diámetro, no segmentación) · porta y vasos</small><canvas id="gl3" aria-label="Reconstrucción 3D del hígado"></canvas></div>
   </div>
   <div id="cursor"></div>
   <table id="tabla">
-    <caption style="text-align:left;color:var(--suave)">Lesiones detectadas en este estudio. Clic o Enter en una fila lleva el cursor a la lesión en los cortes y en el 3D.</caption>
-    <thead><tr><th scope="col">Lesión</th><th scope="col">Segmento</th><th scope="col">Diámetro axial mayor (mm, automático)</th>
+    <caption style="text-align:left;color:var(--suave)">Lesiones de este estudio: L = detección automática de Polaris, M = marca de un radiólogo sin lesión automática debajo. Clic o Enter en una fila lleva el cursor a la lesión en los cortes y en el 3D.</caption>
+    <thead><tr><th scope="col">Lesión</th><th scope="col">Procedencia</th><th scope="col">Segmento</th><th scope="col">Diámetro axial mayor (mm, automático)</th>
       <th scope="col">Radiólogo (mm)</th><th scope="col">Volumen (ml, exploratorio)</th><th scope="col">SUVmax PET</th><th scope="col">Cambio de diámetro vs. el otro estudio</th>
       <th scope="col">Acuerdo con 2º modelo</th></tr></thead>
     <tbody></tbody>
   </table>
+  <section id="marcas" aria-live="polite"></section>
   <section id="focos" aria-live="polite"></section>
   <details open>
     <summary>Límites de esta reconstrucción (léelos antes de interpretar nada)</summary>

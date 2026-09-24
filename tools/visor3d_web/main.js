@@ -11,6 +11,9 @@ const SELECCION = [255, 214, 102]
 const NEUTRO = [230, 220, 205]
 const PORTA = [110, 150, 200]
 const VASOS = [150, 170, 200]
+// Marca puntual del radiólogo (esfera de su diámetro, sin segmentación): color frío, distinto
+// del coral de las mallas, para que nadie lea una esfera como la forma real de la lesión.
+const MARCA = [120, 205, 190]
 
 const $ = (s) => document.querySelector(s)
 const fmt = (x, d = 1) => (x == null ? '—' : Number(x).toFixed(d).replace('.', ','))
@@ -21,7 +24,7 @@ async function json(url) {
   return r.json()
 }
 
-const estado = { fechas: [], fecha: null, estudio: null, comparacion: null, referencia: {}, sel: null, pet: null }
+const estado = { fechas: [], fecha: null, estudio: null, comparacion: null, referencia: {}, sel: null, pet: null, marcas: null }
 const fechaPET = (f) => (f && f.length === 8 ? f.slice(6) + '-' + f.slice(4, 6) + '-' + f.slice(0, 4) : f)
 
 const nv2 = new Niivue({
@@ -53,6 +56,7 @@ async function cargaFecha(fecha) {
   const est = await json(base + 'estudio.json')
   estado.estudio = est
   try { estado.pet = await json(base + 'pet.json') } catch { estado.pet = null }
+  try { estado.marcas = await json(base + 'marcas.json') } catch { estado.marcas = null }
   for (const nv of [nv2, nv3]) {
     while (nv.volumes.length) nv.removeVolume(nv.volumes[0])
     while (nv.meshes.length) nv.removeMesh(nv.meshes[0])
@@ -68,6 +72,7 @@ async function cargaFecha(fecha) {
   await nv3.loadVolumes([{ url: base + 'etiquetas.nii.gz', opacity: 0 }])
   const mallas = []
   for (const L of est.lesiones) if (L.malla) mallas.push({ url: base + L.malla, rgba255: [...CORAL, 255], name: 'L' + L.id + '.ply' })
+  for (const M of (estado.marcas ? estado.marcas.marcas : [])) mallas.push({ url: base + M.malla, rgba255: [...MARCA, 255], name: 'M' + M.id + '.ply' })
   if (est.mallas.porta) mallas.push({ url: base + est.mallas.porta, rgba255: [...PORTA, 255] })
   if (est.mallas.vasos) mallas.push({ url: base + est.mallas.vasos, rgba255: [...VASOS, 200] })
   // El hígado va el ÚLTIMO: NiiVue pinta la transparencia en el orden del array (arquitectura).
@@ -90,6 +95,7 @@ function pintaResumen() {
     `<div><b>${fmt(e.volumen_tumoral_ml, 1)} ml</b><span>volumen tumoral detectado</span></div>` +
     `<div><b>${fmt(fraccionHepaticaPct(e.volumen_tumoral_ml, e.volumen_higado_ml), 1)} %</b><span>del hígado ocupado por lo detectado<br>(exploratorio, no pronóstico)</span></div>` +
     `<div><b>${e.lesiones.length}</b><span>lesiones detectadas<br>(${e.lesiones.filter((l) => l.pequena).length} &lt; 10 mm, fiabilidad baja)</span></div>` +
+    (estado.marcas ? `<div><b>${estado.marcas.recuento.total}</b><span>marcas de un radiólogo (lectura informal, sin informe firmado): ${estado.marcas.recuento.polaris_revisadas} coinciden con las de Polaris, ${estado.marcas.recuento.solo_radiologo} solo suyas</span></div>` : '') +
     `<div><b>${e.modalidad} · ${e.fecha}</b><span>fase portal · ventana W${e.ventana_hu[1] - e.ventana_hu[0]}/L${(e.ventana_hu[0] + e.ventana_hu[1]) / 2}</span></div>`
   const p = estado.pet
   if (p && p.fondo_higado) {
@@ -153,33 +159,59 @@ function pintaTabla() {
     const acuerdo = L.acuerdo_2o_modelo == null ? '—' : fmt(L.acuerdo_2o_modelo * 100, 0) + ' %'
     const pl = estado.pet && (estado.pet.lesiones || []).find((x) => x.id === L.id)
     const suv = pl && pl.suvmax != null ? fmt(pl.suvmax, 2) : '—'
-    return `<tr data-id="${L.id}" tabindex="0"><th scope="row">L${L.id}</th><td>${L.segmento ?? '—'}</td>` +
-      `<td>${fmt(L.diametro_mm)} ${bandera}</td><td>${r ? '<b>' + r.mm + '</b> <small>' + r.etiqueta + '</small>' : '—'}</td>` +
+    const mr = estado.marcas && estado.marcas.automaticas[String(L.id)]
+    const origen = estado.marcas ? (mr ? mr.origen : 'Detectada por Polaris') : '—'
+    const radiol = r ? '<b>' + r.mm + '</b> <small>' + r.etiqueta + '</small>' : (mr ? fmt(mr.radiologo_mm, 2) + ' <small>img ' + mr.corte + '</small>' : '—')
+    return `<tr data-id="L${L.id}" tabindex="0"><th scope="row">L${L.id}</th><td>${origen}</td><td>${L.segmento ?? '—'}</td>` +
+      `<td>${fmt(L.diametro_mm)} ${bandera}</td><td>${radiol}</td>` +
       `<td>${fmt(L.volumen_ml, 2)}</td><td>${suv}</td><td>${delta}</td><td>${acuerdo}</td></tr>`
   })
+  for (const M of (estado.marcas ? estado.marcas.marcas : [])) {
+    filas.push(`<tr data-id="M${M.id}" tabindex="0" class="marca"><th scope="row">M${M.id}</th><td>${M.origen}</td><td>${M.segmento ?? '—'}</td>` +
+      `<td>—</td><td>${fmt(M.mm, 2)} <small>img ${M.corte}</small></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`)
+  }
   $('#tabla tbody').innerHTML = filas.join('')
+  pintaSinPosicion()
   for (const tr of document.querySelectorAll('#tabla tbody tr')) {
-    const ir = () => selecciona(Number(tr.dataset.id))
+    const ir = () => selecciona(tr.dataset.id)
     tr.addEventListener('click', ir)
     tr.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ir() } })
   }
 }
 
-function selecciona(id) {
-  estado.sel = id
-  const L = estado.estudio.lesiones.find((x) => x.id === id)
+function pintaSinPosicion() {
+  const m = estado.marcas
+  const caja = $('#marcas')
+  if (!m) { caja.innerHTML = ''; return }
+  caja.innerHTML =
+    `<h2>Revisión de un radiólogo</h2><p>${m.frase}</p>` +
+    `<p>En el 3D: las <b>${m.recuento.polaris_revisadas}</b> lesiones de Polaris (malla coral) coinciden con una marca suya. ` +
+    `Las <b>${m.recuento.en_3d}</b> que solo marcó él son <b>esferas verde agua del diámetro que midió, centradas en su marca: una marca puntual, no una segmentación</b> (ni forma ni volumen reales).</p>` +
+    (m.sin_posicion.length ? `<p><b>${m.sin_posicion.length} marcas suyas sin posición fiable en el volumen</b> (no se colocan en el 3D; no se sabe dónde están exactamente):</p><ul>` +
+      m.sin_posicion.map((s) => `<li>M${s.id} · imagen ${s.corte} · ${fmt(s.mm, 2)} mm · ${s.motivo}</li>`).join('') + '</ul>' : '')
+}
+
+function selecciona(clave) {
+  estado.sel = clave
+  const esMarca = clave[0] === 'M'
+  const id = Number(clave.slice(1))
+  const L = esMarca ? estado.marcas.marcas.find((x) => x.id === id) : estado.estudio.lesiones.find((x) => x.id === id)
   if (!L) return
   const vol = nv2.volumes[0]
   const vox = vol.mm2vox(L.centro_mm)
   nv2.scene.crosshairPos = nv2.vox2frac(vox)
-  nv2.volumes[1].setColormapLabel(lutEtiquetas(estado.estudio.lesiones, id))
+  nv2.volumes[1].setColormapLabel(lutEtiquetas(estado.estudio.lesiones, esMarca ? null : id))
   nv2.updateGLVolume()
   for (const m of nv3.meshes) {
-    if (m.name && m.name.startsWith('L')) nv3.setMeshProperty(m.id, 'rgba255', m.name === 'L' + id + '.ply' ? [...SELECCION, 255] : [...CORAL, 255])
+    if (!m.name) continue
+    const base = m.name.startsWith('M') ? MARCA : m.name.startsWith('L') ? CORAL : null
+    if (base) nv3.setMeshProperty(m.id, 'rgba255', m.name === clave + '.ply' ? [...SELECCION, 255] : [...base, 255])
   }
   nv2.drawScene(); nv3.drawScene()
-  for (const tr of document.querySelectorAll('#tabla tbody tr')) tr.classList.toggle('sel', Number(tr.dataset.id) === id)
-  $('#estado').textContent = `L${id} · segmento ${L.segmento ?? '—'} · ${fmt(L.diametro_mm)} mm · ${fmt(L.volumen_ml, 2)} ml`
+  for (const tr of document.querySelectorAll('#tabla tbody tr')) tr.classList.toggle('sel', tr.dataset.id === clave)
+  $('#estado').textContent = esMarca
+    ? `M${id} · ${L.origen} · segmento ${L.segmento ?? '—'} · ${fmt(L.mm, 2)} mm (su medida) · marca puntual`
+    : `L${id} · segmento ${L.segmento ?? '—'} · ${fmt(L.diametro_mm)} mm · ${fmt(L.volumen_ml, 2)} ml`
 }
 
 async function main() {
