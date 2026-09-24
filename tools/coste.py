@@ -83,6 +83,12 @@ DEFAULT_PRECIOS = {
                           "cache_write_1h": 20.0},
     "claude-fable-5":    {"input": 10.0, "output": 50.0, "cache_read": 1.0,  "cache_write": 12.5,
                           "cache_write_1h": 20.0},
+    # Opus 5.5 (24-sep-2026): apareció en los transcripts sin fila aquí y `price_for` es de
+    # coincidencia EXACTA, así que se estaba tarifando a cero. input/output/cache_read salen de la
+    # tabla de precios de la referencia de la API (skill `claude-api`, caché de 24-jun-2026);
+    # las dos escrituras de caché son la regla de siempre (1,25× y 2× el input), NO una cifra leída.
+    "claude-opus-5-5":   {"input": 4.0,  "output": 20.0, "cache_read": 0.2,  "cache_write": 5.0,
+                          "cache_write_1h": 8.0},
     "claude-opus-5":     {"input": 5.0,  "output": 25.0, "cache_read": 0.5,  "cache_write": 6.25,
                           "cache_write_1h": 10.0},
     "claude-opus-4-8":   {"input": 5.0,  "output": 25.0, "cache_read": 0.5,  "cache_write": 6.25,
