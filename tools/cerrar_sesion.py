@@ -97,6 +97,37 @@ def _conflicto_en_worktree(wt, base):
     return ""
 
 
+def _git_dir_base():
+    rc, gd, _ = _git(["rev-parse", "--git-dir"], BASE)
+    gd = gd.strip()
+    return (gd if os.path.isabs(gd) else os.path.join(BASE, gd)) if rc == 0 and gd else ""
+
+
+def _base_ocupada():
+    """Motivo (str) si casa base tiene una operación de git A MEDIAS o cambios de otro; "" si no.
+
+    POR QUÉ (24-sep-26). Otra sesión fusionaba en casa base, chocaba y resolvía a mano; el candado
+    `git-mutex` ya lo había soltado al volver su `git merge`. Un cierre que llegara entonces hacía
+    su propio `git merge`, fallaba por «no has concluido tu fusión» y respondía con `merge --abort`:
+    la resolución ajena se perdía y la tool decía «casa base sigue como estaba». Reproducido en
+    `tests/test_cerrar_sesion_conflicto.py::fusion_ajena_a_medias`. Lo sin seguimiento (`??`) no
+    cuenta: casa base siempre tiene alguno y no lo toca un merge."""
+    gd = _git_dir_base()
+    if gd:
+        for marca, que in (("MERGE_HEAD", "una fusión"), ("CHERRY_PICK_HEAD", "un cherry-pick"),
+                           ("REVERT_HEAD", "un revert"), ("rebase-merge", "un rebase"),
+                           ("rebase-apply", "un rebase")):
+            if os.path.exists(os.path.join(gd, marca)):
+                return "%s de otro a medias (%s)" % (que, marca)
+    _, sin_resolver, _ = _git(["diff", "--name-only", "--diff-filter=U"], BASE)
+    if sin_resolver.strip():
+        return "ficheros sin resolver: " + ", ".join(sin_resolver.split()[:5])
+    _, st, _ = _git(["status", "--porcelain", "--untracked-files=no"], BASE)
+    if st.strip():
+        return "cambios de otro sin commitear: " + ", ".join(l[3:] for l in st.splitlines()[:5])
+    return ""
+
+
 def _gate_base_encendido():
     """El mismo interruptor que los hooks de git y el muro: `.claude/hooks/.base_gate_on`."""
     return os.path.exists(os.path.join(BASE, ".claude", "hooks", ".base_gate_on"))
@@ -219,6 +250,14 @@ def cerrar(apply=False, scope=None, podar=True):
                              "son de otro: no los toques y avisa." % (base, BASE),
                     acciones=acciones)
 
+    # CASA BASE OCUPADA (24-sep-26): una fusión (u otra operación) de otro a medias. No se toca:
+    # ni se fusiona encima ni se aborta lo suyo. Antes del commit, como el chequeo de master.
+    ocupada = _base_ocupada() if apply else ""
+    if ocupada:
+        return dict(p, error="casa base está ocupada: %s. No la toco (ni fusiono encima ni aborto lo "
+                             "suyo). Tu rama está intacta: repite el cierre cuando acabe." % ocupada,
+                    acciones=acciones)
+
     # MERGE A MEDIAS EN EL WORKTREE (22-sep-26). Un `git merge master` que choca deja la rama con
     # ficheros sin resolver y marcadores `<<<<<<<`; el paso (a) hacía `add -A` + commit y los
     # FUSIONABA a casa base como un cambio normal. Pasó con `tools/run_agent.sh` (script de TODOS
@@ -259,6 +298,16 @@ def cerrar(apply=False, scope=None, podar=True):
             # `.git` de la casa base, no solo con otros cierres de sesión (A1, 10-jul-26).
             try:
                 with _lock.lock(GIT_MUTEX, timeout=60.0):
+                    # Otra vez DENTRO del candado (24-sep-26): entre el chequeo de arriba y aquí
+                    # otra sesión ha podido empezar su fusión.
+                    ocupada = _base_ocupada()
+                    if ocupada:
+                        return dict(p, error="casa base está ocupada: %s. No la toco (ni fusiono "
+                                             "encima ni aborto lo suyo). Tu rama está intacta: "
+                                             "repite el cierre cuando acabe." % ocupada,
+                                    acciones=acciones)
+                    head_antes = _git(["rev-parse", "HEAD"], BASE)[1].strip()
+                    punta = _git(["rev-parse", rama], wt)[1].strip()
                     rc, _, err = _git(["merge", "--no-ff", rama, "-m",
                                        "merge(%s): cierre de sesión → casa base" % rama], BASE)
                     if rc != 0:
@@ -266,12 +315,25 @@ def cerrar(apply=False, scope=None, podar=True):
                         # dejaba casa base —el sistema vivo 24/7— con `UU` y marcadores
                         # `<<<<<<<` en disco hasta que alguien lo abortara a mano: pasó con dos
                         # sesiones que arreglaron el mismo rojo a la vez. La rama no se toca.
+                        # Solo se aborta la fusión PROPIA (24-sep-26): la que apunta a mi rama.
                         conflictos = _git(["diff", "--name-only", "--diff-filter=U"], BASE)[1]
-                        rc_ab, _, err_ab = _git(["merge", "--abort"], BASE)
-                        estado = ("fusión deshecha (merge --abort): casa base sigue como estaba"
-                                  if rc_ab == 0 else
-                                  "‼️ NO se pudo deshacer (merge --abort: %s) — casa base a medio "
-                                  "fusionar, arréglalo a mano YA" % (err_ab or rc_ab))
+                        gd = _git_dir_base()
+                        mh = os.path.join(gd, "MERGE_HEAD") if gd else ""
+                        mia = bool(mh) and os.path.exists(mh) and \
+                            open(mh).read().split()[:1] == [punta]
+                        if not mia:
+                            estado = ("no había fusión mía que deshacer: no toco casa base"
+                                      if not (mh and os.path.exists(mh)) else
+                                      "‼️ hay una fusión en curso que NO es mía: no la toco")
+                        else:
+                            rc_ab, _, err_ab = _git(["merge", "--abort"], BASE)
+                            limpia = not _base_ocupada() and \
+                                _git(["rev-parse", "HEAD"], BASE)[1].strip() == head_antes
+                            estado = ("fusión deshecha (merge --abort): casa base sigue como estaba"
+                                      if rc_ab == 0 and limpia else
+                                      "‼️ NO se pudo deshacer del todo (merge --abort: %s) — casa base "
+                                      "a medio fusionar, arréglalo a mano YA" % (err_ab or rc_ab or
+                                                                                 "estado distinto"))
                         return dict(p, error="fusión falló (conflicto/estado): %s%s · %s. Tu rama "
                                              "está intacta: actualízala con casa base y vuelve a cerrar."
                                     % (err or "", (" · en conflicto: %s" % ", ".join(conflictos.split()))

@@ -77,6 +77,7 @@ def main():
 
     base_en_rama()
     merge_a_medias_en_la_rama()
+    fusion_ajena_a_medias()
 
     if fallos:
         print("❌ %d fallo(s)\n--- salida de la tool ---\n%s" % (len(fallos), salida[-1500:]))
@@ -168,6 +169,68 @@ def merge_a_medias_en_la_rama():
           "casa base sin marcadores de conflicto")
     check("conflicto" in salida.lower() or "a medias" in salida.lower(),
           "la salida dice que hay un merge a medias: %r" % salida[-200:])
+
+
+
+def fusion_ajena_a_medias():
+    """24-sep-26: casa base tenía la fusión de OTRA sesión a medias (MERGE_HEAD, conflicto ya
+    resuelto a mano y en el índice). El cierre de una rama cualquiera hacía `git merge`, fallaba
+    por «no has concluido tu fusión» y respondía con `git merge --abort`: la resolución ajena se
+    perdía y la tool decía «casa base sigue como estaba». Reproducido en repos de pega."""
+    print("── fusión de OTRA sesión a medias en casa base: no se toca ──")
+    tmp = tempfile.mkdtemp(prefix="cerrar_ajena_")
+    base = os.path.join(tmp, "casa")
+    os.makedirs(base)
+    git(base, "init", "-q", "-b", "master")
+    git(base, "config", "user.email", "t@t")
+    git(base, "config", "user.name", "t")
+    with open(os.path.join(base, ".gitignore"), "w") as f:
+        f.write(".claude/worktrees/\n")
+    for n, t in (("f.txt", "original\n"), ("g.txt", "g\n")):
+        with open(os.path.join(base, n), "w") as f:
+            f.write(t)
+    git(base, "add", "-A")
+    git(base, "commit", "-q", "-m", "inicio")
+    # La otra sesión: su rama choca con master en f.txt.
+    git(base, "checkout", "-q", "-b", "otra")
+    with open(os.path.join(base, "f.txt"), "w") as f:
+        f.write("de la otra\n")
+    git(base, "commit", "-q", "-am", "otra")
+    git(base, "checkout", "-q", "master")
+    with open(os.path.join(base, "f.txt"), "w") as f:
+        f.write("de master\n")
+    git(base, "commit", "-q", "-am", "master")
+    # Mi rama toca OTRO fichero: por sí sola fusionaría limpio.
+    wt = os.path.join(base, ".claude", "worktrees", "mia")
+    git(base, "worktree", "add", "-q", "-b", "claude/mia", wt)
+    with open(os.path.join(wt, "g.txt"), "w") as f:
+        f.write("g de mi rama\n")
+    git(wt, "commit", "-q", "-am", "mia")
+    # La otra sesión fusiona, choca y RESUELVE a mano: trabajo vivo, aún sin commitear.
+    subprocess.run(["git", "-C", base, "merge", "otra"], capture_output=True)
+    resolucion = "RESOLUCION A MANO de la otra sesion\n"
+    with open(os.path.join(base, "f.txt"), "w") as f:
+        f.write(resolucion)
+    git(base, "add", "f.txt")
+    merge_head = open(os.path.join(base, ".git", "MERGE_HEAD")).read()
+    master_antes = git(base, "rev-parse", "master")
+
+    env = dict(os.environ, BTP_REPO=base, BTP_GIT_BASE_OK="1",
+               BTP_STATE_DIR=os.path.join(tmp, "state"))
+    p = subprocess.run([sys.executable, TOOL, "--apply", "--no-poda"], cwd=wt, env=env,
+                       capture_output=True, text=True, timeout=120)
+    salida = p.stdout + p.stderr
+    mh = os.path.join(base, ".git", "MERGE_HEAD")
+    check(os.path.exists(mh) and open(mh).read() == merge_head,
+          "la fusión de la otra sesión sigue a medias, con SU MERGE_HEAD")
+    check(open(os.path.join(base, "f.txt")).read() == resolucion,
+          "su resolución a mano sigue en el disco de casa base")
+    check("f.txt" in git(base, "diff", "--cached", "--name-only"), "y sigue en el índice")
+    check(git(base, "rev-parse", "master") == master_antes, "master no se ha movido")
+    check("ocupada" in salida.lower() or "a medias" in salida.lower(),
+          "la salida dice que casa base tiene una fusión de otro a medias: %r" % salida[-200:])
+    check("sigue como estaba" not in salida, "no afirma que casa base «sigue como estaba»")
+    check(git(wt, "log", "-1", "--format=%s") == "mia", "el trabajo de mi rama sigue intacto")
 
 
 if __name__ == "__main__":
