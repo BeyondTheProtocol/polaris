@@ -75,7 +75,7 @@ Tras ver "qué se cae", **empuja**: `python3 tools/seguimiento.py perseguir --ej
 - **`entrega`** → es de un comité de confianza y se está cayendo. **`tools/persecucion.py` (F4.1, determinista) ya lo DELEGA SOLO**: encola el trabajo INTERNO al comité y lo persigue ({{TITULAR}} lo aprobó 25/6: auto-delega; cooldown 1×/día por hilo). **TÚ no lo encolas a mano** (evita doble). El resultado del comité sale en BORRADOR con el gate de {{TITULAR}} — nada hacia fuera sin su firma.
 - **`desbloquea`** → redacta el follow-up al tercero como **borrador** (nunca se envía).
 - **`codigo_rojo`** → `perseguir` solo lo MARCA. Tú lo valoras con criterio + el muro y disparas `codigo_rojo.py` **solo si la amenaza al goal es REAL** (no por una fecha vencida tonta).
-El `--ejecutar` solo sella la idempotencia en el hilo (interno): así no re-aflora lo ya avisado cada pasada. El **cuello** se persigue aunque no tenga fecha. Al crear tareas, exígeles `objetivo_ned` (el "¿acerca a NED?").
+El `--ejecutar` solo sella la idempotencia en el hilo (interno): así no re-aflora lo ya avisado cada pasada. El **cuello** se persigue aunque no tenga fecha. Al crear tareas, exígeles `objetivo_ned` (el "¿acerca a NED?"). Y `hecho_cuando` si el final es comprobable: qué se mira para darla por cerrada, en una frase (p. ej. «el PDF del informe está en la bóveda», «el hospital confirma la fecha por escrito»). Si no se sabe, déjalo vacío: no lo inventes. Al cerrar una tarea que lo tiene, contrasta el criterio antes de marcarla hecha.
 
 == CERRAR fácil — "di HECHO y ya" (Fase 3, {{TITULAR}} 22/6) ==
 Cerrar una tarea es lo ÚNICO que ella hace al final; tú lo pones facilísimo y reversible. **Tres vías, una sola puerta** (`seguimiento.py`):

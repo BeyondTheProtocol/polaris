@@ -102,6 +102,11 @@ try:
 except Exception as e:  # noqa: BLE001
     ok("bot_telegram importable para probar el cierre", False, "-> %r" % e)
 
+# 9. Vega (quien crea casi todas las tareas autónomas) sabe que tiene que escribirlo, y no inventarlo.
+vega = open(os.path.join(ROOT, ".claude", "agents", "asistente.md"), encoding="utf-8").read()
+ok("Vega tiene la instrucción de escribir hecho_cuando al crear", "`hecho_cuando`" in vega
+   and "no lo inventes" in vega)
+
 subprocess.run(["rm", "-rf", tmp], capture_output=True)
 print(("FALLOS: " + ", ".join(FALLOS)) if FALLOS
       else "test_seguimiento_hecho_cuando: %d/%d OK" % (len(OK), len(OK)))
