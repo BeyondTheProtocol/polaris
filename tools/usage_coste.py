@@ -47,8 +47,9 @@ PRECIOS_FILE = os.path.join(TOOLS_DIR, ".precios.json")
 # mano que se quedó en Opus 4.8 al triple de su tarifa y sin los modelos 5 (13-sep-2026): dos copias
 # divergen, así que ya no hay copia.
 sys.path.insert(0, TOOLS_DIR)
+import coste  # noqa: E402
 from coste import DEFAULT_PRECIOS  # noqa: E402
-NVIDIA_FREE = ("meta/", "deepseek-ai/", "qwen/", "nvidia/", "mistralai/", "google/")
+NVIDIA_FREE = coste.NVIDIA_FREE_PREFIXES   # una sola lista, la de coste.py
 
 # Mapeo de UUID internos de servidores MCP a nombres legibles.
 # Cuando Claude Code asigna un UUID al servidor en vez de nombre textual, aquí lo resolvemos.
@@ -86,25 +87,15 @@ def _precios():
     return p
 
 
-def _price_for(model, tabla):
-    if model in tabla:
-        return tabla[model]
-    # prefijo match (p. ej. claude-haiku-4-5-*)
-    for k, v in tabla.items():
-        if model.startswith(k):
-            return v
-    if model and model.startswith(NVIDIA_FREE):
-        return {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0}
-    return None
-
-
-def _usd(tok, pr):
-    if not pr:
-        return 0.0
-    return (tok["input"] * pr.get("input", 0) +
-            tok["output"] * pr.get("output", 0) +
-            tok["cache_read"] * pr.get("cache_read", 0) +
-            tok["cache_write"] * pr.get("cache_write", 0)) / 1_000_000.0
+# 24-sep-2026: aquí quedaban DOS matchers propios. La tabla ya venía de `coste.py`, pero el
+# emparejamiento y la suma no, y divergían igual:
+#   · `_price_for` casaba por PREFIJO contra TODA la tabla → `sonar-deep-research` cobraba la
+#     tarifa de `sonar`. Un precio equivocado es peor que ninguno, porque no se nota.
+#   · `_usd` no conocía `cache_write_1h`, así que tarifaba a 5 minutos la caché de 1 hora, que es
+#     la que escriben casi siempre las sesiones de Claude Code (1,25× en vez de 2× el input).
+# Compartir el diccionario no basta: se comparten `price_for` y `usd`, que son la decisión.
+_price_for = coste.price_for
+_usd = coste.usd
 
 
 def _empty():

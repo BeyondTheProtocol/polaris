@@ -341,6 +341,7 @@ runpy test_honestidad_lint_repo.py  # nº10  · el barrido cubre algo (barría 0
 runpy test_evals_honestidad.py      # nº13  · el sello de evidencia ya tiene golden set
 runpy test_coste_repo.py            # nº15  · el gasto se mide en TODO el repo, no solo casa base
 runpy test_coste_modelos.py         # 13-sep · todo modelo claude-* gastado tiene precio; se ven subagentes y workflows
+runpy test_gasto_tarifa.py          # 24-sep · un modelo sin tarifa se DICE; una sola tabla y un solo matcher
 runpy test_saldo_prepago.py         # el estimador del prepago deja de afirmar lo que no sabe
 runpy test_bench_jev.py           # 21-sep · a Jev solo sale lo que pasa el borde + fechas/@/URLs
 runpy test_eval_triage_residuo.py # 21-sep · el set dorado no sale con fechas, URLs, @handles ni números largos

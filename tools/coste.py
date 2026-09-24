@@ -61,7 +61,19 @@ def es_casa_base(ruta):
     return os.path.basename(ruta.rstrip(os.sep)) == THIS_PROJECT
 
 
-LEDGER = os.path.join(TOOLS_DIR, ".gasto_ledger.jsonl")
+# El ledger de APIs de pago vive en CASA BASE, no en el worktree desde el que se lee: lo escribe
+# `gasto.py` con esta misma regla (está en .gitignore, así que un ledger de worktree no se fusiona
+# nunca). Sin esto, `coste.py` corrido desde un worktree enseñaba un ledger vacío.
+def _ledger_path():
+    base = os.environ.get("BTP_GASTO_LEDGER")
+    if base:
+        return base
+    repo = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
+    casa = os.path.join(repo, "tools")
+    return os.path.join(casa if os.path.isdir(casa) else TOOLS_DIR, ".gasto_ledger.jsonl")
+
+
+LEDGER = _ledger_path()
 PRECIOS_FILE = os.path.join(TOOLS_DIR, ".precios.json")
 
 # $/millón de tokens. En suscripción Max el recurso real es CUOTA, no €/token
@@ -102,6 +114,21 @@ DEFAULT_PRECIOS = {
     "grok-4.3":          {"input": 3.0,  "output": 15.0, "cache_read": 0.75, "cache_write": 3.0},
     "sonar":             {"input": 1.0,  "output": 1.0,  "cache_read": 0.0,  "cache_write": 0.0},
     "sonar-pro":         {"input": 3.0,  "output": 15.0, "cache_read": 0.0,  "cache_write": 0.0},
+    # 24-sep-2026: estas cuatro filas vivían SOLO en la tabla paralela de `gasto.py`, que se ha
+    # borrado (dos tablas que divergen son la causa raíz del agujero de Opus 5.5). Son las cifras
+    # que ya estaban allí, etiquetadas «ESTIMADO»: se mudan tal cual, NO se han cotejado contra la
+    # tarifa del proveedor en ninguna sesión → siguen siendo INFERIDAS. `gasto.py` solo apunta
+    # input/output, así que la caché de estos cuatro va a 0 por no tener cifra, no por ser gratis.
+    # `perplexity.py` apunta el modelo como `perplexity/sonar` (así lo pide su API): 466 líneas del
+    # ledger de casa base iban con `usd: null` por no casar con la fila `sonar` (contado hoy). Fila
+    # explícita y no un stripper genérico de `proveedor/modelo`: un `openai/gpt-4o` de OpenRouter NO
+    # cuesta necesariamente lo que el gpt-4o de OpenAI, y adivinarlo sería inventar la cifra.
+    "perplexity/sonar":     {"input": 1.0, "output": 1.0,  "cache_read": 0.0, "cache_write": 0.0},
+    "perplexity/sonar-pro": {"input": 3.0, "output": 15.0, "cache_read": 0.0, "cache_write": 0.0},
+    "gpt-5":             {"input": 1.25, "output": 10.0, "cache_read": 0.0,  "cache_write": 0.0},
+    "gemini-2.5-pro":    {"input": 1.25, "output": 10.0, "cache_read": 0.0,  "cache_write": 0.0},
+    "gemini-3":          {"input": 1.25, "output": 10.0, "cache_read": 0.0,  "cache_write": 0.0},
+    "glm-5.2":           {"input": 0.6,  "output": 2.2,  "cache_read": 0.0,  "cache_write": 0.0},
 }
 # Modelos abiertos de NVIDIA NIM = tier gratis → 0 (ajusta si pasas a pago).
 NVIDIA_FREE_PREFIXES = ("meta/", "deepseek-ai/", "qwen/", "nvidia/", "mistralai/", "google/")
@@ -125,7 +152,7 @@ _SUFIJO_FECHA = re.compile(r"-\d{8}$")
 _SUFIJO_VENTANA = re.compile(r"\[\d+[kKmM]\]$")
 
 
-def price_for(model, tabla):
+def price_for(model, tabla, tool=None):
     if model in tabla:
         return tabla[model]
     # `claude-haiku-4-5-20251001` es `claude-haiku-4-5` con fecha: sin esto se tarifaba a cero.
@@ -141,7 +168,11 @@ def price_for(model, tabla):
     sin_ventana = _SUFIJO_VENTANA.sub("", base)
     if sin_ventana != base and sin_ventana in tabla:
         return tabla[sin_ventana]
-    if model and model.startswith(NVIDIA_FREE_PREFIXES):
+    # El tier gratis de NVIDIA NIM es un juicio sobre el PROVEEDOR, y estaba aplicado al NOMBRE del
+    # modelo. Comprobado el 24-sep-2026: eso tarifaba a CERO los `google/…`, `mistralai/…` y
+    # `qwen/…` que sirve OpenRouter, que se pagan — tres líneas del ledger pasaban de `usd: null`
+    # (honesto) a 0,0 (mentira). Ahora hace falta decir de qué tool viene la llamada.
+    if tool == "nvidia" and model and model.startswith(NVIDIA_FREE_PREFIXES):
         return {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0}
     return None  # desconocido → tokens sí, € no
 
@@ -246,6 +277,35 @@ def read_ledger():
     return rows
 
 
+def ledger_usd(rows, tabla=None):
+    """Suma el ledger diciendo QUÉ no pudo sumar. Devuelve (usd, n_con_usd, n_retarifadas, sin_tarifa).
+
+    24-sep-2026: aquí se hacía `float(r.get("usd", 0) or 0)`, que aplasta a 0 una línea sin tarifa.
+    Contado ese día en el ledger de casa base: 466 de 1380 líneas (34%) iban con `usd: null` —
+    todo `perplexity/sonar`, que no casaba con la fila `sonar`— y el informe decía «~$0.01» tan
+    tranquilo. Cero significa «no costó»; null significa «no lo sé», y no son lo mismo.
+
+    `n_retarifadas` son las que venían sin `usd` y AHORA tienen fila: se calculan al vuelo desde los
+    tokens, que el ledger sí guardó exactos, así que el histórico se sana sin reescribir el fichero.
+    `sin_tarifa` es la lista de (tool, modelo) que siguen sin poderse tarifar: esas NO se suman."""
+    tabla = tabla if tabla is not None else precios()
+    total, n_usd, n_retarifadas = 0.0, 0, 0
+    sin_tarifa = defaultdict(int)
+    for r in rows:
+        v = r.get("usd")
+        if isinstance(v, (int, float)):
+            total += float(v); n_usd += 1
+            continue
+        pr = price_for(r.get("model") or "", tabla, r.get("tool"))
+        if pr:
+            total += ((r.get("input_tokens", 0) or 0) * pr.get("input", 0)
+                      + (r.get("output_tokens", 0) or 0) * pr.get("output", 0)) / 1_000_000.0
+            n_retarifadas += 1
+        else:
+            sin_tarifa[(r.get("tool"), r.get("model"))] += 1
+    return total, n_usd, n_retarifadas, dict(sin_tarifa)
+
+
 def fmt_tok(t):
     tot = t["input"] + t["output"] + t["cache_read"] + t["cache_write"]
     return (f"{tot/1000:,.0f}k tok  (in {t['input']/1000:,.0f}k · out {t['output']/1000:,.0f}k · "
@@ -268,11 +328,16 @@ def main():
             pass
 
     # `transcripts` también mira subagentes y agentes de Workflow, no solo las sesiones principales.
+    # Y el alcance por defecto es TODO el repo (casa base + sus worktrees), no solo casa base:
+    # `proyectos_del_repo` existía desde el 25-jul-2026 y la usaban anatomía, el Observatorio y
+    # lentes, pero ESTE CLI se había quedado midiendo `THIS_PROJECT` a secas. Medido el 24-sep-2026:
+    # `claude-opus-5-5` no aparecía en `python3 coste.py` porque sus 3 sesiones eran worktrees — o
+    # sea, la herramienta con la que se mide el agujero no podía verlo.
     if scope_all:
         files = [f for p in glob.glob(os.path.join(PROJECTS, "*")) if os.path.isdir(p)
                  for f in transcripts(p)]
     else:
-        files = transcripts(os.path.join(PROJECTS, THIS_PROJECT))
+        files = [f for p in proyectos_del_repo() for f in transcripts(p)]
     if not files:
         print("No encuentro transcripts en", PROJECTS); return
 
@@ -295,7 +360,7 @@ def main():
 
     ledger = read_ledger()
     ledger_v = [r for r in ledger if (r.get("ts") or "")[:10] in vset] if vset else ledger
-    ledger_usd = sum(float(r.get("usd", 0) or 0) for r in ledger_v)
+    l_usd, l_n, l_retar, l_sin = ledger_usd(ledger_v, tabla)
 
     if want_json:
         out = {
@@ -304,11 +369,13 @@ def main():
                            for m, t in por_modelo.items()},
             "por_dia": {d: dict(t) for d, t in sorted(por_dia.items())},
             "total_ventana": tot_ventana,
-            "apis_pago_ledger_usd": round(ledger_usd, 4),
+            "apis_pago_ledger_usd": round(l_usd, 4),
+            "apis_pago_retarifadas": l_retar,
+            "apis_pago_sin_tarifa": {"%s/%s" % k: v for k, v in l_sin.items()},
         }
         print(json.dumps(out, ensure_ascii=False, indent=2)); return
 
-    alcance = "TODOS los proyectos" if scope_all else "este proyecto (BTP)"
+    alcance = "TODOS los proyectos" if scope_all else "este repo (casa base + worktrees)"
     print(f"💸 GASTO — {alcance} · ventana: {ventana[0] if ventana else '—'} → {ventana[-1] if ventana else '—'}")
     print("   (€ ESTIMADO; en suscripción el € marginal ≈ 0 → mira el VOLUMEN de tokens)\n")
 
@@ -327,7 +394,14 @@ def main():
     print(f"\n  TOTAL € estimado (histórico, modelos con precio): ~${tot_usd:,.2f}")
 
     if ledger:
-        print(f"\nAPIs de pago por uso (ledger, ventana): ~${ledger_usd:,.2f}  ({len(ledger_v)} llamadas)")
+        print(f"\nAPIs de pago por uso (ledger, ventana): ~${l_usd:,.2f}  ({len(ledger_v)} llamadas)")
+        if l_retar:
+            print(f"  · {l_retar} re-tarifadas ahora desde sus tokens (se apuntaron sin tarifa)")
+        if l_sin:
+            n = sum(l_sin.values())
+            print(f"  ⚠️  {n} llamada(s) SIN TARIFA, NO sumadas (su gasto existió y no se sabe cuánto):")
+            for (tool, modelo), c in sorted(l_sin.items(), key=lambda kv: -kv[1]):
+                print(f"       {c:>5}x  {tool}  {modelo}")
     else:
         print("\nAPIs de pago por uso: sin ledger todavía (tools/.gasto_ledger.jsonl). "
               "Grok/Perplexity/NVIDIA aún no registran su uso aquí.")

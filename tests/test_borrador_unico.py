@@ -78,14 +78,14 @@ check("   …y sigue bloqueando un create_draft posterior", _rc(CREATE, A)[0] ==
 check("otro asunto al mismo destinatario → PASA",
       _rc(CREATE, {"to": "onco@{{CENTRO}}.net", "subject": "Biopsia hepática — logística"})[0] == 0)
 check("mismo asunto a OTRO destinatario → PASA",
-      _rc(CREATE, {"to": "otra@hospital.org", "subject": "Sample at {{CENTRO}}"})[0] == 0)
+      _rc(CREATE, {"to": "otra@hospital.example", "subject": "Sample at {{CENTRO}}"})[0] == 0)
 check("el hilo manda sobre el asunto: threadId nuevo → PASA",
       _rc(CREATE, {"to": "onco@{{CENTRO}}.net", "subject": "Sample at {{CENTRO}}", "threadId": "t-999"})[0] == 0)
 check("   …y repetir ese threadId → DENIEGA",
-      _rc(CREATE, {"to": "otra@x.com", "subject": "distinto", "threadId": "t-999"})[0] == 2)
-check("destinatario con nombre («Ana <a@x.com>») casa por la dirección",
-      _rc(CREATE, {"to": "Ana Pérez <a@x.com>", "subject": "Informe"})[0] == 0
-      and _rc(CREATE, {"to": "a@x.com", "subject": "Re: Informe"})[0] == 2)
+      _rc(CREATE, {"to": "otra@x.example", "subject": "distinto", "threadId": "t-999"})[0] == 2)
+check("destinatario con nombre («Ana <a@x.example>») casa por la dirección",
+      _rc(CREATE, {"to": "Ana Pérez <a@x.example>", "subject": "Informe"})[0] == 0
+      and _rc(CREATE, {"to": "a@x.example", "subject": "Re: Informe"})[0] == 2)
 
 _reset()
 check("BTP_BORRADOR_OK=1 → PASA aunque repita",
