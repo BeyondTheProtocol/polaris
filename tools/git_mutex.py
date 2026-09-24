@@ -120,10 +120,112 @@ def _lo_que_se_perderia(ruta):
         return None
 
 
+# ── Freno de la base en la puerta (24-sep-2026, deuda freno-base-deja-el-arbol-a-medio-fusionar) ──
+# El freno nativo (`tools/githooks/reference-transaction`) rechaza mover master sin
+# BTP_GIT_BASE_OK=1, pero lo rechaza TARDE: git ya ha escrito índice y árbol. Un
+# `git_mutex.py -C casa-base merge --no-ff <rama>` sin el OK dejó casa base con MERGE_HEAD y los
+# ficheros de la rama staged unos 17 min (24-sep, sesión frosty-hertz), y ninguna otra sesión
+# podía fusionar. `cerrar_sesion.py` ya comprobaba el gate antes; esta puerta no. Ahora sí:
+#   1. ANTES: lo que movería master de casa base sin el OK no se lanza (rc 3, nada tocado).
+#   2. DESPUÉS: el `merge` fallido ya lo deshace `run()` (otra sesión, el mismo 24-sep, deuda
+#      merge-bloqueado-deja-casa-base-sucia). Aquí se cubre lo que `run()` no ve: `pull`,
+#      `cherry-pick` y `revert` sobre casa base que fallan y dejan un estado a medias nuevo.
+MUEVEN_HEAD = ("merge", "pull", "reset", "cherry-pick", "rebase", "revert", "commit", "am")
+A_MEDIAS = (("MERGE_HEAD", "merge"), ("CHERRY_PICK_HEAD", "cherry-pick"), ("REVERT_HEAD", "revert"))
+RAMAS_BASE = ("master", "main")
+
+
+def _partir(argv):
+    """(repo, resto): consume los `-C <ruta>` iniciales, como hace git."""
+    repo, i = os.getcwd(), 0
+    while i + 1 < len(argv) and argv[i] == "-C":
+        repo = os.path.join(repo, argv[i + 1])
+        i += 2
+    return repo, argv[i:]
+
+
+def _casa():
+    try:
+        from _casa import casa_base
+    except ImportError:          # hay quien copia git_mutex.py suelto (test_ramas_fusionar)
+        def casa_base():
+            return os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
+    return os.path.realpath(casa_base())
+
+
+def _es_casa_base(repo):
+    try:
+        top = subprocess.run(["git", "-C", repo, "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, timeout=10).stdout.strip()
+        return bool(top) and os.path.realpath(top) == _casa()
+    except Exception:            # noqa: BLE001
+        return False
+
+
+def _rama(repo):
+    try:
+        return subprocess.run(["git", "-C", repo, "symbolic-ref", "--short", "-q", "HEAD"],
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:            # noqa: BLE001
+        return ""
+
+
+def _mueve_la_base(argv):
+    """Motivo (str) si `argv` movería master/main de casa base; "" si no."""
+    repo, resto = _partir(argv)
+    if not resto:
+        return ""
+    sub, args = resto[0], resto[1:]
+    if sub == "push":
+        for a in args:
+            destino = a.split(":", 1)[1] if ":" in a else ""
+            if destino.replace("refs/heads/", "").lstrip("+") in RAMAS_BASE:
+                return "push a %s" % destino
+        return ""
+    if sub == "update-ref":
+        refs = [a for a in args if not a.startswith("-")]
+        if refs and refs[0] in tuple("refs/heads/" + r for r in RAMAS_BASE):
+            return "update-ref %s" % refs[0]
+        return ""
+    if sub not in MUEVEN_HEAD or any(a in ("--abort", "--quit") for a in args):
+        return ""
+    if _es_casa_base(repo) and _rama(repo) in RAMAS_BASE:
+        return "%s sobre %s de casa base" % (sub, _rama(repo))
+    return ""
+
+
+def _gate_encendido():
+    return os.path.exists(os.path.join(_casa(), ".claude", "hooks", ".base_gate_on"))
+
+
+def _git_dir(repo):
+    try:
+        return subprocess.run(["git", "-C", repo, "rev-parse", "--absolute-git-dir"],
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:            # noqa: BLE001
+        return ""
+
+
+def _a_medias(gd):
+    return {cmd for f, cmd in A_MEDIAS if gd and os.path.exists(os.path.join(gd, f))}
+
+
 def main(argv):
     if not argv:
         sys.stderr.write("uso: git_mutex.py <args de git...>\n")
         return 2
+    motivo = _mueve_la_base(argv)
+    if motivo and _gate_encendido() and os.environ.get("BTP_GIT_BASE_OK") != "1":
+        sys.stderr.write(
+            "git_mutex: NO lanzo %s sin BTP_GIT_BASE_OK=1. Mover master de casa base es gate de "
+            "{{TITULAR}}, y el freno nativo lo rechazaría tarde, con el árbol ya a medio escribir. Con su "
+            "OK explícito: BTP_GIT_BASE_OK=1 (mejor, `cerrar_sesion.py --apply`).\n" % motivo)
+        return 3
+    repo, resto = _partir(argv)
+    vigilar = bool(resto) and resto[0] in ("pull", "cherry-pick", "revert") \
+        and _es_casa_base(repo)
+    gd = _git_dir(repo) if vigilar else ""
+    antes = _a_medias(gd)
     # ── Freno de poda (20-sep-2026) ─────────────────────────────────────────────────────
     # `cerrar_sesion.py` ya se negaba a podar un worktree con ficheros ignorados dentro (panel
     # del lazo, log de auditoría clínica…). Pero el freno vivía SOLO allí: el mismo día lo avisó
@@ -155,6 +257,19 @@ def main(argv):
         sys.stdout.write(out)
     if err:
         sys.stderr.write(err)
+    if vigilar and rc != 0:
+        for cmd in sorted(_a_medias(gd) - antes):
+            try:
+                rc_ab, _, err_ab = run(["-C", repo, cmd, "--abort"])
+            except TimeoutError as e:
+                rc_ab, err_ab = 75, str(e)
+            if rc_ab == 0:
+                sys.stderr.write("git_mutex: %s fallido deshecho (%s --abort): casa base sigue como "
+                                 "estaba.\n" % (cmd, cmd))
+            else:
+                sys.stderr.write("git_mutex: ‼️ casa base A MEDIAS y no pude deshacerlo (%s --abort: "
+                                 "%s). Arréglalo YA: bloquea las fusiones de todas las sesiones.\n"
+                                 % (cmd, (err_ab or "").strip()[-200:]))
     return rc
 
 

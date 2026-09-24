@@ -326,6 +326,7 @@ runpy test_cosecha_checklists.py
 runpy test_cronica.py
 runpy test_elicit.py
 runpy test_git_mutex.py
+runpy test_git_mutex_freno_base.py
 runpy test_git_mutex_merge_fallido.py
 runpy test_singleton_guard.py
 runpy test_rama_vista_guard.py
