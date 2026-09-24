@@ -339,6 +339,7 @@ runpy test_rama_vista_guard.py
 runpy test_copy_web_guard.py
 runpy test_reservas_decision.py
 runpy test_identidad_paciente.py
+runpy test_identidad_tabla.py       # 24-sep · la ventanilla marcaba como AJENAS sus propias Rx de 2024 (tabla markdown)
 runpy test_borrador_unico.py
 runpy test_web_i18n.py
 runpy test_paso_consolidacion.py

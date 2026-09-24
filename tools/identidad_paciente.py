@@ -98,10 +98,17 @@ def _valores_etiquetados(texto, etiquetas):
             m = re.match(_SEP, resto)
             if not m:
                 continue
-            valor = resto[m.end():].strip()
-            valor = re.split(r"\s{2,}|\||\t", valor)[0].strip()
-            if valor:
-                out.append(valor[:_MAX_VALOR])
+            # El valor puede no estar en la MISMA celda que la etiqueta. En las transcripciones
+            # en tabla markdown («| **F. Nacimiento:** | | 12/05/1990 |») entre etiqueta y valor
+            # hay una celda vacía, y quedarse con el primer trozo devolvía «**»: la fecha real no
+            # se veía y la ventanilla marcaba como AJENOS informes que sí son suyos — las tres
+            # radiografías de tórax de 2024 (24-sep-2026). Se recorren las celdas y se coge la
+            # primera con contenido de verdad, sin los asteriscos del markdown.
+            for celda in re.split(r"\s{2,}|\||\t", resto[m.end():]):
+                celda = celda.strip().strip("*_`~").strip()
+                if celda:
+                    out.append(celda[:_MAX_VALOR])
+                    break
             break
     return out
 
