@@ -153,14 +153,16 @@ def check_doi(doi):
             code if code else body[:60]), "DataCite"
 
     # Última palabra: el Handle System de doi.org conoce los DOI de TODAS las agencias
-    # (mEDRA, JaLC, KISTI, CNKI…). responseCode 1 = existe, 100 = no existe.
+    # (mEDRA, JaLC, KISTI, CNKI…) y también los de Crossref que su API no devuelve
+    # (10.1093/oncolo/oyaf031, OUP: API 404, registrado en Crossref según doi.org/ra).
+    # responseCode 1 = existe, 100 = no existe.
     code, body = _curl("https://doi.org/api/handles/" + doi, timeout=TIMEOUT_RESPALDO)
     try:
         rc = json.loads(body).get("responseCode") if code in (200, 404) else None
     except Exception:
         rc = None
     if rc == 1:
-        return EXISTE, "(registrado en doi.org; agencia distinta de Crossref/DataCite)", "doi.org"
+        return EXISTE, "(registrado en doi.org; las APIs de Crossref y DataCite no lo devuelven)", "doi.org"
     if rc == 100:
         return FABRICADA, "no está en Crossref, DataCite ni doi.org", "Crossref+DataCite+doi.org"
     return NO_RES, "no está en Crossref ni DataCite y doi.org no respondió (%s)" % (

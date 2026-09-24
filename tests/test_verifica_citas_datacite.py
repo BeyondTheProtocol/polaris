@@ -78,6 +78,12 @@ def main():
     (est, _, fue), _ = _con({CROSSREF: NO, DATACITE: NO, HANDLE: H_SI}, "10.1234/medra.x1")
     check("DOI de otra agencia (solo doi.org lo conoce) → existe", est == v.EXISTE and fue == "doi.org")
 
+    # Deuda verifica-citas-falso-positivo-crossref-oup: DOI de OUP registrado en Crossref que
+    # la API de Crossref no devuelve (404). doi.org sí lo conoce: no es fabricado.
+    (est, det, fue), _ = _con({CROSSREF: NO, DATACITE: NO, HANDLE: H_SI}, "10.1093/oncolo/oyaf031")
+    check("DOI de OUP con 404 en la API de Crossref → existe", est == v.EXISTE)
+    check("y el detalle no afirma una agencia que no sabe", "distinta" not in det)
+
     (est, _, _), _ = _con({CROSSREF: NO}, zen)
     check("Crossref 404 + DataCite mudo → no_resoluble, NO se acusa", est == v.NO_RES)
 
