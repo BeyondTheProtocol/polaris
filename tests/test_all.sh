@@ -141,6 +141,7 @@ runpy test_cascada_clinica.py
 runpy test_seguimiento.py
 runpy test_seguimiento_carrera.py
 runpy test_seguimiento_objetivo_ned.py
+runpy test_seguimiento_hecho_cuando.py
 runpy test_avisos_nueva_tarea.py
 runpy test_reconciliar_estado.py
 runpy test_dedup_hilos.py
