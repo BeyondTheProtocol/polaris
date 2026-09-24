@@ -1,7 +1,11 @@
 {
   "_por_que": "24-sep-26. test_biomarcadores_vhio.py es la única defensa de que las 3 analíticas {{CENTRO}} transcritas (CA15.3 509,5, Hb 7,8) siguen entrando y marcándose fuera de rango. Si al quitar una de estas piezas el test sigue verde, esa pieza no está cubierta.",
   "objetivo": "tools/biomarcadores.py",
-  "test": ["python3", "tests/test_biomarcadores_vhio.py"],
+  "test": [
+    "sh",
+    "-c",
+    "python3 tests/test_biomarcadores_vhio.py && python3 tests/test_biomarcadores_ggt_alias.py"
+  ],
   "env": "BTP_BIOMARCADORES",
   "mutaciones": [
     {
@@ -18,6 +22,11 @@
       "etiqueta": "número: la coma decimal deja de convertirse (509,5 y 7,8 no parsean)",
       "viejo": "        return float(s.replace(\",\", \".\"))",
       "nuevo": "        return float(s)"
+    },
+    {
+      "etiqueta": "alias GGT: 'gamma gt' se cae de la lista (vuelve a perder el corpus histórico)",
+      "viejo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\", \"gamma gt\"",
+      "nuevo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\""
     }
   ]
 }

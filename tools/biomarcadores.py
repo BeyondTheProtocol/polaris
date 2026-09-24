@@ -107,7 +107,7 @@ ANALITOS = [
     dict(key="gpt", nombre="GPT (ALT)", grupo="renal_hepatico",
          aliases=["gpt (alt)", "gpt", "alt"], unit_fam="u/l", unidad="U/L"),
     dict(key="ggt", nombre="GGT", grupo="renal_hepatico",
-         aliases=["ggt", "gamma-glutamil", "gamma glutamil"], unit_fam="u/l", unidad="U/L"),
+         aliases=["ggt", "gamma-glutamil", "gamma glutamil", "gamma gt"], unit_fam="u/l", unidad="U/L"),
     dict(key="fosfatasa_alcalina", nombre="Fosfatasa alcalina", grupo="renal_hepatico",
          aliases=["fosfatasa alcalina"], unit_fam="u/l", unidad="U/L"),
     dict(key="bilirrubina_total", nombre="Bilirrubina total", grupo="renal_hepatico",

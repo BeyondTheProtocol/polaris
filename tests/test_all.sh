@@ -134,6 +134,7 @@ runpy test_codigo_rojo_repeticion.py
 runpy test_decision_alto_riesgo.py
 runpy test_fuente_clinica.py
 runpy test_biomarcadores_vhio.py
+runpy test_biomarcadores_ggt_alias.py
 runpy test_frescura_dosier.py
 runpy test_dosier_invariantes.py
 runpy test_cotejo_invariante.py
