@@ -30,7 +30,15 @@ HB_INTERVAL="${BTP_HEARTBEAT_INTERVAL:-60}"
 PY="$(command -v python3 || echo /usr/bin/python3)"
 # Tope diario real (USD) para las etiquetas/avisos; el techo absoluto vive en cost_guard.
 CAP="$("$PY" -c 'import sys;sys.path.insert(0,"'"$TOOLS"'");import cost_guard;print("%.2f"%cost_guard._limits()[0])' 2>/dev/null || echo 30)"
-LOG="$TOOLS/launchd/logs"; mkdir -p "$LOG" "$STATE/dispatcher" 2>/dev/null || true
+# El log sale de BTP_LOG_DIR si está puesto (24-sep-2026): `tests/test_dispatcher.sh` corre este
+# script con BTP_REPO=<árbol bajo prueba>, y en casa base eso era el log REAL. Dejó 125 «EJECUTÓ SIN
+# ENTREGAR … test-entregable-NNNN.md» falsos en dispatcher.out, que es lo primero que lee el tecnico
+# al investigar un fallo del lazo. En batería (BTP_TEST_BATTERY=1) sin BTP_LOG_DIR, va al estado
+# aislado del test: el log de producción nunca es el de un test.
+if [ -n "${BTP_LOG_DIR:-}" ]; then LOG="$BTP_LOG_DIR"
+elif [ "${BTP_TEST_BATTERY:-}" = "1" ]; then LOG="$STATE/launchd-logs"
+else LOG="$TOOLS/launchd/logs"; fi
+mkdir -p "$LOG" "$STATE/dispatcher" 2>/dev/null || true
 LOCK="$STATE/dispatcher/lock"
 BACKOFF_F="$STATE/dispatcher/backoff"
 

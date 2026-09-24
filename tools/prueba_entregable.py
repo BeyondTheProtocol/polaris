@@ -26,6 +26,9 @@ import json
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from deuda import normalizar_clave  # noqa: E402  una sola forma de clave (24-sep-26); solo stdlib
+
 REPO = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
 STATE = os.environ.get("BTP_STATE_DIR") or os.path.join(REPO, "tools", "state")
 TIPOS = ("ruta", "deuda")
@@ -55,10 +58,16 @@ def _ts_deuda(clave):
             libro = json.load(f)
     except Exception:
         return None
-    it = libro.get(clave) if isinstance(libro, dict) else None
-    if not isinstance(it, dict):
+    if not isinstance(libro, dict):
         return None
-    sellos = [it.get(k) for k in ("anotado_ts", "abierto_ts", "visto_ts", "cerrado_ts", "remitido_ts")]
+    # Se compara la forma normalizada de las dos partes: el libro puede traer aún claves viejas
+    # con backticks y el job, la clave tal cual venía en la prosa de la alerta.
+    buscada = normalizar_clave(clave)
+    tocadas = [v for k, v in libro.items() if isinstance(v, dict) and normalizar_clave(k) == buscada]
+    if not tocadas:
+        return None
+    sellos = [it.get(k) for it in tocadas
+              for k in ("anotado_ts", "abierto_ts", "visto_ts", "cerrado_ts", "remitido_ts")]
     sellos = [s for s in sellos if isinstance(s, (int, float))]
     return max(sellos) if sellos else None
 

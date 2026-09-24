@@ -97,6 +97,54 @@ alertas, info = hc._check_ci_publico(run=run, state_dir=d, gh="gh")
 check("throttle → no llama a gh", llamadas == [] and info.get("throttled"))
 check("throttle → repite la alerta guardada", [a[0] for a in alertas] == ["ci_publico_rojo"])
 
+# 10. La alerta nombra la batería roja y su primera línea de fallo (24-sep-26: sin esto el tecnico
+# lo achacó a otra cosa). Log con el formato real del run 36003140839, recortado.
+_LOG = "\n".join([
+    "2026-09-24T13:05:24.4845736Z ── test_regla_en_accion.py ──",
+    "2026-09-24T13:05:27.1315548Z ❌ 9 fallo(s): git push recuerda que el repo no se sube",
+    "2026-09-24T13:05:27.1327989Z   🔴 ROJO: test_regla_en_accion.py (rc=1 · log: /tmp/rojo-test_regla_en_accion.py.log)",
+    "2026-09-24T13:05:59.0197548Z ── test_traspaso_compact.py ──",
+    "2026-09-24T13:05:59.3271251Z   🔴 ROJO: test_traspaso_compact.py (rc=1 · log: /tmp/rojo-test_traspaso_compact.py.log)",
+    "2026-09-24T13:07:05.5049408Z ##[error]Process completed with exit code 2.",
+    "2026-09-24T13:07:05.5680108Z ##[group]rojo-test_traspaso_compact.py.log",
+    "2026-09-24T13:07:05.5680200Z 3:FAIL: test_session_start_reinyecta_solo_tras_compact",
+    "2026-09-24T13:07:05.5680300Z ##[endgroup]",
+])
+
+
+def _gh_con_log(runs, log=_LOG, jobs_rc=0):
+    llamadas = []
+
+    def run(cmd, **kw):
+        llamadas.append(cmd)
+        if cmd[1:3] == ["run", "list"]:
+            return _R(json.dumps(runs))
+        if cmd[1:3] == ["run", "view"]:
+            return _R(json.dumps({"jobs": [{"databaseId": 11, "conclusion": "success"},
+                                           {"databaseId": 22, "conclusion": "failure"}]}), jobs_rc)
+        if cmd[1] == "api":
+            return _R(log if cmd[2].endswith("/jobs/22/logs") else "log de un job verde")
+        return _R("", 1)
+    return run, llamadas
+
+
+rojo = dict(_r("failure", n=0), databaseId=777)
+run, llamadas = _gh_con_log([rojo])
+alertas, _ = hc._check_ci_publico(run=run, state_dir=tempfile.mkdtemp(), gh="gh")
+txt = alertas[0][1] if alertas else ""
+check("nombra la batería roja con su primera línea",
+      "test_regla_en_accion.py («❌ 9 fallo(s): git push recuerda que el repo no se sube»)" in txt)
+check("usa la línea numerada del paso de detalle cuando la hay",
+      "test_traspaso_compact.py («FAIL: test_session_start_reinyecta_solo_tras_compact»)" in txt)
+check("pide el log solo del job que falló",
+      [c[2] for c in llamadas if c[1] == "api"] == ["repos/BeyondTheProtocol/polaris/actions/jobs/22/logs"])
+check("pregunta por los jobs de ESA ejecución", any(c[1:4] == ["run", "view", "777"] for c in llamadas))
+
+run, _ = _gh_con_log([rojo], jobs_rc=1)
+alertas, _ = hc._check_ci_publico(run=run, state_dir=tempfile.mkdtemp(), gh="gh")
+check("si no se pueden leer los jobs, la alerta sale igual, sin detalle",
+      alertas and "actions/runs/0" in alertas[0][1] and "En rojo:" not in alertas[0][1])
+
 # 9. Está enchufado en run() (un check que no se llama no vigila nada).
 fuente = open(os.path.join(ROOT, "tools", "healthcheck.py"), encoding="utf-8").read()
 check("run() llama a _check_ci_publico", "ci_alertas, ci_info = _check_ci_publico()" in fuente)

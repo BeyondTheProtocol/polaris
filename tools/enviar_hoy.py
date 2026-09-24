@@ -28,10 +28,10 @@ USO:
 import os
 import re
 import sys
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from salida import report_to_titular, aplazados_de_hoy, vaciar_aplazados_de_hoy  # noqa: E402
+from salida import report_to_titular, aplazados_pendientes, vaciar_aplazados  # noqa: E402
 import seguimiento  # noqa: E402
 
 FRANJAS = ("mañana", "mediodía", "tarde", "noche")
@@ -175,19 +175,187 @@ def _persistir_hoy_md(hoy_md_path):
     return persistidos
 
 
-def _con_aplazados(text):
-    """Añade al parte los avisos que el portero de ruido agrupó hoy (tools/salida.py
-    _aplazar()). Es la promesa que le hace el mensaje "el resto lo agrupo en el parte":
-    si no se incorporan aquí, se pierden para siempre (nadie más los lee)."""
-    apl = aplazados_de_hoy()
-    if not apl:
+# ── Lo aplazado entra en el parte (24-sep-26) ────────────────────────────────
+# Antes solo entraba lo aplazado HOY, y como el parte sale a las 08:12 y casi todo se
+# aplaza después, no entraba nada: 855 avisos perdidos en dos meses. Ahora entra todo
+# lo pendiente. Lo de hoy y ayer va aviso a aviso, en una línea cada uno; lo más viejo
+# (un parte que no salió, o el atasco del 27-jul al 24-sep) va resumido por tipo con
+# los plazos que siguen vivos. El texto completo no se pierde: salida.vaciar_aplazados
+# lo archiva en tools/state/aplazados/entregados/.
+TOPE_LINEAS_APLAZADOS = 15
+LARGO_LINEA_APLAZADO = 200
+_ETIQUETA_FUENTE = {
+    "healthcheck": "de salud del sistema",
+    "pendientes": "de correos que esperan tu respuesta",
+    "centinela": "de plazos y correos importantes",
+    "polaris-estado": "de estado de Polaris",
+    "observatorio-parte": "de estado de Polaris",
+    "correo-imap": "de correo nuevo",
+    "cost_guard": "de gasto",
+    "vigia": "del vigía",
+}
+_RE_PLAZO_APLAZADO = re.compile(
+    r"Plazo (T-\d+) — «(.+?)» se acerca: es (HOY|manana|en \d+ dias \((\d{4}-\d{2}-\d{2})\))")
+_MES_CORTO = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _dia_corto(iso):
+    try:
+        d = date.fromisoformat(iso[:10])
+        return "%d-%s" % (d.day, _MES_CORTO[d.month - 1])
+    except Exception:
+        return iso
+
+
+def _en_una_linea(texto):
+    t = " · ".join(p.strip(" -•") for p in str(texto).splitlines() if p.strip(" -•"))
+    return t if len(t) <= LARGO_LINEA_APLAZADO else t[:LARGO_LINEA_APLAZADO - 1].rstrip() + "…"
+
+
+def _piezas(texto):
+    """El aviso de salud («🩺 Revisión de salud del lazo:») trae varios hallazgos en viñetas y
+    cambia de una revisión a otra: cada viñeta es una pieza, para que el CI en rojo no quede
+    enterrado en el bloque. Cualquier otro aviso es UNA pieza entera, cabecera incluida: sus
+    viñetas suelen ser el detalle de la primera frase, y sin ella no se entiende el porqué."""
+    lineas = [l.strip() for l in str(texto).splitlines() if l.strip()]
+    if lineas and lineas[0].startswith("🩺"):
+        vinetas = []
+        for l in lineas[1:]:
+            if l.startswith("- "):
+                vinetas.append(l[2:].strip())
+            elif vinetas:
+                vinetas[-1] += " " + l      # continuación de la viñeta: suele ser lo accionable
+        if vinetas:
+            return vinetas
+    return [" · ".join(l[2:].strip() if l.startswith("- ") else l for l in lineas)]
+
+
+# Lo que cambia entre dos versiones del MISMO aviso y no lo hace otro distinto: «(5 seguidas)» y
+# «(30 seguidas)», «hace 3h», «23 sesiones», «$85 de $60», el nº de ejecución del CI. Solo esto se
+# ignora al juntar repetidos. Quitar TODAS las cifras fundía «HTTP 429» con «HTTP 500» y el
+# daemon «job-1» con «job-2» (verificacion, 24-sep).
+_RE_VOLATIL = re.compile(
+    r"\(\d+ seguidas?\)|hace \d+ ?\w*|\b\d+(?:[.,]\d+)? ?(?:h|min|GB|%|sesiones|seguidas|encargo\(s\))(?!\w)"
+    r"|\$\d+(?:[.,]\d+)?|\d+(?:[.,]\d+)?\$|runs/\d+|job [0-9a-f]{6,}")
+
+
+def _cuando(ts, hoy):
+    """«ayer 19:32» / «hoy 08:05»: lo aplazado ayer se lee hoy, y un «hoy vence» o un «es mañana»
+    sin fecha llegaría un día tarde."""
+    try:
+        d = date.fromisoformat(ts[:10])
+    except Exception:
+        return ""
+    hora = ts[11:16]
+    if d == hoy:
+        return "hoy " + hora
+    if d == hoy - timedelta(days=1):
+        return "ayer " + hora
+    return _dia_corto(ts[:10]) + " " + hora
+
+
+def _bloque_recientes(avisos, hoy=None):
+    # Se muestra la versión más reciente de cada aviso, con su hora y cuántas veces salió.
+    # Primero los plazos, luego lo más nuevo.
+    hoy = hoy or date.today()
+    vistos = {}   # clave → [línea más reciente, veces, ts, es_plazo]
+    for a in avisos:
+        ts = str(a.get("ts", ""))
+        for pieza in _piezas(a.get("texto", "")):
+            linea = _en_una_linea(pieza)
+            if not linea:
+                continue
+            clave = _RE_VOLATIL.sub("#", linea)
+            v = vistos.setdefault(clave, [linea, 0, "", a.get("fuente") == "centinela"])
+            v[1] += 1
+            if ts >= v[2]:
+                v[0], v[2] = linea, ts
+    if not vistos:
+        return []
+    out = ["", "📌 Avisos agrupados desde el último parte (%d):" % len(avisos)]
+    items = sorted(vistos.values(), key=lambda v: v[2], reverse=True)
+    items = [v for v in items if v[3]] + [v for v in items if not v[3]]
+    for linea, veces, ts, _ in items[:TOPE_LINEAS_APLAZADOS]:
+        cuando = _cuando(ts, hoy)
+        out.append("• " + (cuando + " · " if cuando else "") + linea
+                   + (" (×%d)" % veces if veces > 1 else ""))
+    if len(items) > TOPE_LINEAS_APLAZADOS:
+        out.append("• …y %d más. El texto completo queda en tools/state/aplazados/entregados/."
+                   % (len(items) - TOPE_LINEAS_APLAZADOS))
+    return out
+
+
+def _plazos_vivos(avisos, hoy):
+    """Plazos avisados por el centinela cuya fecha aún no ha pasado. Por título, el último."""
+    vivos = {}
+    for a in avisos:
+        m = _RE_PLAZO_APLAZADO.search(str(a.get("texto", "")))
+        if not m:
+            continue
+        try:
+            base = date.fromisoformat(str(a.get("ts", ""))[:10])
+        except Exception:
+            continue
+        cuando = m.group(3)
+        if cuando == "HOY":
+            fecha = base
+        elif cuando == "manana":
+            fecha = base + timedelta(days=1)
+        else:
+            try:
+                fecha = date.fromisoformat(m.group(4))
+            except Exception:
+                continue
+        if fecha >= hoy:
+            vivos[m.group(2)] = fecha
+    return sorted(vivos.items(), key=lambda kv: kv[1])
+
+
+def _bloque_rezagados(avisos, hoy):
+    if not avisos:
+        return []
+    dias = sorted(a["dia"] for a in avisos)
+    por_tipo = {}
+    for a in avisos:
+        etiqueta = _ETIQUETA_FUENTE.get(a.get("fuente") or "", "de otro tipo")
+        por_tipo[etiqueta] = por_tipo.get(etiqueta, 0) + 1
+    out = ["", "🗃️ Además hay %d avisos de días anteriores (%s a %s) que no llegaron a salir. "
+               "No te los mando uno a uno: quedan archivados en tools/state/aplazados/entregados/. "
+               "Por tipo:" % (len(avisos), _dia_corto(dias[0]), _dia_corto(dias[-1]))]
+    for etiqueta, n in sorted(por_tipo.items(), key=lambda kv: -kv[1]):
+        out.append("• %d %s" % (n, etiqueta))
+    vivos = _plazos_vivos(avisos, hoy)
+    if vivos:
+        out.append("Plazos de esos avisos que siguen vivos:")
+        for titulo, fecha in vivos:
+            out.append("• «%s»: %s" % (titulo, _dia_corto(fecha.isoformat())))
+    return out
+
+
+def _con_aplazados(text, lote=None, hoy=None):
+    """Añade al parte lo que el portero de ruido aplazó (tools/salida.py _aplazar()). Es
+    la promesa del mensaje «el resto lo agrupo en el parte»: si no entra aquí, nadie más
+    lo lee. `lote` sale de salida.aplazados_pendientes(); su recibo ("leidos") es lo que
+    main() pasa a vaciar_aplazados() cuando el parte se entrega."""
+    lote = aplazados_pendientes() if lote is None else lote
+    avisos = lote.get("avisos") or []
+    if not avisos:
         return text
-    lineas = ["", "📌 Avisos de hoy agrupados (%d):" % len(apl)]
-    for a in apl:
-        t = str(a.get("texto", "")).strip()
-        if t:
-            lineas.append("• " + t)
-    return text + "\n".join(lineas)
+    hoy = hoy or date.today()
+    desde = (hoy - timedelta(days=1)).isoformat()
+    recientes = [a for a in avisos if a.get("dia", "") >= desde]
+    rezagados = [a for a in avisos if a.get("dia", "") < desde]
+    lineas = []
+    # Cada bloque falla por su cuenta: si uno no se puede componer, el otro sale igual y se dice.
+    for nombre, bloque, grupo in (("de hoy y ayer", _bloque_recientes, recientes),
+                                  ("de días anteriores", _bloque_rezagados, rezagados)):
+        try:
+            lineas += bloque(grupo, hoy)
+        except Exception as e:
+            lote["fallo"] = True        # main() no vacía: lo que no salió no se archiva como entregado
+            lineas += ["", "⚠️ No pude componer los avisos agrupados %s (%s). Siguen guardados."
+                       % (nombre, type(e).__name__)]
+    return text + "\n".join(lineas) if lineas else text
 
 
 def main():
@@ -202,7 +370,15 @@ def main():
     if persistidos and "--verbose" in args:
         print("📥 Persistidos desde HOY.md: %d item(s) → %s" % (len(persistidos), persistidos))
 
-    text = _con_aplazados(seguimiento.construir_hoy(franja, "telegram"))
+    base = seguimiento.construir_hoy(franja, "telegram")
+    # El parte sale SIEMPRE: si lo aplazado no se puede leer o componer, va el cuerpo solo, lo dice,
+    # y no se vacía nada (lote vacío), así que lo aplazado espera al siguiente parte.
+    try:
+        lote = aplazados_pendientes()
+        text = _con_aplazados(base, lote)
+    except Exception as e:
+        lote = {"avisos": [], "leidos": {}}
+        text = base + "\n\n⚠️ No pude añadir los avisos agrupados (%s). Siguen guardados." % type(e).__name__
     if dry:
         print("── Lo que se enviaría a Telegram (%s · determinista, GRATIS) ──\n%s" % (franja, text))
         return 0
@@ -211,7 +387,8 @@ def main():
     # mismo cupo, lo aplazado no saldría nunca y el cupo bloquearía el parte en sí.
     res = report_to_titular(text, categoria="parte")
     if res.get("delivered"):
-        vaciar_aplazados_de_hoy()  # solo AHORA que sabemos que de verdad llegó
+        if not lote.get("fallo"):
+            vaciar_aplazados(lote["leidos"])  # solo AHORA que sabemos que de verdad llegó
         print("✅ Parte de HOY enviado a Telegram (vía salida.py)")
         return 0
     # 'retenido' (silencio nocturno → se reenvía a las 08:00) y 'dry' NO son fallo.

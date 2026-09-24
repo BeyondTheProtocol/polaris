@@ -255,6 +255,31 @@ def _marcar_acuse_autofix(clave, que_hizo):
         pass
 
 
+def _clave_del_libro(clave):
+    """La clave que el job de investigación tiene que dejar anotada en el libro de deuda.
+
+    Casi siempre es la de la alerta, en su forma normalizada (`deuda.normalizar_clave`: sin
+    backticks, que dentro de `"…"` en bash son sustitución de comandos). La excepción es la
+    alerta RESUMEN `deuda_escalada`: no está en el libro a propósito (NO_AL_LIBRO, se comía a sí
+    misma hasta 72x), así que exigirla como prueba tumbaba siempre el job aunque el agente
+    anotara bien el hallazgo concreto (jobs 53696bb300 y b1a2bfe70b). Ahí la clave es la del
+    hallazgo escalado con más detecciones, que es el que el propio aviso nombra como «el peor».
+    None = no hay nada que anotar (el resumen ya no tiene hallazgos debajo)."""
+    try:
+        import deuda as _d
+    except Exception:
+        return clave
+    if clave == "deuda_escalada":
+        try:
+            esc = _d.escaladas()
+        except Exception:
+            return None
+        if not esc:
+            return None
+        return max(esc.items(), key=lambda kv: (kv[1].get("veces", 0), kv[0]))[0]
+    return _d.normalizar_clave(clave)
+
+
 def _encolar_investigacion(clave, texto):
     """Encola UNA investigación real para una alerta de salud nueva. Devuelve el id del job, o None
     si no se pudo encolar (y entonces el acuse lo dice en llano, sin prometer).
@@ -278,6 +303,9 @@ def _encolar_investigacion(clave, texto):
             return None
     except Exception:
         pass
+    libro = _clave_del_libro(clave)
+    if not libro:
+        return None
     # La MISIÓN tiene que caber dentro del muro (31-jul-26). Antes decía «arréglala, la fontanería
     # se ejecuta, no se apunta», y en modo autónomo eso es imposible: el guard bloquea `python -c`,
     # `awk`, `ToolSearch`, el binario `claude`, editar código y tocar el propio muro. El agente
@@ -285,8 +313,13 @@ def _encolar_investigacion(clave, texto):
     # LLM cada una, y el fallo aterrizaba en `failed/` alimentando la alerta de «jobs caídos», que
     # encolaba otro job igual. Pedirle lo imposible no es exigencia, es un bucle de gasto.
     # El muro NO se toca: se cambia el encargo. Diagnosticar y DEJARLO ESCRITO sí cabe.
+    resumen = ""
+    if clave == "deuda_escalada":
+        resumen = ("Es una alerta RESUMEN: no está en el libro. El hallazgo que te toca es el peor "
+                   "de los escalados, con clave «%s». Trabaja sobre ese.\n\n" % libro)
     intencion = (
         "Alerta de salud del sistema: «%s» (clave estable: %s).\n\n"
+        "%s"
         "Tu trabajo aquí es DIAGNOSTICAR y DEJARLO ESCRITO, no arreglar el código. Corres en modo "
         "autónomo y el muro te bloquea (correctamente) `python -c`, `awk`, `ToolSearch`, el binario "
         "`claude`, editar cualquier ejecutable y tocar el propio muro. NO intentes rodearlo: si el "
@@ -304,7 +337,7 @@ def _encolar_investigacion(clave, texto):
         "peor que una alerta que grita.\n\n"
         "Termina siempre con un resumen de 2-3 líneas: causa, qué dejaste apuntado, y qué haría "
         "falta para cerrarlo. Que no puedas arreglarlo NO es un fallo tuyo: es el reparto."
-    ) % (texto, clave, clave, clave, clave, clave)
+    ) % (texto, clave, resumen, libro, libro, libro, clave)
     try:
         return q.enqueue(
             intencion, prioridad="alta", agente="tecnico", perfil="privileged",
@@ -312,7 +345,7 @@ def _encolar_investigacion(clave, texto):
             # Lo que tiene que quedar escrito para que el job se pueda cerrar (20-sep-26): la
             # anotación en el libro que el propio encargo pide en su paso 2. Sin esto, un job que
             # choca contra el muro y responde en prosa se cerraba como hecho y la alerta seguía.
-            prueba={"tipo": "deuda", "clave": clave},
+            prueba={"tipo": "deuda", "clave": libro},
             # Datetime COMPLETO, no fecha suelta: hasta el 30-jul-26 aquí iba `%Y-%m-%d` y
             # `cola._expired` solo sabía leer el formato largo, así que TODOS estos jobs se
             # marcaban caducados al nacer. El consumidor ya acepta las dos formas; esto quita el
@@ -1889,7 +1922,7 @@ def _emitir_si_cambia(alertas, categoria="humano"):
         for clave in nuevas:
             if clave in NO_AL_LIBRO:
                 continue
-            it = _deuda._cargar().get(clave)
+            it = _deuda._cargar().get(_deuda.normalizar_clave(clave))
             if it is None or it.get("estado") == "cerrado":
                 _deuda.abrir(clave, str(textos_por_clave.get(clave, clave))[:200],
                              ned="medio", dueno="healthcheck")
@@ -2138,6 +2171,73 @@ CI_PUBLICO_INTERVAL_H = 1
 CI_PUBLICO_ROJO = ("failure", "timed_out", "startup_failure")
 
 
+CI_PUBLICO_MAX_BATERIAS = 5
+_RE_CI_TS = re.compile(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ?")
+_RE_CI_ROJO = re.compile(r"🔴 ROJO: (.+?) \((?:rc=|log:)")
+_RE_CI_NUMERADA = re.compile(r"^\d+:\s*(\S.*)$")
+
+
+def _ci_rojos_del_log(texto):
+    """[(batería, primera línea de fallo)] sacado del log de un job de `tests/test_all.sh`.
+
+    POR QUÉ (24-sep-2026): la alerta decía «CI en ROJO» con el enlace y nada más. El tecnico que
+    la investigó lo achacó a un choque de arreglos de poda cuando eran tres baterías concretas
+    (test_regla_en_accion, test_singleton_guard, test_traspaso_compact). Con el nombre y la
+    primera línea del fallo, quien lo mire empieza por el sitio correcto.
+    Formato del log (visto en el run 36003140839): `🔴 ROJO: <batería> (rc=… · log: …)` en la
+    corrida, y después el paso de detalle abre `##[group]rojo-<batería>.log` con las líneas de
+    fallo numeradas (`2:  ❌ …`). Si ese paso no está, vale la línea anterior al ROJO (el tail -1
+    de la batería)."""
+    lineas = [_RE_CI_TS.sub("", l).rstrip() for l in str(texto or "").splitlines()]
+    out = []
+    for i, l in enumerate(lineas):
+        m = _RE_CI_ROJO.search(l)
+        if not m or m.group(1) in [b for b, _ in out]:
+            continue
+        bateria = m.group(1).strip()
+        previa = lineas[i - 1].strip() if i else ""
+        out.append((bateria, "" if previa.startswith("──") else previa))
+    for n, (bateria, primera) in enumerate(out):
+        try:
+            k = lineas.index("##[group]rojo-%s.log" % bateria)
+        except ValueError:
+            continue
+        for l in lineas[k + 1:]:
+            if l.startswith("##[endgroup]"):
+                break
+            m = _RE_CI_NUMERADA.match(l)
+            if m:
+                out[n] = (bateria, m.group(1).strip())
+                break
+    return [(b, (p if len(p) <= 160 else p[:159] + "…")) for b, p in out]
+
+
+def _ci_rojos_de_run(run_id, run, gh):
+    """Baterías rojas de una ejecución: jobs fallidos → su log → `_ci_rojos_del_log`.
+    Fail-soft: si algo no se puede leer, [] y la alerta sale igual, sin el detalle."""
+    import json as _json
+    try:
+        r = run([gh, "run", "view", str(run_id), "-R", CI_PUBLICO_REPO, "--json", "jobs"],
+                capture_output=True, timeout=60)
+        if r.returncode != 0:
+            return []
+        jobs = _json.loads((r.stdout or b"{}").decode("utf-8", "replace")).get("jobs") or []
+    except Exception:
+        return []
+    out = []
+    for j in jobs:
+        if not isinstance(j, dict) or j.get("conclusion") not in CI_PUBLICO_ROJO:
+            continue
+        try:
+            r = run([gh, "api", "repos/%s/actions/jobs/%s/logs" % (CI_PUBLICO_REPO, j.get("databaseId"))],
+                    capture_output=True, timeout=60)
+            if r.returncode == 0:
+                out.extend(_ci_rojos_del_log((r.stdout or b"").decode("utf-8", "replace")))
+        except Exception:
+            continue
+    return out
+
+
 def _check_ci_publico(run=subprocess.run, state_dir=None, gh=None):
     """¿Está en verde el CI del repo público? (22-sep-2026)
 
@@ -2160,7 +2260,7 @@ def _check_ci_publico(run=subprocess.run, state_dir=None, gh=None):
     gh = gh or shutil.which("gh") or "/opt/homebrew/bin/gh"
     try:
         r = run([gh, "run", "list", "-R", CI_PUBLICO_REPO, "--limit", "30", "--json",
-                 "workflowName,headBranch,status,conclusion,url,createdAt"],
+                 "workflowName,headBranch,status,conclusion,url,createdAt,databaseId"],
                 capture_output=True, timeout=60)
         if r.returncode != 0:
             return [], {"error": (r.stderr or b"").decode("utf-8", "replace")[:200]}
@@ -2184,8 +2284,15 @@ def _check_ci_publico(run=subprocess.run, state_dir=None, gh=None):
                 if y.get("conclusion") not in CI_PUBLICO_ROJO:
                     break
                 seguidas += 1
-            partes.append("«%s» (%s seguida%s): %s" % (w, seguidas, "" if seguidas == 1 else "s",
-                                                      x.get("url", "")))
+            parte = "«%s» (%s seguida%s): %s" % (w, seguidas, "" if seguidas == 1 else "s",
+                                                x.get("url", ""))
+            baterias = _ci_rojos_de_run(x.get("databaseId"), run, gh) if x.get("databaseId") else []
+            if baterias:
+                parte += ". En rojo: " + "; ".join(
+                    ("%s («%s»)" % (b, p)) if p else b for b, p in baterias[:CI_PUBLICO_MAX_BATERIAS])
+                if len(baterias) > CI_PUBLICO_MAX_BATERIAS:
+                    parte += "; y %d más" % (len(baterias) - CI_PUBLICO_MAX_BATERIAS)
+            partes.append(parte)
         alertas.append(("ci_publico_rojo",
                         "El CI del repo público %s está en ROJO y la portada enseña el badge "
                         "«failing». %s" % (CI_PUBLICO_REPO, "; ".join(partes))))

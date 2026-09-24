@@ -102,6 +102,7 @@ runpy test_raices_casa_base.py
 runpy test_radar_no_silenciar.py
 runpy test_deuda_disponibilidad.py
 runpy test_deuda_cerrar_ejecuta.py
+runpy test_clave_deuda_una_forma.py   # 24-sep · una sola forma de clave (backticks) + la alerta resumen exige su hallazgo concreto
 runpy test_ramas_fusionar.py
 runpy test_ocr_layout.py
 runpy test_salida_reintento.py
@@ -122,6 +123,7 @@ runpy test_recall_memoria.py
 runpy test_perfil_clinico_al_dia.py
 runpy test_portero_ruido.py
 runpy test_parte_exento_cupo.py
+runpy test_aplazados_pendientes.py   # 24-sep · el parte recoge lo aplazado de CUALQUIER día (855 avisos perdidos desde el 27-jul)
 runpy test_regla_en_accion.py
 runpy test_hooks_ejecutables.py
 runpy test_cerrar_sesion_conflicto.py

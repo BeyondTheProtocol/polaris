@@ -22,7 +22,7 @@ EOF
 # skew de versión: un worktree que añade un campo nuevo nunca cazaría el problema en su CI).
 q()  { BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cola.py" "$@"; }
 cnt() { wc -l <"$COUNTER" 2>/dev/null | tr -d ' '; }
-run_once() { BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1; }
+run_once() { BTP_TEST_BATTERY=1 BTP_LOG_DIR="$TMP/logs" BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1; }
 fresh() { TMP="$(mktemp -d)"; ST="$TMP/state"; MOCK="$TMP/mock.sh"; COUNTER="$TMP/counter"; HALT="$TMP/.halt"; : >"$COUNTER"; }
 
 echo "== Dispatcher (integración) =="
@@ -33,6 +33,11 @@ echo "== Dispatcher (integración) =="
 PANEL_REAL="$ROOT/00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md"
 panel_sz() { if [ -f "$PANEL_REAL" ]; then wc -c <"$PANEL_REAL" | tr -d " "; else echo 0; fi; }
 PANEL_ANTES="$(panel_sz)"
+# Lo mismo con el LOG (24-sep-2026): con BTP_REPO="$ROOT" en casa base, dispatcher.out era el real
+# y acabó con 125 fallos falsos «EJECUTÓ SIN ENTREGAR … test-entregable-NNNN.md».
+LOG_REAL="$ROOT/tools/launchd/logs/dispatcher.out"
+log_sz() { if [ -f "$LOG_REAL" ]; then wc -c <"$LOG_REAL" | tr -d " "; else echo 0; fi; }
+LOG_ANTES="$(log_sz)"
 
 # 1. HALT corta: no se invoca al agente, el job se queda en cola.
 fresh; mkmock 0 0.05 false
@@ -157,7 +162,7 @@ touch -t "$(date -v-300S +%Y%m%d%H%M.%S 2>/dev/null || date -d '300 seconds ago'
 # Fotografía del latido a mitad del job (a los 2 s, con el mock aún durmiendo).
 ( sleep 2; cp "$HB" "$TMP/hb_mitad.json" 2>/dev/null
   "$PY" -c "import os,time;print(int(time.time()-os.path.getmtime('$HB')))" >"$TMP/hb_edad" 2>/dev/null ) &
-BTP_HEARTBEAT_INTERVAL=1 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
+BTP_HEARTBEAT_INTERVAL=1 BTP_TEST_BATTERY=1 BTP_LOG_DIR="$TMP/logs" BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
 wait
 edad="$(cat "$TMP/hb_edad" 2>/dev/null || echo 999)"
 { [ -n "$edad" ] && [ "$edad" -le 5 ] 2>/dev/null; } && ok || no "latido: debe refrescarse DURANTE el job (edad a mitad: ${edad}s)"
@@ -211,9 +216,22 @@ rm -rf "$TMP"
 fresh; mkmock 0 0.05 false
 rm -f "$ROOT/$REL"
 qp >/dev/null
-BTP_PRUEBA=0 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
+BTP_PRUEBA=0 BTP_TEST_BATTERY=1 BTP_LOG_DIR="$TMP/logs" BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
 [ "$(q status | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["done"])')" = "1" ] && ok || no "gate: BTP_PRUEBA=0 lo apaga (interruptor de emergencia)"
 rm -rf "$TMP"
+
+# 12. el log va a BTP_LOG_DIR; y en batería sin BTP_LOG_DIR, al estado aislado, nunca al real.
+fresh; mkmock 0 0.05 false
+q enqueue --procedencia t "trabajo con log" >/dev/null
+run_once
+grep -q "lanzo job" "$TMP/logs/dispatcher.out" 2>/dev/null && ok || no "log: con BTP_LOG_DIR el dispatcher escribe ahí"
+rm -rf "$TMP"
+fresh; mkmock 0 0.05 false
+q enqueue --procedencia t "trabajo sin BTP_LOG_DIR" >/dev/null
+BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
+grep -q "lanzo job" "$ST/launchd-logs/dispatcher.out" 2>/dev/null && ok || no "log: en batería sin BTP_LOG_DIR va al estado aislado"
+rm -rf "$TMP"
+[ "$(log_sz)" = "$LOG_ANTES" ] && ok || no "el dispatcher.out del árbol bajo prueba creció ($LOG_ANTES → $(log_sz) bytes): un test escribe en el log de verdad"
 
 [ "$(panel_sz)" = "$PANEL_ANTES" ] && ok || no "el PANEL-LAZO del árbol bajo prueba cambió ($PANEL_ANTES → $(panel_sz) bytes): un test escribe en el panel de verdad"
 

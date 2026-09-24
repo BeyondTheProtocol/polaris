@@ -1426,8 +1426,8 @@ def _aplazar(text, fuente=""):
         path = os.path.join(dir_apl, "%s.jsonl" % time.strftime("%Y-%m-%d"))
         primero = not os.path.exists(path)
         rec = {"ts": _now_iso(), "fuente": str(fuente), "texto": str(text)}
-        with open(path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        linea = (json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8")
+        _con_candado(path, "a+b", lambda fh: _anexar_linea(fh, linea))
         if primero:
             send(TELEGRAM, REPORT, None,
                  "Te he mandado ya %d avisos hoy, así que el resto lo agrupo en el parte "
@@ -1454,6 +1454,138 @@ def aplazados_de_hoy():
         return out
     except Exception:
         return []
+
+
+# ── Aplazados de CUALQUIER día (24-sep-26) ────────────────────────────────────────
+# BUG: el parte sale a las 08:12 y solo leía el fichero de HOY. Casi todo se aplaza
+# DESPUÉS (el primer aviso del día suele ser de las 08:18), así que caía en un fichero
+# que el parte de mañana ya no miraba: 855 avisos sin entregar del 27-jul al 24-sep,
+# entre ellos el CI público en rojo. Ahora el parte recoge todos los ficheros pendientes
+# y cada uno se archiva en aplazados/entregados/ SOLO tras confirmar la entrega.
+_RE_DIA_APLAZADO = re.compile(r"^(\d{4}-\d{2}-\d{2})\.jsonl$")
+
+
+def _con_candado(path, modo, fn):
+    """Abre `path` en binario con flock exclusivo (lo comparten _aplazar y vaciar_aplazados) y
+    ejecuta fn(fh). Vuelca a disco ANTES de soltar el candado: con el flush al cerrar, el candado
+    se soltaba con 0 bytes escritos y la carrera que debía cerrar seguía abierta (verificacion,
+    24-sep). Si el fichero se borró mientras se esperaba el candado (vaciar lo quita al quedar
+    vacío), se reabre: escribir en un fichero sin nombre es perder el aviso."""
+    import fcntl
+    for _ in range(3):
+        with open(path, modo) as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                if os.fstat(fh.fileno()).st_nlink == 0:
+                    if "a" in modo:
+                        continue                    # reabre: crea el fichero de nuevo
+                    raise FileNotFoundError(path)   # leer uno ya vaciado daría avisos duplicados
+                out = fn(fh)
+                if any(c in modo for c in "wa+"):
+                    fh.flush()
+                    os.fsync(fh.fileno())
+                return out
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
+    sys.stderr.write("salida: %s se borró tres veces mientras esperaba el candado\n" % path)
+    raise OSError("no pude abrir %s con candado" % path)
+
+
+def _anexar_linea(fh, linea_bytes):
+    """Append que nunca se pega a una línea a medias (un write cortado por disco lleno o un
+    crash): si el fichero no acaba en salto, se lo pone antes. Si no, el aviso nuevo quedaría
+    fundido con la basura, se leería corrupto y se archivaría sin entregar."""
+    fh.seek(0, os.SEEK_END)
+    if fh.tell() > 0:
+        fh.seek(-1, os.SEEK_END)
+        if fh.read(1) != b"\n":
+            fh.seek(0, os.SEEK_END)
+            fh.write(b"\n")
+    fh.seek(0, os.SEEK_END)
+    fh.write(linea_bytes)
+
+
+def aplazados_pendientes():
+    """Todos los avisos aplazados que siguen sin entregar, de cualquier día.
+
+    Devuelve {"avisos": [..., cada uno con "dia"], "leidos": {ruta: (bytes, sha256)}}.
+    `leidos` es el recibo que hay que pasar a vaciar_aplazados(): identifica lo leído por sus
+    BYTES, no por cuántas líneas eran. Con un recibo por nº de líneas, dos partes solapados
+    (launchd + uno manual) archivaban como entregado un aviso que llegó entre medias y nunca
+    salió (verificacion, 24-sep). Una línea final sin salto (a medio escribir) no entra en el
+    recibo: se queda para el siguiente parte."""
+    lote = {"avisos": [], "leidos": {}}
+    dir_apl = os.path.join(STATE, "aplazados")
+    try:
+        nombres = sorted(os.listdir(dir_apl))
+    except Exception:
+        return lote
+    for nombre in nombres:
+        m = _RE_DIA_APLAZADO.match(nombre)
+        if not m:
+            continue
+        path = os.path.join(dir_apl, nombre)
+        try:
+            datos = _con_candado(path, "rb", lambda fh: fh.read())
+        except Exception:
+            continue
+        leidos = datos[:datos.rfind(b"\n") + 1]
+        lote["leidos"][path] = (len(leidos), hashlib.sha256(leidos).hexdigest())
+        for linea in leidos.decode("utf-8", "ignore").splitlines():
+            try:
+                rec = json.loads(linea)
+            except Exception:
+                continue
+            if isinstance(rec, dict):
+                # Tipos fijos: un registro raro (escrito a mano o por otro escritor) no puede
+                # tumbar la composición del parte y dejar fuera a todos los demás.
+                lote["avisos"].append({"ts": str(rec.get("ts") or ""),
+                                       "fuente": str(rec.get("fuente") or ""),
+                                       "texto": str(rec.get("texto") or ""),
+                                       "dia": m.group(1)})
+    return lote
+
+
+def vaciar_aplazados(leidos):
+    """Archiva en aplazados/entregados/ exactamente los bytes que entraron en el parte (el recibo
+    de aplazados_pendientes). Llamar SOLO con el parte ya entregado. Si el fichero ya no empieza
+    por esos bytes (otro parte lo vació antes), no archiva nada: mejor un aviso repetido que uno
+    archivado sin entregar. Lo que llegó después se queda para el siguiente parte. El fichero de
+    hoy se conserva (vacío) para que _aplazar no repita el aviso de «a partir de aquí agrupo».
+    Fail-soft: nunca lanza."""
+    hoy = "%s.jsonl" % time.strftime("%Y-%m-%d")
+    dir_ent = os.path.join(STATE, "aplazados", "entregados")
+    for path, recibo in (leidos or {}).items():
+        try:
+            n, huella = recibo
+            if not os.path.exists(path):
+                continue
+            os.makedirs(dir_ent, exist_ok=True)
+            nombre = os.path.basename(path)
+
+            def _tomar(fh, n=n, huella=huella, nombre=nombre):
+                datos = fh.read()
+                hechas, resto = datos[:n], datos[n:]
+                if len(hechas) < n or hashlib.sha256(hechas).hexdigest() != huella:
+                    sys.stderr.write("salida: %s cambió desde que lo leyó el parte; no archivo "
+                                     "nada (se queda para el siguiente)\n" % nombre)
+                    return None
+                if hechas:
+                    with open(os.path.join(dir_ent, nombre), "ab") as out:
+                        out.write(hechas)
+                        out.flush()
+                        os.fsync(out.fileno())
+                fh.seek(0)
+                fh.truncate()
+                fh.write(resto)
+                quedan = len(resto)
+                if quedan == 0 and nombre != hoy:
+                    os.remove(path)      # con el candado aún tomado; _con_candado reabre si hace falta
+                return quedan
+
+            _con_candado(path, "r+b", _tomar)
+        except Exception as e:
+            sys.stderr.write("salida: aviso, no pude vaciar aplazados de %s: %r\n" % (path, e))
 
 
 def _log_operativo(text, fuente=""):

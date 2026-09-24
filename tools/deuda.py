@@ -172,13 +172,51 @@ def _iso(ts):
     return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def normalizar_clave(clave):
+    """La ÚNICA forma de una clave del libro: sin backticks y sin espacios de más.
+
+    POR QUÉ (24-sep-2026): healthcheck usa el texto de la alerta como clave, y ese texto traía
+    `Python` entre backticks. El encargo le pedía al agente `deuda.py abrir "<clave>"`: dentro de
+    comillas dobles un backtick es sustitución de comandos, así que el agente los quitó (bien) y
+    anotó otra clave. Resultado: dos entradas del mismo hallazgo y el gate de entregable
+    (`prueba_entregable.py`) tumbando un job de 1,72 USD que había hecho el trabajo. Todo lo que
+    lee o escribe una clave pasa por aquí, y el gate también."""
+    return _re.sub(r"\s+", " ", str(clave or "").replace("`", "")).strip()
+
+
+def _sello(it):
+    sellos = [it.get(k) for k in ("anotado_ts", "abierto_ts", "visto_ts", "cerrado_ts", "remitido_ts")]
+    sellos = [x for x in sellos if isinstance(x, (int, float))]
+    return max(sellos) if sellos else 0
+
+
+def _fusionar(a, b):
+    """Dos entradas que resultan ser la misma clave: manda la tocada más tarde. Las veces NO se
+    suman (serían dos detecciones que no ocurrieron y podrían escalar solas); se toma el máximo."""
+    base, otra = (a, b) if _sello(a) >= _sello(b) else (b, a)
+    out = dict(base)
+    out["veces"] = max(int(a.get("veces") or 1), int(b.get("veces") or 1))
+    nota_otra = otra.get("nota") or ""
+    if nota_otra and nota_otra not in (out.get("nota") or ""):
+        out["nota"] = ((out.get("nota") or "") + " || fusionada: " + nota_otra).strip(" |")[:4000]
+    return out
+
+
 def _cargar():
     try:
         with open(LIBRO, encoding="utf-8") as f:
             d = json.load(f)
-        return d if isinstance(d, dict) else {}
     except Exception:
         return {}
+    if not isinstance(d, dict):
+        return {}
+    out = {}
+    for k, v in d.items():
+        k2 = normalizar_clave(k)
+        if not isinstance(v, dict):
+            continue
+        out[k2] = _fusionar(out[k2], v) if k2 in out else v
+    return out
 
 
 def _guardar(d):
@@ -273,6 +311,7 @@ def _test_valido(ruta):
 
 # ── API ───────────────────────────────────────────────────────────────────────────────────────
 def abrir(clave, que, ned="medio", muro=False, dueno=None, nota=""):
+    clave = normalizar_clave(clave)
     d = _cargar()
     if ned not in NED:
         ned = "medio"
@@ -317,6 +356,7 @@ def parecidas(clave, d=None, minimo=2, tope=5):
     # vigilada: ahí parecerse es lo normal y el aviso sería ruido en cada pasada.
     if ":" in str(clave or ""):
         return []
+    clave = normalizar_clave(clave)
     mios = _tokens(clave)
     fuera = []
     for k, it in d.items():
@@ -331,6 +371,7 @@ def parecidas(clave, d=None, minimo=2, tope=5):
 
 def visto(clave, nota=""):
     """Alguien lo volvió a detectar. Incrementa y ESCALA al llegar al umbral (R2)."""
+    clave = normalizar_clave(clave)
     d = _cargar()
     it = d.get(clave)
     if not it:
@@ -379,6 +420,7 @@ def remitir(clave, motivo=""):
     `intermitente` y ya no se puede volver a callar nunca — un fallo que va y viene es un fallo, y
     normalmente de los peores. Devuelve (ok, motivo).
     """
+    clave = normalizar_clave(clave)
     d = _cargar()
     it = d.get(clave)
     if not it:
@@ -418,6 +460,7 @@ def anotar(clave, nota):
     apuntar un matiz subió el contador, cruzó el umbral de muro (2x) y puso ROJA toda la batería por
     una segunda detección que nunca ocurrió. Anotar y re-detectar son cosas distintas y ahora tienen
     verbos distintos. No puede cerrar ni desescalar nada: eso sigue exigiendo su test (R1)."""
+    clave = normalizar_clave(clave)
     d = _cargar()
     it = d.get(clave)
     if not it or not nota:
@@ -432,6 +475,7 @@ def anotar(clave, nota):
 
 def cerrar(clave, test=None, nota=""):
     """R1: solo se cierra con un test que exista y corra. Devuelve (ok, motivo)."""
+    clave = normalizar_clave(clave)
     d = _cargar()
     it = d.get(clave)
     if not it:
