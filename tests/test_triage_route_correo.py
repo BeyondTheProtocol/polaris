@@ -35,7 +35,7 @@ def intent_json(**kw):
 
 SOBRE = {
     "uid": 42, "message_id": "<abc@clinic.example>", "remitente": "Dr. {{CONTACTO}}",
-    "remitente_email": "contacto@dfci.harvard.edu", "asunto": "Resultados",
+    "remitente_email": "oncologo@example.org", "asunto": "Resultados",
     "fecha": "Wed, 16 Jul 2026", "ned_critico": False, "urgente": False, "inyeccion": False,
 }
 

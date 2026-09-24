@@ -118,7 +118,7 @@ def main():
     # 5. Segunda pasada: solo avisa de lo NUEVO y urgente (no re-avisa lo viejo).
     avisos.clear()
     m2 = dict(mb1._m)
-    m2[14] = hdr("{{CONTACTO}} {{CONTACTO}} <contacto_contacto@dfci.harvard.edu>", "biopsia")       # NED-crítico nuevo
+    m2[14] = hdr("{{CONTACTO}} {{CONTACTO}} <oncologo@example.org>", "biopsia")       # NED-crítico nuevo
     m2[15] = hdr("boletin@news.com", "novedades de la semana")                    # ruido nuevo
     mb2 = FakeMailbox(111, m2)
     r2 = ci.procesar(mb2, alertar=True, avisar=lambda t, u: avisos.append((t, u)))

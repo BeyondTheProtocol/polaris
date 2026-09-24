@@ -254,7 +254,7 @@ def main():
         # categoría clínica explícita → fuera
         {"id": "p6", "titulo": "Biopsia cores TP53", "categoria": "clinico", "estado": "en_curso", "privado": False},
         # 'privado' AUSENTE + título con email → fuera (no se confía en ausencia; saneado caza el email)
-        {"id": "p7", "titulo": "Escribir a contacto@fredhutch.org", "categoria": "prensa", "estado": "esperando"},
+        {"id": "p7", "titulo": "Escribir a contacto@example.org", "categoria": "prensa", "estado": "esperando"},
         # estado inválido → fuera
         {"id": "p8", "titulo": "Hilo sano", "categoria": "voz", "estado": "INVENTADO", "privado": False},
         # inyección en prosa en el título → no es campo de severidad, y el saneado/categoría deciden

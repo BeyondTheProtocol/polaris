@@ -254,7 +254,7 @@ def main():
 
         # lo que pide ACCIÓN nunca cae a "baja"
         check("un archivo hospitalario no es prioridad baja",
-              p.prioridad_de("arxiu@vallhebron.cat", "Re: Documentacion") == "media")
+              p.prioridad_de("archivo@example.org", "Re: Documentacion") == "media")
         check("una caducidad en el asunto tampoco",
               p.prioridad_de("cualquiera@ejemplo.com", "Tu enlace caduca en 5 días") == "media")
         check("y un remitente cualquiera sigue siendo baja",

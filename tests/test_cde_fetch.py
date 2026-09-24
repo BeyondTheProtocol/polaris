@@ -92,7 +92,7 @@ FICHA_BUENA = """
 <div>主要研究者信息</div>
 <table class="searchDetailTable">
 <tr><th width="10%">姓名</th><td width="18%">胡夕春</td></tr>
-<tr><th>电话</th><td>021-64175590</td><th>Email</th><td>xchu2009@hotmail.com</td></tr>
+<tr><th>电话</th><td>021-64175590</td><th>Email</th><td>contacto@example.com</td></tr>
 </table>
 <table class="searchDetailTable">
 <tr><th width="15%">入选标准</th><td colspan="3">
@@ -141,7 +141,7 @@ ok("ficha buena -> ok=True", fb["ok"] is True)
 ok("registro correcto", fb["reg_no"] == "CTR20263478")
 ok("investigador principal", fb["investigador_principal"] == "胡夕春")
 ok("teléfono", fb["telefono"] == "021-64175590")
-ok("email", fb["email"] == "xchu2009@hotmail.com")
+ok("email", fb["email"] == "contacto@example.com")
 ok("2 criterios de inclusión", len(fb["criterios_inclusion"]) == 2,
    f"-> {fb['criterios_inclusion']}")
 ok("1 criterio de exclusión", len(fb["criterios_exclusion"]) == 1)
