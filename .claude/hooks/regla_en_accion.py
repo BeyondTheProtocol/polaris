@@ -306,6 +306,10 @@ def _mueve_de_verdad(sub, args):
         # Al revés que antes (verificacion, 24-sep): una RAMA o un tag sin `~` («git reset
         # feature-x») se tomaba por fichero y pasaba. Ahora mueve salvo que parezca una ruta.
         return not _parece_ruta(posicionales[0])
+    if sub in ("checkout", "switch") and [a for a in args if not a.startswith("-")] in (["master"], ["main"]):
+        # Volver a master es la REPARACIÓN de un HEAD desacoplado, no el error (24-sep-26: mi regla
+        # la bloqueaba y `casa_base_guard.py` la permitía; con las dos activas ganaba el bloqueo).
+        return False
     if sub == "symbolic-ref":
         # `git symbolic-ref HEAD` (y `--short`) solo LEE a dónde apunta; escribe con 2 posicionales
         # o con --delete (replay del 24-sep: dos lecturas legítimas bloqueadas).

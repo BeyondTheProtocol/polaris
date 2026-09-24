@@ -346,28 +346,28 @@ def main():
                      ("git restore --staged --worktree f", base), ("git stash pop", base),
                      ("git checkout HEAD -- .", base), ("git switch -qc rama-nueva", base),
                      # pruebas adversariales del 22-sep: otras formas de llegar a casa base
-                     ("git -c core.x=y checkout master", base),
-                     ("git --git-dir=%s/.git --work-tree=%s checkout master" % (base, base), wt),
-                     ("GIT_DIR=%s/.git git checkout master" % base, wt),
-                     ("env GIT_DIR=%s/.git git checkout master" % base, wt),
-                     ("pushd ~/claudecode && git checkout master", wt),
+                     ("git -c core.x=y checkout 6f0f89e --", base),
+                     ("git --git-dir=%s/.git --work-tree=%s checkout 6f0f89e --" % (base, base), wt),
+                     ("GIT_DIR=%s/.git git checkout 6f0f89e --" % base, wt),
+                     ("env GIT_DIR=%s/.git git checkout 6f0f89e --" % base, wt),
+                     ("pushd ~/claudecode && git checkout 6f0f89e --", wt),
                      ("cd %s && cd - && git stash" % wt, base),
-                     ("sh -c 'git checkout master'", base),
+                     ("sh -c 'git checkout 6f0f89e --'", base),
                      ("bash -c \"cd ~/claudecode && git reset --hard\"", wt),
-                     ("(cd ~/claudecode; git checkout master)", wt),
-                     ("git -C %s/tools checkout master" % base, wt),
-                     ("git --no-pager -C ~/claudecode checkout master", wt),
+                     ("(cd ~/claudecode; git checkout 6f0f89e --)", wt),
+                     ("git -C %s/tools checkout 6f0f89e --" % base, wt),
+                     ("git --no-pager -C ~/claudecode checkout 6f0f89e --", wt),
                      # ronda de verificacion del 24-sep: formas que se colaban
-                     ("git -C ~/claudecode/.claude/worktrees checkout master", wt),
-                     ("GIT_DIR=\"%s/.git\" git checkout master" % base, wt),
-                     ("git chec''kout master", base), ("Git checkout master", base),
-                     ("env -i PATH=/usr/bin git checkout master", base),
-                     ("command git checkout master", base),
-                     ("if true; then git checkout master; fi", base),
-                     ("x=$(git checkout master)", base),
+                     ("git -C ~/claudecode/.claude/worktrees checkout 6f0f89e --", wt),
+                     ("GIT_DIR=\"%s/.git\" git checkout 6f0f89e --" % base, wt),
+                     ("git chec''kout 6f0f89e --", base), ("Git checkout 6f0f89e --", base),
+                     ("env -i PATH=/usr/bin git checkout 6f0f89e --", base),
+                     ("command git checkout 6f0f89e --", base),
+                     ("if true; then git checkout 6f0f89e --; fi", base),
+                     ("x=$(git checkout 6f0f89e --)", base),
                      ("bash -lc 'cd ~/claudecode && git reset --hard'", wt),
-                     ("bash <<'EOF'\ncd ~/claudecode\ngit checkout master\nEOF", wt),
-                     ("cd $HOME/claudecode && git checkout master", wt),
+                     ("bash <<'EOF'\ncd ~/claudecode\ngit checkout 6f0f89e --\nEOF", wt),
+                     ("cd $HOME/claudecode && git checkout 6f0f89e --", wt),
                      ("git reset feature-x", base), ("git bisect start HEAD HEAD~10", base),
                      ("git apply x.patch", base), ("git update-ref refs/heads/master HEAD~1", base),
                      ("git symbolic-ref HEAD refs/heads/otra", base)):
@@ -394,6 +394,7 @@ def main():
                      ("(cd ~/claudecode && git log -1); git checkout -b foo", wt),
                      ("git clean -n", base), ("git checkout --help", base),
                      ("git merge claude/x", base), ("git stash show -p", base),
+                     ("git checkout master", base), ("git switch -q master", base),
                      ("git symbolic-ref --short HEAD", base),
                      ("git symbolic-ref refs/remotes/origin/HEAD", base)]:
         r = correr({"session_id": "gmc-ok-" + cmd[:12], "tool_name": "Bash", "cwd": cwd,
@@ -401,12 +402,12 @@ def main():
         check(not (r and r.get("permissionDecision") == "deny"), "permite: %s" % cmd)
     for _ in range(2):   # un freno no se gasta: la segunda vez en la misma sesión también deniega
         r = correr({"session_id": "gmc-mismo", "tool_name": "Bash", "cwd": base,
-                    "tool_input": {"command": "git checkout master"}}, tmp)
+                    "tool_input": {"command": "git checkout 6f0f89e --"}}, tmp)
     check(r and r.get("permissionDecision") == "deny", "sigue denegando a la segunda en la misma sesión")
     entorno = dict(os.environ, TMPDIR=tmp, CLAUDE_PROJECT_DIR=tmp, BTP_ALLOW_CASA_BASE="1")
     p = subprocess.run([sys.executable, HOOK], env=entorno, capture_output=True, text=True,
                        input=json.dumps({"session_id": "gmc-esc", "tool_name": "Bash", "cwd": base,
-                                         "tool_input": {"command": "git checkout master"}}))
+                                         "tool_input": {"command": "git checkout 6f0f89e --"}}))
     check("deny" not in p.stdout, "BTP_ALLOW_CASA_BASE=1 es la vía de escape deliberada")
 
     print("── fail-open ──")
