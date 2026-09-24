@@ -269,17 +269,62 @@ def _host_ok(h):
                         or h in D.HOSTS_CARGA)
 
 
+def _ssh_hostname(h):
+    """El HostName real de `h` según la config de ssh (`ssh -G`, que NO conecta). Así un alias
+    corto que apunte a un host público no pasa por «red propia»."""
+    try:
+        import subprocess
+        p = subprocess.run(["ssh", "-G", h], capture_output=True, text=True, timeout=3)
+        for ln in p.stdout.splitlines():
+            if ln.lower().startswith("hostname "):
+                return ln.split(None, 1)[1].strip()
+    except Exception:
+        pass
+    return h
+
+
+def _red_propia(h):
+    """¿`h` es una máquina de SU red? Nombre corto (Tailscale/mDNS: `polaris`), `.local`, `.ts.net`,
+    IP privada o de Tailscale (100.64/10). Llevar datos ahí no los saca de casa.
+
+    Nació del rodaje del 24-sep, ya fusionado: 4 de 4 denegaciones nuevas en tráfico real eran
+    `ssh polaris …` (`tools/deploy_ff.sh`), la otra máquina de {{TITULAR}}."""
+    import ipaddress
+    h = (h or "").lower().strip("[]").rstrip(".")
+    try:
+        ip = ipaddress.ip_address(h)
+        return ip.is_private or ip.is_loopback or ip in ipaddress.ip_network("100.64.0.0/10")
+    except ValueError:
+        pass
+    if h.endswith((".local", ".ts.net", ".lan", ".home.arpa")):
+        return True
+    if h and "." not in h:
+        real = _ssh_hostname(h).lower().rstrip(".")
+        return real == h or _red_propia(real) or _host_ok(real)
+    return False
+
+
+def _host_remoto_ok(h):
+    """Destino de ssh/scp/rsync: la lista de destinos o su propia red."""
+    return _host_ok(h) or _red_propia(h)
+
+
 def _hosts(texto):
     return [h.lower() for h in _RE_URL_HOST.findall(texto or "")]
 
 
-def _juzga_destinos(que, hosts, ilegible_es_envio=True):
-    """Motivo si algún destino está fuera de la lista; "" si todos están dentro."""
+def _juzga_destinos(que, hosts, ilegible_es_envio=True, remoto=False):
+    """Motivo si algún destino está fuera de la lista; "" si todos están dentro. `remoto` (ssh, scp,
+    rsync, nc) acepta además su propia red: ahí viven sus máquinas, no un servicio de fuera."""
     if D is None:
         return "%s lleva datos y no se ha podido cargar la lista de destinos" % que
+    if remoto:
+        # Un host en variable (`"$R"`, `$(grep …)`) no se puede leer: mismo trato que un scp ilegible.
+        hosts = [h for h in hosts if not any(c in h for c in "$`()")]
     if not hosts:
         return ("%s lleva datos a un destino que no se puede leer" % que) if ilegible_es_envio else ""
-    fuera = sorted({h for h in hosts if not _host_ok(h)})
+    ok_ = _host_remoto_ok if remoto else _host_ok
+    fuera = sorted({h for h in hosts if not ok_(h)})
     return ("%s lleva datos a %s, que no está en la lista de destinos" % (que, ", ".join(fuera))) if fuera else ""
 
 
@@ -379,15 +424,17 @@ def _carga_red(prog, args, cuerpo, dirs, cmd):
         if "-z" in args or any(re.match(r"^-\w*z", a) for a in args if a.startswith("-")):
             return ""                      # sondeo de puerto: no lleva datos
         libres = [a for a in args if not a.startswith("-") and not re.match(r"^\d+$", a)]
-        return _juzga_destinos(prog, [libres[0].lower()] if libres else [])
+        return _juzga_destinos(prog, [libres[0].lower()] if libres else [], remoto=True)
     if prog in _COPIA_REMOTA:
         hosts = [m.group(1) for m in (_RE_REMOTO.match(a) for a in args if not a.startswith("-")) if m]
-        return _juzga_destinos(prog, hosts, ilegible_es_envio=False)
+        return _juzga_destinos(prog, hosts, ilegible_es_envio=False, remoto=True)
     if prog == "ssh":
         host, remota, opciones = _ssh_partes(args)
+        if any(o in ("-G", "-V", "-Q") for o in opciones):
+            return ""                      # imprimir config/versión/capacidades: no conecta
         if any(o in ("-L", "-R", "-D", "-w") or re.match(r"^-[LRDw]\S", o) for o in opciones):
             return "ssh abre un túnel (-L/-R/-D)"
-        fuera = _juzga_destinos("ssh", [host.lower()] if host else [], ilegible_es_envio=False)
+        fuera = _juzga_destinos("ssh", [host.lower()] if host else [], ilegible_es_envio=False, remoto=True)
         if fuera and host.lower() != "github.com":
             return fuera
         if remota:

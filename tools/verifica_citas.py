@@ -13,6 +13,8 @@ Solo IDs PÚBLICOS de literatura — CERO PII, no toca el muro.
 
 APIs (todas gratis, sin clave):
   DOI   -> Crossref      https://api.crossref.org/works/{doi}
+           si 404 -> DataCite  https://api.datacite.org/dois/{doi}   (Zenodo, figshare…)
+           si 404 -> doi.org   https://doi.org/api/handles/{doi}     (cualquier agencia)
   PMID  -> NCBI eutils   https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi
   NCT   -> ClinicalTrials.gov v2   https://clinicaltrials.gov/api/v2/studies/{nct}
   arXiv -> http://export.arxiv.org/api/query?id_list={id}
@@ -40,10 +42,10 @@ NO_RES = "no_resoluble"        # red caída / API muda -> no acusar (puede exist
 NO_PARSE = "no_parseable"      # no encontré ningún id verificable en la cadena
 
 
-def _curl(url, accept="application/json"):
+def _curl(url, accept="application/json", timeout=TIMEOUT):
     """GET con curl. Devuelve (codigo_http:int|None, cuerpo:str). None si curl falla."""
     p = subprocess.run(
-        ["curl", "-sS", "-L", "--max-time", TIMEOUT, "-A", UA,
+        ["curl", "-sS", "-L", "--max-time", str(timeout), "-A", UA,
          "-H", "accept: " + accept, "-w", "\n%{http_code}", url],
         capture_output=True, text=True)
     if p.returncode != 0:
@@ -60,6 +62,25 @@ def _curl(url, accept="application/json"):
 
 
 # --- detección de tipo de id ---
+# Lo que el markdown o la frase pegan al final de un DOI (24-sep-2026: el gate extrajo
+# «10.5281/zenodo.20005708`» con el backtick del código en línea y lo dio por fabricado).
+_COLA_DOI = ".,;:`*_]>\"'"
+
+
+def _limpia_doi(d):
+    """Quita markdown y puntuación de los bordes de un DOI. El `)` final solo se quita si
+    está desparejado: «10.1016/S1470-2045(25)00001-9» lleva paréntesis legítimos."""
+    d = d.lstrip("`*_(<[\"'")
+    while d:
+        if d[-1] in _COLA_DOI:
+            d = d[:-1]
+        elif d[-1] == ")" and d.count(")") > d.count("("):
+            d = d[:-1]
+        else:
+            break
+    return d
+
+
 def clasifica(raw):
     """Devuelve (tipo, id_limpio). tipo ∈ {doi,pmid,nct,arxiv,desconocido}."""
     s = (raw or "").strip().strip(".,;()[]<>\"' ")
@@ -74,7 +95,7 @@ def clasifica(raw):
     # dosis clínicas tipo «10.5/mg» (exige 4+ dígitos tras el punto).
     m = re.search(r'10\.\d{4,9}/\S+', s)
     if m:
-        return "doi", m.group(0).rstrip(".,);]>\"'")
+        return "doi", _limpia_doi(m.group(0))
     # NCT
     m = re.search(r'(NCT\d{8})', s, re.I)
     if m:
@@ -91,7 +112,7 @@ def clasifica(raw):
     # DOI suelto (10.xxxx/yyy) sin url
     m = re.match(r'(10\.\d{4,9}/\S+)$', s)
     if m:
-        return "doi", m.group(1)
+        return "doi", _limpia_doi(m.group(1))
     # dígitos pelados -> en nuestro contexto clínico casi siempre es un PMID
     if re.fullmatch(r'[0-9]{1,8}', s):
         return "pmid", s
@@ -99,7 +120,16 @@ def clasifica(raw):
 
 
 # --- comprobadores por fuente ---
+# Tras el 404 de Crossref, las consultas de respaldo van con timeout corto: el gate de
+# salida da 20 s a todo el lote y, si no llega, no caza nada (fail-open).
+TIMEOUT_RESPALDO = 8
+
+
 def check_doi(doi):
+    """Crossref → DataCite → doi.org. Un 404 de Crossref NO prueba que el DOI no exista:
+    Zenodo, figshare y otros registran en DataCite (24-sep-2026 el gate acusó de fabricados
+    tres DOI reales de Zenodo, uno el del preprint de la firma de {{TITULAR}}). Solo es FABRICADA
+    si las tres fuentes dicen que no; si alguna calla, no_resoluble (no se acusa sin prueba)."""
     code, body = _curl("https://api.crossref.org/works/" + doi)
     if code == 200:
         try:
@@ -107,9 +137,34 @@ def check_doi(doi):
         except Exception:
             t = ""
         return EXISTE, t or "(sin título)", "Crossref"
-    if code == 404:
-        return FABRICADA, "no encontrada en Crossref", "Crossref"
-    return NO_RES, "Crossref no respondió (%s)" % (code if code else body[:60]), "Crossref"
+    if code != 404:
+        return NO_RES, "Crossref no respondió (%s)" % (code if code else body[:60]), "Crossref"
+
+    code, body = _curl("https://api.datacite.org/dois/" + doi, timeout=TIMEOUT_RESPALDO)
+    if code == 200:
+        try:
+            titulos = json.loads(body).get("data", {}).get("attributes", {}).get("titles") or []
+            t = (titulos[0] or {}).get("title", "") if titulos else ""
+        except Exception:
+            t = ""
+        return EXISTE, t or "(sin título)", "DataCite"
+    if code != 404:
+        return NO_RES, "no está en Crossref y DataCite no respondió (%s)" % (
+            code if code else body[:60]), "DataCite"
+
+    # Última palabra: el Handle System de doi.org conoce los DOI de TODAS las agencias
+    # (mEDRA, JaLC, KISTI, CNKI…). responseCode 1 = existe, 100 = no existe.
+    code, body = _curl("https://doi.org/api/handles/" + doi, timeout=TIMEOUT_RESPALDO)
+    try:
+        rc = json.loads(body).get("responseCode") if code in (200, 404) else None
+    except Exception:
+        rc = None
+    if rc == 1:
+        return EXISTE, "(registrado en doi.org; agencia distinta de Crossref/DataCite)", "doi.org"
+    if rc == 100:
+        return FABRICADA, "no está en Crossref, DataCite ni doi.org", "Crossref+DataCite+doi.org"
+    return NO_RES, "no está en Crossref ni DataCite y doi.org no respondió (%s)" % (
+        code if code else body[:60]), "doi.org"
 
 
 def check_pmid(pmid):

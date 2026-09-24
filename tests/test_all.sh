@@ -107,6 +107,7 @@ runpy test_salida_idempotente.py   # 24-sep · auditoría 3.5: una aprobación e
 runpy test_dominios_con_dueno.py
 runpy test_honestidad_lint.py
 runpy test_verifica_citas.py
+runpy test_verifica_citas_datacite.py   # 24-sep · un 404 de Crossref no es cita fabricada (Zenodo/DataCite) + DOI sin markdown pegado
 runpy test_memoria_radar.py
 runpy test_memoria_sistema.py
 runpy test_constitucion_sin_perdida.py
