@@ -339,6 +339,8 @@ runpy test_x_guardados_honestidad.py
 runpy test_x_guardados_cli.py
 runpy test_onco.py
 runpy test_inventario.py
+runpy test_inventario_viejas_modelos.py   # 24-sep · issues #2 y #5 (PR #23 de fuera, incorporado con cambios)
+runpy test_estado_rutina.py               # 24-sep · issue #4 (PR #22 de fuera, incorporado con cambios)
 runpy test_audit_agentes_daemon.py
 runpy test_publicar_fuga.py
 runpy test_publicar_overlay_casa_base.py

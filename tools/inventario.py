@@ -29,6 +29,8 @@ Uso:
   python3 tools/inventario.py --huerfanas     # solo las que no llama nadie
   python3 tools/inventario.py --json
   python3 tools/inventario.py --agentes       # lo mismo para .claude/agents/
+  python3 tools/inventario.py --viejas 60     # herramientas sin tocar en >60 días
+  python3 tools/inventario.py --modelos       # modelos locales de Ollama no usados
 """
 import argparse
 import json
@@ -36,6 +38,7 @@ import os
 import re
 import subprocess
 import sys
+from datetime import date, datetime
 
 REPO = os.environ.get("BTP_REPO") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
@@ -125,14 +128,143 @@ def inventario(carpeta=TOOLS, sufijo=".py"):
     return out
 
 
+def _fecha_commit(valor):
+    """Convierte YYYY-MM-DD a date; devuelve None para fechas no disponibles."""
+    try:
+        return datetime.strptime(valor, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def herramientas_viejas(n_dias, filas=None, hoy=None):
+    """Filtra herramientas cuyo último commit supera N días.
+
+    Reutiliza la clasificación existente y ordena de más vieja a más nueva.
+    Clasificar no implica borrar ni sugiere retirar herramientas.
+    """
+    if n_dias < 0:
+        raise ValueError("N debe ser >= 0")
+    hoy = hoy or date.today()
+    filas = inventario() if filas is None else filas
+    viejas = []
+    for fila in filas:
+        fecha = _fecha_commit(fila.get("ultimo_commit"))
+        if fecha is None:
+            continue
+        dias = (hoy - fecha).days
+        if dias > n_dias:
+            copia = dict(fila)
+            copia["dias_sin_tocar"] = dias
+            viejas.append(copia)
+    return sorted(viejas, key=lambda fila: (-fila["dias_sin_tocar"], fila["pieza"]))
+
+
+def imprimir_herramientas_viejas(n_dias, filas=None):
+    """Imprime la salida humana de --viejas N."""
+    viejas = herramientas_viejas(n_dias, filas=filas)
+    if not viejas:
+        print("No hay herramientas sin tocar en más de %d días." % n_dias)
+        return
+    print("Herramientas sin tocar en más de %d días:" % n_dias)
+    for fila in viejas:
+        print("   %-34s %4d días  [%s]" % (
+            fila["pieza"], fila["dias_sin_tocar"], fila["estado"]))
+    print("\nClasificar no es borrar: esta salida no sugiere retirar nada.")
+
+
+def _modelos_ollama(salida):
+    """Extrae los nombres de modelo de la primera columna de `ollama list`."""
+    lineas = [linea for linea in salida.splitlines() if linea.strip()]
+    if lineas and lineas[0].split()[0].upper() == "NAME":
+        lineas = lineas[1:]
+    return [linea.split()[0] for linea in lineas if linea.split()]
+
+
+def _nombres_citables(modelo):
+    """Cómo puede aparecer un modelo en el código: entero, y sin `:latest` si lo lleva
+    (`ollama pull nomic-embed-text` descarga `nomic-embed-text:latest`)."""
+    m = modelo.lower()
+    return (m, m[:-len(":latest")]) if m.endswith(":latest") else (m,)
+
+
+def modelos_no_usados(ollama_salida=None, codigo=None):
+    """Modelos descargados en Ollama que ningún fichero del repo nombra (issue #5).
+
+    Primera versión: PR #23 de j7j7j7 (24-sep-2026). Incorporada con dos cambios:
+      · se busca CADA modelo por su nombre. El PR prefiltraba con una lista cerrada de familias
+        (llama|mistral|contacto|phi|qwen|deepseek|codellama), así que un modelo de otra familia
+        (`nomic-embed-text`) salía «no usado» aunque el código lo citara;
+      · si `git grep` falla de verdad (rc > 1), se dice. Antes el fallo daba un código vacío y
+        todos los modelos salían «no usados»: justo el fail-open que el issue quería evitar.
+    Los parámetros opcionales permiten probarlo sin llamar a Ollama ni a git."""
+    if ollama_salida is None:
+        try:
+            resultado = subprocess.run(
+                ["ollama", "list"], capture_output=True, text=True, check=True
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("ollama no está instalado o no está en PATH") from exc
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError("ollama list falló (código %d)" % exc.returncode) from exc
+        ollama_salida = resultado.stdout
+
+    modelos = _modelos_ollama(ollama_salida)
+    if codigo is None:
+        terminos = sorted({t for m in modelos for t in _nombres_citables(m)})
+        if not terminos:
+            return []
+        orden = ["git", "-C", REPO, "grep", "-h", "-I", "-i", "-o", "-F"]
+        for t in terminos:
+            orden += ["-e", t]
+        resultado = subprocess.run(orden + ["--"] + list(AMBITOS), capture_output=True, text=True)
+        if resultado.returncode > 1:          # 1 = ninguna coincidencia, que es un resultado
+            raise RuntimeError("git grep falló (código %d): %s" % (
+                resultado.returncode, (resultado.stderr or "").strip()[:200]))
+        codigo = resultado.stdout
+
+    codigo = codigo.lower()
+    return [m for m in modelos if not any(t in codigo for t in _nombres_citables(m))]
+
+
+def imprimir_modelos_no_usados():
+    """Imprime --modelos; devuelve 1 si Ollama no puede consultarse."""
+    try:
+        no_usados = modelos_no_usados()
+    except RuntimeError as exc:
+        print("ERROR: %s" % exc, file=sys.stderr)
+        return 1
+    if not no_usados:
+        print("Todos los modelos descargados están mencionados en el código.")
+        return 0
+    print("Modelos descargados pero no mencionados en el código:")
+    for modelo in no_usados:
+        print("   - %s" % modelo)
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Qué piezas están vivas y cuáles no llama nadie")
     p.add_argument("--huerfanas", action="store_true")
     p.add_argument("--agentes", action="store_true")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--viejas", type=int, metavar="N",
+                   help="herramientas cuyo último commit tiene más de N días")
+    p.add_argument("--modelos", action="store_true",
+                   help="modelos de Ollama descargados pero no mencionados en el repo")
     a = p.parse_args(argv)
 
+    if a.modelos:
+        return imprimir_modelos_no_usados()
+
     filas = inventario(AGENTES, ".md") if a.agentes else inventario()
+    if a.viejas is not None:
+        if a.agentes:
+            p.error("--viejas solo aplica a tools")
+        try:
+            imprimir_herramientas_viejas(a.viejas, filas=filas)
+        except ValueError as exc:
+            p.error(str(exc))
+        return 0
     if a.huerfanas:
         filas = [f for f in filas if f["estado"] in ("huerfana", "solo-test")]
     if a.json:
