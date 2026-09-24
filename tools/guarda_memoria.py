@@ -85,20 +85,27 @@ def _a_gb(v):
 
 
 def _metal_gb(pids):
-    """Lo que `vmmap -summary` atribuye a las regiones IOAccelerator* (Metal/GPU), columnas
-    DIRTY + SWAPPED, sumado en el árbol. Es la parte de la huella que el allocator de Metal
-    reserva. Tarda ~1 s por pid: se llama solo para CONFIRMAR, no en cada muestreo."""
+    """Lo que `vmmap -summary` atribuye a las regiones IOAccelerator* (Metal/GPU), sumado en el
+    árbol: es la parte de la huella que el allocator de Metal reserva. Por región se toma el MAYOR
+    de DIRTY y SWAPPED, no la suma: con el tensor vivo las dos columnas cuentan lo mismo (3,8 GB
+    medidos para 2 GB reales, 24-sep). Tarda ~1,5 s por pid: solo se llama para CONFIRMAR.
+
+    None si `vmmap` no pudo leer algún pid (proceso saliendo, máquina cargada: «can't suspend»).
+    Un fallo NO es «0 GB de Metal»: eso convertía una lectura fallida en uso real y podía matar
+    una corrida de Metal inocente, justo el fallo del 20-sep."""
     total = 0.0
     for p in pids:
         try:
-            out = subprocess.run(["vmmap", "-summary", str(p)], capture_output=True, text=True,
-                                 timeout=30).stdout
+            r = subprocess.run(["vmmap", "-summary", str(p)], capture_output=True, text=True,
+                               timeout=30)
         except Exception:        # noqa: BLE001
-            continue
-        for linea in out.splitlines():
+            return None
+        if r.returncode != 0 or "REGION TYPE" not in r.stdout:
+            return None
+        for linea in r.stdout.splitlines():
             m = re.match(r"^IOAccelerator[^\d]*?\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)", linea)
             if m:                # VIRTUAL RESIDENT DIRTY SWAPPED
-                total += _a_gb(m.group(3)) + _a_gb(m.group(4))
+                total += max(_a_gb(m.group(3)), _a_gb(m.group(4)))
     return total
 
 
@@ -179,7 +186,14 @@ def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_g
             swap = _swap_gb() - swap0
             neto = huella
             if huella >= tope_gb:            # la resta de Metal solo si hace falta (vmmap es caro)
-                neto = max(0.0, huella - _metal_gb(pids))
+                metal = _metal_gb(pids)
+                # vmmap tarda ~1,5 s: la huella se relee DESPUÉS y se usa la menor. Si el proceso
+                # suelta la GPU en medio (al salir), restar el Metal de ahora a la huella de antes
+                # daba 2,2 GB de «uso real» que no existían (medido el 24-sep: 2,2 → 0,17).
+                ahora = _huella_gb(pids)
+                # Sin lectura de Metal, el RSS: tampoco cuenta Metal, y no se inventa un «0».
+                neto = (max(0.0, min(huella, ahora) - metal) if metal is not None
+                        else _rss_gb(pids))
             pico = max(pico, neto)
             if reg:
                 reg.write("%.0f\t%.2f\t%.2f\t%.2f\t%.2f\n"

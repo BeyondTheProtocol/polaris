@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import time
+import types
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ, "tools"))
@@ -91,7 +92,7 @@ def con_medida(huella, metal, swap_nuevo=0.0, rss=0.05, tope_swap=3.0):
             base[0] = 10.0
             return 10.0
         return 10.0 + swap_nuevo
-    G._huella_gb = lambda pids: huella
+    G._huella_gb = huella if callable(huella) else (lambda pids: huella)
     G._metal_gb = lambda pids: metal
     G._swap_gb = swap
     G._rss_gb = lambda pids: rss
@@ -109,8 +110,34 @@ codigo, _p = con_medida(huella=3.0, metal=2.8, swap_nuevo=5.0)
 check(codigo == 99, "5b) la misma huella con la máquina YA empujando swap: mata (código %s)" % codigo)
 codigo, _p = con_medida(huella=0.3, metal=0.0, swap_nuevo=5.0)
 check(codigo == 0, "5c) swap de OTROS con un árbol pequeño: no lo mata (código %s)" % codigo)
+# 5f) el proceso suelta la GPU MIENTRAS vmmap lee: huella 3 antes, 0,2 después, Metal ya a 0.
+#     Restar el Metal de ahora a la huella de antes inventaba 3 GB de uso (visto: 2,2 → 0,17).
+_lecturas = iter([3.0, 0.2] * 50)
+codigo, pico = con_medida(huella=lambda pids: next(_lecturas), metal=0.0, rss=0.05)
+check(codigo == 0, "5f) suelta la GPU mientras vmmap lee: no mata (código %s)" % codigo)
+check(pico < 1.0, "    y el pico usa la huella de después, no la de antes (%.1f GB)" % pico)
+codigo, pico = con_medida(huella=3.0, metal=None, rss=0.3)
+check(codigo == 0, "5d) vmmap no pudo leer (None): no se toma como «0 GB de Metal», no mata (código %s)" % codigo)
+check(pico < 1.0, "    y el pico cae al RSS, no a la huella entera (%.1f GB)" % pico)
+codigo, _p = con_medida(huella=3.0, metal=None, rss=2.0)
+check(codigo == 99, "5e) sin lectura de Metal pero con RSS sobre el techo: mata (código %s)" % codigo)
 codigo, _p = con_medida(huella=3.0, metal=0.0, rss=0.05)
 check(codigo == 99, "6) huella alta, sin Metal, con RSS mínimo (proceso en swap): mata (código %s)" % codigo)
+
+# 6b) Lectura de vmmap (salida real recortada del 24-sep): por región, el MAYOR de DIRTY y SWAPPED
+#     (con el tensor vivo cuentan lo mismo; sumarlas daba 3,8 GB para 2 reales), y un fallo = None.
+_VMMAP = """REGION TYPE                        VIRTUAL RESIDENT    DIRTY  SWAPPED VOLATILE   NONVOL    EMPTY   REGION
+IOAccelerator                       64K      64K      64K       0K       0K       0K       0K        2
+IOAccelerator (graphics)           1.9G     1.9G     1.9G     1.9G       0K     1.9G     240K       16
+MALLOC_SMALL                     111.9M     976K     976K    87.2M       0K       0K       0K       31
+"""
+_run_orig = G.subprocess.run
+G.subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=0, stdout=_VMMAP, stderr="")
+m = G._metal_gb([1])
+check(abs(m - (1.9 + 64 / 1048576)) < 0.01, "6b) Metal = mayor de DIRTY y SWAPPED por región, no la suma (%.2f GB)" % m)
+G.subprocess.run = lambda *a, **k: types.SimpleNamespace(returncode=255, stdout="", stderr="can't suspend")
+check(G._metal_gb([1]) is None, "    y si vmmap falla, None (no «0 GB de Metal»)")
+G.subprocess.run = _run_orig
 
 # 7) Metal DE VERDAD: 2 GB en MPS, liberados sin vaciar la caché. Es lo que mató cinco corridas el
 #    20-sep por la huella de `top`. Techo de 1 GB y swap aislado: no puede matar.
