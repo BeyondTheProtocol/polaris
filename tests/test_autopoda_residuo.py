@@ -35,9 +35,10 @@ def git(cwd, *a):
     return subprocess.run(["git", "-C", cwd] + list(a), capture_output=True, text=True)
 
 
-def bloque(ts, job, did="agente orquestador ejecutado", cost="$0.050000"):
+def bloque(ts, job, did="agente orquestador ejecutado", cost="$0.050000", origen=None):
     return ("\n## %s  job %s\n- QUÉ HIZO: %s\n- QUÉ DECIDIÓ: -\n- ESPERA OK: —\n"
-            "- FALLÓ: —\n- COSTE: %s\n" % (ts, job, did, cost))
+            "- FALLÓ: —\n- COSTE: %s\n%s" % (ts, job, did, cost,
+                                             "- ORIGEN: %s\n" % origen if origen else ""))
 
 
 RESIDUO = "".join(bloque("2026-09-21T09:06:%02d" % s, "aa%08d" % s) for s in range(30, 42))
@@ -67,6 +68,13 @@ u = os.path.join(tmp, "u")
 escribe(u, RESIDUO)
 ok("la ráfaga de la batería se reconoce como residuo", ramas.residuo_de_tests(u) == [REL],
    "-> %r" % ramas.residuo_de_tests(u))
+
+# Con la marca de origen del 24-sep (`- ORIGEN: test`) sigue reconociéndose igual.
+escribe(u, "".join(bloque("2026-09-21T09:06:%02d" % s, "cc%08d" % s, origen="test")
+                   for s in range(30, 42)))
+ok("y también con la línea ORIGEN que se escribe desde el 24-sep",
+   ramas.residuo_de_tests(u) == [REL], "-> %r" % ramas._trabajo_vivo(u))
+escribe(u, RESIDUO)
 ok("y no cuenta como trabajo vivo", ramas._trabajo_vivo(u) == [], "-> %r" % ramas._trabajo_vivo(u))
 
 escribe(u, bloque("2026-09-21T09:00:00", "bb1") + bloque("2026-09-21T09:07:00", "bb2"))

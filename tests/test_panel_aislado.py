@@ -45,5 +45,44 @@ with tempfile.TemporaryDirectory() as tmp:
                    env=env, capture_output=True)
     check("append en batería no crea el panel bajo BTP_REPO", not os.path.exists(real))
 
+# ── ORIGEN: cada bloque dice de dónde sale (24-sep-2026) ──────────────────────────────
+with tempfile.TemporaryDirectory() as tmp:
+    def escribe(env_extra, **kw):
+        ruta = os.path.join(tmp, "p-%d.md" % len(os.listdir(tmp)))
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("BTP_PANEL", "BTP_TEST_BATTERY", "BTP_ORIGEN_PANEL")}
+        env.update(BTP_PANEL=ruta, BTP_BANDEJA=os.path.join(tmp, "b.md"))
+        env.update(env_extra)
+        cmd = [sys.executable, os.path.join(TOOLS, "panel.py"), "append", "--job", "j1",
+               "--did", "algo"]
+        for k, v in kw.items():
+            cmd += ["--" + k, v]
+        subprocess.run(cmd, env=env, capture_output=True)
+        return open(ruta, encoding="utf-8").read()
+
+    check("en la batería, el bloque se marca como test",
+          "- ORIGEN: test\n" in escribe({"BTP_TEST_BATTERY": "1"}))
+    check("fuera de la batería, como lazo", "- ORIGEN: lazo\n" in escribe({}))
+    check("BTP_ORIGEN_PANEL manda",
+          "- ORIGEN: barrido\n" in escribe({"BTP_ORIGEN_PANEL": "barrido"}))
+    check("y --origen manda sobre todo",
+          "- ORIGEN: a-mano\n" in escribe({"BTP_TEST_BATTERY": "1"}, origen="a-mano"))
+
+    # Nadie que LEA el panel se rompe con la línea nueva.
+    texto = escribe({})
+    sys.path.insert(0, TOOLS)
+    import ramas  # noqa: E402
+    check("el bloque con ORIGEN sigue siendo un bloque para ramas.py (poda)",
+          len(list(ramas._BLOQUE_PANEL.finditer(texto))) == 1
+          and not ramas._BLOQUE_PANEL.sub("", texto).strip())
+    viejo = texto.replace("- ORIGEN: lazo\n", "")
+    check("y un bloque VIEJO sin ORIGEN también (el histórico no se rompe)",
+          len(list(ramas._BLOQUE_PANEL.finditer(viejo))) == 1
+          and not ramas._BLOQUE_PANEL.sub("", viejo).strip())
+    import observatorio  # noqa: E402
+    campo = __import__("re").search(r"ORIGEN: (.*)", texto).group(1)
+    check("observatorio expone el origen", campo == "lazo"
+          and '"origen": campo("ORIGEN")' in open(os.path.join(TOOLS, "observatorio.py")).read())
+
 print("RESULTADO panel aislado: %s" % ("OK" if not fallos else "%d fallo(s)" % fallos))
 sys.exit(1 if fallos else 0)

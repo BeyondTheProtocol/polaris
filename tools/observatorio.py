@@ -452,6 +452,7 @@ def estado_actividad():
             "espera": campo("ESPERA OK"),
             "fallo": campo("FALLÓ"),
             "coste": campo("COSTE"),
+            "origen": campo("ORIGEN"),      # lazo | test (desde 24-sep-2026; antes, vacío)
         })
     entradas.reverse()
     return {"entradas": entradas}

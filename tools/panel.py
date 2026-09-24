@@ -37,7 +37,23 @@ def ruta_panel():
     return os.path.join(casa_base(), "00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
 
 
-def append(job=None, did="", decided="", awaiting="", failed="", cost=""):
+def _origen(explicito=None):
+    """Quién escribe esta entrada: `lazo` (el de verdad), `test`, o lo que diga BTP_ORIGEN_PANEL.
+
+    Por qué (24-sep-2026): el panel de casa base tenía 7519 bloques y 4541 con la forma exacta del
+    residuo de `test_all`… y las 52 entradas REALES que una sesión rescató a mano el 20-sep tenían
+    la MISMA firma (id fuera del ledger de coste, «agente orquestador ejecutado», $0,05 / $540).
+    Ningún heurístico a posteriori las separa, así que el histórico se queda como está y de aquí en
+    adelante cada bloque dice de dónde sale. Deuda: panel-lazo-residuo-historico-no-separable.
+    """
+    if explicito:
+        return explicito
+    if os.environ.get("BTP_ORIGEN_PANEL"):
+        return os.environ["BTP_ORIGEN_PANEL"]
+    return "test" if os.environ.get("BTP_TEST_BATTERY") == "1" else "lazo"
+
+
+def append(job=None, did="", decided="", awaiting="", failed="", cost="", origen=None):
     PANEL = ruta_panel()
     os.makedirs(os.path.dirname(PANEL), exist_ok=True)
     ts = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -47,6 +63,7 @@ def append(job=None, did="", decided="", awaiting="", failed="", cost=""):
     block += "- ESPERA OK: %s\n" % (awaiting or "—")
     block += "- FALLÓ: %s\n" % (failed or "—")
     block += "- COSTE: %s\n" % (cost or "-")
+    block += "- ORIGEN: %s\n" % _origen(origen)
     fd = os.open(PANEL, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     try:
         os.write(fd, block.encode("utf-8"))
@@ -68,11 +85,12 @@ def _arg(a, name, default=""):
 
 def main(argv):
     if not argv or argv[0] != "append":
-        print('uso: panel.py append [--job id] [--did ..] [--decided ..] [--awaiting ..] [--failed ..] [--cost ..]')
+        print('uso: panel.py append [--job id] [--did ..] [--decided ..] [--awaiting ..] [--failed ..] [--cost ..] [--origen lazo|test]')
         return 2
     a = argv[1:]
     append(job=_arg(a, "--job"), did=_arg(a, "--did"), decided=_arg(a, "--decided"),
-           awaiting=_arg(a, "--awaiting"), failed=_arg(a, "--failed"), cost=_arg(a, "--cost"))
+           awaiting=_arg(a, "--awaiting"), failed=_arg(a, "--failed"), cost=_arg(a, "--cost"),
+           origen=_arg(a, "--origen") or None)
     return 0
 
 

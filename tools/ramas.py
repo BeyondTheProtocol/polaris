@@ -170,7 +170,7 @@ _PANEL_REL = os.path.join("00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
 _BLOQUE_PANEL = re.compile(
     r"\n?## (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)  job (\S+)\n"
     r"- QUÉ HIZO: [^\n]*\n- QUÉ DECIDIÓ: [^\n]*\n- ESPERA OK: [^\n]*\n"
-    r"- FALLÓ: [^\n]*\n- COSTE: [^\n]*\n")
+    r"- FALLÓ: [^\n]*\n- COSTE: [^\n]*\n(?:- ORIGEN: [^\n]*\n)?")
 _RAFAGA_HUECO_S = 30                  # más separación que esto entre dos entradas = otra ráfaga
 _RAFAGA_MIN = 5
 _RAFAGA_MAX_S = 120
