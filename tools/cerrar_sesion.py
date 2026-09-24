@@ -325,28 +325,33 @@ def cerrar(apply=False, scope=None, podar=True):
         # También en dry-run: el plan es justo donde quieres ver esto ANTES de aplicar.
         #
         # Y desde el 22-sep-2026 el rescate lo hace el cierre, no {{TITULAR}} («todo esto de gestión
-        # debes hacerlo tú»): lo repetido de casa base se descarta, lo propio se copia a un cajón
-        # de casa base y se poda. Solo siguen parando la poda los borradores/encargos vivos y
-        # una copia que falle. Se rescata únicamente si la poda va a ocurrir (limpio y seguro).
+        # debes hacerlo tú»): se archiva a casa base con `ramas.rescatar` —el mismo rescate que usa
+        # la autopoda, no otro— y se poda. `_trabajo_vivo` ya descuenta el residuo reconocido
+        # (restos de la batería, copia exacta de casa base, lo ya rescatado), así que aquí solo
+        # queda lo que de verdad hay que salvar. Siguen parando la poda los borradores y encargos
+        # VIVOS (esperan su firma: archivarlos los sacaría del outbox) y un rescate que falle.
         perdible = _ramas._trabajo_vivo(wt)
         if perdible:
-            cajon = os.path.join(BASE, "tools", "state", "rescate-poda",
-                                 "%s-%s" % (os.path.basename(wt.rstrip("/")),
-                                            __import__("time").strftime("%Y%m%d-%H%M%S")))
-            r = _ramas.rescatar(wt, BASE, cajon, copiar=bool(apply and limpio and seguro))
-            if r["bloquean"]:
+            vivos = [r for r in perdible
+                     if r.startswith(tuple(_ramas._RUTAS_TRABAJO_VIVO))]
+            if vivos:
                 seguro = False
-                acciones.append(
-                    "poda: NO — %d fichero(s) son trabajo vivo o no se pudieron guardar: %s%s"
-                    % (len(r["bloquean"]), ", ".join(r["bloquean"][:4]),
-                       " y %d más" % (len(r["bloquean"]) - 4) if len(r["bloquean"]) > 4 else ""))
+                acciones.append("poda: NO — %d borrador(es)/encargo(s) VIVOS dentro: %s"
+                                % (len(vivos), ", ".join(vivos[:4])))
+            elif apply and limpio and seguro:
+                rescatados = _ramas.rescatar(wt, si=True)
+                fallaron = [rel for rel, _destino, hecho in rescatados if not hecho]
+                if fallaron:
+                    seguro = False
+                    acciones.append("poda: NO — no se pudo rescatar %d fichero(s): %s"
+                                    % (len(fallaron), ", ".join(fallaron[:4])))
+                else:
+                    perdible = []
+                    acciones.append("rescate: %d ignorado(s) archivados a casa base antes de podar"
+                                    % len(rescatados))
             else:
-                perdible = []
-                acciones.append(
-                    "rescate: %d ignorado(s) ya repetidos en casa base; %d con algo propio %s"
-                    % (len(r["repetidos"]), len(r["rescatados"]),
-                       ("guardados en " + os.path.relpath(cajon, BASE)) if (apply and r["rescatados"])
-                       else "(se guardarían en tools/state/rescate-poda/ al aplicar)"))
+                acciones.append("poda: al aplicar se rescatarían %d ignorado(s) a casa base y se podaría"
+                                % len(perdible))
         if apply and limpio and seguro:
             # Candado COMPARTIDO "git-mutex" — MISMO nombre que la fusión de arriba (A1, 10-jul-26,
             # hallazgo B): antes esta poda mutaba `.git/worktrees/` SIN candado, así que una fusión
