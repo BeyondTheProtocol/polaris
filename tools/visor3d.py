@@ -31,6 +31,18 @@ import os
 import sys
 import time
 
+# ─── techo del heap de Metal ───────────────────────────────────────────────────────────────
+# Tiene que estar puesto ANTES de que nadie importe torch: el allocator de MPS lee esto al
+# nacer y ya no lo suelta. Sin límite, PyTorch reserva hasta 1,7× la memoria que Metal
+# «recomienda» (en un Mac de 16 GB, ~18 GB) y la retiene aunque no la use. Medido el 20-sep-26:
+# con el trabajo real ocupando 3,2 GB de RSS, el footprint se quedaba clavado en 9,8 GB y el
+# sistema empujaba 3 GB al swap para hacerle sitio a una reserva vacía.
+_MPS_RATIO = float(os.environ.get("BTP_MPS_RATIO", "0.4"))
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "%g" % _MPS_RATIO)
+# y el bajo TIENE que quedar por debajo del alto, o torch aborta al mover la red a la GPU
+# («invalid low watermark ratio 1.4», que es el valor que trae de fábrica).
+os.environ.setdefault("PYTORCH_MPS_LOW_WATERMARK_RATIO", "%g" % (_MPS_RATIO * 0.85))
+
 _TOOLS = os.path.dirname(os.path.abspath(__file__))
 # tools/queue.py sombrea la `queue` de la stdlib que usan torch/requests (mismo arreglo que
 # postdicom.py): se quita tools/ del path antes de importar nada pesado.
@@ -63,6 +75,15 @@ PRESETS = {
     },
     # La mama no trae tareas de TotalSegmentator, y no es un olvido: no existe modelo de lesión
     # de mama en RM. El tumor sale de la resta del dinámico y la mama del Dixon (assets_mama).
+    # El esqueleto sale del TC de cuerpo entero con kernel de hueso: las 117 clases de
+    # TotalSegmentator traen las 25 vértebras una a una, las costillas y el resto del hueso.
+    "esqueleto": {
+        "organo": "skeleton",
+        "tareas": ["total_completo"],
+        "roi_total": [],
+        "margen_mm": 0,
+        "modalidad": "TC",
+    },
     "mama": {
         "organo": "breast",
         "tareas": [],
@@ -167,6 +188,10 @@ def inventario(raices):
                         "tipo": "\\".join(ds.get("ImageType", []))[:40],
                         # Horas (no identifican): ordenan las fases de un dinámico de RM.
                         "parte": str(ds.get("BodyPartExamined", ""))[:20],
+                        # La POSTURA decide si dos estudios se pueden comparar punto a punto:
+                        # HFS = boca arriba, HFP = boca abajo. Una mama en prono y la misma en
+                        # supino no tienen la misma forma ni de lejos.
+                        "postura": str(ds.get("PatientPosition", ""))[:6],
                         "protocolo": str(ds.get("ProtocolName", ""))[:40],
                         "desc_estudio": str(ds.get("StudyDescription", ""))[:40],
                         "hora_serie": str(ds.get("SeriesTime", ""))[:6],
@@ -239,8 +264,9 @@ def _cmd_inventario(a):
     for f in filas:
         if f["n"] < a.min_n:
             continue
-        print("%s  %-3s %-4s n=%-4d grosor=%-5s %-8s contraste=%-12s %-40s  %s"
-              % (f["fecha"], f["modalidad"], f["serie"], f["n"], f["grosor_mm"], f["paciente"],
+        print("%s  %-3s %-4s n=%-4d grosor=%-5s %-4s %-8s contraste=%-12s %-40s  %s"
+              % (f["fecha"], f["modalidad"], f["serie"], f["n"], f["grosor_mm"],
+                 f.get("postura") or "-", f["paciente"],
                  f["contraste"] or "-", f["descripcion"], f["estudio"]))
     return 0
 
@@ -309,6 +335,30 @@ def convierte(raices, serie):
     }
     json.dump(meta, open(meta_p, "w"), ensure_ascii=False, indent=1)
     return salida, meta
+
+
+def _cmd_cobertura(a):
+    """Hasta dónde llega cada serie, en milímetros del mundo (RAS).
+
+    Sirve para saber si un estudio cubre lo que se quiere dibujar ANTES de montar nada: una
+    reconstrucción del esqueleto no vale si al paciente le falta media columna en la imagen.
+    No imprime nada identificativo: solo extensión y espaciado."""
+    import nibabel as nib
+    import numpy as np
+    print("%-10s %-30s %-22s %-22s %s" % ("serie", "descripción", "x (mm)", "z craneo-caudal",
+                                          "espaciado"))
+    for serie in a.series:
+        ruta, meta = convierte(a.raices, serie)
+        img = nib.load(ruta)
+        af, forma = img.affine, img.shape
+        esq = np.array([[0, 0, 0], [forma[0] - 1, 0, 0], [0, forma[1] - 1, 0],
+                        [0, 0, forma[2] - 1], [forma[0] - 1, forma[1] - 1, forma[2] - 1]])
+        m = np.array([(af @ np.append(e, 1.0))[:3] for e in esq])
+        lo, hi = m.min(0), m.max(0)
+        print("%-10s %-30s %7.0f → %-12.0f %7.0f → %-12.0f %s" % (
+            serie, meta["descripcion"][:30], lo[0], hi[0], lo[2], hi[2],
+            "×".join("%.2f" % v for v in meta["espaciado_mm"])))
+    return 0
 
 
 def _cmd_convierte(a):
@@ -1138,6 +1188,10 @@ def assets_mama(raices, pre, post, grasa, receta, destino):
         # La POSICIÓN del pezón se guarda aunque su relieve se borre: es la referencia con la
         # que se orienta cualquiera en una mama, y un punto en un JSON no es un pezón dibujado.
         pezon_mm = [round(float(M[k].flat[j]), 2) for k in range(3)]
+        # La COLA DE MAMA (prolongación axilar): extremo superoexterno de la mama. Se calcula
+        # de su propia anatomía, no se coloca a ojo, y viaja como REGIÓN, no como lesión: el
+        # PET de galio que la describe es en supino y esta mama es en prono, así que dibujar
+        # ahí un contorno sería inventárselo. La cifra la pone el informe, no este cálculo.
         if receta.get("envoltura_torso_mm"):
             # LA MAMA DE VERDAD, no una bola recortada: una mama es, literalmente, lo que
             # SOBRESALE del tórax. Se calcula la apertura morfológica del cuerpo con una bola
@@ -1753,6 +1807,851 @@ def _cmd_tumor(a):
     return 0
 
 
+# ─── el esqueleto de verdad, no un dibujo ────────────────────────────────────────────────
+#
+# El esquema del esqueleto de /lesiones y /mapa-metastasis son trazados SVG hechos a mano: una
+# mancha por cráneo, rectángulos por vértebras, arcos por costillas. Es lo único de esas páginas
+# que no sale de los datos de {{TITULAR}}. Esto lo sustituye por SU esqueleto, segmentado de su TC de
+# cuerpo entero con kernel de hueso, y —lo que importa más— saca el CENTROIDE de cada hueso con
+# su nombre, de modo que la posición de cada foco deja de estar puesta a ojo.
+
+CIERRE_MM = 3.0         # radio del cierre que vuelve a unir las costillas partidas
+SIMETRIA_MIN_MM3 = 400  # por debajo de esto, un hueso par se da por ausente y se copia del otro lado
+
+
+def _une_fragmentos(mask, lab, nombres, esp, radio_mm=9.0):
+    """Une consigo mismos los trozos de un hueso largo que la segmentación dejó partido.
+
+    Medido en este TC: sus costillas salen con 54 a 10.000 mm³ cuando una costilla entera
+    ronda los 20.000, y la clavícula derecha con 621 de unos 8.000. No es que falte el hueso:
+    es que sale a cachos, y una parrilla a cachos se lee como avería del sistema.
+
+    El cierre se hace POR ETIQUETA, no sobre la máscara entera: así los trozos de la misma
+    costilla se juntan entre ellos y no se pega una costilla con su vecina, que es lo que
+    pasaría con un cierre global del mismo radio.
+    """
+    import numpy as np
+    from scipy import ndimage
+    ids = {v: k for k, v in nombres.items()}
+    largos = [n for n in nombres.values()
+              if "rib_" in n or "clavicula" in n or "humerus" in n]
+    bola = _bola_estructura(esp, radio_mm)
+    unidos = 0
+    for n in largos:
+        i = ids.get(n)
+        if i is None:
+            continue
+        m = lab == i
+        if not m.any():
+            continue
+        _, trozos = ndimage.label(m)
+        if trozos < 2:
+            continue
+        # se trabaja en la caja del hueso, no en el volumen entero: un cierre con bola de 9 mm
+        # sobre todo el TC no cabe en el mini y además no hace falta
+        caja = ndimage.find_objects(m.astype(np.uint8))[0]
+        caja = tuple(slice(max(0, s.start - 12), min(d, s.stop + 12))
+                     for s, d in zip(caja, m.shape))
+        mask[caja] |= ndimage.binary_closing(m[caja], bola)
+        unidos += 1
+    if unidos:
+        print("fragmentos: %d hueso(s) largos unidos consigo mismos (radio %g mm)"
+              % (unidos, radio_mm))
+    return mask
+
+
+def _puentea_columna(mask, lab, nombres):
+    """Cierra los tramos de columna que el modelo no segmentó, interpolando entre los bordes.
+
+    En este TC faltan T11 y T12 enteras (medido: el mayor trozo de T11 tenía 28 vóxeles), y eso
+    deja un VACÍO entre el tórax y la lumbar — justo donde está el foco más intenso de la serie.
+    Un agujero ahí es peor que una reconstrucción: parece que no hay nada donde sí hay hueso.
+
+    Una columna es una cadena continua, así que un hueco interior no es anatomía, es que falta
+    el dato. Se rellena interpolando la SECCIÓN entre el corte lleno de arriba y el de abajo,
+    con distancias con signo (el morphing estándar de formas: la forma intermedia es el nivel
+    cero de la mezcla de las dos distancias). No inventa un hueso donde no hay columna: solo
+    une dos trozos de la misma columna.
+    """
+    import numpy as np
+    from scipy import ndimage
+    ids = {v: k for k, v in nombres.items()}
+    vert = np.isin(lab, [ids[n] for n in CADENA if n in ids])
+    if not vert.any():
+        return mask
+    lleno = vert.any(axis=(0, 1))
+    zz = np.nonzero(lleno)[0]
+    lo, hi = int(zz.min()), int(zz.max())
+    huecos, z = [], lo
+    while z <= hi:
+        if not lleno[z]:
+            ini = z
+            while z <= hi and not lleno[z]:
+                z += 1
+            huecos.append((ini, z - 1))
+        else:
+            z += 1
+    if not huecos:
+        return mask
+    puestos = 0
+    for ini, fin in huecos:
+        a, b = vert[:, :, ini - 1], vert[:, :, fin + 1]
+        if not a.any() or not b.any():
+            continue
+        # distancia con signo: negativa dentro, positiva fuera
+        da = ndimage.distance_transform_edt(~a) - ndimage.distance_transform_edt(a)
+        db = ndimage.distance_transform_edt(~b) - ndimage.distance_transform_edt(b)
+        for k in range(ini, fin + 1):
+            t = (k - ini + 1) / (fin - ini + 2)
+            mask[:, :, k] |= ((1 - t) * da + t * db) < 0
+            puestos += 1
+    if puestos:
+        print("columna: %d corte(s) puenteados en %d hueco(s) — RECONSTRUIDOS, no medidos"
+              % (puestos, len(huecos)))
+    return mask
+
+
+def _simetriza_costillas(mask, lab, nombres, esp):
+    """Recupera del otro lado las costillas que faltan. Solo costillas, y solo si faltan.
+
+    Medido en este TC: salen 9 costillas derechas y 10 izquierdas de 12, y no las mismas. Una
+    parrilla con huecos asimétricos se lee como fallo, no como anatomía. Un tórax es simétrico
+    dentro de lo que este render puede distinguir, así que la que falta se copia de su pareja.
+
+    Se limita a las costillas a propósito: espejar el esqueleto entero también duplicaría lo
+    que de verdad es asimétrico y taparía cosas que conviene ver tal cual.
+    """
+    import numpy as np
+    ids = {v: k for k, v in nombres.items()}
+    vol = float(np.prod(esp))
+    eje_x = float(np.argwhere(mask)[:, 0].mean()) if mask.any() else mask.shape[0] / 2
+    copiadas = []
+    for k in range(1, 13):
+        par = {}
+        for lado in ("left", "right"):
+            i = ids.get("rib_%s_%d" % (lado, k))
+            par[lado] = (lab == i) if i is not None else np.zeros_like(mask)
+        v_i, v_d = par["left"].sum() * vol, par["right"].sum() * vol
+        if v_i < SIMETRIA_MIN_MM3 and v_d >= SIMETRIA_MIN_MM3:
+            falta, tiene, nom = "left", "right", "izquierda"
+        elif v_d < SIMETRIA_MIN_MM3 and v_i >= SIMETRIA_MIN_MM3:
+            falta, tiene, nom = "right", "left", "derecha"
+        else:
+            continue
+        # espejo respecto al eje medio del cuerpo, redondeando al vóxel
+        idx = np.argwhere(par[tiene])
+        idx[:, 0] = np.clip(np.round(2 * eje_x - idx[:, 0]).astype(int), 0, mask.shape[0] - 1)
+        mask[idx[:, 0], idx[:, 1], idx[:, 2]] = True
+        copiadas.append("%d%s" % (k, nom[0]))
+    if copiadas:
+        print("simetría: %d costilla(s) copiadas del otro lado (%s) — RECONSTRUIDAS, no medidas"
+              % (len(copiadas), " ".join(copiadas)))
+    return mask
+
+
+def _reconstruye(mask, esp):
+    """Cierra los agujeros que la segmentación deja y recupera por simetría lo que falta.
+
+    Aquí el esqueleto deja de ser SOLO medida y pasa a ser RECONSTRUCCIÓN, y eso hay que
+    decirlo donde se publique. La razón para hacerlo igualmente: este esqueleto es un fondo
+    para situar los focos, y lo que sustituye es un dibujo hecho a mano entero. Una parrilla
+    costal con mordiscos se lee como error del sistema, no como anatomía, y distrae de lo único
+    que aquí es dato de verdad, que son los focos.
+
+    Lo que NO se toca: la posición de los focos, que sale de los centroides, no de esta máscara.
+    """
+    import numpy as np
+    from scipy import ndimage
+    # 1) agujeros interiores: hueso rodeado de hueso que la segmentación se dejó
+    lleno = ndimage.binary_fill_holes(mask)
+    # y también por cortes, que pilla los que en 3D tienen salida por algún lado
+    for eje in (0, 2):
+        lleno |= np.moveaxis(ndimage.binary_fill_holes(
+            np.moveaxis(mask, eje, 0).reshape(mask.shape[eje], -1)).reshape(
+                np.moveaxis(mask, eje, 0).shape), 0, eje)
+    return lleno
+CADENA = (["vertebrae_C%d" % i for i in range(1, 8)]
+          + ["vertebrae_T%d" % i for i in range(1, 13)]
+          + ["vertebrae_L%d" % i for i in range(1, 6)] + ["vertebrae_S1"])
+
+
+def vertebras_finas(red, lab_grueso, nombres, destino, device="auto", margen_mm=40.0):
+    """Centroides de cada vértebra POR SU NOMBRE, con el modelo fino, sobre un recorte.
+
+    Tres caminos probados y descartados antes de este, todos el 20-sep-26:
+
+    · el modelo de 3 mm pierde niveles enteros en este TC (faltaban T11, T12 y C5-C7, y T9 salía
+      con 58 mm³), así que no sirve para decir en qué vértebra está un foco;
+    · el fino sobre el cuerpo entero corre CINCO redes y ahogó la máquina (7,5 GB de swap);
+    · `roi_subset`, que habría corrido solo la red de vértebras, RENUMERA las etiquetas: con
+      `ml=False` hasta los ficheros por nombre traían otra estructura (la columna salía
+      C7→S1→C6→C5→…). Está en [[polaris-totalsegmentator-roi-subset-renumera]].
+
+    Lo que sí funciona: recortar la imagen a la columna y correr la tarea COMPLETA ahí. El
+    recorte estrecha mucho en x-y (la columna es estrecha) pero **conserva todo el rango
+    cráneo-caudal**, porque el modelo nombra cada vértebra por su sitio en la cadena y un
+    recorte que la parta la renumera igual que trocear.
+    """
+    import nibabel as nib
+    import numpy as np
+    from scipy import ndimage
+    from totalsegmentator.python_api import totalsegmentator
+    # la versión va en el nombre: cada vez que cambia CÓMO se recorta, el fichero de antes deja
+    # de valer, y reutilizarlo me hizo dar por probado un arreglo que ni se había ejecutado.
+    out = os.path.join(destino, "columna_v2_total.nii.gz")
+    if not os.path.exists(out):
+        os.makedirs(destino, exist_ok=True)
+        # canónica, porque la caja se calcula sobre `lab_grueso`, que YA está en canónica.
+        # Recortar la imagen cruda con índices de la canónica mezcla dos espacios: la caja
+        # cae donde no es y el modelo nombra las vértebras con lo que ve, que es otra cosa.
+        src = nib.as_closest_canonical(nib.load(red))
+        esp = np.sqrt((src.affine[:3, :3] ** 2).sum(axis=0))
+        ids = {v: k for k, v in nombres.items()}
+        col = np.isin(lab_grueso, [ids[n] for n in CADENA if n in ids])
+        if not col.any():
+            raise SystemExit("ABORTA: la pasada gruesa no encontró columna donde recortar")
+        xs, ys, _ = np.nonzero(col)
+        def _caja(v, n, e):
+            return (max(0, int(v.min() - margen_mm / e)), min(n, int(v.max() + margen_mm / e) + 1))
+        x0, x1 = _caja(xs, col.shape[0], esp[0])
+        y0, y1 = _caja(ys, col.shape[1], esp[1])
+        if src.shape != lab_grueso.shape:
+            raise SystemExit("ABORTA: la imagen (%s) y la máscara gruesa (%s) no comparten "
+                             "rejilla; la caja del recorte caería donde no es"
+                             % (src.shape, lab_grueso.shape))
+        datos = np.asarray(src.dataobj, dtype=np.int16)[x0:x1, y0:y1, :]   # z entero a propósito
+        af = src.affine.copy()
+        af[:3, 3] = (src.affine @ np.array([x0, y0, 0, 1.0]))[:3]
+        ent = os.path.join(destino, "columna_in.nii.gz")
+        nib.save(nifti_limpio(datos, af, np.int16), ent)
+        print("  recorte de columna: %s de %s vóxeles (%.0f%% del volumen)"
+              % (datos.shape, col.shape, 100.0 * datos.size / col.size), flush=True)
+        del datos
+        tmp = out + ".parcial.nii.gz"
+        totalsegmentator(input=ent, output=tmp, task="total", ml=True, fast=False,
+                         device=_dispositivo(device), quiet=True)
+        os.replace(tmp, out)
+        os.remove(ent)
+    img = nib.as_closest_canonical(nib.load(out))
+    lab = np.asarray(img.dataobj)
+    ids = {v: k for k, v in nombres.items()}
+    centros, vacias = {}, []
+    for n in CADENA:
+        i = ids.get(n)
+        m = (lab == i) if i is not None else None
+        if m is None or not m.any():
+            vacias.append(n)
+            continue
+        centros[n] = [round(float(v), 1)
+                      for v in (img.affine @ np.append(ndimage.center_of_mass(m), 1.0))[:3]]
+    print("vértebras finas: %d con centroide%s"
+          % (len(centros), "" if not vacias else " · sin encontrar: " + ", ".join(vacias)))
+    if os.environ.get("BTP_DIAG"):
+        for n in CADENA:
+            i = ids.get(n)
+            if n in centros and i is not None:
+                m = lab == i
+                tr, nc = ndimage.label(m)
+                vols = sorted(np.bincount(tr.ravel())[1:], reverse=True)
+                print("  DIAG %-15s z=%8.1f mm · %d trozo(s) · mayores %s"
+                      % (n, centros[n][2], nc, vols[:3]), flush=True)
+    _orden_columna(centros)
+    return centros
+
+
+def niveles_por_conteo(lab, nombres, afin, cráneo_z=None):
+    """Nombra cada vértebra por su SITIO en la cadena, no por lo que diga el modelo.
+
+    El hallazgo que desbloquea esto: TotalSegmentator segmenta bien los cuerpos vertebrales y
+    los nombra MAL (medido: la columna salía C7→S1→C6→C5…, y con cada etiqueta partida en
+    trozos, dos de ellos del mismo tamaño en vértebras distintas). Pero el orden de una columna
+    no es opinable: de arriba abajo son C1…C7, T1…T12, L1…L5. Si cuento los cuerpos, los
+    nombres salen del orden, sin depender de que el modelo acierte.
+
+    Cómo se cuenta: se proyecta el hueso vertebral corte a corte; los discos dejan un mínimo en
+    ese perfil porque ahí hay menos hueso. Cada tramo entre dos mínimos es un cuerpo.
+
+    El freno: entre la base del cráneo y el sacro hay 24 cuerpos, ni uno más ni uno menos. Si
+    no salen 24, esto NO devuelve nada — prefiero no dar niveles a dar niveles corridos, que es
+    el error que pone un foco en la vértebra de al lado sin que se note.
+    """
+    import numpy as np
+    from scipy import ndimage
+    ids = {v: k for k, v in nombres.items()}
+    vert = np.isin(lab, [ids[n] for n in CADENA if n in ids])
+    if not vert.any():
+        return {}
+    perfil = vert.sum(axis=(0, 1)).astype(float)
+    zz = np.nonzero(perfil)[0]
+    z0, z1 = int(zz.min()), int(zz.max())
+    suave = ndimage.gaussian_filter1d(perfil[z0:z1 + 1], 1.5)
+    # mínimos locales del perfil = discos. Se exige que el mínimo sea REAL (baja al menos un
+    # 8 % respecto a los máximos vecinos), o el ruido inventa discos donde no los hay.
+    minimos = []
+    for i in range(2, len(suave) - 2):
+        if suave[i] <= suave[i - 1] and suave[i] <= suave[i + 1]:
+            v_izq, v_der = suave[max(0, i - 6):i], suave[i + 1:i + 7]
+            izq = float(v_izq.max()) if v_izq.size else 0.0
+            der = float(v_der.max()) if v_der.size else 0.0
+            if min(izq, der) > 0 and suave[i] < 0.92 * min(izq, der):
+                if not minimos or i - minimos[-1] > 3:
+                    minimos.append(i)
+    cuerpos = len(minimos) + 1
+    print("conteo de la columna: %d cuerpos entre los cortes %d y %d" % (cuerpos, z0, z1))
+    if cuerpos != len(CADENA) - 1:      # 24: de C1 a L5; S1 ya es sacro
+        print("AVISO: esperaba %d cuerpos y conté %d — no se nombran niveles"
+              % (len(CADENA) - 1, cuerpos), file=sys.stderr)
+        return {}
+    bordes = [0] + minimos + [len(suave) - 1]
+    centros = {}
+    for k, n in enumerate(CADENA[:-1]):
+        a, b = bordes[k], bordes[k + 1]
+        tramo = vert[:, :, z0 + a:z0 + b + 1]
+        if not tramo.any():
+            continue
+        com = np.asarray(ndimage.center_of_mass(tramo)) + np.array([0, 0, z0 + a])
+        centros[n] = [round(float(v), 1) for v in (afin @ np.append(com, 1.0))[:3]]
+    return centros
+
+
+def niveles_por_reparto(lab, nombres, afin):
+    """Los 24 niveles repartidos a lo largo de SU columna, entre el cráneo y el sacro.
+
+    Último recurso, y se dice lo que es: una ESTIMACIÓN. Antes se intentó, y se midió por qué
+    no vale, todo el 20-sep-26:
+      · el modelo de 3 mm pierde niveles enteros (faltaban T11, T12, C5-C7);
+      · el fino entero no cabe en 16 GB y troceado entra en thrashing;
+      · `roi_subset` renumera y hasta los ficheros por nombre traen otra estructura;
+      · sobre un recorte estrecho las vértebras salen partidas y una etiqueta aparece en dos;
+      · contar cuerpos por los discos da 21 de 24 (C1 no tiene cuerpo, arriba se funden);
+      · las costillas, que serían el ancla natural de cada dorsal, salen desordenadas y faltan 5.
+
+    Lo que SÍ está bien segmentado es el cráneo, el sacro y la forma de la columna. Entre la
+    base del cráneo y el techo del sacro hay 24 cuerpos, siempre. Repartirlos a lo largo del
+    eje real de su columna no inventa anatomía: usa la suya, con sus curvas. Lo que no hace es
+    medir cada nivel, y por eso sale etiquetado como estimado y nunca como dato de informe.
+
+    El freno: cada nivel tiene que caer DENTRO del hueso vertebral. Si alguno cae en el aire,
+    el eje está mal y no se devuelve nada.
+    """
+    import numpy as np
+    from scipy import ndimage
+    ids = {v: k for k, v in nombres.items()}
+    vert = np.isin(lab, [ids[n] for n in CADENA if n in ids])
+    craneo = ids.get("skull")
+    sacro = ids.get("sacrum")
+    if not vert.any() or craneo is None or sacro is None:
+        return {}
+    m_cr, m_sa = lab == craneo, lab == sacro
+    if not m_cr.any() or not m_sa.any():
+        print("AVISO: sin cráneo o sin sacro, no hay entre qué repartir", file=sys.stderr)
+        return {}
+    # Los extremos salen de la PROPIA columna, no del cráneo: el cráneo baja más que la
+    # cervical alta (mandíbula, base), y repartir desde ahí dejaba seis niveles en el aire.
+    # El corte más alto con hueso vertebral ES C1, y el más bajo, L5 sobre el sacro.
+    zv = np.nonzero(vert.any(axis=(0, 1)))[0]
+    lo, hi = int(zv.min()), int(zv.max())
+    z_sa = int(np.nonzero(m_sa.any(axis=(0, 1)))[0].max())
+    if not (lo <= z_sa <= hi or abs(z_sa - lo) < abs(z_sa - hi)):
+        pass    # el sacro solo sirve de comprobación de sentido, no de extremo
+    if hi - lo < len(CADENA):
+        print("AVISO: cráneo y sacro salen pegados, el reparto no tiene sentido", file=sys.stderr)
+        return {}
+    # eje real de la columna: centro del hueso vertebral en cada corte, suavizado
+    n = len(CADENA) - 1
+    centros, fuera = {}, []
+    for k, nom in enumerate(CADENA[:-1]):
+        # el centro de cada nivel, no su borde: por eso k + 0.5
+        z = int(round(lo + (hi - lo) * (k + 0.5) / n))
+        corte = vert[:, :, max(0, z - 2):z + 3]
+        if not corte.any():
+            fuera.append(nom)
+            continue
+        com = np.asarray(ndimage.center_of_mass(corte))
+        com[2] = z
+        centros[nom] = [round(float(v), 1) for v in (afin @ np.append(com, 1.0))[:3]]
+    if fuera:
+        print("AVISO: %d nivel(es) caen fuera del hueso (%s) — no se reparten"
+              % (len(fuera), ", ".join(fuera[:4])), file=sys.stderr)
+        return {}
+    print("niveles repartidos: %d, todos dentro del hueso vertebral (ESTIMADOS)" % len(centros))
+    return centros
+
+
+def _orden_columna(centros):
+    """La columna tiene un orden físico innegociable: si no sale monótona, los nombres están mal.
+
+    Es el único freno que caza una renumeración, porque el render se ve perfecto igualmente.
+    """
+    alturas = [(n, centros[n][2]) for n in CADENA if n in centros]
+    z = [a for _, a in alturas]
+    if len(z) > 2 and not (all(x > y for x, y in zip(z, z[1:]))
+                           or all(x < y for x, y in zip(z, z[1:]))):
+        fuera = [n for (n, a), (_, b) in zip(alturas, alturas[1:]) if (a - b) * (z[0] - z[1]) < 0]
+        raise SystemExit("ABORTA: la columna no sale en orden (rompen: %s). Los nombres están "
+                         "barajados y cada foco iría a la vértebra de al lado." % fuera[:6])
+    print("orden de la columna: ok (%d niveles monótonos)" % len(z))
+
+
+def _revisa_cadena(nombres, lab, afin):
+    """La columna tiene que salir entera y en orden, o los focos van a la vértebra que no es.
+
+    Dos formas de equivocarse que NO se ven mirando el render: que falte un nivel en medio (el
+    foco se queda sin hueso) y que el orden se rompa (el modelo ha renumerado, y entonces un
+    foco de D11 acaba en la vértebra de al lado). Medido el 20-sep-26: el modelo de 3 mm perdía
+    T11, T12 y C5-C7 en este TC, y T9 salía con 58 mm³.
+    """
+    import numpy as np
+    from scipy import ndimage
+    ids = {v: k for k, v in nombres.items()}
+    vol0 = float(np.prod(np.sqrt((np.asarray(afin)[:3, :3] ** 2).sum(axis=0))))
+    alturas, ausentes, chicas = [], [], []
+    for n in CADENA:
+        i = ids.get(n)
+        m = (lab == i) if i is not None else None
+        if m is None or not m.any():
+            ausentes.append(n)
+            continue
+        v = float(m.sum()) * vol0
+        if v < VERTEBRA_MIN_MM3:
+            chicas.append("%s (%d mm³)" % (n, v))
+        alturas.append((n, float(ndimage.center_of_mass(m)[2])))
+    # el orden: de C1 a S1 la altura tiene que bajar siempre (o subir siempre, según la rejilla)
+    z = [a for _, a in alturas]
+    monotona = all(x > y for x, y in zip(z, z[1:])) or all(x < y for x, y in zip(z, z[1:]))
+    huecos = [n for n in ausentes if CADENA.index(n) > CADENA.index(alturas[0][0])
+              and CADENA.index(n) < CADENA.index(alturas[-1][0])] if alturas else ausentes
+    print("cadena vertebral: %d de %d niveles%s"
+          % (len(alturas), len(CADENA), "" if not chicas else " · pequeñas: " + ", ".join(chicas)))
+    if huecos or not monotona:
+        raise SystemExit(
+            "ABORTA: la columna no sale entera o está desordenada (huecos: %s · en orden: %s). "
+            "Colocar un foco con esto lo pondría en la vértebra de al lado."
+            % (huecos or "ninguno", monotona))
+
+
+VERTEBRA_MIN_MM3 = 2000  # por debajo de esto el nivel está reconocido a medias, no sirve de ancla
+MOTA_MIN_MM3 = 40       # por debajo de esto, un trozo suelto es un recorte del campo.
+# Bajado de 120 a 40 el 20-sep: a 120 se llevaba los restos de T11-T12, que en este TC salen
+# muy fragmentadas, y dejaba un VACÍO entre el tórax y la lumbar — justo donde está el foco
+# más intenso de la serie. Un hueco ahí es peor que un par de motas.
+# Empezó en 1500 y se comió costillas enteras: a 3 mm una costilla sale partida en trozos de
+# menos de 1500 mm³, así que el umbral borraba hueso de verdad y dejaba el tórax asimétrico.
+
+
+def _huesos_del_mapa():
+    """Nombres de clase de TotalSegmentator que son hueso, en el orden en que se dibujan."""
+    from totalsegmentator.map_to_binary import class_map
+    nombres = list(class_map["total"].values())
+    # CON húmeros. Los quité cuando el fondo era un dibujo y los brazos levantados del TC
+    # desentonaban. Con el esqueleto real desentona lo contrario: un tronco sin brazos se lee
+    # como que falta medio cuerpo, y {{TITULAR}} lo dijo —«le faltan trozos, debería ser un
+    # esqueleto completo». Están enteros en su TC (81.000 y 83.000 mm³ medidos), levantados,
+    # que es como se hace un TC de cuerpo entero.
+    def es_hueso(n):
+        return (n.startswith("vertebrae_") or "rib_" in n
+                or n in ("sacrum", "sternum", "skull", "hip_left", "hip_right",
+                         "femur_left", "femur_right", "humerus_left", "humerus_right",
+                         "scapula_left", "scapula_right", "clavicula_left", "clavicula_right"))
+    return [n for n in nombres if es_hueso(n)]
+
+
+def esqueleto(raices, serie, device="auto", voxel=1.5, trozos=3, solapa=16, suaviza_mm=1.0,
+              fino=False, vertebras=False, niveles=True, solo=None):
+    """Máscara del esqueleto + centroide de cada hueso, desde el TC. Devuelve (mask, afín, centros)."""
+    import nibabel as nib
+    import numpy as np
+    from scipy import ndimage
+    from totalsegmentator.map_to_binary import class_map
+    from totalsegmentator.python_api import totalsegmentator
+    imagen, meta = convierte(raices, serie)
+    if meta["modalidad"] != "CT":
+        raise SystemExit("ABORTA: el esqueleto sale del TC; %s es %s." % (serie, meta["modalidad"]))
+    # REMUESTREAR ANTES de segmentar, y no es un atajo: TotalSegmentator trabaja por dentro a
+    # 1,5 mm de todos modos, pero DEVUELVE el mapa de etiquetas a la resolución original. Sobre
+    # un TC de cuerpo entero a 0,78 mm eso son 245 millones de vóxeles, y el 20-sep-26 pedir eso
+    # llegó a 20 GB en un mini de 16 y hubo que matarlo a mano. A 1,5 mm son ~8 veces menos, y
+    # para una silueta de esqueleto sobra.
+    exige_telemetria_apagada()
+    red = os.path.join(_cache(serie), "esqueleto_%gmm.nii.gz" % voxel)
+    if not os.path.exists(red):
+        # Se decima por PASO ENTERO, no con `resample_to_output`: esa interpola por splines en
+        # float64 y con un TC de cuerpo entero se fue a 11,2 GB (la guarda lo mató, 20-sep-26).
+        # Un paso entero se lee en rodajas con `dataobj`, así que nibabel no carga el volumen
+        # entero y el pico se queda en megas. Para una silueta de esqueleto, un vóxel de cada n
+        # sobra; la geometría se corrige en el afín.
+        src = nib.load(imagen)
+        esp0 = np.sqrt((src.affine[:3, :3] ** 2).sum(axis=0))
+        paso = [max(1, int(round(voxel / e))) for e in esp0]
+        datos = np.asarray(src.dataobj[::paso[0], ::paso[1], ::paso[2]], dtype=np.int16)
+        af = src.affine.copy()
+        af[:3, :3] = src.affine[:3, :3] * np.array(paso)
+        nib.save(nifti_limpio(datos, af, np.int16), red)
+        del datos
+    # el nº de trozos va en el nombre: el cosido de 3 trozos y el de una pieza no son el mismo
+    # fichero, y reutilizar uno por el otro fue lo que me escondió un cosido en espejo.
+    out = os.path.join(_cache(serie), "seg",
+                       "esqueleto_%gmm_x%d%s_total.nii.gz" % (voxel, max(1, trozos),
+                                                             "_fino" if fino else ""))
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    if not os.path.exists(out) and trozos > 1:
+        # POR TROZOS, y no es una manía: el pico de nnU-Net es proporcional al volumen, y este TC
+        # de cuerpo entero pide ~10,5 GB de una pieza (medido cuatro veces: 11,2 · 11,3 · 10,4 ·
+        # 10,2 GB, las cuatro cortadas por la guarda). En un mini de 16 GB con el escritorio
+        # abierto, eso es dejar la máquina inservible. Cada trozo pide su parte y cabe.
+        # Se solapan `solapa` cortes y en la zona común manda el trozo que tiene el vóxel más
+        # LEJOS de su propio borde, que es donde la red ve con más contexto.
+        # canónica, porque la caja se calcula sobre `lab_grueso`, que YA está en canónica.
+        # Recortar la imagen cruda con índices de la canónica mezcla dos espacios: la caja
+        # cae donde no es y el modelo nombra las vértebras con lo que ve, que es otra cosa.
+        src = nib.as_closest_canonical(nib.load(red))
+        datos = np.asarray(src.dataobj, dtype=np.int16)
+        nz = datos.shape[2]
+        etq = np.zeros(datos.shape, np.uint8)
+        dist = np.zeros(datos.shape, np.int32)
+        cortes = np.linspace(0, nz, trozos + 1).round().astype(int)
+        for k in range(trozos):
+            z0 = max(0, cortes[k] - solapa)
+            z1 = min(nz, cortes[k + 1] + solapa)
+            # el nombre lleva TODO lo que cambia el contenido (nº de trozos, solape, modelo):
+            # reutilizar una pieza de otra configuración hacía que las formas no casaran.
+            pieza = os.path.join(os.path.dirname(out), "trozo%d_de%d_s%d_%gmm%s.nii.gz"
+                                 % (k, trozos, solapa, voxel, "_fino" if fino else ""))
+            # el afín del recorte se calcula SIEMPRE, no solo al crearlo: con la pieza ya en
+            # caché hacía falta igual para devolverla a esta rejilla al coserla.
+            af = src.affine.copy()
+            af[:3, 3] = (src.affine @ np.array([0, 0, z0, 1.0]))[:3]
+            if not os.path.exists(pieza):
+                ent = pieza.replace(".nii.gz", "_in.nii.gz")
+                nib.save(nifti_limpio(datos[:, :, z0:z1], af, np.int16), ent)
+                tmp = pieza + ".parcial.nii.gz"
+                print("  trozo %d/%d · cortes %d–%d" % (k + 1, trozos, z0, z1), flush=True)
+                totalsegmentator(input=ent, output=tmp, task="total", ml=True, fast=not fino,
+                                 device=_dispositivo(device), quiet=True)
+                os.replace(tmp, pieza)
+                os.remove(ent)
+            # OJO: TotalSegmentator devuelve la pieza en SU orientación, no necesariamente en
+            # la del recorte que le di. Coserla con el afín de la imagen original salía en
+            # espejo, y en un esqueleto simétrico eso no se ve: lo cazó el ancla del hígado.
+            # Así que la pieza se lleva a la rejilla del recorte antes de pegarla.
+            pimg = nib.load(pieza)
+            if os.environ.get("BTP_DIAG"):
+                print("  DIAG trozo %d: recorte %s · pieza %s · forma %s vs %s"
+                      % (k, nib.orientations.aff2axcodes(af),
+                         nib.orientations.aff2axcodes(pimg.affine),
+                         pimg.shape, datos[:, :, z0:z1].shape), flush=True)
+            orig = nib.orientations.io_orientation(af)
+            suya = nib.orientations.io_orientation(pimg.affine)
+            lp = np.asarray(pimg.dataobj)
+            if not np.allclose(orig, suya):
+                lp = nib.orientations.apply_orientation(
+                    lp, nib.orientations.ornt_transform(suya, orig))
+            lp = lp.astype(np.uint8)
+            if lp.shape != datos[:, :, z0:z1].shape:
+                raise SystemExit("ABORTA: el trozo %d vuelve con forma %s y esperaba %s"
+                                 % (k, lp.shape, datos[:, :, z0:z1].shape))
+            # +1 para que el primer y el último corte del trozo también entren (d=0 no gana a dist=0)
+            d = np.minimum(np.arange(z1 - z0), (z1 - z0 - 1) - np.arange(z1 - z0)) + 1
+            mejor = d[None, None, :] > dist[:, :, z0:z1]
+            sub = etq[:, :, z0:z1]
+            sub[mejor] = lp[mejor]
+            etq[:, :, z0:z1] = sub
+            dist[:, :, z0:z1] = np.maximum(dist[:, :, z0:z1], d[None, None, :])
+            del lp
+        nib.save(nifti_limpio(etq, src.affine, np.uint8), out + ".parcial.nii.gz")
+        os.replace(out + ".parcial.nii.gz", out)
+        del datos, etq, dist
+    if not os.path.exists(out):
+        # a un temporal y luego rename: si la guarda mata a mitad, no queda un fichero a medias
+        # que la vuelta siguiente dé por bueno
+        tmp = out + ".parcial.nii.gz"
+        # `fast=True` NO es «peor calidad aceptable»: es lo único que cabe, y está medido.
+        # nnU-Net materializa el mapa de probabilidades de las 118 clases en float32, así que el
+        # pico es nº de vóxeles × 118 × 4 bytes:
+        #     a 1,56 mm → 30,6 M vóxeles = 14,5 GB   (medido: la guarda cortó a 11,3 GB)
+        #     a 3,00 mm →  5,5 M vóxeles =  2,6 GB   ← con fast
+        # Por eso los dos intentos anteriores, con remuestreos completamente distintos, pararon
+        # en el MISMO sitio: ninguno tocaba la causa. Para una silueta de esqueleto, 3 mm sobra.
+        # SIN `roi_subset`: renumera las etiquetas de 1 a n y deja de casar con `class_map`,
+        # que es lo que reventó el primer intento que llegó al final (KeyError 25). Y no hacía
+        # falta: lo que hace que quepa es el tamaño del volumen, no el número de clases pedidas.
+        # `fast` NO es «un poco peor»: es OTRO modelo, el de 3 mm. Y remuestrea a 3 mm pase lo
+        # que pase, así que darle la imagen a 1,5 mm con fast gasta memoria sin ganar nada.
+        # A 3 mm este TC pierde niveles vertebrales enteros: faltaban T11, T12 y C5-C7, y T9
+        # salía con 58 mm³ (medido). Para colocar un foco en SU vértebra eso no vale.
+        totalsegmentator(input=red, output=tmp, task="total", ml=True, fast=not fino,
+                         device=_dispositivo(device), quiet=True)
+        os.replace(tmp, out)
+    # A orientación canónica SIEMPRE, venga de una pieza o de tres cosidas. `proyecta_anterior`
+    # da por hecho que el eje 0 es x del paciente y el 2 es z; eso solo es cierto en canónica.
+    # Los dos caminos traían orientaciones distintas (TotalSegmentator reorienta su salida, el
+    # cosido conservaba la del DICOM) y por eso uno salía derecho y el otro en espejo.
+    _bruto = nib.load(out)
+    img = nib.as_closest_canonical(_bruto)
+    if os.environ.get("BTP_DIAG"):
+        print("DIAG cosido: %s → canónica %s · forma %s"
+              % (nib.orientations.aff2axcodes(_bruto.affine),
+                 nib.orientations.aff2axcodes(img.affine), img.shape), flush=True)
+    lab = np.asarray(img.dataobj).astype(np.int16)
+    nombres = class_map["total"]                 # número → nombre
+    ids = {v: k for k, v in nombres.items()}     # nombre → número
+    if os.environ.get("BTP_INVENTARIO"):
+        vol0 = float(np.prod(np.sqrt((img.affine[:3, :3] ** 2).sum(axis=0))))
+        hay = {nombres.get(int(i)): int(c) * vol0
+               for i, c in zip(*np.unique(lab, return_counts=True)) if i}
+        for grupo, pats in (("columna", ("vertebrae_",)), ("costillas", ("rib_",)),
+                            ("cintura", ("scapula", "clavicula", "sternum")),
+                            ("brazos", ("humerus", "radius", "ulna", "carpal", "hand")),
+                            ("pelvis", ("hip", "sacrum")),
+                            ("piernas", ("femur", "patella", "tibia", "fibula", "foot")),
+                            ("cabeza", ("skull",))):
+            hay_g = {k: v for k, v in hay.items() if k and any(p in k for p in pats)}
+            print("INV %-10s %2d pieza(s) · %s" % (grupo, len(hay_g),
+                  ", ".join("%s %.0f" % (k.replace("vertebrae_", "").replace("rib_", ""), v)
+                            for k, v in sorted(hay_g.items())[:14]) or "NADA"), flush=True)
+    if os.environ.get("BTP_DIAG"):
+        hay_lab, cuenta = np.unique(lab, return_counts=True)
+        vol0 = float(np.prod(np.sqrt((img.affine[:3, :3] ** 2).sum(axis=0))))
+        faltan = [n for i, n in sorted(nombres.items())
+                  if (n.startswith("vertebrae_") or n in ("sacrum", "sternum"))
+                  and i not in set(hay_lab.tolist())]
+        print("DIAG etiquetas presentes: %d · vértebras/sacro/esternón AUSENTES: %s"
+              % (len(hay_lab) - 1, faltan or "ninguna"), flush=True)
+        chicas = [(nombres.get(int(i)), int(c * vol0)) for i, c in zip(hay_lab, cuenta)
+                  if i and c * vol0 < 3000]
+        print("DIAG etiquetas con menos de 3000 mm³:", chicas[:12], flush=True)
+    if vertebras:
+        # los niveles vienen de su propia pasada, que es la única que los nombra bien
+        finas = vertebras_finas(red, lab, nombres,
+                                os.path.join(_cache(serie), "seg", "columna_%gmm" % voxel),
+                                device=device)
+    elif niveles:
+        # los nombres salen del ORDEN de la cadena, no de lo que diga el modelo
+        finas = niveles_por_conteo(lab, nombres, img.affine)
+        if not finas:
+            finas = niveles_por_reparto(lab, nombres, img.affine)
+        if finas:
+            _orden_columna(finas)
+    else:
+        # Sin niveles vertebrales publicados. No es un apaño para saltarse el freno: es que si
+        # no sale NINGÚN nombre de vértebra, ningún foco puede acabar en la vértebra de al lado.
+        # La silueta sigue siendo la real y los huesos que no son columna (escápula, ilíaco,
+        # sacro, fémur, costilla) siguen teniendo su centroide.
+        finas = {}
+    huesos = _huesos_del_mapa()
+    if solo:
+        # Solo los huesos QUE TIENEN LESIÓN. Idea de {{TITULAR}}: en vez de pelearse por completar
+        # un esqueleto que el TC nunca escaneó entero, enseñar las piezas que importan. Cada
+        # una es suya, está en su sitio real, y no hay nada que reconstruir ni que disimular.
+        huesos = [n for n in huesos if n in solo]
+        print("solo lesionados: %d hueso(s) de %s" % (len(huesos), ", ".join(sorted(solo))))
+    quiero = [ids[n] for n in huesos if n in ids]
+    mask = np.isin(lab, quiero)
+    if not mask.any():
+        raise SystemExit("ABORTA: la segmentación no trae hueso; ¿es un TC de cuerpo entero?")
+    # fuera las motas sueltas: trozos que el borde del campo corta y quedan flotando en el aire.
+    # El umbral va en mm³ para que no dependa de a cuántos milímetros se haya remuestreado.
+    esp_mm = np.sqrt((img.affine[:3, :3] ** 2).sum(axis=0))
+    esp_v = float(np.prod(esp_mm))
+    trozo, n = ndimage.label(mask)
+    if n > 1:
+        vol = np.bincount(trozo.ravel())[1:] * esp_v
+        mask = np.isin(trozo, np.nonzero(vol >= MOTA_MIN_MM3)[0] + 1)
+        fuera = int((vol < MOTA_MIN_MM3).sum())
+        if fuera:
+            print("limpieza: %d trozo(s) sueltos por debajo de %d mm³" % (fuera, MOTA_MIN_MM3))
+    del trozo
+    # Ancla de lateralidad. Un esqueleto es casi simétrico, así que si la vista sale en espejo
+    # NO se nota mirándola: los focos de la derecha aparecerían en la izquierda y nadie lo vería
+    # hasta que fuese tarde. El hígado y el bazo no son simétricos y no admiten discusión, así
+    # que se sacan sus centroides SOLO para comprobar el sentido, y no se dibujan.
+    ancla = {}
+    for organo in ("liver", "spleen"):
+        i = ids.get(organo)
+        if i is not None and (lab == i).any():
+            com = ndimage.center_of_mass((lab == i).astype(np.uint8))
+            ancla[organo] = [float(v) for v in (img.affine @ np.append(np.asarray(com), 1.0))[:3]]
+    mask = _une_fragmentos(mask, lab, nombres, esp_mm)
+    mask = _simetriza_costillas(mask, lab, nombres, esp_mm)
+    mask = _puentea_columna(mask, lab, nombres)
+    # el centroide se calcula sobre lo que QUEDA tras la limpieza, no sobre la etiqueta original:
+    # si a una costilla le quitamos su único trozo, `center_of_mass` devolvía NaN en silencio.
+    lab = np.where(mask, lab, 0)
+    centros = {}
+    presentes = [i for i in quiero if (lab == i).any()]
+    # centroide de CADA hueso por su etiqueta: es lo que sustituye a las posiciones a ojo
+    coms = ndimage.center_of_mass(mask, lab, presentes)
+    for i, com in zip(presentes, coms):
+        nombre = nombres.get(int(i))
+        if not nombre:          # etiqueta que no está en class_map: se dice y se sigue
+            print("AVISO: etiqueta %s sin nombre en class_map; la salto" % i, file=sys.stderr)
+            continue
+        p = (img.affine @ np.append(np.asarray(com), 1.0))[:3]
+        centros[nombre] = [round(float(v), 1) for v in p]
+    centros.update(finas)      # el nivel vertebral fino manda sobre el del mapa grueso
+    if not niveles and not vertebras:
+        centros = {n: c for n, c in centros.items() if n not in set(CADENA)}
+    # El borde escalonado no se arregla segmentando más fino: a 1,5 mm el volumen es 8 veces
+    # mayor y la máquina empujó 6,3 GB al swap (medido). Y no haría falta aunque cupiera: el
+    # detalle anatómico que aporta es nulo para una SILUETA. Lo que se ve feo es el escalón del
+    # vóxel, y eso se quita remuestreando la máscara YA hecha, que cuesta unos cientos de MB.
+    if suaviza_mm and suaviza_mm < min(esp_mm):
+        factor = [e / suaviza_mm for e in esp_mm]
+        mask = ndimage.zoom(mask.astype(np.float32), factor, order=1) > 0.5
+        # y un cierre: a 3 mm las costillas salen cortadas a trozos y una parrilla costal
+        # discontinua se lee como error, no como anatomía. El cierre las vuelve a unir sin
+        # engordar el hueso más que el radio de la bola.
+        mask = ndimage.binary_closing(mask, _bola_estructura([suaviza_mm] * 3, CIERRE_MM))
+        mask = _reconstruye(mask, [suaviza_mm] * 3)
+        afin_s = img.affine.copy()
+        afin_s[:3, :3] = img.affine[:3, :3] / np.array(factor)
+    else:
+        afin_s = img.affine
+    return mask, afin_s, centros, ancla
+
+
+def proyecta_anterior(mask, afin, ancho=880):
+    """Vista de frente del esqueleto, sombreada por profundidad.
+
+    No es un render 3D: para cada punto de la pantalla se busca el vóxel de hueso MÁS ANTERIOR y
+    se ilumina según la inclinación de esa superficie. Sale una figura con volumen y cuesta un
+    segundo, que para un SELECTOR es lo que hace falta — girarlo no aporta nada aquí.
+
+    Devuelve (rgba, extension) con la extensión en mm del mundo, que es lo que permite colocar
+    después cada foco por su centroide en vez de a ojo. Vista anterior: la derecha del cuerpo
+    queda a la IZQUIERDA de quien mira, como dice el rótulo de la página.
+    """
+    import numpy as np
+    from scipy import ndimage
+    esp = np.sqrt((np.asarray(afin)[:3, :3] ** 2).sum(axis=0))
+    # índice del vóxel más anterior (mayor y) con hueso, por cada (x, z)
+    hay = mask.any(axis=1)
+    idx = mask.shape[1] - 1 - np.argmax(mask[:, ::-1, :], axis=1)
+    prof = np.where(hay, idx.astype(np.float32) * esp[1], np.nan)
+    # sombreado: normal aproximada por el gradiente del mapa de profundidad.
+    # El suavizado NO es cosmético: la profundidad viene cuantizada al vóxel, y sin suavizar
+    # el sombreado dibuja las terrazas del remuestreo como si fueran curvas de nivel.
+    p = np.where(hay, prof, np.nanmax(prof[hay]) if hay.any() else 0.0)
+    p = ndimage.gaussian_filter(p, 2.2)
+    gx, gz = np.gradient(p)
+    # El 2.2 de la componente Z es lo que aplana o levanta la figura: cuanto más bajo, más
+    # inclinada se ve la normal y más marcado sale el volumen. A 1.35 el hueso deja de parecer
+    # una silueta recortada y se le ven los relieves (crestas ilíacas, apófisis, arcos).
+    n = np.stack([-gx, -gz, np.ones_like(p) * 1.35], axis=-1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True) + 1e-9
+    luz = np.array([-0.45, 0.45, 0.78])
+    luz /= np.linalg.norm(luz)
+    lam = np.clip((n * luz).sum(axis=-1), 0, 1)
+    # la profundidad también atenúa: lo de detrás se apaga
+    if hay.any():
+        z0, z1 = np.nanmin(prof[hay]), np.nanmax(prof[hay])
+        cerca = np.clip((p - z0) / max(1e-6, z1 - z0), 0, 1)
+    else:
+        cerca = np.zeros_like(p)
+    # Relieve, en tres capas que se suman:
+    #  · difusa, con el exponente más bajo para que el medio tono no se queme;
+    #  · un brillo especular estrecho, que es lo que hace que un hueso parezca hueso;
+    #  · oclusión de andar por casa: donde el mapa de profundidad es CÓNCAVO se oscurece, y eso
+    #    mete las sombras de los huecos (entre costillas, el agujero obturador, las órbitas).
+    espec = np.clip(lam, 0, 1) ** 22
+    hueco = ndimage.gaussian_filter(p, 6.0) - p
+    ocl = np.clip(hueco / (np.abs(hueco).max() + 1e-6), 0, 1)
+    val = np.where(hay,
+                   0.20 + 0.62 * lam ** 0.9 + 0.26 * espec
+                   + 0.16 * np.nan_to_num(cerca) - 0.16 * ocl,
+                   0.0)
+    val = np.clip(val, 0.0, 1.0)
+    # A pantalla. Las tres operaciones van juntas en una función y se aplican TAMBIÉN a los
+    # índices, porque deducir a mano dónde acaba cada eje después de un rot90 y dos flips es
+    # justo donde me equivoqué: la vista salía en espejo y, en un esqueleto simétrico, mirándola
+    # no se nota. Así el mapa de mm a píxel sale de las mismas operaciones que la imagen.
+    def a_pantalla(m):
+        # La máscara llega en canónica RAS: el eje 0 crece hacia la DERECHA del cuerpo. La vista
+        # anterior la pone a la izquierda de quien mira, que es lo que dice el rótulo de la
+        # página, así que ese eje se invierte. El ancla del hígado lo comprueba después.
+        return np.flipud(np.fliplr(np.rot90(m, k=1)))
+    val = a_pantalla(val)
+    alfa = a_pantalla(hay.astype(np.float32))
+    rgba = np.zeros(val.shape + (4,), np.uint8)
+    # hueso gris-azulado pálido, como el resto del negativoscopio
+    for k, base in enumerate((0xD7, 0xDB, 0xE2)):
+        rgba[..., k] = np.clip(val * base, 0, 255).astype(np.uint8)
+    rgba[..., 3] = (np.clip(alfa, 0, 1) * 255).astype(np.uint8)
+    # extensión en mm: qué punto del mundo cae en el borde de la imagen, leído de los índices
+    nx, nz = mask.shape[0], mask.shape[2]
+    ii = a_pantalla(np.repeat(np.arange(nx)[:, None], nz, axis=1))
+    kk = a_pantalla(np.repeat(np.arange(nz)[None, :], nx, axis=0))
+
+    def _mm(i, k):
+        return (np.asarray(afin) @ np.append([i, 0, k], 1.0))[:3]
+
+    ext = {"x": [float(_mm(ii[0, 0], 0)[0]), float(_mm(ii[0, -1], 0)[0])],
+           "z": [float(_mm(0, kk[0, 0])[2]), float(_mm(0, kk[-1, 0])[2])]}
+    return rgba, ext
+
+
+def _uv(mm, extremos):
+    """De milímetros del mundo a fracción 0-1 de la imagen, en el eje que diga `extremos`."""
+    return (mm - extremos[0]) / (extremos[1] - extremos[0])
+
+
+def _cmd_esqueleto(a):
+    import numpy as np
+    from PIL import Image
+    globals()["ORGANO"] = "esqueleto"
+    mask, afin, centros, ancla = esqueleto(a.raices, a.serie, device=a.device, voxel=a.voxel,
+                                           trozos=a.trozos, solapa=a.solapa,
+                                           suaviza_mm=a.suaviza_mm, fino=a.fino,
+                                           vertebras=a.vertebras, niveles=not a.sin_niveles,
+                                           solo=set(a.solo.split(",")) if a.solo else None)
+    rgba, ext = proyecta_anterior(mask, afin)
+    dst = _dir("render")
+    exige_zona_clinica(dst)
+    os.makedirs(dst, exist_ok=True)
+    im = Image.fromarray(rgba, "RGBA")
+    if a.ancho and im.width != a.ancho:
+        im = im.resize((a.ancho, max(1, round(im.height * a.ancho / im.width))), Image.LANCZOS)
+    ruta = os.path.join(dst, "esqueleto-anterior.png")
+    im.save(ruta, "PNG", optimize=True)
+    # coordenadas de cada hueso en la MISMA imagen, normalizadas: es lo que la web necesita
+    uv = {}
+    for nombre, (x, y, z) in centros.items():
+        uv[nombre] = {"u": round(_uv(x, ext["x"]), 5), "v": round(_uv(z, ext["z"]), 5)}
+    # el hígado tiene que caer a la IZQUIERDA de quien mira, que es lo que dice el rótulo de
+    # la página. Si no, la proyección está en espejo y todos los focos saldrían del lado que no es.
+    if {"liver", "spleen"} <= set(ancla):
+        def _u(p):
+            return _uv(p[0], ext["x"])
+        if not _u(ancla["liver"]) < _u(ancla["spleen"]):
+            raise SystemExit("ABORTA: la vista sale en espejo (el hígado cae en el lado del bazo). "
+                             "Un esqueleto es simétrico y esto NO se ve mirando la imagen.")
+        print("lateralidad: ok (hígado u=%.3f < bazo u=%.3f)"
+              % (_u(ancla["liver"]), _u(ancla["spleen"])))
+    else:
+        print("AVISO: sin hígado ni bazo en la segmentación, la lateralidad va SIN COMPROBAR",
+              file=sys.stderr)
+    # y el otro eje: la cabeza arriba. Con el cuerpo del revés los focos cervicales saldrían en
+    # la pelvis, y tampoco se ve mirando una silueta.
+    arriba = next((n for n in ("skull", "vertebrae_C1", "vertebrae_C3") if n in uv), None)
+    abajo = next((n for n in ("femur_left", "femur_right", "hip_left") if n in uv), None)
+    if arriba and abajo:
+        if not uv[arriba]["v"] < uv[abajo]["v"]:
+            raise SystemExit("ABORTA: la vista sale del revés (%s por debajo de %s)."
+                             % (arriba, abajo))
+        print("vertical: ok (%s v=%.3f por encima de %s v=%.3f)"
+              % (arriba, uv[arriba]["v"], abajo, uv[abajo]["v"]))
+    else:
+        print("AVISO: sin cráneo ni fémur, el sentido vertical va SIN COMPROBAR", file=sys.stderr)
+    json.dump({"imagen": os.path.basename(ruta), "tamano": [im.width, im.height],
+               "serie": a.serie, "huesos": uv},
+              open(os.path.join(dst, "esqueleto.json"), "w"), ensure_ascii=False, indent=1)
+    print("esqueleto: %d×%d px · %d huesos con centroide → %s"
+          % (im.width, im.height, len(uv), os.path.relpath(dst, SALIDA_RAIZ)))
+    for n in sorted(uv)[:6]:
+        print("  %-18s u=%.3f v=%.3f" % (n, uv[n]["u"], uv[n]["v"]))
+    return 0
+
+
 # ─── visor local (offline) ───────────────────────────────────────────────────────────────
 
 WEB = os.path.join(_TOOLS, "visor3d_web")
@@ -1900,8 +2799,8 @@ def _cmd_hoja(a):
     return 0
 
 
-MARCA_BORRADORES = os.path.join(REPO, "00_FUENTE-DE-VERDAD", "07 · Marca", "Videos-Higado-3D")
-CARPETA_MARCA = {"higado": "Videos-Higado-3D", "mama": "Videos-Mama-3D"}
+CARPETA_MARCA = {"higado": "Videos-Higado-3D", "mama": "Videos-Mama-3D",
+                 "esqueleto": "Esqueleto-3D"}
 
 
 def _marca(*partes):
@@ -1918,9 +2817,12 @@ def _cmd_exporta(a):
     import json as _j
     import shutil
     import subprocess
-    vdir = _dir("visor", "video")
-    mp4 = os.path.join(vdir, os.path.basename(a.nombre))
-    if not os.path.exists(mp4):
+    # el vídeo sale del visor; el render del esqueleto, de su carpeta. Las dos son zona clínica
+    # y las dos salen por esta misma ventanilla, que es la única que revisa lo que se lleva.
+    candidatos = [os.path.join(_dir("visor", "video"), os.path.basename(a.nombre)),
+                  os.path.join(_dir("render"), os.path.basename(a.nombre))]
+    mp4 = next((c for c in candidatos if os.path.exists(c)), None)
+    if not mp4:
         raise SystemExit("No existe %s" % a.nombre)
     if mp4.endswith(".png"):
         # Fotograma/hoja renderizados: sin trozos de texto (tEXt/iTXt/zTXt/eXIf) que lleven nada
@@ -1928,13 +2830,33 @@ def _cmd_exporta(a):
         raros = [c for c in (b"tEXt", b"iTXt", b"zTXt", b"eXIf") if c in datos]
         if raros:
             raise SystemExit("ABORTA: el PNG lleva metadatos %s" % raros)
-        os.makedirs(MARCA_BORRADORES, exist_ok=True)
-        dst = os.path.join(MARCA_BORRADORES, os.path.basename(mp4).replace(".png", "-BORRADOR.png"))
+        destino = _marca()          # depende del órgano ACTIVO, no de una constante fija:
+        os.makedirs(destino, exist_ok=True)   # con la constante, el esqueleto caía en la del hígado
+        dst = os.path.join(destino, os.path.basename(mp4).replace(".png", "-BORRADOR.png"))
         shutil.copy(mp4, dst)
         print("exportado (borrador):", os.path.relpath(dst, REPO))
         return 0
+    if mp4.endswith(".json"):
+        # El mapa de huesos son fracciones 0-1 de la imagen y nombres de hueso: nada que
+        # identifique. Pero se revisa igual, porque el fichero de origen sí lleva la serie.
+        datos = _j.loads(open(mp4, encoding="utf-8").read())
+        permitido = {"imagen", "tamano", "huesos"}
+        fuera = sorted(set(datos) - permitido)
+        if fuera:
+            print("exporta: se dejan fuera las claves %s" % fuera)
+        limpio = {k: datos[k] for k in permitido if k in datos}
+        for nombre, c in limpio.get("huesos", {}).items():
+            if not (isinstance(c, dict) and set(c) <= {"u", "v"}
+                    and all(isinstance(x, (int, float)) for x in c.values())):
+                raise SystemExit("ABORTA: %s no es un par u/v numérico" % nombre)
+        destino = _marca()
+        os.makedirs(destino, exist_ok=True)
+        dst = os.path.join(destino, os.path.basename(mp4).replace(".json", "-BORRADOR.json"))
+        _j.dump(limpio, open(dst, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print("exportado (borrador):", os.path.relpath(dst, REPO))
+        return 0
     if not mp4.endswith(".mp4"):
-        raise SystemExit("Solo se exportan .mp4 o .png renderizados")
+        raise SystemExit("Solo se exportan .mp4, .png o .json renderizados")
     info = _j.loads(subprocess.run(["ffprobe", "-v", "error", "-show_format", "-show_streams",
                                     "-of", "json", mp4], capture_output=True, text=True,
                                    check=True).stdout)
@@ -1946,8 +2868,9 @@ def _cmd_exporta(a):
     raras = sorted(set(etiquetas) - permitidas)
     if raras:
         raise SystemExit("ABORTA: el MP4 lleva metadatos no esperados: %s" % raras)
-    os.makedirs(MARCA_BORRADORES, exist_ok=True)
-    dst = os.path.join(MARCA_BORRADORES, os.path.basename(mp4).replace(".mp4", "-BORRADOR.mp4"))
+    destino = _marca()
+    os.makedirs(destino, exist_ok=True)
+    dst = os.path.join(destino, os.path.basename(mp4).replace(".mp4", "-BORRADOR.mp4"))
     shutil.copy(mp4, dst)
     print("exportado (borrador, NO publicado):", os.path.relpath(dst, REPO))
     return 0
@@ -2839,6 +3762,10 @@ def main(argv=None):
             ps.add_argument("--tareas", nargs="*")
             ps.add_argument("--device", default="mps")
         ps.set_defaults(fn=fn)
+    pcb = sub.add_parser("cobertura", help="hasta dónde llega cada serie, en mm del mundo")
+    pcb.add_argument("--raiz", dest="raices", action="append", required=True)
+    pcb.add_argument("series", nargs="+")
+    pcb.set_defaults(fn=_cmd_cobertura)
     pv = sub.add_parser("visor", help="monta el visor local con los assets")
     pv.add_argument("--comparacion", help="nombre del JSON de comparación (serieA_serieB)")
     pv.set_defaults(fn=_cmd_visor)
@@ -2963,6 +3890,26 @@ def main(argv=None):
     ptu.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     ptu.add_argument("-n", type=int, default=8)
     ptu.set_defaults(fn=_cmd_tumor)
+    pes = sub.add_parser("esqueleto", help="su esqueleto del TC + centroide de cada hueso")
+    pes.add_argument("--raiz", dest="raices", action="append", required=True)
+    pes.add_argument("--serie", required=True, help="TC de cuerpo entero (mejor kernel de hueso)")
+    pes.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
+    pes.add_argument("--ancho", type=int, default=880)
+    pes.add_argument("--solo", help="lista de huesos separados por coma: solo esos se dibujan")
+    pes.add_argument("--sin-niveles", action="store_true",
+                     help="no publicar centroides de vértebra (la silueta sí, los niveles no)")
+    pes.add_argument("--vertebras", action="store_true",
+                     help="pasada aparte, con el modelo fino, solo para nombrar cada vértebra")
+    pes.add_argument("--fino", action="store_true",
+                     help="modelo de 1,5 mm en vez del de 3 mm (el de 3 pierde niveles vertebrales)")
+    pes.add_argument("--suaviza-mm", type=float, default=1.0,
+                     help="mm a los que se remuestrea la MÁSCARA para quitar el escalón (0 = no)")
+    pes.add_argument("--trozos", type=int, default=3,
+                     help="en cuántas rebanadas se parte el cuerpo (el entero no cabe)")
+    pes.add_argument("--solapa", type=int, default=16, help="cortes de solape entre trozos")
+    pes.add_argument("--voxel", type=float, default=1.5,
+                     help="mm a los que se remuestrea ANTES de segmentar (el TC entero no cabe)")
+    pes.set_defaults(fn=_cmd_esqueleto)
     pre_ = sub.add_parser("reservorio", help="vista del reservorio venoso en un TC (3 MIPs del metal)")
     pre_.add_argument("serie")
     pre_.add_argument("--umbral", type=float, default=2000.0,
