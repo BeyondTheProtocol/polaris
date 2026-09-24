@@ -3581,6 +3581,831 @@ def _cmd_reservorio(a):
     return 0
 
 
+# ─── catéter del reservorio: trayecto, punta y referencias (24-sep-2026) ─────────────────
+#
+# `reservorio` aísla el METAL, y el catéter no es metal: es poliuretano radiopaco de 8 F
+# (2,7 mm), que en un TC de 2-3 mm de corte sale como una línea fina de unos cientos de HU,
+# la misma banda que el hueso. Por eso no se aísla por umbral: se aísla por FORMA (sombrero
+# de copa: lo que es más fino que la bola desaparece al abrir, y la resta lo deja solo),
+# se le quita el hueso grueso (el que sobrevive a la apertura, dilatado) y se sigue desde
+# el portal por conectividad, puenteando huecos cortos. La punta es el punto más lejano del
+# portal ANDANDO por el catéter, no el más bajo: si estuviera retraída hacia arriba, el más
+# bajo mentiría.
+#
+# Referencia anatómica: la CARINA. Se sigue la tráquea (aire cerca de la línea media) corte
+# a corte desde arriba, y la carina es el último corte donde la luz es una sola. Es la
+# referencia estándar en la radiografía de control de un catéter central; la unión
+# cavoatrial no se marca porque en un TC sin fase venosa dedicada no hay borde que medir.
+#
+# MIDE, no concluye. Lo que sale es una lámina (MIP coronal + sagital a escala) y un JSON
+# con números para que Radiología los mire; el diagnóstico de por qué no refluye no está aquí.
+
+CATETER_DEFAULTS = {
+    "umbral_metal": 2950.0,   # HU del titanio del portal (validado el 21-sep sobre el 8-sep)
+    "bola_mm": 3.0,           # radio de la apertura: deja pasar lo más fino que 6 mm
+    "sombrero_min": 150.0,    # HU que tiene que aportar el sombrero de copa
+    "ct_min": 200.0,          # y HU absoluto mínimo del vóxel (tejido blando queda fuera)
+    "hueso_min": 200.0,       # HU desde el que un vóxel cuenta como hueso candidato
+    "hueso_radio_plano_mm": 2.5,  # disco de apertura en el plano: lo más fino que 5 mm no es hueso
+    "hueso_dilata_mm": 3.0,   # cuánto se ensancha el hueso grueso para tapar su cortical
+    "halo_mm": 4.0,           # artefacto de endurecimiento alrededor del titanio, fuera
+    "z_sobre_portal_mm": 60.0,    # recorte: hasta aquí por encima del portal
+    "z_bajo_carina_mm": 150.0,    # recorte: hasta aquí por debajo de la carina (o del portal si no hay)
+    "puente_mm": 6.0,         # hueco máximo que se salta entre fragmentos del catéter
+    "min_fragmento": 8,       # vóxeles: por debajo es ruido
+}
+
+
+def _componente_mayor(mask):
+    import numpy as np
+    from scipy import ndimage
+    lab, n = ndimage.label(mask)
+    if not n:
+        return np.zeros_like(mask, dtype=bool), 0
+    tam = ndimage.sum(mask, lab, index=range(1, n + 1))
+    return lab == int(np.argmax(tam)) + 1, n
+
+
+def cuerpo_tc(ct, esp):
+    """Cuerpo en un TC: lo que supera -300 HU, cerrado, sin agujeros y en un solo trozo."""
+    from scipy import ndimage
+    import numpy as np
+    m = ct > -300
+    m = ndimage.binary_closing(m, structure=_bola_estructura(esp, 4.0))
+    # agujeros rellenos CORTE A CORTE: en 3D la tráquea toca el borde superior del estudio y
+    # `binary_fill_holes` no la rellenaría, y sin ella dentro del cuerpo no hay carina que buscar
+    for z in range(m.shape[2]):
+        m[:, :, z] = ndimage.binary_fill_holes(m[:, :, z])
+    m, _ = _componente_mayor(m)
+    return m
+
+
+def portal_metal(ct, esp, umbral=2950.0):
+    """Máscara del portal (objeto metálico más grande de la mitad anterior) o None."""
+    metal = ct > umbral
+    metal[:, : ct.shape[1] // 2, :] = False
+    obj, n = _componente_mayor(metal)
+    return (obj if n else None), n
+
+
+def carina(ct, esp, cuerpo=None, x_medio=None, z_max=None):
+    """(z_indice, x_indice, y_indice, detalle) de la carina siguiendo la tráquea de arriba abajo.
+
+    Por cada corte axial, de craneal a caudal: componentes de aire (< -600 HU) dentro del
+    cuerpo, de área entre 40 y 1200 mm² (una tráquea mide ~250). Se arranca por la más cercana
+    a la línea media y, a partir de ahí, se sigue por SOLAPE: las hijas de un corte son las
+    componentes que pisan la madre del corte anterior ensanchada 4 mm (seguir por centroide
+    fallaba cuando el bronquio principal derecho se abre en horizontal: la hija quedaba a más
+    de 20 mm y el rastro se perdía). La carina es el ÚLTIMO corte con una sola luz seguida:
+    el siguiente tiene dos hijas de ≥ 25 mm². `BTP_DEBUG_CARINA=1` imprime el rastro.
+    Devuelve None si no se encuentra.
+    """
+    import numpy as np
+    from scipy import ndimage
+    if cuerpo is None:
+        cuerpo = cuerpo_tc(ct, esp)
+    aire = (ct < -600) & cuerpo
+    nx, ny, nz = ct.shape
+    if x_medio is None:
+        cols = np.argwhere(cuerpo.any(axis=(1, 2)))
+        x_medio = float(cols.mean()) if len(cols) else nx / 2.0
+    area_vox = esp[0] * esp[1]
+    debug = os.environ.get("BTP_DEBUG_CARINA") == "1"
+    r = max(1, int(round(4.0 / esp[0])))
+    yy, xx = np.mgrid[-r:r + 1, -r:r + 1]
+    disco = (xx ** 2 + yy ** 2) <= r ** 2
+    madre = None            # máscara 2D de la luz seguida en el corte anterior
+    ultimo_solo = None
+    seguidos = 0
+    perdidos = 0
+    z_ini = nz - 1 if z_max is None else min(nz - 1, int(z_max))
+    for z in range(z_ini, -1, -1):                         # de arriba (z alto en RAS) abajo
+        lab, n = ndimage.label(aire[:, :, z])
+        if madre is None:
+            cand = []
+            for k in range(1, n + 1):
+                m = lab == k
+                area = m.sum() * area_vox
+                if not (40.0 <= area <= 1200.0):
+                    continue
+                c = np.argwhere(m).mean(0)
+                if abs(c[0] - x_medio) * esp[0] > 30.0:
+                    continue
+                cand.append((abs(c[0] - x_medio), m, area, c))
+            if not cand:
+                continue
+            _, m, area, c = min(cand, key=lambda t: t[0])
+            madre, ultimo_solo, seguidos, perdidos = m, (z, c, area), 1, 0
+            if debug:
+                print("carina: arranque en z=%d área %.0f" % (z, area))
+            continue
+        ancha = ndimage.binary_dilation(madre, structure=disco)
+        hijas = []
+        for k in np.unique(lab[ancha]):
+            if k == 0:
+                continue
+            m = lab == k
+            area = m.sum() * area_vox
+            if 25.0 <= area <= 1200.0:
+                hijas.append((area, m, np.argwhere(m).mean(0)))
+        if debug:
+            print("carina: z=%d hijas=%s seguidos=%d" % (z, [round(h[0]) for h in hijas], seguidos))
+        if len(hijas) >= 2 and seguidos >= 3:
+            hijas.sort(key=lambda t: -t[0])
+            z_c, c_c, a_c = ultimo_solo
+            # Un bronquio principal es MENOR que la tráquea. Una «hija» mayor que la madre
+            # (8-sep-2026: 256 mm² con una tráquea de 137) es otra cosa (esófago con aire,
+            # un bronquio entrando de lado, la propia tráquea ensanchándose): no es la carina.
+            if hijas[0][0] >= a_c:
+                area, m, c = hijas[0]
+                madre, ultimo_solo, perdidos = m, (z, c, area), 0
+                seguidos += 1
+                continue
+            fiable = bool(seguidos >= 10 and 100.0 <= a_c <= 600.0 and hijas[1][0] >= 0.2 * a_c)
+            detalle = {"z_corte": int(z_c), "area_traquea_mm2": round(float(a_c), 1),
+                       "hijas_mm2": [round(float(h[0]), 1) for h in hijas[:2]],
+                       "cortes_de_traquea_seguidos": int(seguidos), "fiable": fiable,
+                       "criterio_fiable": ">=10 cortes seguidos, tráquea 100-600 mm2, ambas hijas < madre y la menor >= 20 % de la madre"}
+            return int(z_c), float(c_c[0]), float(c_c[1]), detalle
+        if hijas:
+            area, m, c = max(hijas, key=lambda t: t[0])
+            madre, ultimo_solo, perdidos = m, (z, c, area), 0
+            seguidos += 1
+        else:
+            perdidos += 1
+            if perdidos > 2:
+                madre, seguidos = None, 0    # pista perdida tres cortes seguidos: se reinicia
+    return None
+
+
+def hueso_grueso(ct, esp, hueso_min=200.0, radio_plano_mm=2.5, dilata_mm=3.0):
+    """Hueso que NO es el catéter: lo que supera `hueso_min` y sobrevive a una apertura con un
+    disco de `radio_plano_mm` EN EL PLANO axial (un catéter de 8 F, 2,7 mm, no sobrevive; una
+    costilla, la clavícula o una vértebra sí), ensanchado `dilata_mm` para tapar la cortical
+    que el volumen parcial deja a medias. Solo en el plano porque el corte (2-3 mm) es más
+    grueso que el catéter y una bola 3D se llevaría costillas oblicuas por delante."""
+    import numpy as np
+    from scipy import ndimage
+    r = max(1, int(round(radio_plano_mm / float(esp[0]))))
+    yy, xx = np.mgrid[-r:r + 1, -r:r + 1]
+    disco = ((xx ** 2 + yy ** 2) <= r ** 2)[:, :, None]
+    b = ct > hueso_min
+    b = ndimage.binary_opening(b, structure=disco)
+    return ndimage.binary_dilation(b, structure=_bola_estructura(esp, dilata_mm))
+
+
+def cateter_mascara(ct, esp, portal, cuerpo=None, p=None):
+    """Máscara del catéter siguiéndolo desde el portal. Devuelve (mask, info)."""
+    import numpy as np
+    from scipy import ndimage
+    p = dict(CATETER_DEFAULTS, **(p or {}))
+    if cuerpo is None:
+        cuerpo = cuerpo_tc(ct, esp)
+    bola = _bola_estructura(esp, p["bola_mm"])
+    # el metal satura y arrastraría el sombrero: se tapa con tejido antes de abrir, y su halo
+    # (artefacto de endurecimiento, 1000-2900 HU a 2-4 mm del titanio) se excluye entero
+    halo = ndimage.binary_dilation(portal, structure=_bola_estructura(esp, p["halo_mm"]))
+    ct_s = np.where(halo, 40.0, ct).astype(np.float32)
+    abierto = ndimage.grey_opening(ct_s, footprint=bola)
+    sombrero = ct_s - abierto
+    grueso = hueso_grueso(ct_s, esp, p["hueso_min"], p["hueso_radio_plano_mm"], p["hueso_dilata_mm"])
+    fino = (sombrero > p["sombrero_min"]) & (ct_s > p["ct_min"]) & cuerpo & ~grueso & ~halo
+    # semilla: una corona alrededor del halo del portal (el catéter arranca pegado a él)
+    semilla = ndimage.binary_dilation(halo, structure=_bola_estructura(esp, 5.0)) & ~halo
+    lab, n = ndimage.label(fino, structure=np.ones((3, 3, 3)))
+    if not n:
+        return np.zeros_like(fino), {"fragmentos": 0, "arranque": False}, {"fino": fino, "grueso": grueso}
+    tam = ndimage.sum(fino, lab, index=np.arange(1, n + 1))
+    ok = np.zeros(n + 1, bool)
+    ok[1:] = tam >= p["min_fragmento"]
+    etiquetas_ok = lab * ok[lab]
+    # crecimiento greedy: primero lo que toca la semilla, luego lo que queda a < puente_mm
+    activos = set(int(v) for v in np.unique(etiquetas_ok[semilla])) - {0}
+    if not activos:
+        return np.zeros_like(fino), {"fragmentos": int(ok.sum()), "arranque": False}, {"fino": fino, "grueso": grueso}
+    actual = np.isin(etiquetas_ok, list(activos))
+    puentes = 0
+    while True:
+        dist = ndimage.distance_transform_edt(~actual, sampling=esp)
+        nuevos = set(int(v) for v in np.unique(etiquetas_ok[(dist <= p["puente_mm"]) & ~actual])) - {0} - activos
+        if not nuevos:
+            break
+        activos |= nuevos
+        puentes += len(nuevos)
+        actual = np.isin(etiquetas_ok, list(activos))
+    return actual, {"fragmentos": int(ok.sum()), "arranque": True, "unidos": len(activos),
+                    "puentes": puentes, "hu_max": float(ct[actual].max()) if actual.any() else None,
+                    "hu_mediana": float(np.median(ct[actual])) if actual.any() else None}, \
+        {"fino": fino, "grueso": grueso}
+
+
+def cateter_camino(mask, esp, portal):
+    """Camino ordenado del catéter (lista de índices ijk) desde el portal a la punta.
+
+    Geodésica sobre la máscara dilatada 1 vóxel: el coste es el paso en mm, el origen es el
+    borde del portal. La punta es el vóxel de la máscara con mayor distancia geodésica.
+    """
+    import numpy as np
+    from scipy import ndimage
+    from skimage.graph import MCP_Geometric
+    if not mask.any():
+        return [], 0.0
+    pasable = ndimage.binary_dilation(mask, structure=np.ones((3, 3, 3)))
+    coste = np.where(pasable, 1.0, np.inf).astype(np.float64)
+    borde = ndimage.binary_dilation(portal, structure=np.ones((3, 3, 3))) & ~portal & pasable
+    inicios = [tuple(v) for v in np.argwhere(borde)]
+    if not inicios:
+        d = ndimage.distance_transform_edt(~portal, sampling=esp)
+        d[~mask] = np.inf
+        inicios = [tuple(np.unravel_index(int(np.argmin(d)), d.shape))]
+    mcp = MCP_Geometric(coste, sampling=tuple(float(e) for e in esp))
+    dist, _ = mcp.find_costs(inicios)
+    dm = np.where(mask & np.isfinite(dist), dist, -np.inf)
+    if not np.isfinite(dm).any():
+        return [], 0.0
+    punta = tuple(np.unravel_index(int(np.argmax(dm)), dm.shape))
+    camino = [tuple(int(x) for x in v) for v in mcp.traceback(punta)]
+    return camino, float(dm[punta])
+
+
+def _mm_de(afin, ijk):
+    import numpy as np
+    return (np.asarray(afin) @ np.append(np.asarray(ijk, float), 1.0))[:3]
+
+
+def cateter_medidas(ct, esp, afin, mask, camino, portal, car):
+    """Números del trayecto en mm del mundo (RAS: +x derecha del paciente, +y anterior, +z arriba)."""
+    import numpy as np
+    from scipy import ndimage
+    out = {}
+    pc = np.argwhere(portal).mean(0)
+    out["portal_mm"] = [round(float(v), 1) for v in _mm_de(afin, pc)]
+    if car is not None:
+        zc, xc, yc, det = car
+        cm = _mm_de(afin, (xc, yc, zc))
+        out["carina_mm"] = [round(float(v), 1) for v in cm]
+        out["portal_vs_carina_z_mm"] = round(float(out["portal_mm"][2] - cm[2]), 1)
+        out["portal_vs_linea_media_mm"] = round(float(out["portal_mm"][0] - cm[0]), 1)
+        out["carina_detalle"] = det
+    if not camino:
+        return out
+    pts = np.array([_mm_de(afin, c) for c in camino])
+    out["punta_mm"] = [round(float(v), 1) for v in pts[-1]]
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    out["longitud_cateter_mm"] = round(float(seg.sum()), 1)
+    out["punta_a_portal_recta_mm"] = round(float(np.linalg.norm(pts[-1] - pts[0])), 1)
+    # ángulo de doblez máximo en ventanas de ±8 mm a lo largo del camino
+    acum = np.concatenate([[0.0], np.cumsum(seg)])
+    max_ang, donde = 0.0, None
+    for i in range(len(pts)):
+        a = int(np.searchsorted(acum, acum[i] - 8.0))
+        b = int(np.searchsorted(acum, acum[i] + 8.0)) - 1
+        if a >= i or b <= i or b >= len(pts):
+            continue
+        u, v = pts[i] - pts[a], pts[b] - pts[i]
+        nu, nv = np.linalg.norm(u), np.linalg.norm(v)
+        if nu < 1e-6 or nv < 1e-6:
+            continue
+        ang = float(np.degrees(np.arccos(np.clip(u @ v / (nu * nv), -1, 1))))
+        if ang > max_ang:
+            max_ang, donde = ang, i
+    out["doblez_max_grados"] = round(max_ang, 1)
+    out["doblez_max_en_mm"] = [round(float(v), 1) for v in pts[donde]] if donde is not None else None
+    out["doblez_max_a_mm_del_portal"] = round(float(acum[donde]), 1) if donde is not None else None
+    if car is not None:
+        cm = out["carina_mm"]
+        out["punta_vs_carina_mm"] = round(float(pts[-1][2] - cm[2]), 1)      # negativo = por debajo
+        out["punta_vs_linea_media_mm"] = round(float(pts[-1][0] - cm[0]), 1)  # + = derecha
+    # hueso más cercano a lo largo del camino (clavícula / primera costilla)
+    hueso = ct > 250
+    hueso &= ~ndimage.binary_dilation(portal, structure=_bola_estructura(esp, 5.0))  # sin el halo
+    hueso &= ~ndimage.binary_dilation(mask, structure=np.ones((3, 3, 3)))
+    d_h = ndimage.distance_transform_edt(~hueso, sampling=esp)
+    dist_cam = np.array([d_h[c] for c in camino])
+    i_min = int(np.argmin(dist_cam))
+    out["hueso_mas_cerca_mm"] = round(float(dist_cam[i_min]), 1)
+    out["hueso_mas_cerca_en_mm"] = [round(float(v), 1) for v in pts[i_min]]
+    out["hueso_mas_cerca_a_mm_del_portal"] = round(float(acum[i_min]), 1)
+    # holgura vertical en ese punto: hueso por encima y por debajo en la misma columna (x,y)
+    i, j, k = camino[i_min]
+    col = hueso[i, j, :]
+    arriba = np.argwhere(col[k + 1:])
+    abajo = np.argwhere(col[:k][::-1])
+    out["holgura_vertical_mm"] = {
+        "hueso_encima_a_mm": round(float((arriba[0][0] + 1) * esp[2]), 1) if len(arriba) else None,
+        "hueso_debajo_a_mm": round(float((abajo[0][0] + 1) * esp[2]), 1) if len(abajo) else None,
+    }
+    # perfil de densidad a lo largo del camino, por tramos de 10 mm (proxy de grosor)
+    perfil = []
+    for t0 in np.arange(0.0, acum[-1], 10.0):
+        sel = (acum >= t0) & (acum < t0 + 10.0)
+        if sel.any():
+            perfil.append(int(round(float(max(ct[c] for c, s in zip(camino, sel) if s)))))
+    out["perfil_hu_max_por_10mm"] = perfil
+    return out
+
+
+def _lamina_cateter(ct, esp, afin, mask, portal, camino, car, medidas, px, vmin, vmax, titulo):
+    """MIP coronal + sagital a escala real, con catéter en color, portal, punta y carina."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+    idx = np.argwhere(mask | portal)
+    lo, hi = idx.min(0), idx.max(0)
+    m = np.ceil(np.array([40.0, 40.0, 40.0]) / esp).astype(int)
+    a0, b0 = np.maximum(lo - m, 0), np.minimum(hi + m + 1, ct.shape)
+    if car is not None:
+        zc = int(car[0])
+        a0[2] = min(a0[2], max(0, zc - m[2]))
+        b0[2] = max(b0[2], min(ct.shape[2], zc + m[2]))
+    sl = tuple(slice(int(a0[k]), int(b0[k])) for k in range(3))
+    sub, sm, sp = ct[sl], mask[sl], portal[sl]
+
+    def panel(eje, ex, ey, flip_i):
+        mip = np.clip((sub.max(axis=eje) - vmin) / (vmax - vmin), 0, 1)
+        capa = sm.max(axis=eje)
+        met = sp.max(axis=eje)
+        if flip_i:
+            mip, capa, met = mip[::-1], capa[::-1], met[::-1]
+        g = (mip * 255).astype(np.uint8)
+        rgb = np.stack([g, g, g], -1)
+        rgb[capa] = [255, 80, 40]           # catéter: naranja
+        rgb[met] = [80, 200, 255]           # portal: azul
+        im = Image.fromarray(np.ascontiguousarray(np.transpose(rgb, (1, 0, 2))[::-1]))
+        W, H = max(1, int(mip.shape[0] * ex * px)), max(1, int(mip.shape[1] * ey * px))
+        im = im.resize((W, H), Image.NEAREST)
+        d = ImageDraw.Draw(im)
+
+        def a_px(i, j):
+            if flip_i:
+                i = mip.shape[0] - 1 - i
+            return (int((i + 0.5) * ex * px), int(H - (j + 0.5) * ey * px))
+        return im, d, a_px
+
+    co, dco, pco = panel(1, esp[0], esp[2], True)     # coronal: i=x (dcha. del paciente a la izq.)
+    sa, dsa, psa = panel(0, esp[1], esp[2], False)    # sagital: i=y (anterior a la dcha.)
+    AM = (255, 220, 0)
+    for im, d, a_px, nombre, eje_i in ((co, dco, pco, "CORONAL (de frente; dcha. del paciente a la izq.)", 0),
+                                       (sa, dsa, psa, "SAGITAL (de lado; anterior a la dcha.)", 1)):
+        d.text((6, 4), "%s · %s" % (titulo, nombre), fill=AM)
+        y = im.height - 14
+        d.line([(6, y), (6 + int(20 * px), y)], fill=AM, width=2)
+        d.text((6, y - 12), "20 mm", fill=AM)
+        if car is not None:
+            zc = int(car[0]) - int(a0[2])
+            _, yy = a_px(0, zc)
+            d.line([(0, yy), (im.width, yy)], fill=(0, 255, 120), width=1)
+            d.text((max(0, im.width - 60), yy - 12), "carina", fill=(0, 255, 120))
+        if camino:
+            c = camino[-1]
+            xx, yy = a_px(c[eje_i] - int(a0[eje_i]), c[2] - int(a0[2]))
+            r = int(3 * px)
+            d.ellipse([xx - r, yy - r, xx + r, yy + r], outline=(255, 0, 255), width=2)
+            txt = "punta"
+            if medidas.get("punta_vs_carina_mm") is not None:
+                txt += " %+.0f mm vs carina" % medidas["punta_vs_carina_mm"]
+            d.text((min(xx + r + 3, im.width - 120), yy - 6), txt, fill=(255, 0, 255))
+    ancho = co.width + sa.width + 30
+    alto = max(co.height, sa.height) + 44
+    lam = Image.new("RGB", (ancho, alto), (0, 0, 0))
+    lam.paste(co, (10, 10))
+    lam.paste(sa, (co.width + 20, 10))
+    d = ImageDraw.Draw(lam)
+    pie = ("catéter=naranja · portal=azul · carina=verde · punta=magenta · "
+           "MIP de un bloque, a escala real · MEDICIÓN automática, no lectura radiológica")
+    d.text((10, alto - 30), pie, fill=(200, 200, 200))
+    d.text((10, alto - 16), "Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.",
+           fill=(200, 200, 200))
+    return lam
+
+
+def _z_portal_en_bruto(raw, esp, umbral):
+    """Índice z del portal en el volumen SIN recortar, barato: metal de la mitad anterior sobre
+    una versión reducida 4×4 en el plano (máximo por bloque, que no pierde metal), y de sus
+    componentes, la mayor de las que miden ≥ 15 mm en los tres ejes. Los empastes dentales
+    de un PET de cuerpo entero también son metal, pero miden < 10 mm: con la mediana de todos
+    los cortes con metal el recorte caía entre los dientes y el portal (8-sep-2026)."""
+    import numpy as np
+    from scipy import ndimage
+    b = 4
+    nx, ny = (raw.shape[0] // b) * b, (raw.shape[1] // b) * b
+    red = raw[:nx, :ny].reshape(nx // b, b, ny // b, b, raw.shape[2]).max(axis=(1, 3))
+    metal = red > umbral
+    metal[:, : metal.shape[1] // 2, :] = False
+    lab, n = ndimage.label(metal)
+    if not n:
+        return None
+    mejor, vol = None, 0
+    for k, sl in enumerate(ndimage.find_objects(lab), start=1):
+        if sl is None:
+            continue
+        ext = [(sl[0].stop - sl[0].start) * esp[0] * b, (sl[1].stop - sl[1].start) * esp[1] * b,
+               (sl[2].stop - sl[2].start) * esp[2]]
+        if min(ext) < 15.0:
+            continue
+        v = int((lab[sl] == k).sum())
+        if v > vol:
+            mejor, vol = sl, v
+    if mejor is None:
+        return None
+    return 0.5 * (mejor[2].start + mejor[2].stop - 1)
+
+
+def _lamina_debug(ct, esp, mask, portal, capas, car, serie, px=2.0, vmin=-200.0, vmax=1500.0):
+    """Para afinar umbrales MIRANDO: MIP coronal y sagital del recorte ENTERO con los
+    candidatos finos (amarillo), el hueso grueso (azul oscuro), lo elegido (rojo) y el portal."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+    fino, grueso = capas["fino"], capas["grueso"]
+    paneles = []
+    for eje, ex, ey, flip in ((1, esp[0], esp[2], True), (0, esp[1], esp[2], False)):
+        mip = np.clip((ct.max(axis=eje) - vmin) / (vmax - vmin), 0, 1)
+        g = (mip * 255).astype(np.uint8)
+        rgb = np.stack([g, g, g], -1)
+        rgb[grueso.max(axis=eje)] = (rgb[grueso.max(axis=eje)] * 0.5 + np.array([0, 0, 120])).astype(np.uint8)
+        rgb[fino.max(axis=eje)] = [255, 230, 0]
+        rgb[mask.max(axis=eje)] = [255, 40, 40]
+        rgb[portal.max(axis=eje)] = [80, 200, 255]
+        if flip:
+            rgb = rgb[::-1]
+        im = Image.fromarray(np.ascontiguousarray(np.transpose(rgb, (1, 0, 2))[::-1]))
+        im = im.resize((max(1, int(rgb.shape[0] * ex * px)), max(1, int(rgb.shape[1] * ey * px))), Image.NEAREST)
+        if car is not None:
+            yy = int(im.height - (int(car[0]) + 0.5) * ey * px)
+            ImageDraw.Draw(im).line([(0, yy), (im.width, yy)], fill=(0, 255, 120), width=1)
+        paneles.append(im)
+    lam = Image.new("RGB", (sum(p_.width for p_ in paneles) + 30, max(p_.height for p_ in paneles) + 20), (0, 0, 0))
+    x = 10
+    for p_ in paneles:
+        lam.paste(p_, (x, 10))
+        x += p_.width + 10
+    dst = _dir("visor")
+    exige_zona_clinica(dst)
+    lam.save(os.path.join(dst, "cateter_debug_%s.png" % serie))
+
+
+def cateter(serie, p=None, px=4.0, vmin=-200.0, vmax=1500.0, guardar=True):
+    """Trayecto y punta del catéter del reservorio en una serie TC ya convertida.
+
+    Devuelve el dict de medidas (sin PII: solo mm y HU). Si `guardar`, deja la lámina y el
+    JSON en la carpeta del visor (zona clínica), donde `sirve` los enseña en 127.0.0.1.
+    """
+    import numpy as np
+    import nibabel as nib
+    ruta = os.path.join(_cache(serie), "imagen.nii.gz")
+    meta_p = os.path.join(_cache(serie), "meta.json")
+    if not os.path.exists(ruta):
+        raise SystemExit("sin volumen de %s: corre antes `convierte`" % serie)
+    meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
+    img = nib.as_closest_canonical(nib.load(ruta))
+    esp = np.array(img.header.get_zooms()[:3], dtype=float)
+    afin = np.array(img.affine, float)
+    pp = dict(CATETER_DEFAULTS, **(p or {}))
+    # Recorte TEMPRANO en z, antes de pasar a float32: un cuerpo entero a 0,78 mm son 550 M de
+    # vóxeles (2,2 GB en float32) y una apertura 3D ahí no cabe en un portátil. Solo el portal
+    # hace falta para acotar: todo lo que importa cae entre 80 mm por encima de él y 220 mm por
+    # debajo (carina incluida). El recorte fino, con la carina, lo hace `cateter_volumen`.
+    raw = np.asarray(img.dataobj)
+    z_p = _z_portal_en_bruto(raw, esp, pp["umbral_metal"])
+    if z_p is not None:
+        z0 = max(0, int(z_p - 220.0 / esp[2]))
+        z1 = min(raw.shape[2], int(z_p + 80.0 / esp[2]) + 1)
+        raw = raw[:, :, z0:z1]
+        afin[:3, 3] += afin[:3, 2] * z0
+    ct = raw.astype(np.float32)
+    del raw
+    # Series de alta resolución (0,4-0,5 mm de píxel): a la mitad en el plano, por bloques de
+    # 2×2. El catéter sigue midiendo 3 píxeles y la apertura pasa de horas a minutos.
+    if esp[0] < 0.6:
+        nx, ny = (ct.shape[0] // 2) * 2, (ct.shape[1] // 2) * 2
+        ct = ct[:nx, :ny].reshape(nx // 2, 2, ny // 2, 2, ct.shape[2]).mean(axis=(1, 3))
+        afin[:3, :2] *= 2.0
+        afin[:3, 3] += afin[:3, 0] * 0.25 + afin[:3, 1] * 0.25   # centro del bloque 2×2
+        esp = esp * np.array([2.0, 2.0, 1.0])
+    return cateter_volumen(ct, esp, afin, serie, meta, p, px, vmin, vmax, guardar)
+
+
+def _carga_recortada(serie, p=None):
+    """(ct, esp, afin, meta) de una serie convertida: canónica RAS, recortada en z alrededor
+    del portal y reducida en el plano si es de alta resolución. Misma carga que `cateter`."""
+    import numpy as np
+    import nibabel as nib
+    ruta = os.path.join(_cache(serie), "imagen.nii.gz")
+    meta_p = os.path.join(_cache(serie), "meta.json")
+    if not os.path.exists(ruta):
+        raise SystemExit("sin volumen de %s: corre antes `convierte`" % serie)
+    meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
+    img = nib.as_closest_canonical(nib.load(ruta))
+    esp = np.array(img.header.get_zooms()[:3], dtype=float)
+    afin = np.array(img.affine, float)
+    pp = dict(CATETER_DEFAULTS, **(p or {}))
+    raw = np.asarray(img.dataobj)
+    z_p = _z_portal_en_bruto(raw, esp, pp["umbral_metal"])
+    if z_p is not None:
+        z0 = max(0, int(z_p - 220.0 / esp[2]))
+        z1 = min(raw.shape[2], int(z_p + 80.0 / esp[2]) + 1)
+        raw = raw[:, :, z0:z1]
+        afin[:3, 3] += afin[:3, 2] * z0
+    ct = raw.astype(np.float32)
+    del raw
+    if esp[0] < 0.6:
+        nx, ny = (ct.shape[0] // 2) * 2, (ct.shape[1] // 2) * 2
+        ct = ct[:nx, :ny].reshape(nx // 2, 2, ny // 2, 2, ct.shape[2]).mean(axis=(1, 3))
+        afin[:3, :2] *= 2.0
+        afin[:3, 3] += afin[:3, 0] * 0.25 + afin[:3, 1] * 0.25
+        esp = esp * np.array([2.0, 2.0, 1.0])
+    return ct, esp, afin, meta
+
+
+def _traquea_en(ct, esp, cuerpo, z, x_medio=None):
+    """(x, y) en índices de la luz traqueal en el corte `z`, o None: aire (< -600 HU) dentro del
+    cuerpo, 40-1200 mm², la más cercana a la línea media del cuerpo."""
+    import numpy as np
+    from scipy import ndimage
+    aire = (ct[:, :, z] < -600) & cuerpo[:, :, z]
+    lab, n = ndimage.label(aire)
+    if x_medio is None:
+        cols = np.argwhere(cuerpo.any(axis=(1, 2))).ravel()
+        x_medio = float(cols.mean()) if len(cols) else ct.shape[0] / 2.0
+    mejor = None
+    for k in range(1, n + 1):
+        m = lab == k
+        area = m.sum() * esp[0] * esp[1]
+        if not (40.0 <= area <= 1200.0):
+            continue
+        c = m.nonzero()
+        cx, cy = float(np.mean(c[0])), float(np.mean(c[1]))
+        d = abs(cx - x_medio) * esp[0]
+        if d <= 30.0 and (mejor is None or d < mejor[0]):
+            mejor = (d, cx, cy)
+    return None if mejor is None else (mejor[1], mejor[2])
+
+
+def losa_volumen(ct, esp, afin, serie="sintetico", meta=None, sobre_mm=50.0, bajo_mm=170.0,
+                 y_post_mm=15.0, px=3.0, vmin=-100.0, vmax=2500.0, rejilla_mm=20.0):
+    """La losa sobre un volumen en memoria (RAS). Devuelve (res, lámina PIL, bloque recortado).
+
+    Recorte en los TRES ejes. El de Y es el que importa (24-sep-2026, lo tumbó `verificacion`):
+    sin él, la MIP coronal superponía columna, esternón y costillas, y un catéter de 400-600 HU
+    desaparecía detrás de hueso de 1000. El sesgo era unidireccional (solo podía ACORTAR el
+    catéter visible), justo la hipótesis «punta alta» que salió. Ahora la losa va desde
+    `y_post_mm` (15 mm) por detrás del centro de la tráquea (la cava superior queda delante y a
+    la derecha de ella; el cuerpo vertebral, 20-30 mm por detrás, fuera) hasta la piel anterior.
+    Y además el HUESO GRUESO (clavícula, esternón, costillas: `hueso_grueso`) se quita de la
+    MIP en gris y se pinta aparte en azul tenue: así el hueso sigue de referencia pero ya no
+    puede tapar un catéter de 400-600 HU. El catéter, fino, sobrevive a la apertura. La LÍNEA MEDIA es la x de la tráquea, no x=0, que es el
+    isocentro del escáner (la carina del 10-jul estaba en x=+19,4).
+    """
+    import numpy as np
+    from PIL import Image, ImageDraw
+    meta = meta or {}
+    cu = cuerpo_tc(ct, esp)
+    portal, n_metal = portal_metal(ct, esp, CATETER_DEFAULTS["umbral_metal"])
+    res = {"serie": serie, "fecha": meta.get("fecha"), "descripcion": meta.get("descripcion"),
+           "espaciado_mm": [round(float(e), 3) for e in esp], "ventana_hu": [vmin, vmax]}
+    if portal is None:
+        res["error"] = "sin metal en la mitad anterior"
+        return res, None, None
+    idx = np.argwhere(portal)
+    z_p = float(idx[:, 2].mean())
+    car = carina(ct, esp, cu, z_max=z_p + 30.0 / esp[2])
+    # tráquea de referencia: la carina si es fiable; si no, la luz traqueal 20 mm sobre el portal
+    if car is not None and car[3].get("fiable"):
+        tx, ty = car[1], car[2]
+        res["linea_media_origen"] = "carina"
+    else:
+        t = _traquea_en(ct, esp, cu, int(min(ct.shape[2] - 1, z_p + 20.0 / esp[2])))
+        if t is None:
+            t = _traquea_en(ct, esp, cu, int(z_p))
+        if t is None:
+            res["error"] = "sin tráquea de referencia"
+            return res, None, None
+        tx, ty = t
+        res["linea_media_origen"] = "traquea_sobre_portal"
+    z0 = max(0, int(z_p - bajo_mm / esp[2]))
+    z1 = min(ct.shape[2], int(z_p + sobre_mm / esp[2]) + 1)
+    x_p = float(idx[:, 0].mean())
+    lado = 1.0 if x_p < tx else -1.0             # +1: portal a la izquierda del paciente (x bajo)
+    xa = x_p - lado * 30.0 / esp[0]
+    xb = tx + lado * 70.0 / esp[0]
+    x0, x1 = int(max(0, min(xa, xb))), int(min(ct.shape[0], max(xa, xb) + 1))
+    # Y: desde y_post_mm por detrás de la tráquea hasta la piel anterior del cuerpo
+    filas = np.argwhere(cu[:, :, z0:z1].any(axis=(0, 2))).ravel()
+    y_ant = int(filas.max()) if len(filas) else ct.shape[1] - 1
+    y0 = int(max(0, ty - y_post_mm / esp[1]))
+    y1 = int(min(ct.shape[1], y_ant + 1))
+    sub = ct[x0:x1, y0:y1, z0:z1]
+    spo = portal[x0:x1, y0:y1, z0:z1]
+    grueso = hueso_grueso(np.where(spo, 40.0, sub), esp) & ~spo
+    sub_sh = np.where(grueso, -1000.0, sub).astype(np.float32)     # sin hueso grueso
+    org = afin[:3, 3] + afin[:3, 0] * x0 + afin[:3, 1] * y0 + afin[:3, 2] * z0
+
+    def mundo(i, j, k):
+        return org + afin[:3, 0] * i + afin[:3, 1] * j + afin[:3, 2] * k
+    res["caja_mm"] = {"x": [round(float(mundo(0, 0, 0)[0]), 1), round(float(mundo(sub.shape[0] - 1, 0, 0)[0]), 1)],
+                      "y": [round(float(mundo(0, 0, 0)[1]), 1), round(float(mundo(0, sub.shape[1] - 1, 0)[1]), 1)],
+                      "z": [round(float(mundo(0, 0, 0)[2]), 1), round(float(mundo(0, 0, sub.shape[2] - 1)[2]), 1)]}
+    res["caja_indices"] = {"x": [x0, x1], "y": [y0, y1], "z": [z0, z1]}
+    pc = idx.mean(0)
+    res["portal_mm"] = [round(float(v), 1) for v in (afin[:3, 3] + afin[:3, :3] @ pc)]
+    lm = afin[:3, 3] + afin[:3, :3] @ np.array([tx, ty, z_p])
+    res["linea_media_x_mm"] = round(float(lm[0]), 1)
+    res["traquea_y_mm"] = round(float(lm[1]), 1)
+    res["portal_vs_linea_media_mm"] = round(float(res["portal_mm"][0] - lm[0]), 1)
+    if car is not None:
+        cm = afin[:3, 3] + afin[:3, :3] @ np.array([car[1], car[2], car[0]])
+        res["carina_mm"] = [round(float(v), 1) for v in cm]
+        res["carina_detalle"] = car[3]
+        res["carina_corte_nifti"] = int(car[0])
+    AM, VE, GR, CY = (255, 220, 0), (0, 255, 120), (90, 90, 90), (0, 200, 255)
+    paneles = []
+    for eje, ex, ey, flip, nombre, eje_h in ((1, esp[0], esp[2], True, "CORONAL (de frente; dcha. del paciente a la izq.)", 0),
+                                            (0, esp[1], esp[2], False, "SAGITAL (de lado; anterior a la dcha.)", 1)):
+        mip = np.clip((sub_sh.max(axis=eje) - vmin) / (vmax - vmin), 0, 1)
+        hue = np.clip((np.where(grueso, sub, -1000.0).max(axis=eje) - 200.0) / 1300.0, 0, 1)
+        met = spo.max(axis=eje)
+        if flip:
+            mip, hue, met = mip[::-1], hue[::-1], met[::-1]
+        g = (mip * 255).astype(np.uint8)
+        rgb = np.stack([g, g, g], -1).astype(np.float32)
+        hb = hue[..., None] * np.array([40.0, 60.0, 110.0])           # hueso: azul tenue, debajo
+        rgb = np.where(rgb.max(-1, keepdims=True) > 30, rgb, np.maximum(rgb, hb))
+        rgb = rgb.astype(np.uint8)
+        rgb[met] = [80, 200, 255]
+        im = Image.fromarray(np.ascontiguousarray(np.transpose(rgb, (1, 0, 2))[::-1]))
+        W, H = max(1, int(mip.shape[0] * ex * px)), max(1, int(mip.shape[1] * ey * px))
+        im = im.resize((W, H), Image.LANCZOS)
+        d = ImageDraw.Draw(im)
+        n_h = mip.shape[0]
+
+        def a_px(i, k, flip=flip, n_h=n_h, ex=ex, ey=ey, H=H):
+            if flip:
+                i = n_h - 1 - i
+            return (int((i + 0.5) * ex * px), int(H - (k + 0.5) * ey * px))
+        h0 = float(mundo(0, 0, 0)[eje_h])
+        h1 = float(mundo(sub.shape[0] - 1, 0, 0)[eje_h]) if eje_h == 0 else float(mundo(0, sub.shape[1] - 1, 0)[eje_h])
+        for v in np.arange(np.ceil(min(h0, h1) / rejilla_mm) * rejilla_mm, max(h0, h1), rejilla_mm):
+            i = (v - h0) / afin[eje_h, eje_h]
+            xx, _ = a_px(i, 0)
+            d.line([(xx, 0), (xx, H)], fill=GR, width=1)
+            d.text((xx + 2, H - 12), "%d" % v, fill=AM)
+        z_lo = float(mundo(0, 0, 0)[2])
+        z_hi = float(mundo(0, 0, sub.shape[2] - 1)[2])
+        for v in np.arange(np.ceil(z_lo / rejilla_mm) * rejilla_mm, z_hi, rejilla_mm):
+            k = (v - z_lo) / afin[2, 2]
+            _, yy = a_px(0, k)
+            d.line([(0, yy), (W, yy)], fill=GR, width=1)
+            d.text((2, yy - 11), "z %d" % v, fill=AM)
+        if eje_h == 0:                                   # línea media = tráquea (cian)
+            xx, _ = a_px(tx - x0, 0)
+            d.line([(xx, 0), (xx, H)], fill=CY, width=2)
+            d.text((xx + 3, 30), "línea media (tráquea) x %.0f" % lm[0], fill=CY)
+        else:                                            # borde posterior de la losa
+            d.text((4, 30), "losa: %.0f mm tras la tráquea → piel anterior" % y_post_mm, fill=CY)
+        if car is not None:
+            _, yy = a_px(0, int(car[0]) - z0)
+            d.line([(0, yy), (W, yy)], fill=VE, width=2)
+            d.text((W - 170, yy - 12), "carina z %.0f%s" % (res["carina_mm"][2], "" if car[3].get("fiable") else " (NO fiable)"), fill=VE)
+        d.text((6, 4), "%s %s · %s" % (meta.get("fecha", "?"), serie, nombre), fill=AM)
+        d.text((6, 16), "MIP de losa · ventana %d…%d HU · rejilla %d mm (RAS: x+ dcha, y+ anterior, z+ arriba)"
+               % (vmin, vmax, rejilla_mm), fill=AM)
+        paneles.append(im)
+    lam = Image.new("RGB", (sum(p_.width for p_ in paneles) + 30, max(p_.height for p_ in paneles) + 44), (0, 0, 0))
+    x = 10
+    for p_ in paneles:
+        lam.paste(p_, (x, 10))
+        x += p_.width + 10
+    d = ImageDraw.Draw(lam)
+    d.text((10, lam.height - 30), "portal=azul · hueso grueso=azul tenue (quitado de la MIP gris) · carina=verde (automática) · "
+           "línea media=cian (tráquea) · la punta se lee a mano sobre la rejilla · MEDICIÓN, no lectura radiológica", fill=(200, 200, 200))
+    d.text((10, lam.height - 16), "Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.",
+           fill=(200, 200, 200))
+    return res, lam, sub_sh
+
+
+def losa(serie, sobre_mm=50.0, bajo_mm=170.0, px=3.0, vmin=-100.0, vmax=2500.0, rejilla_mm=20.0,
+         y_post_mm=15.0):
+    """Plan B (24-sep-2026): MIP coronal + sagital de una LOSA (portal, clavícula, primera
+    costilla, cava superior) con REJILLA en mm del mundo para medir a mano la punta del
+    catéter y su relación con la carina. Ver `losa_volumen` para el recorte y por qué."""
+    ct, esp, afin, meta = _carga_recortada(serie)
+    res, lam, _ = losa_volumen(ct, esp, afin, serie, meta, sobre_mm, bajo_mm, y_post_mm, px, vmin, vmax,
+                               rejilla_mm)
+    if lam is None:
+        return res
+    dst = _dir("visor")
+    exige_zona_clinica(dst)
+    os.makedirs(dst, exist_ok=True)
+    lam.save(os.path.join(dst, "losa_%s.png" % serie))
+    json.dump(res, open(os.path.join(dst, "losa_%s.json" % serie), "w"), ensure_ascii=False, indent=1)
+    res["lamina"] = "losa_%s.png" % serie
+    return res
+
+
+def _cmd_losa(a):
+    for serie in a.series:
+        r = losa(serie, a.sobre, a.bajo, a.px, a.vmin, a.vmax, a.rejilla, a.y_post)
+        print(json.dumps(r, ensure_ascii=False))
+    return 0
+
+
+def cateter_volumen(ct, esp, afin, serie="sintetico", meta=None, p=None, px=4.0, vmin=-200.0,
+                    vmax=1500.0, guardar=True):
+    """La parte que no toca disco: sobre un volumen ya en memoria (RAS). Testable con fantoma."""
+    import numpy as np
+    meta = meta or {}
+    p = dict(CATETER_DEFAULTS, **(p or {}))
+    cu = cuerpo_tc(ct, esp)
+    portal, n_metal = portal_metal(ct, esp, p["umbral_metal"])
+    res = {"serie": serie, "fecha": meta.get("fecha"), "descripcion": meta.get("descripcion"),
+           "espaciado_mm": [round(float(e), 3) for e in esp], "parametros": p,
+           "objetos_metal": int(n_metal)}
+    if portal is None:
+        res["error"] = "sin metal > %.0f HU en la mitad anterior" % p["umbral_metal"]
+        return res
+    idx = np.argwhere(portal)
+    res["portal_caja_mm"] = [round(float(v), 1) for v in (idx.max(0) - idx.min(0) + 1) * esp]
+    # la carina está SIEMPRE por debajo de un portal infraclavicular: la tráquea se sigue desde
+    # 30 mm por encima de él, no desde la boca (en un PET de cuerpo entero, el aire de la
+    # faringe se parte en dos y se hacía pasar por carina a 150 mm por encima del portal)
+    car = carina(ct, esp, cu, z_max=float(idx[:, 2].mean()) + 30.0 / esp[2])
+    res["carina_encontrada"] = car is not None
+    # recorte en z: del portal + z_sobre_portal_mm a la carina − z_bajo_carina_mm. Fuera de eso no
+    # hay catéter que buscar, y la apertura 3D sobre el tórax entero tarda minutos.
+    z_p = float(idx[:, 2].mean())
+    z_ref = float(car[0]) if car is not None else z_p
+    z1 = min(ct.shape[2], int(np.ceil(z_p + p["z_sobre_portal_mm"] / esp[2])) + 1)
+    z0 = max(0, int(np.floor(z_ref - p["z_bajo_carina_mm"] / esp[2])))
+    if z0 >= z1 - 2:
+        z0 = 0
+    ct, cu, portal = ct[:, :, z0:z1], cu[:, :, z0:z1], portal[:, :, z0:z1]
+    afin = np.array(afin, float).copy()
+    afin[:3, 3] += afin[:3, 2] * z0
+    if car is not None:
+        car = (car[0] - z0, car[1], car[2], car[3])
+    res["recorte_z"] = [int(z0), int(z1)]
+    mask, info, capas = cateter_mascara(ct, esp, portal, cu, p)
+    if os.environ.get("BTP_DEBUG_CATETER") == "1" and guardar:
+        _lamina_debug(ct, esp, mask, portal, capas, car, serie, px=2.0, vmin=vmin, vmax=vmax)
+    res["segmentacion"] = info
+    camino, geo = cateter_camino(mask, esp, portal)
+    res["volumen_cateter_mm3"] = round(float(mask.sum() * esp.prod()), 0)
+    res["n_puntos_camino"] = len(camino)
+    res["medidas"] = cateter_medidas(ct, esp, afin, mask, camino, portal, car)
+    if guardar:
+        dst = _dir("visor")
+        exige_zona_clinica(dst)
+        os.makedirs(dst, exist_ok=True)
+        titulo = "%s %s" % (meta.get("fecha", "?"), serie)
+        lam = _lamina_cateter(ct, esp, afin, mask, portal, camino, car, res["medidas"], px, vmin, vmax,
+                              titulo)
+        lam.save(os.path.join(dst, "cateter_%s.png" % serie))
+        json.dump(res, open(os.path.join(dst, "cateter_%s.json" % serie), "w"),
+                  ensure_ascii=False, indent=1)
+        res["lamina"] = "cateter_%s.png" % serie
+    return res
+
+
+def _cmd_cateter(a):
+    p = {}
+    for k in ("umbral_metal", "bola_mm", "sombrero_min", "ct_min", "hueso_min", "hueso_dilata_mm",
+              "hueso_radio_plano_mm", "halo_mm", "puente_mm", "z_sobre_portal_mm", "z_bajo_carina_mm"):
+        v = getattr(a, k, None)
+        if v is not None:
+            p[k] = v
+    filas = []
+    for serie in a.series:
+        r = cateter(serie, p, px=a.px, vmin=a.vmin, vmax=a.vmax)
+        filas.append(r)
+        m = r.get("medidas", {})
+        print("%s %s  %s" % (r.get("fecha"), serie, r.get("descripcion")))
+        if "error" in r:
+            print("  ", r["error"])
+            continue
+        print("   portal caja %s mm · metal objetos %d · catéter: %s" %
+              ("x".join("%.0f" % v for v in r["portal_caja_mm"]), r["objetos_metal"], r["segmentacion"]))
+        print("   longitud %s mm · punta %s · carina %s" %
+              (m.get("longitud_cateter_mm"), m.get("punta_mm"), m.get("carina_mm")))
+        print("   punta vs carina %s mm (-=debajo) · vs línea media %s mm (+=dcha) · doblez máx %s° a %s mm del portal"
+              % (m.get("punta_vs_carina_mm"), m.get("punta_vs_linea_media_mm"),
+                 m.get("doblez_max_grados"), m.get("doblez_max_a_mm_del_portal")))
+        print("   hueso más cerca %s mm (a %s mm del portal) · holgura %s · HU máx por 10 mm: %s"
+              % (m.get("hueso_mas_cerca_mm"), m.get("hueso_mas_cerca_a_mm_del_portal"),
+                 m.get("holgura_vertical_mm"), m.get("perfil_hu_max_por_10mm")))
+        if r.get("lamina"):
+            print("   lámina: %s (se ve con `sirve`)" % r["lamina"])
+    if len(filas) > 1:
+        print("\ncomparación (mm; punta vs carina: -=por debajo):")
+        print("%-9s %-9s %10s %8s %8s %8s %8s" % ("fecha", "serie", "punta-car", "punta-x", "long",
+                                                  "doblez", "hueso"))
+        for r in filas:
+            m = r.get("medidas", {})
+            print("%-9s %-9s %10s %8s %8s %8s %8s" % (r.get("fecha"), r["serie"], m.get("punta_vs_carina_mm"),
+                                                      m.get("punta_vs_linea_media_mm"),
+                                                      m.get("longitud_cateter_mm"),
+                                                      m.get("doblez_max_grados"), m.get("hueso_mas_cerca_mm")))
+    return 0
+
+
 def _cmd_sirve(a):
     """Sirve el visor SOLO en 127.0.0.1 (nunca 0.0.0.0): verlo no es publicarlo."""
     import functools
@@ -4253,6 +5078,32 @@ def main(argv=None):
     pre_.add_argument("--vmin", type=float, default=-200.0, help="HU que salen negro")
     pre_.add_argument("--vmax", type=float, default=3000.0, help="HU que salen blanco")
     pre_.set_defaults(fn=_cmd_reservorio)
+    pca = sub.add_parser("cateter", help="trayecto y punta del catéter del reservorio vs carina (MIPs + JSON)")
+    pca.add_argument("series", nargs="+")
+    for k, ayuda in (("umbral_metal", "HU del metal del portal"), ("bola_mm", "radio de la apertura (mm)"),
+                     ("sombrero_min", "HU mínimo del sombrero de copa"), ("ct_min", "HU mínimo absoluto"),
+                     ("hueso_min", "HU desde el que es hueso"), ("hueso_dilata_mm", "ensanche del hueso (mm)"),
+                     ("hueso_radio_plano_mm", "disco de apertura del hueso en el plano (mm)"),
+                     ("halo_mm", "halo de artefacto alrededor del portal (mm)"),
+                     ("puente_mm", "hueco máximo entre fragmentos (mm)"),
+                     ("z_sobre_portal_mm", "recorte por encima del portal (mm)"),
+                     ("z_bajo_carina_mm", "recorte por debajo de la carina (mm)")):
+        pca.add_argument("--" + k.replace("_", "-"), dest=k, type=float, default=None, help=ayuda)
+    pca.add_argument("--px", type=float, default=4.0, help="px por mm en la lámina")
+    pca.add_argument("--vmin", type=float, default=-200.0)
+    pca.add_argument("--vmax", type=float, default=1500.0)
+    pca.set_defaults(fn=_cmd_cateter)
+    plo = sub.add_parser("losa", help="MIP coronal+sagital de una losa con rejilla en mm (punta del catéter a mano)")
+    plo.add_argument("series", nargs="+")
+    plo.add_argument("--sobre", type=float, default=50.0, help="mm por encima del portal")
+    plo.add_argument("--bajo", type=float, default=170.0, help="mm por debajo del portal")
+    plo.add_argument("--px", type=float, default=3.0)
+    plo.add_argument("--vmin", type=float, default=-100.0)
+    plo.add_argument("--vmax", type=float, default=2500.0)
+    plo.add_argument("--rejilla", type=float, default=20.0, help="paso de la rejilla en mm")
+    plo.add_argument("--y-post", dest="y_post", type=float, default=15.0,
+                     help="mm por detrás de la tráquea donde empieza la losa (la columna queda fuera)")
+    plo.set_defaults(fn=_cmd_losa)
     pmr = sub.add_parser("marcas", help="marcas de un radiólogo sobre un TC → esferas + procedencia")
     pmr.add_argument("revision", help="lesiones_55.json de la revisión")
     pmr.add_argument("--serie", required=True, help="huella de la serie (caché de imagen.nii.gz)")
