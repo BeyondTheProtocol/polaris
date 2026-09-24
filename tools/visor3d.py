@@ -26,6 +26,7 @@ Intérprete: `.venv-imagen` (pydicom, SimpleITK, nibabel, scikit-image, TotalSeg
 import argparse
 import hashlib
 import importlib.util
+import inspect
 import json
 import os
 import sys
@@ -126,6 +127,96 @@ def huella(*partes):
     """Hash corto y estable para comparar identidades sin mostrarlas."""
     h = hashlib.sha256("|".join(str(p or "") for p in partes).encode("utf-8"))
     return h.hexdigest()[:8]
+
+
+# ─── procedencia: qué modelo, qué código y qué segmentación hay detrás de cada cifra ─────
+#
+# Antes la caché de segmentación era «existe el fichero» y compara() no guardaba con qué
+# versión se hizo cada lado: un cambio de TotalSegmentator podía comparar un TC segmentado con
+# la versión vieja contra otro con la nueva y enseñar la diferencia como evolución (auditoría de
+# arquitectura, 24-sep-26). Ahora cada segmentación lleva al lado un `.sello.json` con la receta
+# que la produjo, y solo se reutiliza si la receta de hoy es la misma. La huella del fichero
+# entero de visor3d va en el SELLO de cada salida, no en la clave de caché: el fichero se edita
+# casi a diario y cada edición re-segmentaría todas las series (decisión del plan, 24-sep).
+
+def _huella_visor():
+    return huella(open(__file__, "rb").read())
+
+
+def _receta_seg(tarea, device, codigo=None, **kw):
+    """Lo que determina una segmentación. Si cambia algo de esto, la caché no vale."""
+    return {"totalsegmentator": _version_ts(), "tarea": tarea, "device": str(device),
+            "codigo": codigo, "kw": {k: kw[k] for k in sorted(kw)}}
+
+
+def _sello_de(out):
+    return out + ".sello.json"
+
+
+def cache_vale(out, receta):
+    """True solo si el fichero existe, trae sello, la receta casa y el contenido es el sellado."""
+    if not (os.path.exists(out) and os.path.exists(_sello_de(out))):
+        return False
+    try:
+        s = json.load(open(_sello_de(out)))
+    except (OSError, ValueError):
+        return False
+    return s.get("receta") == receta and s.get("sha256") == _sha256(out)
+
+
+def sella_cache(out, receta):
+    json.dump({"receta": receta, "sha256": _sha256(out), "visor3d": _huella_visor(),
+               "sellado": time.strftime("%Y-%m-%dT%H:%M:%S")},
+              open(_sello_de(out), "w"), ensure_ascii=False, indent=1)
+
+
+def serie_uid(raices, serie):
+    """SeriesInstanceUID real, resuelto EN LOCAL y guardado solo en la caché (zona clínica).
+    Nunca se imprime: el inventario lo trata como identificador (tests/test_visor3d.py)."""
+    meta_p = os.path.join(_cache(serie), "meta.json")
+    meta = json.load(open(meta_p)) if os.path.exists(meta_p) else None
+    if meta and meta.get("serie_uid"):
+        return meta["serie_uid"]
+    uid = _localiza_serie(raices, serie)[1]
+    if meta is not None:
+        meta["serie_uid"] = uid
+        json.dump(meta, open(meta_p, "w"), ensure_ascii=False, indent=1)
+    return uid
+
+
+def procedencia(raices, serie, rutas_seg):
+    """Sello de una salida: versión del modelo, huella de visor3d, sha256 y receta de cada
+    segmentación usada, y la serie de la que sale. Se escribe solo en zona clínica."""
+    segs = {}
+    for tarea, ruta in sorted(rutas_seg.items()):
+        s = json.load(open(_sello_de(ruta))) if os.path.exists(_sello_de(ruta)) else {}
+        segs[tarea] = {"sha256": _sha256(ruta),
+                       "receta": huella(json.dumps(s.get("receta"), sort_keys=True))
+                       if s.get("receta") else None}
+    return {"totalsegmentator": _version_ts(), "visor3d": _huella_visor(), "serie": serie,
+            "serie_uid": serie_uid(raices, serie), "segmentaciones": segs}
+
+
+def exige_procedencia_comparable(pa, pb):
+    """Fail-closed: dos lados de una comparación con modelo o receta distintos NO se comparan.
+    La diferencia que saldría sería del modelo, no de la paciente."""
+    for lado, p in (("antes", pa), ("despues", pb)):
+        if not p or not p.get("totalsegmentator") or not p.get("segmentaciones"):
+            raise SystemExit("ABORTA: el lado «%s» no trae sello de procedencia." % lado)
+        sin = [t for t, s in p["segmentaciones"].items() if not s.get("receta")]
+        if sin:
+            raise SystemExit("ABORTA: el lado «%s» usa segmentaciones sin sello: %s" % (lado, sin))
+    if pa["totalsegmentator"] != pb["totalsegmentator"]:
+        raise SystemExit("ABORTA: TotalSegmentator %s en un lado y %s en el otro; re-segmenta "
+                         "los dos con la misma versión." % (pa["totalsegmentator"],
+                                                            pb["totalsegmentator"]))
+    comunes = set(pa["segmentaciones"]) & set(pb["segmentaciones"])
+    distintas = [t for t in sorted(comunes)
+                 if pa["segmentaciones"][t]["receta"] != pb["segmentaciones"][t]["receta"]]
+    if distintas or set(pa["segmentaciones"]) != set(pb["segmentaciones"]):
+        raise SystemExit("ABORTA: los dos lados no se segmentaron con la misma receta (%s)."
+                         % (distintas or sorted(set(pa["segmentaciones"]) ^
+                                                set(pb["segmentaciones"]))))
 
 
 # ─── inventario ──────────────────────────────────────────────────────────────────────────
@@ -370,6 +461,11 @@ def _cmd_convierte(a):
 
 # ─── segmentación ────────────────────────────────────────────────────────────────────────
 
+# Terminología de las salidas internas: lo que detecta el modelo y lo que midió radiología
+# no pueden llamarse igual (sugerencia de Umair Saleheen en LinkedIn, 24-sep-26).
+ESTADO_CANDIDATA = "lesión candidata"
+ESTADO_RADIOLOGIA = "medida por radiología"
+
 ROI_FASE = ["aorta", "portal_vein_and_splenic_vein", "liver", "spleen"]
 # Estructuras vecinas del hígado con captación fisiológica de FDG (excreción, intestino):
 # un «foco» ahí no es hepático.
@@ -391,15 +487,22 @@ def segmenta(raices, serie, preset="higado", tareas=None, device="mps"):
     segdir = os.path.join(_cache(serie), "seg")
     os.makedirs(segdir, exist_ok=True)
     hechas = {}
+    codigo = huella(inspect.getsource(segmenta))
     for t in tareas:
         out = os.path.join(segdir, t + ".nii.gz")
-        if not os.path.exists(out):
-            kw = {}
-            if t in ("total", "total_mr"):
-                kw["roi_subset"] = sorted(set(cfg["roi_total"] + ROI_FASE))
-            tarea = "total" if t == "total_completo" else t     # 117 clases, sin recorte
-            totalsegmentator(input=imagen, output=out, task=tarea, ml=True, device=device,
+        kw = {}
+        if t in ("total", "total_mr"):
+            kw["roi_subset"] = sorted(set(cfg["roi_total"] + ROI_FASE))
+        tarea = "total" if t == "total_completo" else t     # 117 clases, sin recorte
+        receta = _receta_seg(tarea, device, codigo=codigo, ml=True, **kw)
+        if not cache_vale(out, receta):
+            # Sin sello o con otra receta NO se reutiliza: una segmentación de otra versión del
+            # modelo, reutilizada en silencio, es justo lo que este sello existe para impedir.
+            tmp = out + ".parcial.nii.gz"
+            totalsegmentator(input=imagen, output=tmp, task=tarea, ml=True, device=device,
                              quiet=True, **kw)
+            os.replace(tmp, out)
+            sella_cache(out, receta)
         hechas[t] = out
     return hechas
 
@@ -515,6 +618,9 @@ def lesiones(raices, serie):
         d = _diametro_axial_mayor(m, esp)
         out.append({
             "_comp": i,
+            # Lo que sale de aquí es del MODELO: nadie lo ha confirmado. «Lesión candidata» hasta
+            # que un informe radiológico la mida (sugerencia de Umair Saleheen, 24-sep-26).
+            "estado": ESTADO_CANDIDATA,
             "diametro_mm": round(d, 1),
             "volumen_ml": round(nv * vox_ml, 2),
             "centro_mm": [round(float(c), 1) for c in centro],
@@ -537,6 +643,7 @@ def lesiones(raices, serie):
     nib.save(nifti_limpio(ids, aff, np.uint8), os.path.join(_cache(serie), "lesiones_id.nii.gz"))
     return {
         "serie": serie,
+        "procedencia": procedencia(raices, serie, seg),
         "volumen_higado_ml": round(float(higado.sum()) * vox_ml, 1),
         "centro_higado_mm": [round(float(c), 1) for c in
                              (aff @ np.append(np.argwhere(higado).mean(axis=0), 1.0))[:3]],
@@ -593,7 +700,12 @@ def empareja(a, b, tolerancia_mm=15.0, tolerancia_mismo_segmento_mm=25.0):
 
 def compara(raices, serie_a, serie_b):
     a, b = lesiones(raices, serie_a), lesiones(raices, serie_b)
-    res = {"antes": a, "despues": b, "pares": empareja(a, b)}
+    # Antes de emparejar nada: si los dos lados no salen del mismo modelo y la misma receta, la
+    # «evolución» mediría el cambio de modelo. Aborta, no avisa.
+    exige_procedencia_comparable(a.get("procedencia"), b.get("procedencia"))
+    res = {"antes": a, "despues": b, "pares": empareja(a, b),
+           "procedencia": {"antes": a["procedencia"], "despues": b["procedencia"],
+                           "visor3d": _huella_visor()}}
     d = _dir("comparacion")
     exige_zona_clinica(d)
     os.makedirs(d, exist_ok=True)
@@ -606,13 +718,16 @@ def _cmd_compara(a):
     res, ruta = compara(a.raices, a.series[0], a.series[1])
     for lado in ("antes", "despues"):
         r = res[lado]
-        print("%s %s: hígado %.0f ml · lesiones %d · volumen tumoral %.1f ml"
+        print("%s %s: hígado %.0f ml · lesiones candidatas %d · volumen tumoral %.1f ml"
               % (lado, r["serie"], r["volumen_higado_ml"], len(r["lesiones"]),
                  r["volumen_tumoral_ml"]))
         for L in r["lesiones"]:
             print("   L%-2d  %5.1f mm  %7.2f ml  seg %-4s %s acuerdo2=%s"
                   % (L["id"], L["diametro_mm"], L["volumen_ml"], L["segmento"],
                      "<10mm" if L["pequena"] else "     ", L["acuerdo_2o_modelo"]))
+    pr = res["procedencia"]
+    print("procedencia: TotalSegmentator %s · visor3d %s (mismo modelo y receta en los dos lados)"
+          % (pr["antes"]["totalsegmentator"], pr["visor3d"]))
     print("pares:")
     for p in res["pares"]:
         print("  ", json.dumps(p))
@@ -897,6 +1012,12 @@ def assets(raices, serie, destino, voxel_mm=2.0):
               "volumen_higado_ml": info["volumen_higado_ml"],
               "volumen_tumoral_ml": info["volumen_tumoral_ml"],
               "lesiones": info["lesiones"], "mallas": mallas}
+    # Sello, como la receta de la mama: con qué modelo, qué código y qué segmentaciones se hizo,
+    # y el sha256 de cada malla. estudio.json vive en zona clínica; la web no lo copia entero.
+    todas = dict(mallas, **{"lesion%02d" % L["id"]: L["malla"] for L in info["lesiones"]
+                            if L.get("malla")})
+    salida["procedencia"] = dict(info["procedencia"], sha256_mallas={
+        k: _sha256(os.path.join(destino, v)) for k, v in sorted(todas.items())})
     json.dump(salida, open(os.path.join(destino, "estudio.json"), "w"), ensure_ascii=False,
               indent=1)
     return salida
@@ -1722,7 +1843,13 @@ def tumor_modelo(raices, serie, folds=(0,), device="auto"):
     base = os.path.join(_cache(serie), "mama_mia")
     salida = os.path.join(base, "salida")
     marca = os.path.join(salida, "caso.nii.gz")
-    if os.path.exists(marca):
+    # Misma regla que TotalSegmentator: la máscara solo se reutiliza si salió de ESTOS pesos
+    # (sha256 del zip bajado), estos folds y este dispositivo.
+    pesos = os.path.join(MODELOS, MAMA_MIA["carpeta"], ".completo")
+    sha_pesos = json.load(open(pesos)).get("sha256_zip") if os.path.exists(pesos) else None
+    device = _dispositivo(device)
+    receta = _receta_seg("mama_mia", device, codigo=sha_pesos, folds=list(folds))
+    if cache_vale(marca, receta):
         return marca
     entrada = os.path.join(base, "entrada")
     shutil.rmtree(base, ignore_errors=True)
@@ -1730,7 +1857,6 @@ def tumor_modelo(raices, serie, folds=(0,), device="auto"):
     os.makedirs(salida, exist_ok=True)
     exige_zona_clinica(base)
     shutil.copy(imagen, os.path.join(entrada, "caso_0000.nii.gz"))
-    device = _dispositivo(device)
     p = nnUNetPredictor(tile_step_size=0.5, use_gaussian=True, use_mirroring=False,
                         device=torch.device(device), verbose=False, allow_tqdm=True)
     p.initialize_from_trained_model_folder(modelo, use_folds=tuple(folds),
@@ -1740,6 +1866,7 @@ def tumor_modelo(raices, serie, folds=(0,), device="auto"):
     shutil.rmtree(entrada, ignore_errors=True)
     if not os.path.exists(marca):
         raise SystemExit("ABORTA: el modelo no dejó máscara en %s" % salida)
+    sella_cache(marca, receta)
     return marca
 
 
@@ -1999,7 +2126,9 @@ def vertebras_finas(red, lab_grueso, nombres, destino, device="auto", margen_mm=
     # la versión va en el nombre: cada vez que cambia CÓMO se recorta, el fichero de antes deja
     # de valer, y reutilizarlo me hizo dar por probado un arreglo que ni se había ejecutado.
     out = os.path.join(destino, "columna_v2_total.nii.gz")
-    if not os.path.exists(out):
+    receta = _receta_seg("total", _dispositivo(device), codigo="columna_v2", ml=True, fast=False,
+                         margen_mm=margen_mm)
+    if not cache_vale(out, receta):
         os.makedirs(destino, exist_ok=True)
         # canónica, porque la caja se calcula sobre `lab_grueso`, que YA está en canónica.
         # Recortar la imagen cruda con índices de la canónica mezcla dos espacios: la caja
@@ -2032,6 +2161,7 @@ def vertebras_finas(red, lab_grueso, nombres, destino, device="auto", margen_mm=
                          device=_dispositivo(device), quiet=True)
         os.replace(tmp, out)
         os.remove(ent)
+        sella_cache(out, receta)
     img = nib.as_closest_canonical(nib.load(out))
     lab = np.asarray(img.dataobj)
     ids = {v: k for k, v in nombres.items()}
@@ -2294,7 +2424,10 @@ def esqueleto(raices, serie, device="auto", voxel=1.5, trozos=3, solapa=16, suav
                        "esqueleto_%gmm_x%d%s_total.nii.gz" % (voxel, max(1, trozos),
                                                              "_fino" if fino else ""))
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    if not os.path.exists(out) and trozos > 1:
+    receta = _receta_seg("total", _dispositivo(device), codigo="esqueleto", ml=True,
+                         fast=not fino, voxel=voxel, trozos=max(1, trozos), solapa=solapa)
+    rehacer = not cache_vale(out, receta)
+    if rehacer and trozos > 1:
         # POR TROZOS, y no es una manía: el pico de nnU-Net es proporcional al volumen, y este TC
         # de cuerpo entero pide ~10,5 GB de una pieza (medido cuatro veces: 11,2 · 11,3 · 10,4 ·
         # 10,2 GB, las cuatro cortadas por la guarda). En un mini de 16 GB con el escritorio
@@ -2360,8 +2493,9 @@ def esqueleto(raices, serie, device="auto", voxel=1.5, trozos=3, solapa=16, suav
             del lp
         nib.save(nifti_limpio(etq, src.affine, np.uint8), out + ".parcial.nii.gz")
         os.replace(out + ".parcial.nii.gz", out)
+        sella_cache(out, receta)
         del datos, etq, dist
-    if not os.path.exists(out):
+    if not cache_vale(out, receta):
         # a un temporal y luego rename: si la guarda mata a mitad, no queda un fichero a medias
         # que la vuelta siguiente dé por bueno
         tmp = out + ".parcial.nii.gz"
@@ -2382,6 +2516,7 @@ def esqueleto(raices, serie, device="auto", voxel=1.5, trozos=3, solapa=16, suav
         totalsegmentator(input=red, output=tmp, task="total", ml=True, fast=not fino,
                          device=_dispositivo(device), quiet=True)
         os.replace(tmp, out)
+        sella_cache(out, receta)
     # A orientación canónica SIEMPRE, venga de una pieza o de tres cosidas. `proyecta_anterior`
     # da por hecho que el eje 0 es x del paciente y el 2 es z; eso solo es cierto en canónica.
     # Los dos caminos traían orientaciones distintas (TotalSegmentator reorienta su salida, el
@@ -3219,6 +3354,16 @@ def _pet_para(carpeta):
         c = json.load(open(os.path.join(d, f)))
         filas = c.get("lesiones") or []
         if filas and all(suyo.get(L["id"]) == round(L["diametro_mm"], 1) for L in filas):
+            # Casar id y diámetro no basta: el PET tiene que venir de LAS MISMAS segmentaciones
+            # del TC. Estudio o PET sin sello, o de otra segmentación → aborta, como ficha().
+            if not est.get("procedencia"):
+                raise SystemExit("ABORTA: estudio.json de %s sin sello de procedencia; "
+                                 "regenera `assets`." % carpeta)
+            if (((c.get("procedencia") or {}).get("ct_diag") or {}).get("segmentaciones")
+                    != est["procedencia"]["segmentaciones"]):
+                raise SystemExit("ABORTA: el PET %s casa con %s por id y diámetro pero no por "
+                                 "segmentación (o no trae sello); recalcúlalo con `suv`."
+                                 % (f, carpeta))
             if r is not None:
                 raise SystemExit("ABORTA: dos PET casan con %s; no se puede elegir" % carpeta)
             r = c
@@ -3290,6 +3435,7 @@ def _cmd_web(a):
         nombre = "lesion%02d" % (len(lesiones) + 1)
         piezas.append((nombre, L["malla"], 0))
         pieza = {"malla": nombre + ".ply", "diametro_auto_mm": round(L["diametro_mm"], 1),
+                 "estado": ESTADO_RADIOLOGIA if r else ESTADO_CANDIDATA,
                  "diana": r["etiqueta"] if r else None, "mm_informe": r["mm"] if r else None}
         # PET: se une por el id ORIGINAL de la lesión. La web las renumera por DIÁMETRO y el
         # PET las numera por VOLUMEN, así que casarlas por posición pone el SUV en la lesión
@@ -3575,6 +3721,29 @@ def _registra_higado(mask_fijo_ruta, mask_movil_ruta, label_fijo, label_movil):
     return comp, d_rig, dice(comp), fijo_img
 
 
+def guarda_transformada(t, ruta):
+    """sitk.WriteTransform a .h5 (el campo de Demons necesita HDF5) → {fichero, sha256, sentido}."""
+    import SimpleITK as sitk
+    exige_zona_clinica(os.path.dirname(ruta))
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    sitk.WriteTransform(t, ruta)
+    return {"fichero": os.path.basename(ruta), "sha256": _sha256(ruta),
+            "sentido": "fijo (TC del PET) → móvil (TC diagnóstico), para sitk.Resample"}
+
+
+def pet_vigente(pet, info):
+    """Un cruce PET solo vale para las lesiones de HOY si se hizo sobre las mismas
+    segmentaciones del TC diagnóstico: si se re-segmentó después, los ids ya no casan y el SUV
+    caería en otra lesión."""
+    if not pet:
+        return pet
+    p = (pet.get("procedencia") or {}).get("ct_diag")
+    if not p or p.get("segmentaciones") != info["procedencia"]["segmentaciones"]:
+        raise SystemExit("ABORTA: el cruce PET de %s no trae sello o se hizo sobre otra "
+                         "segmentación del TC; recalcúlalo con `suv`." % info["serie"])
+    return pet
+
+
 def _ids_en_pet(ids_ruta, transformada, ref_img):
     """Mapa de ids de lesiones del TC diagnóstico → rejilla del TC del PET (vecino más cercano)."""
     import SimpleITK as sitk
@@ -3598,6 +3767,10 @@ def suv_lesiones(raices, serie_pet, serie_ctpet, serie_ctdiag):
     seg_diag = segmenta(raices, serie_ctdiag, tareas=["total"])["total"]
     info = lesiones(raices, serie_ctdiag)       # también escribe lesiones_id.nii.gz
     t, d_rig, d_fin, _ = _registra_higado(seg_pet, seg_diag, cm["liver"], cm["liver"])
+    # La transformada (rígida + Demons) se guarda: sin ella no se puede rehacer ni auditar dónde
+    # cayó cada foco. Va a zona clínica, junto al JSON del cruce, con su sha256 en el sello.
+    tfm = guarda_transformada(t, os.path.join(_dir("pet"), "%s_%s.tfm.h5" % (serie_pet,
+                                                                            serie_ctdiag)))
     ref = sitk.ReadImage(seg_pet)   # rejilla nativa del TC del PET para llevar los ids
     ids_ct = _ids_en_pet(os.path.join(_cache(serie_ctdiag), "lesiones_id.nii.gz"), t, ref)
     # sitk devuelve [z,y,x] en LPS; se reescribe como NIfTI para llevarlo con nibabel al PET
@@ -3665,7 +3838,12 @@ def suv_lesiones(raices, serie_pet, serie_ctpet, serie_ctdiag):
                           "organo": nombre_de.get(int(tot[k]), "fuera de órganos segmentados"),
                           "lesion_cercana": lid or None, "distancia_mm": round(float(dist[k]), 1)})
         focos.sort(key=lambda f: -f["suvmax"])
-    return {"pet": meta, "dice_registro_higado": round(d_fin, 3),
+    sello = {"totalsegmentator": _version_ts(), "visor3d": _huella_visor(),
+             "pet_serie_uid": serie_uid(raices, serie_pet),
+             "ct_pet": procedencia(raices, serie_ctpet, {"total": seg_pet,
+                                                         "total_completo": seg_pet_completo}),
+             "ct_diag": info["procedencia"], "transformada": tfm}
+    return {"pet": meta, "procedencia": sello, "dice_registro_higado": round(d_fin, 3),
             "dice_registro_rigido": round(d_rig, 3), "focos_pet": focos,
             "fondo_higado": {"suvmean": round(float(fondo.mean()), 2),
                              "suvsd": round(float(fondo.std()), 2),
@@ -3819,7 +3997,8 @@ def ficha(raices, serie, previo=None):
         no_reencontradas = [{"id_previo": p["antes"], "segmento": prev_de[p["antes"]]["segmento"],
                              "diametro_mm": prev_de[p["antes"]]["diametro_mm"]}
                             for p in res["pares"] if p.get("despues") is None]
-    pet_now, pet_prev = _pet_de(serie), (_pet_de(previo) if previo else None)
+    pet_now = pet_vigente(_pet_de(serie), info)
+    pet_prev = pet_vigente(_pet_de(previo), res["antes"]) if previo else None
     suv_now = {L["id"]: L["suvmax"] for L in (pet_now or {}).get("lesiones", [])}
     suv_prev = {L["id"]: L["suvmax"] for L in (pet_prev or {}).get("lesiones", [])}
     filas = []
@@ -3827,7 +4006,8 @@ def ficha(raices, serie, previo=None):
         e = evo.get(L["id"], {})
         ip = e.get("id_previo")
         filas.append({
-            "id": L["id"], "segmento": L["segmento"], "diametro_mm": L["diametro_mm"],
+            "id": L["id"], "estado": L["estado"], "segmento": L["segmento"],
+            "diametro_mm": L["diametro_mm"],
             "volumen_ml": L["volumen_ml"], "pequena": L["pequena"],
             "acuerdo_2o_modelo": L["acuerdo_2o_modelo"],
             "densidad": dens.get(L["id"]),
@@ -3840,7 +4020,9 @@ def ficha(raices, serie, previo=None):
                                                  (pet_prev or {}).get("fondo_higado"))}
             if (pet_prev and ip) else None,
         })
-    r = {"aviso": "Medidas de un modelo, sin validar por radiología. No es un diagnóstico.",
+    r = {"aviso": "Lesiones candidatas: medidas de un modelo, sin validar por radiología. "
+                  "No es un diagnóstico.",
+         "procedencia": info["procedencia"],
          "serie": serie, "fecha": meta["fecha"], "previo": previo,
          "fecha_previo": convierte(raices, previo)[1]["fecha"] if previo else None,
          "hu_parenquima": par,

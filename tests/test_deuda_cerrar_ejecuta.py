@@ -22,7 +22,20 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 _TMP = tempfile.mkdtemp(prefix="deuda_cierra_")
 os.environ["BTP_STATE_DIR"] = _TMP
-os.environ["BTP_REPO"] = ROOT
+# Los tests de mentira y su enganche viven en un árbol DE JUGUETE, nunca en el tests/ real.
+# Antes se escribían en ROOT/tests/test_all.sh con leer-modificar-escribir y sin lock: con varios
+# test_all.sh a la vez (12 vivos el 24-sep-26), el limpiar() de uno restauraba la copia de otro y
+# casa base se quedaba con `runpy test_zz_con_nieto_BORRAR.py` sin commitear, bloqueando fusiones
+# y pudiendo comerse líneas que otra sesión acababa de fusionar. `deuda.py` ya resuelve REPO y
+# TEST_ALL desde BTP_REPO, así que basta con apuntarlo aquí.
+FALSO = tempfile.mkdtemp(prefix="deuda_repo_")
+os.makedirs(os.path.join(FALSO, "tests"))
+_TA_REAL = os.path.join(ROOT, "tests", "test_all.sh")
+with open(_TA_REAL, encoding="utf-8") as _f:
+    _ORIGINAL_REAL = _f.read()
+with open(os.path.join(FALSO, "tests", "test_all.sh"), "w", encoding="utf-8") as _f:
+    _f.write(_ORIGINAL_REAL)
+os.environ["BTP_REPO"] = FALSO
 import deuda  # noqa: E402
 
 deuda.STATE = _TMP
@@ -42,10 +55,10 @@ def ok(cond, name):
 
 def _escribe_test(nombre, cuerpo):
     """Crea un test de mentira en tests/ y lo engancha a test_all.sh; devuelve (ruta_rel, limpiar)."""
-    ruta = os.path.join(ROOT, "tests", nombre)
+    ruta = os.path.join(FALSO, "tests", nombre)
     with open(ruta, "w", encoding="utf-8") as f:
         f.write(cuerpo)
-    ta = os.path.join(ROOT, "tests", "test_all.sh")
+    ta = os.path.join(FALSO, "tests", "test_all.sh")
     original = open(ta, encoding="utf-8").read()
     with open(ta, "w", encoding="utf-8") as f:
         f.write(original + "\n# temporal de test_deuda_cerrar_ejecuta\nrunpy %s\n" % nombre)
@@ -113,7 +126,7 @@ def main():
     rel2, limpiar2 = _escribe_test("test_zz_huerfano_BORRAR.py", "print('ok')\n")
     try:
         # lo desenganchamos de test_all.sh: existe y pasa, pero nadie lo corre
-        ta = os.path.join(ROOT, "tests", "test_all.sh")
+        ta = os.path.join(FALSO, "tests", "test_all.sh")
         cuerpo = open(ta, encoding="utf-8").read().replace("runpy test_zz_huerfano_BORRAR.py\n", "")
         open(ta, "w", encoding="utf-8").write(cuerpo)
         ok(deuda.cerrar("prueba-sin-test", rel2)[0] is False,
@@ -184,6 +197,16 @@ def main():
         import importlib
         importlib.reload(deuda)
         deuda.STATE, deuda.LIBRO = _TMP, os.path.join(_TMP, "deuda.json")
+
+    # --- 7. Nada de lo anterior tocó el árbol real (24-sep-2026) ---
+    # Si alguien vuelve a apuntar los tests de mentira a ROOT/tests, esto salta aunque limpiar()
+    # haya dejado el fichero bien: la carrera solo se ve con varias suites a la vez.
+    ok(os.path.realpath(deuda.TEST_ALL) != os.path.realpath(_TA_REAL)
+       and not os.path.realpath(FALSO).startswith(os.path.realpath(ROOT)),
+       "los tests de mentira se enganchan en el test_all.sh real: ensucian casa base")
+    import glob
+    ok(not glob.glob(os.path.join(ROOT, "tests", "test_zz_*_BORRAR.py")),
+       "quedan tests de mentira en el tests/ real")
 
     print("RESULTADO deuda_cerrar_ejecuta: %d OK, %d fallos" % (_pass, _fail))
     print("✅ CERRAR EJECUTA EL TEST — EN VERDE" if _fail == 0 else "❌ revisar fallos")
