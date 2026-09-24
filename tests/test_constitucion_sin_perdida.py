@@ -85,7 +85,9 @@ MOVIDAS = [
     ("se hace con los MCP de literatura (`search_papers`, `create_systematic_review`, PubMed/PMC) o un `Workflow` de varios agentes",
      "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
     ("`salida.py` (Telegram, HALT + anti-spam)", "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
-    ("`deid.py` (de-identificar, determinista y verificado por el juez del muro)",
+    # 24-sep-26 (auditoría externa 3.3): «verificado por el juez del muro» prometía anonimato y no lo
+    # era (redacta y verifica con los mismos patrones). La norma sigue aquí con el lenguaje honesto.
+    ("`deid.py` (de-identificar por patrones; «sin identificadores detectados» NO es anónimo",
      "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
     ("`honestidad_lint.py`: apoyo del sello de evidencia", "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
     ("`cosecha_entregables.py`: red de seguridad de «dónde quedó archivado»",

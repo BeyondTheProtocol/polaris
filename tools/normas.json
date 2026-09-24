@@ -3100,6 +3100,30 @@
    "auditable": true,
    "repetida": false,
    "nota": "22-sep-2026: hallazgo 3.1 de la auditoría externa. `tools/state/ok_envio.json` valía con decir origen=prompt y lo escribía cualquiera. Arreglado en tools/permiso_envio.py; canario y replay de 24.266 llamadas reales."
+  },
+  {
+   "slug": "feedback-contacto-tiene-material-suficiente-por-defecto",
+   "que": "Asumir que {{CONTACTO}} tiene material suficiente; solo deja de valer si lo dice ELLA",
+   "clase": "contexto",
+   "mecanismo": "criterio — no hay garantía dura; el plan verificado (Flex 2x25µm + WES 2x10µm, correo del 7-sep) vive en la memoria y en ESTADO-ACTUAL",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "Regla de {{TITULAR}} 24-sep-2026 tras tres códigos rojos míos sobre el material. Preguntar a {{CONTACTO}} sigue valiendo; escalar o bloquear por material, no."
+  },
+  {
+   "slug": "feedback-agotar-correo-y-whatsapp-antes-de-codigo-rojo",
+   "que": "Antes de disparar código rojo o escribir «no consta», agotar correo, WhatsApp y ventanilla clínica, y decir qué fuentes se miraron",
+   "clase": "contexto",
+   "mecanismo": "criterio hoy — candidato a hook PreToolUse sobre codigo_rojo.py trigger que exija declarar las fuentes consultadas",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "24-sep-2026: tres códigos rojos que se habrían evitado leyendo el correo del 7-sep y el WhatsApp del 21-sep. Un grep normal NO lee la zona clínica (clinico_guard), y su resultado vacío parece «no existe»."
   }
  ]
 }
