@@ -643,6 +643,35 @@ def enrutado_incumplido(t, tools=None):
 # Ninguna de las dos clases se deja cazar por una regex sobre el texto final; necesitan otro sitio.
 
 
+
+def gestion_pide_ok(t, tools=None):
+    """feedback-gestion-de-sesion-la-hago-yo — a fuego (22-sep-26): la fusión a casa base, la poda
+    del worktree y el cierre de sesión los hago yo. Canta si le pido OK para eso.
+    Afinado con replay_gate (14 días, 2.187 turnos): «fusionar» a secas NO basta, porque también
+    es el PR de la web, y eso sí sale fuera. El objeto tiene que ser casa base, worktree o poda."""
+    pide = (r"(espera tu OK|cuando (me )?des el OK|con tu OK|te pido (el )?OK|necesito tu OK|"
+            r"¿\s*(fusiono|podo|borro|cierro|elimino)\b)")
+    gestion = r"(casa base|worktree|\bpod(ar|a|o)\b|cerrar_sesion|cierre de sesi[óo]n)"
+    # Lo que SÍ sigue siendo gate suyo, o no es una petición: la web y lo que sale fuera, el muro
+    # (fusionar un hook del muro lo firma ella), el código rojo, y lo descrito en pasado.
+    fuera = (r"\bnada\b|ya no|sin pedir|sin preguntar|#\d+|\bPR\b|pull|deploy|preview|vista previa|"
+             r"netlify|web|producci[óo]n|publica|muro|hook|ci_barrido|guard|c[óo]digo rojo|"
+             r"fusion[ée]\b|fusionad[oa]|se hizo|no he comprobado|cada una con tu OK|"
+             r"con tu OK y verificad|^[-*\s]*\**hecho\b|commit `?[0-9a-f]{7}`? con tu OK")
+    lineas = [l.strip() for l in _sin_fences(t).splitlines()]
+    for n, l in enumerate(lineas):
+        if not re.search(pide, l, re.I):
+            continue
+        # «**Qué espera tu OK**» como encabezado: el objeto va en la línea de debajo.
+        f = l if len(l) > 30 or n + 1 >= len(lineas) else l + " " + lineas[n + 1]
+        if re.search(gestion, f, re.I) and not re.search(fuera, f, re.I):
+            return ("Le pides OK para gestión de sesión («%s…»). Fusionar a casa base, rescatar "
+                    "ignorados y podar el worktree lo haces tú (`BTP_GIT_BASE_OK=1 "
+                    "cerrar_sesion.py --apply`). Solo se para por trabajo vivo de otro o por el muro."
+                    % f[:140])
+    return None
+
+
 # Checks que corren aunque la respuesta sea corta: «hecho» sin haber lanzado al comité es
 # justo el incumplimiento, y el mínimo de caracteres lo dejaba pasar.
 SIN_MINIMO = {"enrutado_incumplido"}
@@ -668,6 +697,7 @@ CHECKS = {
     "enrutado_incumplido": enrutado_incumplido,
     "china_omitida": china_omitida,
     "geografia_como_filtro": geografia_como_filtro,
+    "gestion_pide_ok": gestion_pide_ok,
 }
 
 
@@ -873,6 +903,8 @@ def _selftest():
                         "siempre, antes de seguir con el resumen de lo que he encontrado hoy."),
         ("taller_descartado", "Lo de mejorar Polaris no es urgente ahora mismo, así que lo dejo "
                               "aparcado y seguimos con lo demás que teníamos entre manos."),
+        ("gestion_pide_ok", "Qué espera tu OK: fusionar la rama a casa base con cerrar_sesion.py "
+                            "y podar el worktree cuando lo veas, que ya está todo en verde."),
     ]
     fallos = []
     for check, texto in casos:

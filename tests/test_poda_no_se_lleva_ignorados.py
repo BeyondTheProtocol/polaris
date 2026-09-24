@@ -72,7 +72,42 @@ ok("cerrar_sesion consulta _trabajo_vivo antes de podar", "_trabajo_vivo(wt)" in
 ok("y un hallazgo IMPIDE la poda, no solo la comenta",
    "seguido" not in src and "seguro = False" in src)
 
+# 7. El rescate (22-sep-2026): el cierre guarda solo, sin preguntar a {{TITULAR}}.
 import shutil  # noqa: E402
+wt, base = tempfile.mkdtemp(prefix="rw-"), tempfile.mkdtemp(prefix="rb-")
+cajon = os.path.join(base, "tools/state/rescate-poda/x")
+
+
+def _en(raiz, rel, contenido):
+    os.makedirs(os.path.dirname(os.path.join(raiz, rel)), exist_ok=True)
+    open(os.path.join(raiz, rel), "w").write(contenido)
+
+
+_en(base, ".claude/logs/clinico-access.log", "a\nb\nc\n")
+_en(wt, ".claude/logs/clinico-access.log", "a\nb\n")                # copia vieja de casa base
+_en(base, "00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md", "viejo\n")
+_en(wt, "00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md", "viejo\n## job nuevo\n")  # algo propio
+_en(wt, ".claude/logs/solo-aqui.log", "x\n")                          # no existe en casa base
+r = ramas.rescatar(wt, base, cajon, copiar=False)
+ok("dry-run: la copia vieja cuenta como repetida", r["repetidos"] == [".claude/logs/clinico-access.log"], "-> %r" % r)
+ok("dry-run: no escribe nada", not os.path.exists(cajon))
+r = ramas.rescatar(wt, base, cajon)
+ok("lo propio se rescata (entrada nueva y fichero que no existe en casa base)",
+   sorted(r["rescatados"]) == [".claude/logs/solo-aqui.log", "00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md"], "-> %r" % r)
+ok("y queda en el cajón íntegro",
+   open(os.path.join(cajon, "00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md")).read() == "viejo\n## job nuevo\n")
+ok("el fichero de casa base NO se toca (restos de tests no ensucian el panel)",
+   open(os.path.join(base, "00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md")).read() == "viejo\n")
+ok("sin nada vivo, nada bloquea la poda", r["bloquean"] == [], "-> %r" % r["bloquean"])
+_en(wt, "tools/state/outbox/pending/borrador.json", "{}")
+ok("un borrador esperando su OK SIGUE bloqueando la poda",
+   any("borrador.json" in f for f in ramas.rescatar(wt, base, cajon, copiar=False)["bloquean"]))
+ok("fail-closed: si casa base no se puede leer, no se da por repetido",
+   not ramas._lineas_ya_en(os.path.join(wt, ".claude/logs/clinico-access.log"), "/no/existe"))
+ok("cerrar_sesion rescata antes de podar", "_ramas.rescatar(wt, BASE" in src)
+shutil.rmtree(wt, ignore_errors=True)
+shutil.rmtree(base, ignore_errors=True)
+
 shutil.rmtree(tmp, ignore_errors=True)
 
 print(("FALLOS: " + ", ".join(FALLOS)) if FALLOS

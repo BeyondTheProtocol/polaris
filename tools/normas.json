@@ -3076,6 +3076,18 @@
    "auditable": false,
    "repetida": false,
    "nota": "22-sep-2026 15:11: un checkout para comparar la carga fija desacopló HEAD ~40 s y devolvió run_agent.sh con marcadores de conflicto al árbol vivo. Candidata a bloqueo (hook PreToolUse): deuda checkout-en-casa-base-sin-freno."
+  },
+  {
+   "slug": "feedback-gestion-de-sesion-la-hago-yo",
+   "que": "La gestión de la sesión (fusión a casa base, rescate de ignorados, poda) la hago yo sin pedirle OK",
+   "clase": "salida",
+   "mecanismo": ".claude/hooks/gate_salida.py::gestion_pide_ok",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": true,
+   "nota": "A fuego, 22-sep-26. El rescate de ignorados (ramas.rescatar) quita la causa de la pregunta; este check caza la pregunta."
   }
  ]
 }

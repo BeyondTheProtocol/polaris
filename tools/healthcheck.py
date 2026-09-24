@@ -991,9 +991,17 @@ def _check_roster_daemons():
     except Exception:
         pass
     info["fallando_suprimido_por_saldo"] = bloqueado_por_dinero
+    #    Y el 75 (EX_TEMPFAIL) NO es un fallo: es como `run_agent.sh` dice «aplazo esto a propósito»
+    #    (Claude no disponible, cadena de modelos agotada por límite de capacidad, tope local de
+    #    gasto). El 22-sep-26 tres daemons —asistente, correo, git-barrido— llevaban 5, 5 y 9
+    #    detecciones en el libro de deudas con `.err` lleno de «cadena de modelos agotada por límite
+    #    → aplazo», y `launchctl list` dándolos en 0. Un aplazo declarado no es un daemon roto:
+    #    contarlo como fallo tapa los fallos de verdad con ruido y pone la suite en rojo por nada.
+    APLAZO_DELIBERADO = 75
     fallando_bruto = [] if bloqueado_por_dinero else sorted(
         lbl for lbl in (roster & cargados)
-        if estado[lbl][0] == "-" and estado[lbl][1].isdigit() and int(estado[lbl][1]) > 0)
+        if estado[lbl][0] == "-" and estado[lbl][1].isdigit()
+        and int(estado[lbl][1]) > 0 and int(estado[lbl][1]) != APLAZO_DELIBERADO)
     info["fallando"] = {lbl: estado[lbl][1] for lbl in fallando_bruto}
     # SUPERSEDE (3/7/26, hermano del que ya usan _salud_daemons/seguimiento._heartbeats_problema):
     # el exit-code de `launchctl list` es la última pasada CONOCIDA, pero puede quedarse "fallando"

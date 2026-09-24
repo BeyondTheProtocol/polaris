@@ -323,14 +323,30 @@ def cerrar(apply=False, scope=None, podar=True):
         # clínica. Las dos veces se salvaron porque alguien miró a mano antes de borrar.
         # Ahora no se poda: se dice qué hay y dónde, y que se rescate primero.
         # También en dry-run: el plan es justo donde quieres ver esto ANTES de aplicar.
+        #
+        # Y desde el 22-sep-2026 el rescate lo hace el cierre, no {{TITULAR}} («todo esto de gestión
+        # debes hacerlo tú»): lo repetido de casa base se descarta, lo propio se copia a un cajón
+        # de casa base y se poda. Solo siguen parando la poda los borradores/encargos vivos y
+        # una copia que falle. Se rescata únicamente si la poda va a ocurrir (limpio y seguro).
         perdible = _ramas._trabajo_vivo(wt)
         if perdible:
-            seguro = False
-            acciones.append(
-                "poda: NO — se perderían %d fichero(s) que git no ve (están gitignored): %s%s. "
-                "Rescátalos a casa base y vuelve a intentarlo."
-                % (len(perdible), ", ".join(perdible[:4]),
-                   " y %d más" % (len(perdible) - 4) if len(perdible) > 4 else ""))
+            cajon = os.path.join(BASE, "tools", "state", "rescate-poda",
+                                 "%s-%s" % (os.path.basename(wt.rstrip("/")),
+                                            __import__("time").strftime("%Y%m%d-%H%M%S")))
+            r = _ramas.rescatar(wt, BASE, cajon, copiar=bool(apply and limpio and seguro))
+            if r["bloquean"]:
+                seguro = False
+                acciones.append(
+                    "poda: NO — %d fichero(s) son trabajo vivo o no se pudieron guardar: %s%s"
+                    % (len(r["bloquean"]), ", ".join(r["bloquean"][:4]),
+                       " y %d más" % (len(r["bloquean"]) - 4) if len(r["bloquean"]) > 4 else ""))
+            else:
+                perdible = []
+                acciones.append(
+                    "rescate: %d ignorado(s) ya repetidos en casa base; %d con algo propio %s"
+                    % (len(r["repetidos"]), len(r["rescatados"]),
+                       ("guardados en " + os.path.relpath(cajon, BASE)) if (apply and r["rescatados"])
+                       else "(se guardarían en tools/state/rescate-poda/ al aplicar)"))
         if apply and limpio and seguro:
             # Candado COMPARTIDO "git-mutex" — MISMO nombre que la fusión de arriba (A1, 10-jul-26,
             # hallazgo B): antes esta poda mutaba `.git/worktrees/` SIN candado, así que una fusión

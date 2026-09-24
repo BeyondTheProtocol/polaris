@@ -172,6 +172,63 @@ def _trabajo_vivo(path):
     return fuera
 
 
+def rescatar(wt, base, destino, copiar=True):
+    """Guarda lo que la poda se llevaría, para que cerrar una sesión no dependa de {{TITULAR}}.
+
+    Regla suya (22-sep-2026, «todo esto de gestión debes hacerlo tú, grábalo a fuego»): el cierre
+    se paraba a preguntarle por 20 ficheros ignorados que eran copias viejas de casa base y restos
+    de `test_all.sh`. Ahora se clasifica cada fichero de `_ARBOLES_QUE_NO_TOCAN_AQUI`:
+      · repetido: todas sus líneas ya están en el mismo fichero de casa base → no hay nada que salvar;
+      · rescatado: tiene algo propio → se COPIA a `destino/<ruta>` (nunca se mezcla en el de casa
+        base: pueden ser restos de tests y ensuciarían el panel o el log de auditoría);
+      · bloquea: borradores y encargos vivos (`_RUTAS_TRABAJO_VIVO`) o una copia que falla. Eso es
+        trabajo de alguien a medias y la poda sigue negándose.
+    Sin tope de hallazgos: aquí no basta con saber que hay, hay que salvarlo todo.
+    Devuelve {"repetidos": [...], "rescatados": [...], "bloquean": [...]}."""
+    import shutil
+    out = {"repetidos": [], "rescatados": [], "bloquean": []}
+    for rel in _RUTAS_TRABAJO_VIVO:
+        d = os.path.join(wt, rel)
+        if os.path.isdir(d):
+            out["bloquean"] += [os.path.join(rel, f) for f in os.listdir(d) if not f.startswith(".")]
+    for arbol in _ARBOLES_QUE_NO_TOCAN_AQUI:
+        d = os.path.join(wt, arbol)
+        if not os.path.isdir(d):
+            continue
+        for raiz, _dirs, ficheros in os.walk(d):
+            for f in ficheros:
+                if f.startswith("."):
+                    continue
+                src = os.path.join(raiz, f)
+                rel = os.path.relpath(src, wt)
+                if _lineas_ya_en(src, os.path.join(base, rel)):
+                    out["repetidos"].append(rel)
+                    continue
+                if copiar:
+                    dst = os.path.join(destino, rel)
+                    try:
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        shutil.copy2(src, dst)
+                        if os.path.getsize(dst) != os.path.getsize(src):
+                            raise OSError("la copia no mide lo mismo")
+                    except OSError as e:
+                        out["bloquean"].append("%s (no se pudo copiar: %s)" % (rel, e))
+                        continue
+                out["rescatados"].append(rel)
+    return out
+
+
+def _lineas_ya_en(src, dst):
+    """¿Todas las líneas de `src` están ya en `dst`? Si no se puede leer alguno, NO (fail-closed)."""
+    try:
+        with open(dst, "rb") as fb:
+            ya = set(fb.read().splitlines())
+        with open(src, "rb") as fs:
+            return all(l in ya for l in fs.read().splitlines())
+    except OSError:
+        return False
+
+
 def _candidatas_vacias():
     """Worktrees NO-base, sin cambios sin commitear, SIN commits propios respecto a la base,
     SIN trabajo vivo invisible para git (ver `_trabajo_vivo`) y SIN sesión de Claude dentro.

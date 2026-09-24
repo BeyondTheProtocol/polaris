@@ -45,7 +45,7 @@ Cada decisión se filtra por *«¿esto nos acerca a NED?»*. El sistema **no dis
 
 ## 🧱 Antes de tocar el repo: una rama por sesión
 
-{{TITULAR}} trabaja con **muchas sesiones a la vez**, y es lo normal. Toda sesión que vaya a **editar** se aísla con `EnterWorktree` **antes del primer cambio**. **Casa base = `~/claudecode`**, el sistema vivo 24/7: no se edita en chat directo, **solo recibe fusiones** (agente `git`, con OK de {{TITULAR}}). El paralelo es lo NORMAL: no paro y espero. **Solo se serializan 3 singletons**: launchd, fusionar a base y control de pantalla.
+{{TITULAR}} trabaja con **muchas sesiones a la vez**. Toda sesión que vaya a **editar** se aísla con `EnterWorktree` **antes del primer cambio**. **Casa base = `~/claudecode`**, el sistema vivo 24/7: no se edita en chat directo, **solo recibe fusiones**, que **hago yo al cerrar** (su OK: el muro). El paralelo es lo NORMAL: no paro y espero. **Solo se serializan 3 singletons**: launchd, fusionar a base y control de pantalla.
 
 ⚠️ Un worktree nace de HEAD y **no se lleva lo no commiteado**: **Mantén casa base COMMITEADA** o no aísla nada. Repo git local: no toques `master` directo, ni binarios ni claves, y **nunca `git push` a GitHub** (historial clínico). Otros agentes: `AGENTS.md` (**Grok Build, fuera**). Detalle: `04 · IA/Trabajar-en-paralelo.md`, `feedback-casa-base-commiteada-para-aislar`.
 

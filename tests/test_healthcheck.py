@@ -592,6 +592,21 @@ def red_sin_dns_correo_roster_tests():
            "roster con DNS → daemon_fallando como siempre: %r" % claves)
         ok(kicks == ["com.btp.correo"], "roster con DNS → kickstart × 1: %r" % kicks)
 
+        # 5b. exit 75 (EX_TEMPFAIL) = aplazo deliberado de run_agent, NO un daemon roto
+        #     (22-sep-26: asistente, correo y git-barrido llevaban 5, 5 y 9 detecciones en el libro
+        #     con el .err lleno de «cadena de modelos agotada por límite → aplazo»).
+        del kicks[:]
+        hc._launchctl_estado = lambda: {"com.btp.correo": ("-", "75")}
+        al, info = hc._check_roster_daemons()
+        claves = [a[0] for a in al]
+        ok("daemon_fallando:com.btp.correo" not in claves,
+           "exit 75 (aplazo) NO es daemon_fallando: %r" % claves)
+        ok(kicks == [], "exit 75 → no se kickstartea un daemon que se aplazó solo: %r" % kicks)
+        hc._launchctl_estado = lambda: {"com.btp.correo": ("-", "1")}
+        al, _ = hc._check_roster_daemons()
+        ok("daemon_fallando:com.btp.correo" in [a[0] for a in al],
+           "y un exit 1 de verdad sigue cantando")
+
         # 6. Roster sin ningún fallando → ni se sondea el DNS
         hc._launchctl_estado = lambda: {"com.btp.correo": ("-", "0")}
         socket.getaddrinfo = sin_dns; del llamadas[:]
