@@ -10,6 +10,8 @@
   · La LÍNEA MEDIA es la x de la tráquea, no x=0 (el isocentro del escáner): el fantoma
     lleva la tráquea desplazada 15 mm del centro y `linea_media_x_mm` tiene que darla.
   · La carina NO acepta una «hija» mayor que la madre.
+  · `cateter_semiauto` (3D del reservorio): sembrado en la punta, sigue el tubo tenue y no se
+    va por la vértebra brillante.
 """
 import os
 import subprocess
@@ -102,6 +104,21 @@ ct2[tr2 | gorda | fina] = -950.0
 car2 = V.carina(ct2, ESP)
 check(car2 is None or car2[0] != 55, "una hija de 380 mm² con madre de 200 no se acepta como carina en z=55 (sale %s)"
       % (None if car2 is None else car2[0]))
+
+# catéter semiautomático: sembrado en (x, z) de la punta dibujada, tiene que seguir el tubo
+portal = ct > 3000
+cam, info = V.cateter_semiauto(ct, ESP, afin, portal, (POLI[-1][0] * ESP[0], POLI[-1][2] * ESP[2]),
+                               (int(TY - 15), NY))
+check(len(cam) > 20, "camino semiautomático con puntos (%d) %s" % (len(cam), info.get("error", "")))
+if cam:
+    LONG = float(np.linalg.norm(np.diff(POLI * ESP, axis=0), axis=1).sum())
+    check(abs(info["longitud_mm"] - LONG) <= 0.15 * LONG, "longitud %.0f mm (polilínea %.0f)" % (info["longitud_mm"], LONG))
+    lejos = max(min(np.linalg.norm(np.array([c[0] * ESP[0], c[1] * ESP[1], c[2] * ESP[2]]) - (a * ESP)) for a in
+                    [POLI[0] + t * (POLI[1] - POLI[0]) for t in np.linspace(0, 1, 40)]
+                    + [POLI[1] + t * (POLI[2] - POLI[1]) for t in np.linspace(0, 1, 40)]) for c in cam[len(cam) // 4:])
+    check(lejos <= 3.0, "el camino no se aleja más de 3 mm del catéter dibujado (máx %.1f)" % lejos)
+    tubo = V._tubo(cam, ct.shape, ESP, 1.35)
+    check(not (tubo & (ct > 1000) & (ct < 3000)).any(), "el tubo no pisa la vértebra")
 
 if fallos:
     print("❌ %d fallo(s): %s" % (len(fallos), "; ".join(fallos)))

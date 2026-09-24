@@ -3906,10 +3906,26 @@ def cuerpo_tc(ct, esp):
 
 def portal_metal(ct, esp, umbral=2950.0):
     """Máscara del portal (objeto metálico más grande de la mitad anterior) o None."""
+    from scipy import ndimage
     metal = ct > umbral
     metal[:, : ct.shape[1] // 2, :] = False
-    obj, n = _componente_mayor(metal)
-    return (obj if n else None), n
+    metal = ndimage.binary_opening(metal, structure=_bola_estructura(esp, 1.2))   # sin rayas
+    lab, n = ndimage.label(metal)
+    if not n:
+        return None, 0
+    mejor, vol = None, 0
+    for k, sl in enumerate(ndimage.find_objects(lab), start=1):
+        if sl is None:
+            continue
+        ext = [(sl[d].stop - sl[d].start) * esp[d] for d in range(3)]
+        if max(ext) > 60.0 or min(ext) < 6.0:    # un port cabe en 60 mm; una prótesis o una raya larga, no
+            continue
+        v = int((lab[sl] == k).sum())
+        if v > vol:
+            mejor, vol = k, v
+    if mejor is None:
+        return None, n
+    return lab == mejor, n
 
 
 def carina(ct, esp, cuerpo=None, x_medio=None, z_max=None):
@@ -4255,23 +4271,28 @@ def _z_portal_en_bruto(raw, esp, umbral):
     red = raw[:nx, :ny].reshape(nx // b, b, ny // b, b, raw.shape[2]).max(axis=(1, 3))
     metal = red > umbral
     metal[:, : metal.shape[1] // 2, :] = False
+    # en un kernel de hueso el titanio raya (>2950 HU en estrellas de varios cm): una apertura
+    # de un bloque las quita y deja el cuerpo del portal
+    metal = ndimage.binary_opening(metal, structure=np.ones((2, 2, 1)))
     lab, n = ndimage.label(metal)
     if not n:
         return None
-    mejor, vol = None, 0
+    cand = []
     for k, sl in enumerate(ndimage.find_objects(lab), start=1):
         if sl is None:
             continue
         ext = [(sl[0].stop - sl[0].start) * esp[0] * b, (sl[1].stop - sl[1].start) * esp[1] * b,
                (sl[2].stop - sl[2].start) * esp[2]]
-        if min(ext) < 15.0:
+        # 26-may-2026 (kernel de hueso, cuerpo entero): el objeto «metálico» más grande era
+        # otra cosa en la pelvis (32×38×31 mm). El port mide 22×23×25 mm y es lo más craneal
+        # que hay con ≥ 15 mm en los tres ejes (los empastes son más pequeños): se elige el
+        # candidato válido MÁS ALTO, no el más grande.
+        if min(ext) < 12.0 or max(ext) > 60.0:
             continue
-        v = int((lab[sl] == k).sum())
-        if v > vol:
-            mejor, vol = sl, v
-    if mejor is None:
+        cand.append((0.5 * (sl[2].start + sl[2].stop - 1), int((lab[sl] == k).sum())))
+    if not cand:
         return None
-    return 0.5 * (mejor[2].start + mejor[2].stop - 1)
+    return max(cand)[0]
 
 
 def _lamina_debug(ct, esp, mask, portal, capas, car, serie, px=2.0, vmin=-200.0, vmax=1500.0):
@@ -4563,6 +4584,260 @@ def losa(serie, sobre_mm=50.0, bajo_mm=170.0, px=3.0, vmin=-100.0, vmax=2500.0, 
     json.dump(res, open(os.path.join(dst, "losa_%s.json" % serie), "w"), ensure_ascii=False, indent=1)
     res["lamina"] = "losa_%s.png" % serie
     return res
+
+
+def cateter_semiauto(ct, esp, afin, portal, punta_xz_mm, y_rango, radio_busca_mm=8.0):
+    """Trazo SEMIAUTOMÁTICO del catéter: extremos sembrados (borde del portal y una punta dada
+    en (x, z) mm, leída a mano en la losa; la y se busca en todo el grosor de la losa), camino
+    geodésico entre ellos que prefiere lo brillante y fino (sombrero de copa). Devuelve
+    (camino_ijk, info).
+
+    Lo que va entre los dos extremos lo elige el coste, no una persona: por eso la nota lo
+    llama interpolado. Si el coste se pierde (cruza por donde no hay catéter), se nota en el
+    render, no en un número; mirar el render es parte del método."""
+    import numpy as np
+    from scipy import ndimage
+    from skimage.graph import MCP_Geometric
+    halo = ndimage.binary_dilation(portal, structure=_bola_estructura(esp, CATETER_DEFAULTS["halo_mm"]))
+    ct_s = np.where(halo, 40.0, ct).astype(np.float32)
+    bola = _bola_estructura(esp, CATETER_DEFAULTS["bola_mm"])
+    sombrero = ct_s - ndimage.grey_opening(ct_s, footprint=bola)
+    y0, y1 = y_rango
+    permitido = np.zeros(ct.shape, bool)
+    permitido[:, y0:y1, :] = True
+    s = np.clip(sombrero / 600.0, 0.0, 1.0)
+    coste = np.where(permitido, 1.0 / (0.03 + s ** 2), np.inf).astype(np.float64)
+    coste[halo] = 1.0                                   # a través del halo se puede pasar
+    # punta real: el vóxel más brillante del sombrero en una columna (x, z) de ±radio, toda la y
+    inv = np.linalg.inv(afin)
+    px = (inv @ np.array([punta_xz_mm[0], 0.0, punta_xz_mm[1], 1.0]))[:3]
+    ii = np.arange(ct.shape[0])[:, None, None]
+    kk = np.arange(ct.shape[2])[None, None, :]
+    col = ((ii - px[0]) * esp[0]) ** 2 + ((kk - px[2]) * esp[2]) ** 2 <= radio_busca_mm ** 2
+    zona = np.broadcast_to(col, ct.shape) & permitido
+    if not zona.any():
+        return [], {"error": "la semilla de la punta cae fuera de la losa"}
+    cand = np.where(zona, sombrero, -np.inf)
+    punta = tuple(int(v) for v in np.unravel_index(int(np.argmax(cand)), cand.shape))
+    borde = ndimage.binary_dilation(portal, structure=np.ones((3, 3, 3))) & ~portal
+    inicios = [tuple(int(x) for x in v) for v in np.argwhere(borde)]
+    mcp = MCP_Geometric(coste, sampling=tuple(float(e) for e in esp))
+    dist, _ = mcp.find_costs(inicios, [punta])
+    if not np.isfinite(dist[punta]):
+        return [], {"error": "sin camino finito del portal a la punta"}
+    camino = [tuple(int(x) for x in v) for v in mcp.traceback(punta)]
+    pts = np.array([_mm_de(afin, c) for c in camino])
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    return camino, {"punta_ijk": list(punta), "punta_mm": [round(float(v), 1) for v in pts[-1]],
+                    "semilla_xz_mm": [round(float(v), 1) for v in punta_xz_mm],
+                    "longitud_mm": round(float(seg.sum()), 1), "n_puntos": len(camino),
+                    "recta_portal_punta_mm": round(float(np.linalg.norm(pts[-1] - pts[0])), 1),
+                    "sombrero_mediana_camino": round(float(np.median([sombrero[c] for c in camino])), 0),
+                    "sombrero_p10_camino": round(float(np.percentile([sombrero[c] for c in camino], 10)), 0)}
+
+
+def _tubo(camino, forma, esp, radio_mm):
+    """Máscara de un tubo de `radio_mm` alrededor de un camino de índices."""
+    import numpy as np
+    from scipy import ndimage
+    eje = np.zeros(forma, bool)
+    for c in camino:
+        eje[c] = True
+    d = ndimage.distance_transform_edt(~eje, sampling=esp)
+    return d <= radio_mm
+
+
+def _render_etiquetas(lab, esp, colores, ancho=1000):
+    """Imagen «3D» fija: vista anterior sombreada por profundidad de VARIAS etiquetas a la vez.
+    Para cada (x, z) gana la etiqueta más anterior; el sombreado sale del mapa de profundidad
+    (misma idea que `proyecta_anterior`, que solo sabía de una máscara). Devuelve PIL.Image."""
+    import numpy as np
+    from scipy import ndimage
+    from PIL import Image
+    hay = lab.any(axis=1)
+    idx = lab.shape[1] - 1 - np.argmax((lab > 0)[:, ::-1, :], axis=1)
+    et = np.take_along_axis(lab, idx[:, None, :], axis=1)[:, 0, :]
+    prof = idx.astype(np.float32) * esp[1]
+    p = np.where(hay, prof, prof[hay].max() if hay.any() else 0.0)
+    p = ndimage.gaussian_filter(p, 1.6)
+    gx, gz = np.gradient(p)
+    n = np.stack([-gx, -gz, np.ones_like(p) * 1.35], axis=-1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True) + 1e-9
+    luz = np.array([-0.45, 0.45, 0.78])
+    luz /= np.linalg.norm(luz)
+    lam = np.clip((n * luz).sum(axis=-1), 0, 1)
+    val = np.clip(0.25 + 0.6 * lam ** 0.9 + 0.25 * lam ** 22, 0, 1)
+    rgb = np.zeros(et.shape + (3,), np.float32)
+    for k, col in colores.items():
+        m = (et == k) & hay
+        rgb[m] = np.asarray(col, np.float32)[None, :] * val[m][:, None]
+    img = np.transpose(rgb[::-1], (1, 0, 2))[::-1]        # dcha. del paciente a la izq.; z arriba
+    im = Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+    esc = ancho / im.width
+    return im.resize((ancho, int(im.height * esc * esp[2] / esp[0])), Image.LANCZOS)
+
+
+_RESERVORIO_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reservorio 3D</title>
+<style>html,body{margin:0;height:100%;background:#0b0b10;color:#ddd;font:14px/1.4 system-ui,sans-serif}
+#v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:ew-resize;user-select:none}
+#v img{max-width:100%;max-height:100%}#p{position:absolute;left:12px;top:12px;max-width:380px;background:rgba(0,0,0,.6);padding:10px 12px;border-radius:8px}
+#t{font-weight:600}#n{font-size:12px;color:#aaa;white-space:pre-wrap;margin-top:6px}#pie{position:absolute;left:12px;bottom:10px;font-size:12px;color:#999}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}</style></head><body>
+<div id="v"><img id="im"></div><div id="p"><div id="t">Reservorio</div><div id="l"></div><div id="n"></div></div>
+<div id="pie">Girar: arrastrar a los lados (o teclas ← →). Sin dependencias: 24 vistas pre-renderizadas en local. Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.</div>
+<script>
+const q=new URLSearchParams(location.search);const c=q.get('escena')||'reservorio';let esc=null,i=0;
+async function go(){esc=await (await fetch(c+'/escena.json')).json();document.getElementById('t').textContent=esc.titulo;
+document.getElementById('n').textContent=esc.nota;const l=document.getElementById('l');
+for(const m of esc.mallas){const d=document.createElement('div');const s=document.createElement('span');s.className='sw';s.style.background=m.color;d.append(s,m.nombre+(m.detalle?' · '+m.detalle:''));l.appendChild(d)}
+pinta()}
+function pinta(){const n=esc.vueltas.length;i=((i%n)+n)%n;document.getElementById('im').src=c+'/'+esc.vueltas[i]}
+let x0=null;const v=document.getElementById('v');v.onpointerdown=e=>{x0=e.clientX};v.onpointerup=()=>{x0=null};
+v.onpointermove=e=>{if(x0===null)return;const d=e.clientX-x0;if(Math.abs(d)>12){i+=d>0?1:-1;x0=e.clientX;pinta()}};
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){i--;pinta()}if(e.key==='ArrowRight'){i++;pinta()}});go();
+</script></body></html>
+"""
+
+
+def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vueltas=24):
+    """Escena 3D del reservorio en una serie sin contraste: portal (metal), catéter
+    (semiautomático), tráquea + bronquios (aire), hueso de la región (umbral, sin etiquetar) y
+    carina. Deja PLY + escena.json + 24 vistas pre-renderizadas (giro alrededor del eje
+    cráneo-caudal) en <visor>/reservorio_<serie>/, más `reservorio.html` (sin dependencias:
+    no hay three.js ni esbuild instalados y no se instala nada de terceros sin OK) y una
+    imagen fija. Modelo conocido por la etiqueta del implante: PowerPort isp titanio REF
+    8708061, catéter 8 F (2,7 mm) Chronoflex; el radio del tubo es el nominal, no medido."""
+    import numpy as np
+    from scipy import ndimage
+    from PIL import ImageDraw
+    ct, esp, afin, meta = _carga_recortada(serie)
+    cu = cuerpo_tc(ct, esp)
+    portal, _ = portal_metal(ct, esp, CATETER_DEFAULTS["umbral_metal"])
+    if portal is None:
+        raise SystemExit("sin portal metálico en %s" % serie)
+    idx = np.argwhere(portal)
+    z_p = float(idx[:, 2].mean())
+    car = carina(ct, esp, cu, z_max=z_p + 30.0 / esp[2])
+    if car is not None and car[3].get("fiable"):
+        tx, ty = car[1], car[2]
+    else:
+        t = _traquea_en(ct, esp, cu, int(min(ct.shape[2] - 1, z_p + 20.0 / esp[2])))
+        if t is None:
+            raise SystemExit("sin tráquea de referencia en %s" % serie)
+        tx, ty = t
+    y0 = int(max(0, ty - y_post_mm / esp[1]))
+    y1 = ct.shape[1]
+    camino, info = cateter_semiauto(ct, esp, afin, portal, punta_xz_mm, (y0, y1))
+    if not camino:
+        raise SystemExit("catéter: %s" % info.get("error"))
+    zt = min(c[2] for c in camino)
+    z0 = int(max(0, min(zt - 40.0 / esp[2], z_p - 40.0 / esp[2])))
+    z1 = int(min(ct.shape[2], z_p + 40.0 / esp[2]))
+    x_p = float(idx[:, 0].mean())
+    lado = 1.0 if x_p < tx else -1.0
+    xa, xb = x_p - lado * 30.0 / esp[0], tx + lado * 70.0 / esp[0]
+    x0, x1 = int(max(0, min(xa, xb))), int(min(ct.shape[0], max(xa, xb) + 1))
+    sl = (slice(x0, x1), slice(y0, y1), slice(z0, z1))
+    afin_c = np.array(afin, float).copy()
+    afin_c[:3, 3] = afin[:3, 3] + afin[:3, 0] * x0 + afin[:3, 1] * y0 + afin[:3, 2] * z0
+    sub = ct[sl]
+    tubo = _tubo(camino, ct.shape, esp, radio_cateter_mm)[sl]
+    por = portal[sl]
+    # tráquea y bronquios principales: luz de aire (< -800 HU) ABIERTA con una bola de 4 mm.
+    # Sin la apertura, el aire de la tráquea conecta con el parénquima pulmonar (-850 HU)
+    # por los bronquios y la «tráquea» salían los dos pulmones enteros (10-jul, v1 del 3D).
+    aire = ndimage.binary_opening((sub < -800) & cu[sl], structure=_bola_estructura(esp, 4.0))
+    lab_a, n = ndimage.label(aire)
+    zs = int(min(sub.shape[2] - 1, max(0, z_p - z0 + 20.0 / esp[2])))
+    # componente de aire más cercana a la tráquea de referencia en ese corte (a < 12 mm): el
+    # centroide puede caer en la pared o en un vóxel de volumen parcial y no en la luz
+    k = 0
+    cerca = _bola_mm(sub.shape, (tx - x0, ty - y0, zs), 12.0, esp)
+    cerca[:, :, :zs] = False
+    cerca[:, :, zs + 1:] = False
+    ks = [int(v) for v in np.unique(lab_a[cerca]) if v]
+    if ks:
+        k = max(ks, key=lambda v: int((lab_a[:, :, zs] == v).sum()))
+    traq = (lab_a == k) if k else np.zeros(sub.shape, bool)
+    halo = ndimage.binary_dilation(por, structure=_bola_estructura(esp, 5.0))
+    hueso = hueso_grueso(np.where(halo, 40.0, sub), esp) & ~halo & ~tubo
+    dst = _dir("visor", "reservorio_%s" % serie)
+    exige_zona_clinica(dst)
+    os.makedirs(dst, exist_ok=True)
+    mallas = []
+    for nombre, mask, suav, color, extra in (
+            ("portal", por, 0.8, "#8fd3ff", {"detalle": "titanio, umbral > 2950 HU"}),
+            ("cateter", tubo, 0.6, "#ff6a3d", {"detalle": "8 F (2,7 mm) nominal; trazo semiautomático"}),
+            ("traquea", traq, 1.0, "#c8f7c5", {"detalle": "aire < -800 HU, abierto 4 mm"}),
+            ("hueso", hueso, 1.0, "#d7dbe2", {"detalle": "umbral > 200 HU, sin etiquetar"})):
+        r = _malla(mask, afin_c, suav, min_componente=int(200 / esp.prod()) if nombre == "hueso" else 0)
+        if r:
+            ply_binario(os.path.join(dst, nombre + ".ply"), *r)
+            mallas.append(dict(nombre=nombre, fichero=nombre + ".ply", color=color, **extra))
+    if car is not None:
+        esf = _bola_mm(sub.shape, (car[1] - x0, car[2] - y0, car[0] - z0), 3.0, esp)
+        r = _malla(esf, afin_c, 0.5)
+        if r:
+            ply_binario(os.path.join(dst, "carina.ply"), *r)
+            mallas.append(dict(nombre="carina", fichero="carina.ply", color="#39ff8a",
+                               detalle="automática%s" % ("" if car[3].get("fiable") else " (NO fiable)")))
+    # vistas: giro alrededor del eje cráneo-caudal (el plano x-y es isótropo; se rota el volumen
+    # de etiquetas y se proyecta siempre «de frente»)
+    lab = np.zeros(sub.shape, np.uint8)
+    lab[hueso] = 1
+    lab[traq] = 2
+    lab[tubo] = 3
+    lab[por] = 4
+    if car is not None:
+        lab[esf] = 5
+    colores = {1: (200, 205, 215), 2: (150, 230, 150), 3: (255, 106, 61), 4: (143, 211, 255), 5: (57, 255, 138)}
+    fecha = meta.get("fecha", "")
+    titulo = "Reservorio · %s-%s-%s · serie %s" % (fecha[:4], fecha[4:6], fecha[6:], serie)
+    nombres = []
+    for v in range(vueltas):
+        ang = 360.0 * v / vueltas
+        rot = ndimage.rotate(lab, ang, axes=(0, 1), reshape=True, order=0, prefilter=False)
+        im = _render_etiquetas(rot, esp, colores)
+        d = ImageDraw.Draw(im)
+        d.text((8, 6), "%s · giro %.0f° (0° = de frente, dcha. del paciente a la izq.)" % (titulo, ang), fill=(255, 220, 0))
+        d.text((8, im.height - 16), "portal azul · catéter naranja (semiautomático) · tráquea verde · carina verde brillante · hueso gris · Apoyo a la decisión, no diagnóstico",
+               fill=(200, 200, 200))
+        nombre = "vuelta_%02d.png" % v
+        im.save(os.path.join(dst, nombre))
+        nombres.append(nombre)
+        if v == 0:
+            im.save(os.path.join(dst, "reservorio3d_%s.png" % serie))
+            # y la misma vista SIN hueso: la clavícula y las costillas anteriores tapan el
+            # trayecto de frente, y para ver el dispositivo entero hace falta quitarlas
+            lab_sh = lab.copy()
+            lab_sh[lab_sh == 1] = 0
+            im2 = _render_etiquetas(lab_sh, esp, colores)
+            d2 = ImageDraw.Draw(im2)
+            d2.text((8, 6), "%s · de frente, SIN hueso · portal azul · catéter naranja (semiautomático) · tráquea verde · carina verde brillante" % titulo, fill=(255, 220, 0))
+            d2.text((8, im2.height - 16), "Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.", fill=(200, 200, 200))
+            im2.save(os.path.join(dst, "reservorio3d_%s_sin_hueso.png" % serie))
+    escena = {"titulo": titulo,
+              "nota": ("PowerPort isp titanio REF 8708061 (etiqueta del implante), catéter 8 F Chronoflex. "
+                       "Catéter: extremos sembrados (portal y punta leída en la losa), camino por coste de "
+                       "brillo = INTERPOLADO. Hueso y tráquea por umbral. Sin cava: serie sin contraste."),
+              "mallas": mallas, "vueltas": nombres, "serie": serie, "fecha": fecha, "cateter": info,
+              "carina_mm": [round(float(v), 1) for v in _mm_de(afin, (car[1], car[2], car[0]))] if car else None,
+              "carina_fiable": bool(car[3].get("fiable")) if car else None,
+              "portal_mm": [round(float(v), 1) for v in _mm_de(afin, idx.mean(0))],
+              "espaciado_mm": [round(float(e), 3) for e in esp]}
+    json.dump(escena, open(os.path.join(dst, "escena.json"), "w"), ensure_ascii=False, indent=1)
+    with open(os.path.join(_dir("visor"), "reservorio.html"), "w") as f:
+        f.write(_RESERVORIO_HTML)
+    return escena
+
+
+def _cmd_reservorio3d(a):
+    esc = reservorio3d(a.serie, a.punta, a.y_post, a.radio, a.vueltas)
+    print(json.dumps({k: v for k, v in esc.items() if k not in ("mallas", "vueltas")}, ensure_ascii=False, indent=1))
+    print("mallas: %s" % ", ".join(m["nombre"] for m in esc["mallas"]))
+    print("ver: http://127.0.0.1:8794/reservorio.html?escena=reservorio_%s · fija: reservorio_%s/reservorio3d_%s.png"
+          % (a.serie, a.serie, a.serie))
+    return 0
 
 
 def _cmd_losa(a):
@@ -5381,6 +5656,14 @@ def main(argv=None):
     plo.add_argument("--y-post", dest="y_post", type=float, default=15.0,
                      help="mm por detrás de la tráquea donde empieza la losa (la columna queda fuera)")
     plo.set_defaults(fn=_cmd_losa)
+    p3 = sub.add_parser("reservorio3d", help="escena 3D del reservorio (portal, catéter semiautomático, tráquea, hueso) + vistas giradas")
+    p3.add_argument("serie")
+    p3.add_argument("--punta", type=float, nargs=2, required=True, metavar=("X_MM", "Z_MM"),
+                    help="punta leída en la losa, en mm del mundo (x, z); la y se busca sola")
+    p3.add_argument("--y-post", dest="y_post", type=float, default=45.0, help="mm por detrás de la tráquea que entran en la escena")
+    p3.add_argument("--radio", type=float, default=1.35, help="radio del tubo del catéter (8 F = 1,35 mm)")
+    p3.add_argument("--vueltas", type=int, default=24)
+    p3.set_defaults(fn=_cmd_reservorio3d)
     pmr = sub.add_parser("marcas", help="marcas de un radiólogo sobre un TC → esferas + procedencia")
     pmr.add_argument("revision", help="lesiones_55.json de la revisión")
     pmr.add_argument("--serie", required=True, help="huella de la serie (caché de imagen.nii.gz)")
