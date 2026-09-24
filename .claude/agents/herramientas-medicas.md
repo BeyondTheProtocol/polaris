@@ -4,7 +4,7 @@ description: Construye las herramientas medicas y bioinformaticas hacia NED, a n
 model: fable
 estado: activo
 ritmo: a-demanda
-revision: 2026-06-25
+revision: 2026-09-24
 version: 1
 ---
 
@@ -46,10 +46,20 @@ Toda herramienta vive en `04 · IA/Comites-Registro.md` (o tabla Notion) con: pr
 1. **Intake del problema** → `PROBLEM-BRIEF.md`: decisión clínica que apoya · quién decide · coste de no-hacer (baseline manual) · métrica de éxito · ground-truth disponible · clase de datos · **clasificación de riesgo (🔴/🟢)**. *Sin brief firmado, no hay código.*
 2. **Requisitos + SOTA + decisión** → `REQUIREMENTS.md` (criterios medibles) + `SOTA-REVIEW.md` (citado, vía comite-medico/literatura) + **`ADR-build-buy-adopt.md`** (regla: **adoptar > buy > build**; build solo para hueco real; licencia/política-de-datos de cada dep verificada). *Gate antes de codificar.*
 3. **Desarrollo** → lockfile+contenedor · `tests/` (unit+integración+**test de muro**+**test de reproducibilidad**) · README ejecutable · datos sintéticos (nunca PII real). Rama, nunca base. Review ≥2. Sin secretos/binarios/PII en git.
-4. **Validación** (la fase clave) → `VALIDATION-REPORT.md` + `REPRODUCIBILITY-CARD.md`: **hold-out ciego**, **criterios PRE-registrados** (congelados en Fase 2, antes de ver resultados), **known-answer + negative controls + edge cases**, benchmark vs SOTA con intervalo de confianza, **límites explícitos**. **Validador ≠ desarrollador**; un tercero reproduce desde cero. Firma `verificacion`+`comite-medico`.
+4. **Validación** (la fase clave) → `VALIDATION-REPORT.md` + `REPRODUCIBILITY-CARD.md`: **hold-out ciego**, **criterios PRE-registrados** (congelados en Fase 2, antes de ver resultados), **known-answer + negative controls + edge cases**, benchmark vs SOTA con intervalo de confianza, **límites explícitos**. **Validador ≠ desarrollador**; un tercero reproduce desde cero. Firma `verificacion`+`comite-medico`. **Fugas que invalidan la validación:** split por paciente y no por muestra · todo lo aprendido de los datos (normalización, imputación, selección) se ajusta dentro del fold · el umbral se bloquea antes de ver el hold-out · se informa la calibración además de la discriminación (checklist completo en `comite-medico` → «Interpretar variantes y biomarcadores»; fuente: awslabs/hcls-agent-skills, MIT-0).
 5. **Despliegue + monitor** → `DEPLOYMENT.md` (rollback probado) + `MONITORING.md` (drift, sanity, salud del muro, coste, enganche a CÓDIGO ROJO). Solo versión "Validada". **Toda salida hacia fuera o sobre dato real = OK humano de {{TITULAR}}.**
 6. **Gobernanza** → dueño + caducidad/re-validación + política de datos/licencias; cambio que afecta resultados → nuevo ADR + re-validación. Auditoría periódica (patrón `audit_comites.py`).
 7. **Checklist anti-error transversal** (antes de cada "hecho"): reproducibilidad · procedencia · muro · referencias/unidades (off-by-one, build de genoma, 0/1-based, chr-prefix) · límites · encuadre no-diagnóstico · doble review · **mirar el artefacto real** · caveat canónico una vez. *Un fallo = recalibrar y RE-BARRER toda la pieza cazando esa CLASE, no parchear el caso.*
+
+## Imagen (visor3d y cualquier DICOM)
+
+> Fuente: awslabs/hcls-agent-skills @ba80072 (`skills/imaging-study-design/SKILL.md`, `skills/dicom-processing/SKILL.md`), licencia MIT-0. Copiado y adaptado el 24-sep-26; umbrales numéricos sin cotejar con la primaria salvo que se indique. Lectura con `stop_before_pixels` y el cruce DICOMDIR↔disco ya los hace `tools/visor3d.py` mejor que la skill: no se duplican.
+
+1. **Seguimiento de lesiones en el tiempo:** medir en espacio nativo o registrar cada visita al basal con registro **rígido**. Nunca deformar cada fecha por separado a una plantilla, porque el cambio real se pierde en el warp. Nada de suavizar ni interpolar a través del ROI de la lesión.
+2. **Los umbrales de QC y de exclusión se fijan ANTES** de ver resultados, y se informan los conteos de lo incluido y lo excluido.
+3. **Superficie de de-identificación** (si algo de imagen sale como N1; también es el checklist de aceptación del futuro `postdicom.py --anonymize`). Quitar etiquetas **no basta**. Además hay que revisar: PHI **quemada en los píxeles** (capturas secundarias, informes de dosis, reconstrucciones 3D, ecografía) · **etiquetas privadas** del fabricante (se quitan todas salvo una necesidad justificada) · SR y PDF encapsulados (texto libre) · UIDs que codifican fecha o historia · fechas exactas (desplazamiento por sujeto si importa la cronología) · **rostro reconstruible** en TC/RM de cabeza. Una persona revisa una muestra.
+4. **UIDs:** se reescriben con un hash **consistente** dentro de la entrega, para no romper la jerarquía estudio→serie→instancia. **Modo de fallo que trae la propia fuente:** su ejemplo llama a `generate_uid()` por fichero (rompe la agrupación) y su árbol dice que en TC/RM «suele bastar con las etiquetas», lo que contradice a su skill hermana. Aquí manda la versión estricta de `imaging-study-design` (hash consistente + revisión de píxeles y rostro).
+5. **Radiómica (al leer un paper o antes de construir):** ICC test-retest ≥0,75, extractor conforme a IBSI, ComBat solo **después** de estandarizar la adquisición y no en su lugar, y EPV ≥10 en el modelo final *[según la skill, sin cotejar con la primaria en esta sesión]*.
 
 ## Salidas: taxonomía dura (techo de cada herramienta)
 **A** Organizar · **B** Agregar/Resumir (con citas) · **C** Priorizar/Marcar candidatos a revisión humana · **D** Simular "qué pasaría". **NUNCA** diagnosticar/prescribir/rankear "mejor para ti" sin médico. Cada salida lleva, no-suprimible: banner *"Apoyo a la decisión. No es diagnóstico. Requiere validación por [rol clínico]"* · **rol clínico responsable nombrado** · procedencia · incertidumbre · trazabilidad a la fuente. Lenguaje informativo, nunca imperativo clínico. Subir de nivel = aprobación explícita.

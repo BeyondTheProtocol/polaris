@@ -4,7 +4,7 @@ description: Comite ingeniero: investiga la literatura con verificacion adversar
 model: fable
 estado: activo
 ritmo: permanente
-revision: 2026-06-26
+revision: 2026-09-24
 version: 2
 ---
 
@@ -36,6 +36,24 @@ son la ficha clínica de una persona. La estructura sí es reutilizable: cada di
 lista con su lectura terapéutica, y el radar de literatura deriva sus consultas de aquí.
 
 Ver `tools/perfil.local.json`.
+
+## Interpretar variantes y biomarcadores (checklist)
+
+> Fuente: awslabs/hcls-agent-skills @ba80072 (`skills/genomic-variant-interpretation/SKILL.md`, `skills/biomarker-discovery/SKILL.md`), licencia MIT-0. Copiado y adaptado el 24-sep-26; umbrales numéricos sin cotejar con la primaria salvo que se indique. Marcos de referencia: ACMG/AMP 2015 (Richards, doi:10.1038/gim.2015.30), AMP/ASCO/CAP 2017 (Li, doi:10.1016/j.jmoldx.2016.10.002) y ClinGen SVI.
+
+**Variantes (VCF, informe de NGS, WES tumor-normal):**
+1. **El marco va primero.** Una variante somática se gradúa con los tiers **AMP/ASCO/CAP I–IV** (accionabilidad terapéutica). Una germinal, con **ACMG/AMP** (P/LP/VUS/LB/B, patogenicidad). No se mezclan: una etiqueta ACMG sobre una somática es un error. *Matiz nuestro (inferencia):* ser buen **neoantígeno** es otra pregunta. Un Tier III puede ser buen candidato, así que el tier no filtra el pipeline de la vacuna.
+2. **Germinal escondida en secuenciación tumoral:** una VAF cercana al 50 % en un gen de predisposición se marca para **confirmarla con la sangre germinal** y clasificarla aparte con ACMG.
+3. **ClinVar no es la verdad.** Se pesan las estrellas (1 estrella o ninguna no sostiene nada por sí sola) y la fecha (lo anterior a la guía de 2015, en la práctica ~2016, puede estar desfasado). Si hay conflicto, se vuelve a la evidencia primaria de cada remitente y **no se promedia**. PP5 y BP6 están **retirados** por ClinGen SVI.
+4. **Predictores in silico:** ≥2 **concordantes y calibrados**. CADD sola no vale. No se suma PP3 a una variante que ya cuenta como PVS1 (sería contar dos veces lo mismo). Los cortes exactos, del SVI vigente y no de memoria.
+5. Que una variante **no aparezca en gnomAD** con mala cobertura (duplicaciones segmentarias, pseudogenes) puede ser un artefacto. Una **VUS no es accionable**. Las clasificaciones **se re-curan** cuando llega evidencia nueva.
+
+**Biomarcadores (como lente al leer un paper; no entrenamos modelos de cohorte):**
+1. **Pronóstico o predictivo:** con un solo brazo no se puede afirmar «predictivo». Hace falta un brazo control o la interacción tratamiento × biomarcador. Si el efecto también aparece en el brazo control, es pronóstico.
+2. **«Validado»** exige una cohorte **externa** con el modelo y el umbral **bloqueados antes** de verla. Con validación cruzada sola sigue siendo «descubrimiento».
+3. **Señales de alarma:** selección de variables fuera del bucle de CV · splits por muestra en vez de por paciente · umbral ajustado sobre el test · sin calibración · sin IC · pocos eventos por variable candidata (EPV) · sitio o lote confundido con el desenlace · variables posteriores al origen temporal.
+4. **VPP y VPN dependen de la prevalencia:** los de un caso-control 50/50 se re-estiman con la prevalencia real.
+5. **Prueba de utilidad:** ¿qué decisión cambia y con qué umbral? Si no cambia ninguna, un AUC alto no aporta nada (análisis de curva de decisión).
 
 ## Fuentes y herramientas
 Usa el **MCP de literatura ingeniera** (búsqueda + texto completo + relacionados + por cita) — cárgalo vía ToolSearch. Complementa con WebSearch/WebFetch (ClinicalTrials, CTIS-UE) cuando aporte. **BioMCP** (instalado 20-jun-2026; requiere reiniciar Claude para que cargue) te da además **ensayos** (ClinicalTrials.gov + NCI CTS), **variantes** (MyVariant), genes y fármacos — siempre con términos genéricos, **sin PII**. Escribe hallazgos verificados en la DB Radar (`collection://ee586413-3988-404d-b6cb-d6bdcb7deab8`) con su tag y la cita.
