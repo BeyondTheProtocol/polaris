@@ -11,6 +11,9 @@ Uso:
   python3 tools/ramas.py conflictos      # ficheros que tocan DOS ramas a la vez (exit 1 si hay)
   python3 tools/ramas.py limpia          # git worktree prune + LISTA las ramas limpias y vacías
   python3 tools/ramas.py limpia --si     # además elimina esas ramas limpias y vacías
+  python3 tools/ramas.py autopoda        # = limpia --si --avisar (rutina diaria git-barrido):
+                                         #   poda lo fusionado y limpio (el residuo de tests no
+                                         #   cuenta como trabajo) y avisa, sin spam, de lo dudoso
   python3 tools/ramas.py json            # salida JSON (la usa El Observatorio)
 
 `limpia`/`limpia --si` MUTAN el `.git` de la casa base (worktree prune/remove) — por eso pasan
@@ -20,8 +23,10 @@ comité de arquitectura encontró sobre el `.git` compartido (A1, 10-jul-26 — 
 """
 import json
 import os
+import re
 import subprocess
 import sys
+from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -149,8 +154,133 @@ _ARBOLES_QUE_NO_TOCAN_AQUI = (
 _TOPE_HALLAZGOS = 40                  # con saber que hay, basta; no hace falta listarlo todo
 
 
+# RESIDUO DE TESTS (22-sep-2026). `tests/test_dispatcher.sh` escribía 12 jobs falsos en el
+# PANEL-LAZO del árbol bajo prueba en cada pasada de test_all (ya no: panel.ruta_panel()). Ese
+# residuo bloqueaba la poda igual que un panel de verdad, y el 21 y 22-sep hubo que podar a mano.
+# Se reconoce SOLO si todo encaja; ante cualquier duda, es trabajo vivo (fail-closed):
+#   · el fichero entero son bloques del panel con su forma exacta (nada más dentro);
+#   · van en ráfagas: cada pasada de la batería escribe una docena de entradas a segundos unas de
+#     otras (y en un worktree se corre test_all muchas veces: una ráfaga por pasada). Toda ráfaga
+#     debe tener al menos _RAFAGA_MIN entradas y durar menos de _RAFAGA_MAX_S; una entrada suelta
+#     es ritmo del lazo real, que tarda minutos por job;
+#   · ningún job es conocido en casa base (ni en su cola ni en su panel): un job real que corrió
+#     desde un worktree (el caso del 20-sep) sí está en la cola de casa base.
+_PANEL_REL = os.path.join("00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
+_BLOQUE_PANEL = re.compile(
+    r"\n?## (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)  job (\S+)\n"
+    r"- QUÉ HIZO: [^\n]*\n- QUÉ DECIDIÓ: [^\n]*\n- ESPERA OK: [^\n]*\n"
+    r"- FALLÓ: [^\n]*\n- COSTE: [^\n]*\n")
+_RAFAGA_HUECO_S = 30                  # más separación que esto entre dos entradas = otra ráfaga
+_RAFAGA_MIN = 5
+_RAFAGA_MAX_S = 120
+
+
+def _jobs_de_casa_base():
+    """Ids de job que casa base conoce: nombres de la cola (`<rango>-<ts>-<id>.json`) + panel."""
+    sys.path.insert(0, HERE)
+    import _casa
+    ids = set()
+    for _raiz, _dirs, ficheros in os.walk(os.path.join(_casa.state_dir(), "queue")):
+        for f in ficheros:
+            if f.endswith(".json"):
+                ids.add(f[:-5].rsplit("-", 1)[-1])
+    try:
+        with open(os.path.join(_casa.casa_base(), _PANEL_REL), encoding="utf-8") as fh:
+            ids.update(re.findall(r"^## \S+  job (\S+)$", fh.read(), re.M))
+    except OSError:
+        pass
+    return ids
+
+
+def _es_residuo_de_tests(fichero):
+    """¿Este PANEL-LAZO.md es solo residuo de la batería? Ver el bloque de arriba."""
+    try:
+        with open(fichero, encoding="utf-8") as fh:
+            txt = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return False
+    bloques = list(_BLOQUE_PANEL.finditer(txt))
+    if not bloques or _BLOQUE_PANEL.sub("", txt).strip():
+        return False
+    try:
+        ts = [datetime.strptime(b.group(1), "%Y-%m-%dT%H:%M:%S") for b in bloques]
+    except ValueError:
+        return False
+    rafagas, actual = [], [ts[0]]
+    for t in ts[1:]:
+        if abs((t - actual[-1]).total_seconds()) <= _RAFAGA_HUECO_S:
+            actual.append(t)
+        else:
+            rafagas.append(actual)
+            actual = [t]
+    rafagas.append(actual)
+    for r in rafagas:
+        if len(r) < _RAFAGA_MIN or (max(r) - min(r)).total_seconds() > _RAFAGA_MAX_S:
+            return False
+    conocidos = _jobs_de_casa_base()
+    return not any(b.group(2) in conocidos for b in bloques)
+
+
+# COPIAS DE CASA BASE (22-sep-2026). La app, al crear un worktree, copia dentro los ignorados de
+# `.claude/` de casa base: 8 MB de `.claude/logs/clinico-access.log` y compañía en CADA worktree.
+# El freno los tomaba por trabajo vivo y ningún worktree nuevo se podaba nunca. Un fichero cuyo
+# contenido es PREFIJO del mismo fichero en casa base (idéntico, o casa base siguió añadiendo
+# líneas, que es lo que hacen los logs) no pierde nada al podarse. Una sola línea que casa base
+# no tenga (el caso del 20-sep: accesos escritos solo en el worktree) lo hace trabajo vivo.
+_TROZO = 1 << 20
+
+
+def _es_copia_de_casa_base(fichero, rel):
+    import _casa
+    origen = os.path.join(_casa.casa_base(), rel)
+    if os.path.realpath(origen) == os.path.realpath(fichero):
+        return False
+    try:
+        if os.path.getsize(fichero) > os.path.getsize(origen):
+            return False
+        with open(fichero, "rb") as a, open(origen, "rb") as b:
+            while True:
+                x = a.read(_TROZO)
+                if not x:
+                    return True
+                if b.read(len(x)) != x:
+                    return False
+    except OSError:
+        return False
+
+
+def _motivo_residuo(path, rel):
+    """Por qué este fichero ignorado del worktree se puede perder sin pena, o None si no se sabe."""
+    f = os.path.join(path, rel)
+    if rel == _PANEL_REL and _es_residuo_de_tests(f):
+        return "residuo de tests"
+    if _es_copia_de_casa_base(f, rel):
+        return "copia de casa base"
+    return None
+
+
+def residuo(path):
+    """[(rel, motivo)] de los ficheros ignorados del worktree que NO son trabajo: se pierden sin pena."""
+    out = []
+    for rel in _ARBOLES_QUE_NO_TOCAN_AQUI:
+        d = os.path.join(path, rel)
+        for raiz, _dirs, ficheros in (os.walk(d) if os.path.isdir(d) else ()):
+            for f in ficheros:
+                r = os.path.relpath(os.path.join(raiz, f), path)
+                m = None if f.startswith(".") else _motivo_residuo(path, r)
+                if m:
+                    out.append((r, m))
+    return out
+
+
+def residuo_de_tests(path):
+    """Compat: solo los ficheros que son residuo de la batería de tests."""
+    return [r for r, m in residuo(path) if m == "residuo de tests"]
+
+
 def _trabajo_vivo(path):
-    """Ficheros que se perderían al podar este worktree (invisible para git)."""
+    """Ficheros que se perderían al podar este worktree (invisible para git).
+    El residuo reconocido (`residuo`: tests o copia exacta de casa base) no cuenta."""
     fuera = []
     for rel in _RUTAS_TRABAJO_VIVO:
         d = os.path.join(path, rel)
@@ -166,7 +296,10 @@ def _trabajo_vivo(path):
             for f in ficheros:
                 if f.startswith("."):
                     continue
-                fuera.append(os.path.relpath(os.path.join(raiz, f), path))
+                rel_f = os.path.relpath(os.path.join(raiz, f), path)
+                if _motivo_residuo(path, rel_f):
+                    continue
+                fuera.append(rel_f)
                 if len(fuera) >= _TOPE_HALLAZGOS:
                     return fuera
     return fuera
@@ -254,8 +387,9 @@ def _candidatas_vacias():
             continue
         if w.get("branch") in ocupadas:
             continue
-        sucio = _run(["git", "-C", w["path"], "status", "--porcelain"]).strip()
-        if sucio:
+        # `_run` devuelve "" también si git FALLA (timeout, árbol roto): eso no es «limpio».
+        sucio = _run_rc(["git", "-C", w["path"], "status", "--porcelain"])
+        if sucio is None or sucio.strip():
             continue
         if _trabajo_vivo(w["path"]):
             continue
@@ -510,6 +644,113 @@ def _rama_actual():
         return ""
 
 
+def dudosos():
+    """Worktrees YA fusionados (0 commits propios) que no se podan porque algo no cuadra: cambios
+    sin commitear o trabajo que git no ve. Son los que hay que mirar; no se tocan solos.
+    [{rama, path, motivo}]. Los que tienen sesión viva no salen: están en uso, no son dudosos."""
+    base = _rama_base()
+    ocupadas = {x["rama"] for x in sesiones()
+                if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
+    out = []
+    for w in worktrees():
+        if w["es_base"] or w.get("branch") in ocupadas:
+            continue
+        if _ahead_ref(_ref_de(w), base) != 0:
+            continue                  # sin fusionar: eso lo decide {{TITULAR}} por otra vía (huerfanas)
+        sucio = _run_rc(["git", "-C", w["path"], "status", "--porcelain"])
+        vivo = _trabajo_vivo(w["path"])
+        if sucio is None:
+            motivo = "git status falla en el worktree"
+        elif sucio.strip():
+            motivo = "%d cambio(s) sin commitear" % len(sucio.strip().splitlines())
+        elif vivo:
+            motivo = "%d fichero(s) que git no ve: %s" % (len(vivo), ", ".join(vivo[:3]))
+        else:
+            continue
+        out.append({"rama": w.get("branch", "?"), "path": w["path"], "motivo": motivo})
+    return out
+
+
+def _avisar_dudosos(lista):
+    """Una línea operativa (no Telegram) por worktree dudoso NUEVO. Anti-spam: se recuerda qué
+    se avisó y no se repite mientras siga igual; si se resuelve, se olvida."""
+    import _casa
+    ruta = os.path.join(_casa.state_dir(), "autopoda_avisados.json")
+    try:
+        with open(ruta, encoding="utf-8") as fh:
+            ya = json.load(fh)
+    except (OSError, ValueError):
+        ya = {}
+    ahora = {d["path"]: d["motivo"] for d in lista}
+    nuevos = [d for d in lista if ya.get(d["path"]) != d["motivo"]]
+    if nuevos:
+        try:
+            import salida
+            salida.report_to_titular(
+                "🌿 Worktrees ya fusionados que NO podé por algo dudoso (míralos antes de borrar): "
+                + "; ".join("%s → %s" % (d["rama"], d["motivo"]) for d in nuevos),
+                categoria="operativo", voz="sobria", fuente="ramas.autopoda")
+        except Exception as e:           # noqa: BLE001 — el aviso nunca tumba la poda
+            print("  (no pude dejar el aviso operativo: %s)" % e)
+    try:
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta + ".tmp", "w", encoding="utf-8") as fh:
+            json.dump(ahora, fh, ensure_ascii=False, indent=1)
+        os.replace(ruta + ".tmp", ruta)
+    except OSError:
+        pass
+    return nuevos
+
+
+def limpia(si=False, avisar=False):
+    """Poda los worktrees limpios, fusionados y sin sesión; dice (y con `avisar`, avisa) lo dudoso.
+    MUTA `.git/worktrees/` → candado compartido "git-mutex" (fail-closed: si no se puede tomar,
+    se avisa y NO se poda a ciegas; ver cerrar_sesion.py, mismo candado)."""
+    try:
+        _, out, err = git_mutex.run(["-C", ROOT, "worktree", "prune"])
+        print(out or err or "prune: ok (sin entradas obsoletas).")
+    except TimeoutError as e:
+        print("prune: NO se pudo tomar el candado compartido (otro actor muta la casa base ahora): %s" % e)
+        return 75
+    # Lo que NO se poda por tener trabajo vivo se DICE. Un "no hay nada que podar" que en
+    # realidad significa "hay un borrador dentro" se lee como cola vacía, y el borrador se
+    # queda ahí sin que nadie sepa que existe.
+    _ocupadas = {x["rama"] for x in sesiones()
+                 if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
+    for w in worktrees():
+        if w["es_base"]:
+            continue
+        if w.get("branch") in _ocupadas:
+            print("⏸️  %s NO se poda: tienes una sesión trabajando dentro" % w.get("branch", "?"))
+            continue
+        vivo = _trabajo_vivo(w["path"])
+        if vivo:
+            print("⏸️  %s NO se poda: tiene %d fichero(s) sin ejecutar/firmar (%s)"
+                  % (w.get("branch", "?"), len(vivo), ", ".join(vivo[:3])))
+    cand = _candidatas_vacias()
+    if avisar:
+        _avisar_dudosos(dudosos())
+    if not cand:
+        print("No hay ramas limpias y vacías que podar.")
+        return 0
+    print("Ramas limpias y vacías (sin cambios ni commits propios):")
+    for w in cand:
+        res = residuo(w["path"])
+        print("  • %s  (%s)%s" % (w.get("branch", "?"), w["path"],
+                                  "  · %d fichero(s) ignorados sin pena (%s)"
+                                  % (len(res), ", ".join(sorted({m for _, m in res}))) if res else ""))
+    if si:
+        for w in cand:
+            try:
+                _, out, err = git_mutex.run(["-C", ROOT, "worktree", "remove", w["path"]])
+                print(out or err or ("eliminada: " + w["branch"]))
+            except TimeoutError as e:
+                print("  NO se pudo eliminar %s: candado compartido ocupado (%s)" % (w["branch"], e))
+    else:
+        print("(usa `limpia --si` para eliminarlas)")
+    return 0
+
+
 def main(argv):
     cmd = argv[0] if argv else "list"
     if cmd == "fusionar":
@@ -548,46 +789,10 @@ def main(argv):
                 extra = "..." if len(h["ficheros"]) > 4 else ""
                 print("  [!] %s  (%d fichero/s: %s%s)" % (h["rama"], len(h["ficheros"]),
                       ", ".join(h["ficheros"][:4]), extra))
-    elif cmd == "limpia":
-        # MUTA `.git/worktrees/` → candado compartido "git-mutex" (fail-closed: si no se puede
-        # tomar, se avisa y NO se poda a ciegas; ver cerrar_sesion.py, mismo candado).
-        try:
-            _, out, err = git_mutex.run(["-C", ROOT, "worktree", "prune"])
-            print(out or err or "prune: ok (sin entradas obsoletas).")
-        except TimeoutError as e:
-            print("prune: NO se pudo tomar el candado compartido (otro actor muta la casa base ahora): %s" % e)
-            return 75
-        # Lo que NO se poda por tener trabajo vivo se DICE. Un "no hay nada que podar" que en
-        # realidad significa "hay un borrador dentro" se lee como cola vacía, y el borrador se
-        # queda ahí sin que nadie sepa que existe.
-        _ocupadas = {x["rama"] for x in sesiones()
-                     if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
-        for w in worktrees():
-            if w["es_base"]:
-                continue
-            if w.get("branch") in _ocupadas:
-                print("⏸️  %s NO se poda: tienes una sesión trabajando dentro" % w.get("branch", "?"))
-                continue
-            vivo = _trabajo_vivo(w["path"])
-            if vivo:
-                print("⏸️  %s NO se poda: tiene %d fichero(s) sin ejecutar/firmar (%s)"
-                      % (w.get("branch", "?"), len(vivo), ", ".join(vivo[:3])))
-        cand = _candidatas_vacias()
-        if not cand:
-            print("No hay ramas limpias y vacías que podar.")
-            return 0
-        print("Ramas limpias y vacías (sin cambios ni commits propios):")
-        for w in cand:
-            print("  • %s  (%s)" % (w.get("branch", "?"), w["path"]))
-        if "--si" in argv:
-            for w in cand:
-                try:
-                    _, out, err = git_mutex.run(["-C", ROOT, "worktree", "remove", w["path"]])
-                    print(out or err or ("eliminada: " + w["branch"]))
-                except TimeoutError as e:
-                    print("  NO se pudo eliminar %s: candado compartido ocupado (%s)" % (w["branch"], e))
-        else:
-            print("(usa `limpia --si` para eliminarlas)")
+    elif cmd in ("limpia", "autopoda"):
+        # `autopoda` = `limpia --si --avisar`: lo que corre la rutina diaria com.btp.git-barrido.
+        auto = cmd == "autopoda"
+        return limpia(si=auto or "--si" in argv, avisar=auto or "--avisar" in argv)
     else:
         print(__doc__)
         return 2

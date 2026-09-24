@@ -199,6 +199,7 @@ runpy test_x_guardados_enriquecido.py
 runpy test_ramas_detached.py
 runpy test_poda_no_se_lleva_ignorados.py
 runpy test_git_mutex_poda.py
+runpy test_autopoda_residuo.py     # 22-sep · los worktrees fusionados se podan solos; el residuo de tests no los bloquea, lo dudoso sí
 runpy test_ramas_conflictos.py
 runpy test_ramas_borrador.py
 runpy test_cierre_continuidad.py
@@ -236,7 +237,9 @@ runpy test_evals.py
 runpy test_borde_gateway.py
 runpy test_yt_inbox.py
 runpy test_mcp_server.py
+run   test_git_barrido_poda.sh  # 22-sep · la poda diaria no depende de que el modelo esté disponible
 run   test_dispatcher.sh
+runpy test_panel_aislado.py       # 22-sep · la batería no escribe en el PANEL-LAZO de verdad (bloqueaba la poda)
 run   test_credito_agotado.sh
 
 # Mutantes sobre los frenos del MURO: una defensa sin mutante que la mate no está cubierta.

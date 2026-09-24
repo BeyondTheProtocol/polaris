@@ -117,9 +117,9 @@
    "nota": ""
   },
   "com.btp.git-barrido": {
-   "script": "run_agent.sh",
+   "script": "git_barrido.sh",
    "concern": "git-barrido",
-   "nota": ""
+   "nota": "poda determinista (ramas.py autopoda) y despues el agente git: los dias de limite de modelo la poda sigue ocurriendo"
   },
   "com.btp.healthcheck": {
    "script": "healthcheck.py",

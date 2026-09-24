@@ -20,7 +20,25 @@ from _casa import casa_base  # noqa: E402
 PANEL = os.path.join(casa_base(), "00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
 
 
+def ruta_panel():
+    """Dónde escribe ESTA llamada. Se resuelve en cada append, no al importar.
+
+    `BTP_PANEL` lo redirige (los tests lo apuntan a su tmp, como BTP_BANDEJA). Y en batería de
+    tests (`BTP_TEST_BATTERY=1`) sin `BTP_PANEL`, nunca el panel de verdad: test_dispatcher.sh
+    pasa `BTP_REPO=<árbol bajo prueba>` y cada pasada de test_all dejaba 12 entradas de jobs
+    falsos en el PANEL-LAZO de ese árbol. En un worktree, eso bloqueaba la poda (gitignored =
+    «se perdería»); en casa base, ensuciaba el panel real (22-sep-2026).
+    """
+    if os.environ.get("BTP_PANEL"):
+        return os.environ["BTP_PANEL"]
+    if os.environ.get("BTP_TEST_BATTERY") == "1":
+        import tempfile
+        return os.path.join(tempfile.gettempdir(), "btp-test-panel-%d" % os.getuid(), "PANEL-LAZO.md")
+    return os.path.join(casa_base(), "00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
+
+
 def append(job=None, did="", decided="", awaiting="", failed="", cost=""):
+    PANEL = ruta_panel()
     os.makedirs(os.path.dirname(PANEL), exist_ok=True)
     ts = time.strftime("%Y-%m-%dT%H:%M:%S")
     block = "\n## %s  job %s\n" % (ts, job or "-")

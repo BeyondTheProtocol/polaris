@@ -19,7 +19,7 @@
 	<string>com.btp.git-barrido</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+		<string>/Users/polaris/claudecode/tools/git_barrido.sh</string>
 		<string>Ejecuta tu barrido diario de git (rutina com.btp.git-barrido), según el capítulo «Barrido diario» de tu charter: escanea cabos sueltos, limpia solo lo de cero pérdida (ramas fusionadas sin sesión, worktrees muertos), surfacea solo lo que necesita decisión de {{TITULAR}}, y NUNCA fusiones a base / push / borres lo no fusionado / commitees trabajo ajeno.</string>
 	</array>
 	<key>RunAtLoad</key>

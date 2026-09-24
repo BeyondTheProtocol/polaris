@@ -22,10 +22,17 @@ EOF
 # skew de versión: un worktree que añade un campo nuevo nunca cazaría el problema en su CI).
 q()  { BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cola.py" "$@"; }
 cnt() { wc -l <"$COUNTER" 2>/dev/null | tr -d ' '; }
-run_once() { BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1; }
+run_once() { BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1; }
 fresh() { TMP="$(mktemp -d)"; ST="$TMP/state"; MOCK="$TMP/mock.sh"; COUNTER="$TMP/counter"; HALT="$TMP/.halt"; : >"$COUNTER"; }
 
 echo "== Dispatcher (integración) =="
+
+# El panel del árbol bajo prueba NO se toca (22-sep-2026): con BTP_REPO="$ROOT", cada pasada
+# dejaba 12 jobs falsos en su PANEL-LAZO.md (gitignored). En un worktree bloqueaba la poda; en
+# casa base ensuciaba el panel real. Foto antes; se compara al final.
+PANEL_REAL="$ROOT/00_FUENTE-DE-VERDAD/Gestion/PANEL-LAZO.md"
+panel_sz() { if [ -f "$PANEL_REAL" ]; then wc -c <"$PANEL_REAL" | tr -d " "; else echo 0; fi; }
+PANEL_ANTES="$(panel_sz)"
 
 # 1. HALT corta: no se invoca al agente, el job se queda en cola.
 fresh; mkmock 0 0.05 false
@@ -44,6 +51,7 @@ run_once
 [ "$(q status | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["done"])')" = "1" ] && ok || no "feliz: job en done"
 spent="$(BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cost_guard.py" today | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["gastado_usd"])')"
 [ "$spent" = "0.07" ] && ok || no "feliz: coste 0.07 sumado (got $spent)"
+grep -q "^## .* job " "$TMP/panel.md" 2>/dev/null && ok || no "feliz: la entrada del panel va al panel del tmp (BTP_PANEL)"
 rm -rf "$TMP"
 
 # 3. lock «un cerebro»: si el lockdir lo tiene un PID vivo, el dispatcher sale sin trabajar.
@@ -149,7 +157,7 @@ touch -t "$(date -v-300S +%Y%m%d%H%M.%S 2>/dev/null || date -d '300 seconds ago'
 # Fotografía del latido a mitad del job (a los 2 s, con el mock aún durmiendo).
 ( sleep 2; cp "$HB" "$TMP/hb_mitad.json" 2>/dev/null
   "$PY" -c "import os,time;print(int(time.time()-os.path.getmtime('$HB')))" >"$TMP/hb_edad" 2>/dev/null ) &
-BTP_HEARTBEAT_INTERVAL=1 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
+BTP_HEARTBEAT_INTERVAL=1 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
 wait
 edad="$(cat "$TMP/hb_edad" 2>/dev/null || echo 999)"
 { [ -n "$edad" ] && [ "$edad" -le 5 ] 2>/dev/null; } && ok || no "latido: debe refrescarse DURANTE el job (edad a mitad: ${edad}s)"
@@ -203,9 +211,11 @@ rm -rf "$TMP"
 fresh; mkmock 0 0.05 false
 rm -f "$ROOT/$REL"
 qp >/dev/null
-BTP_PRUEBA=0 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
+BTP_PRUEBA=0 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
 [ "$(q status | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["done"])')" = "1" ] && ok || no "gate: BTP_PRUEBA=0 lo apaga (interruptor de emergencia)"
 rm -rf "$TMP"
+
+[ "$(panel_sz)" = "$PANEL_ANTES" ] && ok || no "el PANEL-LAZO del árbol bajo prueba cambió ($PANEL_ANTES → $(panel_sz) bytes): un test escribe en el panel de verdad"
 
 echo
 echo "RESULTADO dispatcher: $pass OK, $fail fallos"
