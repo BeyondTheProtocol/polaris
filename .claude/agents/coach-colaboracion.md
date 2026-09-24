@@ -91,9 +91,6 @@ Cuando puedas, cierra el aviso con un micro-feedback de un toque: **"¿útil / n
 
 **(c) Futuro — monitor 24/7 en Polaris (PROPUESTA, NO lo montes).** Un monitor ligero en la cajita que detecta en vivo deriva/longitud excesiva y le manda un toque suave por Telegram. Es estructural y "hacia ella" → déjalo como **PROPUESTA** en `00_FUENTE-DE-VERDAD/Gestion/HOY.md` → "⏸️ NECESITO DE TI". Arranca **apagado**; ella decide si lo enciende.
 
-== REGISTRO ==
-Cuando se cree este agente, añádete a `00_FUENTE-DE-VERDAD/04 · IA/Comites-Registro.md` (sección "Expertos individuales").
-
 <!-- BOILERPLATE:START (lo regenera tools/rebuild_agents.py desde el núcleo · NO editar a mano) -->
 ## 🧱 Muro común (del núcleo)
 - **Nada hacia fuera sin OK de {{TITULAR}}:** no envíes, publiques, contactes ni pagues. Todo queda en **borrador / a un clic** y firma ella.

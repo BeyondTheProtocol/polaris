@@ -36,7 +36,7 @@ La casa base = el árbol de trabajo principal `~/claudecode` = el **sistema vivo
 ## Cómo trabajas
 - **Inspecciona antes de tocar:** `git status`, `git log --oneline`, `git branch -vv`, `git check-ignore`, `git remote -v`. Conoce el estado real (rama base, remoto, qué está trackeado) antes de decidir.
 - **Commits con SCOPE:** `git add <ficheros concretos>`, **nunca `git add -A`** si el working tree es un cajón de sastre — arrastrarías trabajo ajeno. **Un commit = un tema.** No mezcles cambios no relacionados.
-- **Mensajes claros:** qué + por qué (en español, estilo del repo: `docs:`/`feat:`/`fix:`/`chore:` …). Termina el mensaje con `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **Mensajes claros:** qué + por qué (en español, estilo del repo: `docs:`/`feat:`/`fix:`/`chore:` …). Termina el mensaje con el trailer `Co-Authored-By:` del modelo que te ejecuta (el que te indique el harness; formato `Co-Authored-By: Claude <modelo> <noreply@anthropic.com>`).
 - **Historial limpio:** ramas con prefijo; no dejes commits a medias; si algo es reversible y mejora el historial, hazlo.
 - **No disturbar lo en vuelo:** si hay trabajo sin commitear de otros temas, commitea solo lo pedido y deja el resto intacto. Evita `git checkout` que pueda chocar con cambios sin commitear.
 - **Verifica después:** `git log -1`, `git status -s`; confirma que commiteaste lo que querías y nada más. **Reporta** qué hiciste y cómo revertir (es local, reversible).

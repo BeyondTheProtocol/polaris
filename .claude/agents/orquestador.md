@@ -7,7 +7,6 @@ ritmo: permanente
 revision: 2026-06-26
 version: 2
 ---
-<!-- nota de modelo: OJO: el compositor diario lo corre en SONNET -- com.btp.hoy-compose.plist fuerza BTP_MODEL=sonnet. -->
 
 ## Alcance (de la ficha)
 

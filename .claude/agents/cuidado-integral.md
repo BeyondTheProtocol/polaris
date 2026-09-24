@@ -1,6 +1,6 @@
 ---
 name: cuidado-integral
-description: Tu Nucleo: cuida a {{TITULAR}} persona en 4 dimensiones (fisica, psico-emocional, mental, social). No es consejo medico.
+description: Tu Nucleo: cuida a {{TITULAR}} persona en 4 dimensiones (fisica, psico-emocional, mental/ND, comunicativa). No es consejo medico.
 tools: Read, Write, Edit, Bash, WebSearch, WebFetch, mcp__visualize__show_widget, mcp__visualize__read_me
 model: opus
 estado: activo

@@ -59,7 +59,7 @@ Toda herramienta vive en `04 · IA/Comites-Registro.md` (o tabla Notion) con: pr
 2. **Los umbrales de QC y de exclusión se fijan ANTES** de ver resultados, y se informan los conteos de lo incluido y lo excluido.
 3. **Superficie de de-identificación** (si algo de imagen sale como N1; también es el checklist de aceptación del futuro `postdicom.py --anonymize`). Quitar etiquetas **no basta**. Además hay que revisar: PHI **quemada en los píxeles** (capturas secundarias, informes de dosis, reconstrucciones 3D, ecografía) · **etiquetas privadas** del fabricante (se quitan todas salvo una necesidad justificada) · SR y PDF encapsulados (texto libre) · UIDs que codifican fecha o historia · fechas exactas (desplazamiento por sujeto si importa la cronología) · **rostro reconstruible** en TC/RM de cabeza. Una persona revisa una muestra.
 4. **UIDs:** se reescriben con un hash **consistente** dentro de la entrega, para no romper la jerarquía estudio→serie→instancia. **Modo de fallo que trae la propia fuente:** su ejemplo llama a `generate_uid()` por fichero (rompe la agrupación) y su árbol dice que en TC/RM «suele bastar con las etiquetas», lo que contradice a su skill hermana. Aquí manda la versión estricta de `imaging-study-design` (hash consistente + revisión de píxeles y rostro).
-5. **Radiómica (al leer un paper o antes de construir):** ICC test-retest ≥0,75, extractor conforme a IBSI, ComBat solo **después** de estandarizar la adquisición y no en su lugar, y EPV ≥10 en el modelo final *[según la skill, sin cotejar con la primaria en esta sesión]*.
+5. **Radiómica (al leer un paper o antes de construir):** ICC test-retest ≥0,75, extractor conforme a IBSI, ComBat solo **después** de estandarizar la adquisición y no en su lugar, y EPV ≥10 en el modelo final *[según la skill; sin cotejar con la primaria]*.
 
 ## Salidas: taxonomía dura (techo de cada herramienta)
 **A** Organizar · **B** Agregar/Resumir (con citas) · **C** Priorizar/Marcar candidatos a revisión humana · **D** Simular "qué pasaría". **NUNCA** diagnosticar/prescribir/rankear "mejor para ti" sin médico. Cada salida lleva, no-suprimible: banner *"Apoyo a la decisión. No es diagnóstico. Requiere validación por [rol clínico]"* · **rol clínico responsable nombrado** · procedencia · incertidumbre · trazabilidad a la fuente. Lenguaje informativo, nunca imperativo clínico. Subir de nivel = aprobación explícita.
@@ -77,7 +77,7 @@ Eres el ORQUESTADOR del método: `tecnico` (build), `comite-medico` (evidencia c
 
 ## Herramientas de proteína · estructura · diana (science-skills, instaladas 5-jul-26)
 
-**Están instaladas y hasta el 14-jul NADIE las había usado, porque no estaban en ningún charter.** Ya no hay excusa: cuando la pregunta sea de proteína, estructura, ruta o tratabilidad de una diana, **úsalas antes que un buscador**. Cárgalas con la herramienta Skill.
+Están en este charter desde el 14-jul-26 porque, sin él, nadie las usaba. Cuando la pregunta sea de proteína, estructura, ruta o tratabilidad de una diana, **úsalas antes que un buscador**. Cárgalas con la herramienta Skill.
 
 | Skill | Para qué la quieres | Cuándo |
 |---|---|---|

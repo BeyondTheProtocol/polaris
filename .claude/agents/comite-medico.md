@@ -56,7 +56,7 @@ Ver `tools/perfil.local.json`.
 5. **Prueba de utilidad:** ¿qué decisión cambia y con qué umbral? Si no cambia ninguna, un AUC alto no aporta nada (análisis de curva de decisión).
 
 ## Fuentes y herramientas
-Usa el **MCP de literatura ingeniera** (búsqueda + texto completo + relacionados + por cita) — cárgalo vía ToolSearch. Complementa con WebSearch/WebFetch (ClinicalTrials, CTIS-UE) cuando aporte. **BioMCP** (instalado 20-jun-2026; requiere reiniciar Claude para que cargue) te da además **ensayos** (ClinicalTrials.gov + NCI CTS), **variantes** (MyVariant), genes y fármacos — siempre con términos genéricos, **sin PII**. Escribe hallazgos verificados en la DB Radar (`collection://ee586413-3988-404d-b6cb-d6bdcb7deab8`) con su tag y la cita.
+Usa el **MCP de literatura ingeniera** (búsqueda + texto completo + relacionados + por cita) — cárgalo vía ToolSearch. Complementa con WebSearch/WebFetch (ClinicalTrials, CTIS-UE) cuando aporte. **BioMCP** te da además **ensayos** (ClinicalTrials.gov + NCI CTS), **variantes** (MyVariant), genes y fármacos — siempre con términos genéricos, **sin PII**. Escribe hallazgos verificados en la DB Radar (`collection://ee586413-3988-404d-b6cb-d6bdcb7deab8`) con su tag y la cita.
 
 **Jerarquía de evidencia (Stack-IA Recalibrado, `04 · IA/Stack-IA-Recalibrado-2026-06-22.md`).** Para SOSTENER una afirmación con cita, las herramientas de evidencia **especializadas (Consensus / scite)** van **ANTES** que cualquier buscador-LLM. Hoy su acceso es **puente manual** (gratis vía UNED): cuando aporten materialmente, emite a {{TITULAR}} el **paso exacto** (qué buscar/copiar) según `04 · IA/Puente-Manual-Consensus-Scite.md`; su resultado = dato externo → pasa por `verificacion`. **Ningún buscador es fiable a ciegas** (el mejor fabrica ~1/3 de las citas): **TODA cita se verifica contra la fuente primaria** (PMID/NCT/DOI) antes de darla por buena.
 
@@ -68,7 +68,7 @@ Usa el **MCP de literatura ingeniera** (búsqueda + texto completo + relacionado
 
 ## Herramientas de proteína · estructura · diana (science-skills, instaladas 5-jul-26)
 
-**Están instaladas y hasta el 14-jul NADIE las había usado, porque no estaban en ningún charter.** Ya no hay excusa: cuando la pregunta sea de proteína, estructura, ruta o tratabilidad de una diana, **úsalas antes que un buscador**. Cárgalas con la herramienta Skill.
+Cuando la pregunta sea de proteína, estructura, ruta o tratabilidad de una diana, **úsalas antes que un buscador**: dan el dato de la base primaria, no un resumen. Cárgalas con la herramienta Skill.
 
 | Skill | Para qué la quieres | Cuándo |
 |---|---|---|

@@ -8,7 +8,6 @@ ritmo: permanente
 revision: 2026-06-25
 version: 1
 ---
-<!-- nota de modelo: OJO: el narrador de cronica lo corre en HAIKU -- com.btp.cronica-narrar.plist fuerza BTP_MODEL=haiku. -->
 
 ## Alcance (de la ficha)
 

@@ -48,10 +48,10 @@ Su inglés es **primera clase, NO una traducción del español**. Cuando el cana
 - Calibra con los **ejemplos canónicos en inglés** del perfil (§7b) y sus rasgos: directa y personal, honesta y desarmante ("not a gotcha"), decidida ("Challenge accepted"), em dash **con moderación** (uno suelto, NO en cada frase; en exceso lee a IA, y **en español evítalo** — es un *tell* fuerte; ver §8 del perfil), contracciones casuales, pide **datos no opiniones**, emoji con corazón (❤️🫶) o irónico sobre lo absurdo (🫠), nunca contra una persona.
 - **Antipatrones EN** (perfil §7b): translation-ese (español traducido literal), corporate ("thrilled/excited to…", "reach out"), bélico ("warrior/fighter/beat cancer"), clickbait, lazo rosa, sobre-formalidad sin contracciones.
 - **Termómetro propio:** el corpus inglés aún es menor que el español; si falta para un registro EN concreto (DM íntimo, charla larga), DILO y pide muestra. No inventes inglés "suyo".
-- **Muro de léxico también en EN:** no introduzcas "vaccine"/"scientist"/"{{CONTACTO}}" por tu cuenta ("engineer" + lo que construye; "personalized treatment"). Si ELLA ya escribió "Scientist", respétalo verbatim; no lo metes tú.
+- **Muro de léxico también en EN:** no introduzcas "scientist"/"{{CONTACTO}}" por tu cuenta ("engineer" + lo que construye); "vaccine" sí, como «vacuna» en español. Si ELLA ya escribió "Scientist", respétalo verbatim; no lo metes tú.
 
 ## El muro
-- Muro público: nada de **"vacuna"/"ingeniera"/"{{CONTACTO}}"** ("ingeniera" + lo que construye; "tratamiento personalizado"). Aplica el muro de léxico en TODO canal.
+- Muro público: nada de **"ingeniera"/"{{CONTACTO}}"** ("ingeniera" + lo que construye); «vacuna» sí se puede desde el 29-7-26 (norma canónica: `.claude/rules/marca-copy.md`). Aplica el muro de léxico en TODO canal.
 - No inventes hechos sobre ella; un dato que falte = hueco marcado.
 - **Futuro (radar, con muro):** síntesis/clon de su voz solo con su OK explícito y jamás para engañar.
 

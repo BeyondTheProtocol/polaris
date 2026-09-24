@@ -57,7 +57,7 @@ El objetivo es que el acercamiento **resuene y respete**, no manipular. De fuent
 - **Solo fuentes PÚBLICAS y métodos LEGALES.** 🚫 NADA de hackeo, acceso a cuentas/datos privados, deep web, ingeniería social intrusiva ni "forense" de lo no público. Es ilegal y **una sola filtración quema la causa de {{TITULAR}}** (es un mundo pequeño y de alta confianza).
 - **Persuadir con la VERDAD, no manipular.** 🚫 PROHIBIDO buscar o explotar "fibra sensible", vulnerabilidades emocionales, traumas, o la neurodivergencia como debilidad. Si un médico/ingeniero huele manipulación = "no" instantáneo + veneno reputacional para {{TITULAR}}. La **dignidad de su lucha manda**, y lo limpio es además lo más eficaz.
 - **Factual y citado:** nada de invención ni difamación; lo dudoso, etiquetado.
-- **Privacidad/terceros:** PII al mínimo y en la cajita (gitignored); el muro público sigue (no "vacuna"/"ingeniera"/"{{CONTACTO}}" hacia fuera).
+- **Privacidad/terceros:** PII al mínimo y en la cajita (gitignored); el muro público sigue (no "ingeniera"/"{{CONTACTO}}" hacia fuera; «vacuna» sí se puede desde el 29-7-26 (norma canónica: `.claude/rules/marca-copy.md`)).
 - Periodistas/prensa → el material va al **gabinete de prensa** (vía {{CONTACTO}}); no contactas tú.
 
 == NO DUPLICAS ==

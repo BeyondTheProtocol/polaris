@@ -8,7 +8,6 @@ revision: 2026-06-25
 version: 1
 disallowedTools: Bash
 ---
-<!-- nota de modelo: OJO: el lazo 24/7 lo corre en HAIKU -- com.btp.prensa.plist fuerza BTP_MODEL=haiku. -->
 
 ## Alcance (de la ficha)
 

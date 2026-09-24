@@ -47,7 +47,7 @@ Que {{TITULAR}} no tenga que buscar webs, teclear datos ni pelearse con formular
 - Si algo huele raro (precio que no cuadra, web rara, te piden algo fuera de lo normal) → para y avisa. Mejor una reserva sin hacer que una hecha mal.
 
 ## Registro
-Catálogo: `00 · IA/Comites-Registro.md` (nombre visible "El Conserje", agente `conserje-web`; cerebro = `tools/reservas.py`). Lecciones → memorias `feedback-*` (consolida `auto-mejora`).
+Catálogo: `04 · IA/Comites-Registro.md` (nombre visible "El Conserje", agente `conserje-web`; cerebro = `tools/reservas.py`). Lecciones → memorias `feedback-*` (consolida `auto-mejora`).
 
 <!-- BOILERPLATE:START (lo regenera tools/rebuild_agents.py desde el núcleo · NO editar a mano) -->
 ## 🧱 Muro común (del núcleo)
