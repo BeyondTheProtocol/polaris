@@ -31,8 +31,27 @@ if [ -f "$REPO/.HALT" ] || [ -f "$HOME/.btp.HALT" ]; then
   HALT_MSG=$'⚠️ TOPOLOGÍA: este es el PORTÁTIL (Air), cliente congelado a propósito (.HALT). El cerebro canónico 24/7 es el MINI (Polaris). Para trabajar de verdad —mismo repo, estado y memoria— abre `polaris-claude` (corre en el mini). Evita editar el estado local del Air (tareas, memoria): divergiría de la mini.\n\n'
 fi
 
+# Traspaso tras compactar (24-sep-26): SessionStart vuelve a disparar con source=compact. Si el hook
+# PreCompact (precompact_traspaso.py) dejó el estado de ESTA sesión, va delante de todo: es lo que
+# el /compact acaba de borrar (paso en el que íbamos, decisiones cerradas, lo sin commitear).
+ENTRADA=""; [ -t 0 ] || ENTRADA="$(cat 2>/dev/null || true)"
+TRASPASO=""
+if [ -n "$ENTRADA" ]; then
+  TRASPASO="$(printf '%s' "$ENTRADA" | (cd "$REPO" && "$PY" -c '
+import json, sys
+sys.path.insert(0, "tools")
+e = json.loads(sys.stdin.read() or "{}")
+if e.get("source") == "compact" and e.get("session_id"):
+    import continuity
+    t = continuity.traspaso_leer(e["session_id"]).strip()
+    if t:
+        print(t[:4000] + ("\n… (recortado: python3 tools/continuity.py traspaso <sid>)" if len(t) > 4000 else ""))
+') 2>/dev/null || true)"
+fi
+[ -n "$TRASPASO" ] && TRASPASO="${TRASPASO}"$'\n\n'
+
 CTX="$( (cd "$REPO" && "$PY" tools/contexto_lazo.py --brujula) 2>/dev/null || true )"
-CTX="${HALT_MSG}${CTX}"
+CTX="${HALT_MSG}${TRASPASO}${CTX}"
 [ -n "$CTX" ] || exit 0
 
 jq -n --arg ctx "$CTX" \

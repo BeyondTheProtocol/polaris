@@ -14,6 +14,18 @@
         ]
       }
     ],
+    "PreCompact": [
+      {
+        "_comment": "Traspaso antes de compactar (24-sep-26). Lo que inyecta SessionStart y lo decidido en el chat se perdia con /compact. Sin matcher: manual y auto. Escribe en tools/state/traspasos/<session_id>.md (via tools/continuity.py, procedencia confiable, fuera del INDEX a proposito) rama, lo sin commitear, ficheros tocados, 'Paso N de M', planes aprobados, respuestas a AskUserQuestion y un prompt de continuacion; session_start.sh lo reinyecta cuando source=compact. Sin LLM. NUNCA bloquea la compactacion (fail-open, exit 0 siempre). Bypass BTP_TRASPASO_OFF=1.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precompact_traspaso.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

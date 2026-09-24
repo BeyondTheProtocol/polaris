@@ -214,6 +214,7 @@ runpy test_autopoda_residuo.py     # 22-sep · los worktrees fusionados se podan
 runpy test_ramas_conflictos.py
 runpy test_ramas_borrador.py
 runpy test_cierre_continuidad.py
+runpy test_traspaso_compact.py
 runpy test_bot_free.py
 runpy test_bot_heartbeat.py
 runpy test_responder_datos.py

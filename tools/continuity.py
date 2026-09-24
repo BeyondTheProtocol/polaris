@@ -68,7 +68,75 @@ def recent(n=10):
     return ["## " + b for b in bloques[-n:]]
 
 
+# ── TRASPASO ANTES DE COMPACTAR (24-sep-2026) ─────────────────────────────────────────────────
+# Lo escribe el hook PreCompact (`.claude/hooks/precompact_traspaso.py`) y lo relee SessionStart
+# cuando `source == "compact"`: lo decidido y el paso en el que íbamos sobreviven al /compact.
+#
+# Vive en un directorio HERMANO de `continuity/`, no dentro, y NO pasa por INDEX.md, a propósito:
+#   · la brújula solo enseña los 2 últimos bloques del INDEX, y un volcado automático por cada
+#     compactación echaría fuera los resúmenes que escribe una persona;
+#   · `cerrar_sesion._continuidad_al_dia()` mira el mtime de lo que hay en `continuity/`, y un
+#     volcado automático taparía el aviso de «cerraste sin dejar memoria de sesión».
+# Uno por sesión, sobrescrito: solo vale el último. Se construye con datos de la propia sesión
+# (git, planes aprobados, respuestas de {{TITULAR}}), así que la procedencia es `confiable`.
+TRASPASOS = os.path.join(STATE, "traspasos")
+TRASPASO_DIAS = 14
+
+
+def _sid_seguro(session_id):
+    sid = "".join(c for c in str(session_id or "") if c.isalnum() or c in "-_")
+    if not sid:
+        raise ValueError("session_id vacio o invalido")
+    return sid[:80]
+
+
+def traspaso_guardar(session_id, texto):
+    """Escribe (sobrescribe) el traspaso de una sesión. Devuelve la ruta."""
+    os.makedirs(TRASPASOS, mode=0o700, exist_ok=True)
+    ruta = os.path.join(TRASPASOS, _sid_seguro(session_id) + ".md")
+    ts = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    cuerpo = "## %s  [confiable] (precompact)\n%s\n" % (ts, str(texto).strip())
+    tmp = ruta + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, cuerpo.encode("utf-8"))
+    finally:
+        os.close(fd)
+    os.replace(tmp, ruta)
+    _podar_traspasos()
+    return ruta
+
+
+def traspaso_leer(session_id):
+    """El traspaso de esa sesión, o "" si no hay."""
+    try:
+        ruta = os.path.join(TRASPASOS, _sid_seguro(session_id) + ".md")
+        with open(ruta, encoding="utf-8") as f:
+            return f.read()
+    except (OSError, ValueError):
+        return ""
+
+
+def _podar_traspasos():
+    import time
+    limite = time.time() - TRASPASO_DIAS * 86400
+    try:
+        for n in os.listdir(TRASPASOS):
+            p = os.path.join(TRASPASOS, n)
+            if os.path.getmtime(p) < limite:
+                os.remove(p)
+    except OSError:
+        pass
+
+
 def main(argv):
+    if argv and argv[0] == "traspaso":
+        # continuity.py traspaso <session_id>  → imprime el traspaso de esa sesión
+        if len(argv) < 2:
+            print("uso: continuity.py traspaso <session_id>")
+            return 2
+        print(traspaso_leer(argv[1]) or "(sin traspaso para esa sesion)")
+        return 0
     if argv and argv[0] == "record":
         # Sin default a 'confiable': marcar la procedencia es explícito (evita lavar
         # contenido derivado-de-no-confiable como instrucción legítima, H8).
