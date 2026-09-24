@@ -107,7 +107,7 @@
     "memoria y saber": 14,
     "modelos de IA": 14,
     "muro y seguridad": 20,
-    "otras": 2,
+    "otras": 3,
     "redes y prensa": 13,
     "salud del sistema": 17
   },
@@ -129,9 +129,11 @@
     "relevo"
   ],
   "guardas": [
+    "borrador_unico_guard",
     "casa_base_guard",
     "clinico_guard",
     "contrato_asiento",
+    "copy_web_guard",
     "cosecha_panel",
     "enrutado_guard",
     "entrada_guard",
@@ -141,10 +143,14 @@
     "ok_envio_prompt",
     "plan_nudge",
     "presencia_cc",
+    "rama_vista_guard",
     "regla_en_accion",
     "salida_guard",
     "session_start",
+    "singleton_guard",
+    "token_rotacion_guard",
     "traza_subagente",
+    "worktree_guard",
     "zonas_clinicas"
   ],
   "mcp_cuenta": [
