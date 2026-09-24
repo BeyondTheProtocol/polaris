@@ -198,6 +198,13 @@ class QuienLoPide(unittest.TestCase):
             self.assertFalse(ok, origen)
             self.assertIn("firma", motivo)
 
+    def test_programalo_no_publica_en_la_web(self):
+        """Un permiso abierto con «prográmalo» (24-sep-26) cubre tareas programadas, no la web."""
+        self._pide("prográmalo para mañana a las 8:30")
+        ok, motivo = WN.lo_pide_titular()
+        self.assertFalse(ok)
+        self.assertIn("programar", motivo)
+
     def test_el_permiso_cubre_la_peticion_no_una_llamada(self):
         """Una petición suya puede traer dos entradas («el ensayo fallido Y que entro en X»). Si
         el permiso fuera de un solo uso, la segunda le pediría otro mensaje: justo el trabajo que

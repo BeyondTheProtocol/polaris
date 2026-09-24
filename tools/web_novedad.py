@@ -98,9 +98,12 @@ def lo_pide_titular():
     k = P.clave(permitir_env=False)
     if not k:
         return False, "sin clave de firma en el Llavero: el permiso no se puede comprobar"
-    d, motivo, _ctx = P.validar(k)
+    d, motivo, ctx = P.validar(k)
     if not d:
         return False, motivo
+    # Publicar en la web es enviar. Un permiso abierto con «prográmalo» no lo cubre (24-sep-26).
+    if not P.permite(ctx, "envio"):
+        return False, "ella pidió programar una tarea, no publicar en la web"
     try:
         P.gastar_uno(d, k, USOS_MAX)
     except Exception:

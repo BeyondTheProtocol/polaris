@@ -44,6 +44,16 @@ SERVICIO = "btp-ok-envio-mac"
 VIDA_S = 600
 ORIGENES = ("prompt",)
 AUTOMATICOS = ("<task-notification", "<scheduled-task", "<ci-monitor-event")
+# Un prompt que lleve CUALQUIERA de estas etiquetas, en cualquier sitio, no lo tecleó ella: lo
+# lanzó una tarea programada, una notificación o el monitor de CI (24-sep-26, verificacion). Antes
+# se miraba DESPUÉS de quitar los bloques y solo al principio, así que un cierre falso de la
+# etiqueta dentro del cuerpo de una tarea dejaba el resto como «texto suyo» y abría un permiso de
+# envío real (sonda e2e). Se mira el texto CRUDO.
+_AUTOMATICO = re.compile(r"</?(?:task-notification|scheduled-task|ci-monitor-event)\b", re.I)
+
+
+def es_automatico(texto):
+    return bool(_AUTOMATICO.search(texto or ""))
 
 # Órdenes de envío de {{TITULAR}}. Imperativo y en segunda persona: «envíalo», «mándaselo», «publica».
 # NO entran las formas condicionales o de tercera persona («habría que enviar», «cuando lo envíe»),
@@ -67,9 +77,39 @@ ORDEN = re.compile(
     r"que\s+salga\s+en\s+la\s+web\b"
     r")", re.I)
 
+# Órdenes de PROGRAMAR (24-sep-26). Crear o lanzar una tarea programada es salida (salida_guard:
+# es un agente que actuará solo más tarde), pero ninguna frase natural suya lo abría: pidió
+# «haz la tarea programada» y «ya puedes cread la tarea peorramada» y el permiso solo se abrió con
+# «ya puedes enviar», que no dice lo que aprueba. Esta orden abre un permiso de ALCANCE
+# «programar»: vale para `*_scheduled_task` y para nada más (ni correo, ni web). «Programa» a secas
+# no cuenta: es también un sustantivo («el programa»); hace falta el clítico o «la tarea».
+# Imperativo al principio de la frase (o tras «vale», «dale», «venga»…): «el programa la revisión»
+# o «Vega programa la tarea cada lunes» no son órdenes suyas, y «crear» en infinitivo va casi
+# siempre en una subordinada («antes de crear la tarea…»). «Tarea» sola en este sistema es también
+# una tarjeta del Tablero, así que «crea la tarea en el Tablero/Vega» no cuenta (revisión de
+# verificacion, 24-sep-26: 9 frases así abrían el permiso).
+_INICIO = r"(?:^|\n\s*|[,.;:¿?¡!]\s*|\b(?:vale|venga|dale|ok|pues|ahora|y|por\s+favor|porfa)\s+)"
+ORDEN_PROGRAMAR = re.compile(
+    r"(?:^|[\s,.;:¿?¡!])("
+    r"progr?[áa]ma(?:lo|la|los|las)\b|"
+    r"ya\s+puedes\s+(?:programar|crea[rd]?\s+la\s+tarea)\b"
+    r")|" + _INICIO + r"("
+    r"progr?[áa]ma\s+(?:la|una|esa|esta)\s+(?:tarea|revisi[óo]n|comprobaci[óo]n)\b|"
+    r"crea[d]?\s+(?:la|una|esa|esta)\s+tarea\b(?!\s+(?:en|a|para)\s+(?:el\s+)?(?:tablero|vega))|"
+    r"haz\s+(?:la|una|esa|esta)\s+tarea\s+\w*ramada\b"
+    r")", re.I)
+
 # Si el mensaje habla de dejarlo en borrador, NO es una orden de envío aunque use el verbo.
-FRENA = re.compile(r"(no\s+(?:lo\s+)?(?:env[ií]es|mandes|publiques)|d[ée]jalo\s+en\s+borrador|"
-                   r"solo\s+(?:el\s+)?borrador|sin\s+enviar)", re.I)
+# `(?:lo|la|los|las)`: «no la envíes, envíala mañana» abría un envío hoy (verificacion, 24-sep-26).
+FRENA = re.compile(r"(no\s+(?:(?:lo|la|los|las|le|les)\s+)?(?:env[ií]es|mandes|publiques)|"
+                   r"d[ée]ja(?:lo|la)\s+en\s+borrador|solo\s+(?:el\s+)?borrador|sin\s+enviar|"
+                   r"no\s+(?:(?:lo|la|los|las)\s+)?programes|sin\s+programar|"
+                   r"no\s+(?:hay\s+que|hace\s+falta)\s+crear|no\s+(?:la\s+)?crees\b|sin\s+crear|"
+                   r"antes\s+de\s+crear)", re.I)
+
+# Tools que un permiso de alcance «programar» deja pasar. Todo lo demás exige una orden de envío.
+# `update_`: cambiar una tarea existente es cambiar lo que un agente hará solo (verificacion).
+PROGRAMAN = re.compile(r"__(?:create|run|update)[_-]?scheduled[_-]?task$", re.I)
 
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _CAMPOS_DESTINO = ("to", "cc", "bcc", "recipient", "recipients")
@@ -91,9 +131,32 @@ def solo_suyo(texto):
     return INYECTADO.sub(" ", texto or "").strip()
 
 
-def es_orden(texto):
+def alcance(texto):
+    """Qué abre su mensaje: {"envio"}, {"programar"}, los dos o nada. Un envío vale también para
+    programar (como hasta ahora); programar NO vale para enviar ni publicar."""
+    if es_automatico(texto):
+        return set()
     texto = solo_suyo(texto)
-    return bool(texto) and not FRENA.search(texto) and bool(ORDEN.search(texto))
+    if not texto or FRENA.search(texto):
+        return set()
+    out = set()
+    if ORDEN.search(texto):
+        out |= {"envio", "programar"}
+    if ORDEN_PROGRAMAR.search(texto):
+        out.add("programar")
+    return out
+
+
+def es_orden(texto):
+    return bool(alcance(texto))
+
+
+def permite(ctx, que):
+    """¿El permiso validado (su `ctx`) cubre `que` («envio» | «programar»)? Un ctx sin alcance
+    (formato anterior) se lee como envío, que es lo único que existía; un alcance VACÍO no cubre
+    nada (antes `or` lo convertía en permiso total)."""
+    a = (ctx or {}).get("alcance")
+    return que in ({"envio", "programar"} if a is None else a)
 
 
 def token_path():
@@ -261,12 +324,17 @@ def marcar_usado(d, por=""):
     borrar()
 
 
-def texto_prompt(entrada):
-    """Texto del mensaje de usuario, sin los <system-reminder> que el harness antepone."""
+def _crudo(entrada):
     c = (entrada.get("message") or {}).get("content")
     if isinstance(c, list):
         c = "\n".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
-    if not isinstance(c, str):
+    return c if isinstance(c, str) else None
+
+
+def texto_prompt(entrada):
+    """Texto del mensaje de usuario, sin los <system-reminder> que el harness antepone."""
+    c = _crudo(entrada)
+    if c is None:
         return None
     # Se quitan TODOS los bloques inyectados, no solo los del principio (24-sep-26): una orden
     # pegada al FINAL por un hook colaba igual, y el test la reprodujo.
@@ -274,11 +342,12 @@ def texto_prompt(entrada):
 
 
 def _es_humano(e):
-    """Prompt TECLEADO por una persona (mismo criterio que healthcheck, censo del 11-sep-26)."""
+    """Prompt TECLEADO por una persona (mismo criterio que healthcheck, censo del 11-sep-26).
+    El prompt de una tarea programada llega con origin human: se descarta por su texto CRUDO."""
     if e.get("type") != "user" or e.get("origin") != {"kind": "human"} or e.get("isSidechain") is not False:
         return False
-    t = texto_prompt(e)
-    return t is not None and not t.startswith(AUTOMATICOS)
+    crudo = _crudo(e)
+    return crudo is not None and not es_automatico(crudo)
 
 
 def _cuerpo(e):
@@ -362,12 +431,17 @@ def contexto(d):
             en_vista = info
     return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(texto)},
                       "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
-                      "cambios": [e for _, e in cambios]}
+                      "cambios": [e for _, e in cambios], "alcance": alcance(texto)}
 
 
-def comprobar_envio(ctx, entrada):
-    """"" si la llamada casa con lo que ella aprobó; si no, el motivo."""
+def comprobar_envio(ctx, entrada, tool=""):
+    """"" si la llamada casa con lo que ella aprobó; si no, el motivo. Con `tool`, además, un
+    permiso que solo abrió «programar» no deja pasar nada que no sea una tarea programada."""
     entrada = entrada or {}
+    que = "programar" if PROGRAMAN.search(tool or "") else "envio"
+    if tool and not permite(ctx, que):
+        return ("ella pidió programar, no enviar ni publicar" if que == "envio"
+                else "su orden no cubre programar una tarea")
     destinos = destinatarios(entrada)
     if ctx.get("emails") and destinos - ctx["emails"]:
         return "va a %s y ella nombró %s" % (", ".join(sorted(destinos - ctx["emails"])),

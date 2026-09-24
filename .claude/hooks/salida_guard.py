@@ -67,7 +67,9 @@ LOG = os.path.join(STATE, "salida_guard.jsonl")
 # `mcp__<lo que sea>__send_message` entre, pero `get_message` no.
 ENVIAN = re.compile(
     r"__(send_message|send_chat_message|send_email|send_draft|reply|forward|create_comment|"
-    r"create_pages|update_page|create_scheduled_task|run_scheduled_task|"
+    # `update_scheduled_task`: cambiar una tarea programada es cambiar lo que un agente hará solo
+    # más tarde, igual que crearla (verificacion, 24-sep-26: pasaba como clic, sin permiso).
+    r"create_pages|update_page|create_scheduled_task|run_scheduled_task|update_scheduled_task|"
     # Configuración permanente hacia fuera: un webhook no es un clic, es un canal abierto.
     r"create_webhooks|create_activity_subscription)$", re.I)
 
@@ -540,7 +542,7 @@ def _token_valido(datos=None, entrada=None):
     if not d:
         _log("token_invalido", datos.get("tool_name") or "?", motivo)
         return None, motivo
-    discrepa = P.comprobar_envio(ctx, entrada)
+    discrepa = P.comprobar_envio(ctx, entrada, datos.get("tool_name") or "")
     if discrepa:
         # No se borra: su OK sigue valiendo para lo que SÍ aprobó.
         _log("token_no_casa", datos.get("tool_name") or "?", discrepa)

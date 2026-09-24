@@ -104,9 +104,11 @@ def main():
         ok(juzga(t) == "envia", "deniega MCP: %s" % t.split("__")[-1])
     for t in ("mcp__6e48e780-9f62-48ae-8d52-8d8580968023__create_file",
               "mcp__6e48e780-9f62-48ae-8d52-8d8580968023__update_file",
-              "mcp__bf7c680d-5fdc-5ef4-b4a0-abadb619bf0a__create_trigger",
-              "mcp__scheduled-tasks__update_scheduled_task"):
+              "mcp__bf7c680d-5fdc-5ef4-b4a0-abadb619bf0a__create_trigger"):
         ok(juzga(t) == "clic", "escritura MCP fuera → se pregunta: %s" % t.split("__")[-1])
+    # Cambiar una tarea programada es cambiar lo que un agente hará solo: permiso, no aviso (24-sep-26).
+    ok(juzga("mcp__scheduled-tasks__update_scheduled_task") == "envia",
+       "update_scheduled_task exige permiso como create/run")
 
     # ── 2. Lo legítimo medido sigue pasando ────────────────────────────────────────────────────
     pasa = [

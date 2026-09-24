@@ -56,10 +56,15 @@ def main():
                      datos.get("transcript_path"), k)
         except Exception:
             return 0
-        aviso = ("🔓 {{TITULAR}} ha pedido un envío en este mensaje: el freno de salida queda abierto para "
-                 "**UNA** llamada, 10 minutos, en esta sesión. Vale solo para lo que ella aprobó: "
-                 "las direcciones que nombró y el borrador que tenía delante, sin retocarlo. Si lo "
-                 "que ibas a mandar no es eso, déjalo en borrador y enséñaselo.")
+        if "envio" in P.alcance(prompt):
+            aviso = ("🔓 {{TITULAR}} ha pedido un envío en este mensaje: el freno de salida queda abierto para "
+                     "**UNA** llamada, 10 minutos, en esta sesión. Vale solo para lo que ella aprobó: "
+                     "las direcciones que nombró y el borrador que tenía delante, sin retocarlo. Si lo "
+                     "que ibas a mandar no es eso, déjalo en borrador y enséñaselo.")
+        else:
+            aviso = ("🔓 {{TITULAR}} ha pedido PROGRAMAR una tarea en este mensaje: el freno queda abierto "
+                     "para **UNA** llamada, 10 minutos, y SOLO para crear, lanzar o cambiar una tarea "
+                     "programada. No vale para enviar, publicar ni nada más.")
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit", "additionalContext": aviso}}, ensure_ascii=False))
     return 0
