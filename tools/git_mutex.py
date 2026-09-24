@@ -51,9 +51,55 @@ def run(args, timeout=None, check_output_timeout=120):
     Lanza TimeoutError si no se puede tomar el candado en `timeout` s (otro actor lo tiene) —
     fail-closed: el llamante debe tratarlo como "aplázalo", NUNCA como "mútalo sin candado"."""
     with _lock.lock(NOMBRE, timeout=timeout if timeout is not None else TIMEOUT):
+        es_merge, prefijo = _es_merge_nuevo(args)
+        habia_merge = es_merge and _hay_merge_head(prefijo, check_output_timeout)
         p = subprocess.run(["git"] + list(args), capture_output=True, text=True,
                             timeout=check_output_timeout)
-        return p.returncode, p.stdout, p.stderr
+        err = p.stderr
+        # Merge fallido → deshacer AQUÍ, dentro del candado (24-sep-2026). Un merge bloqueado por el
+        # freno de la base (hook reference-transaction) o por un conflicto dejaba casa base —el
+        # sistema vivo 24/7— con el árbol mezclado, staged y MERGE_HEAD hasta que alguien abortara a
+        # mano: pasó dos veces el mismo día (deuda merge-bloqueado-deja-casa-base-sucia). Misma
+        # política que cerrar_sesion.py. Solo si el MERGE_HEAD lo creó ESTE merge: uno previo es de
+        # otra sesión a medio resolver y no se toca.
+        if es_merge and p.returncode != 0 and not habia_merge \
+                and _hay_merge_head(prefijo, check_output_timeout):
+            ab = subprocess.run(["git"] + prefijo + ["merge", "--abort"], capture_output=True,
+                                text=True, timeout=check_output_timeout)
+            if ab.returncode == 0:
+                err += ("git_mutex: merge fallido → deshecho (merge --abort): el repo sigue como "
+                        "estaba y tu rama está intacta.\n")
+            else:
+                err += ("‼️ git_mutex: merge fallido y NO se pudo deshacer (merge --abort: %s). "
+                        "El repo está a medio fusionar: arréglalo YA.\n" % (ab.stderr.strip() or ab.returncode))
+        return p.returncode, p.stdout, err
+
+
+def _es_merge_nuevo(args):
+    """(True, [-C repo…]) si args es un `git merge` que EMPIEZA una fusión; (False, prefijo) si no.
+    `--abort/--continue/--quit` gestionan una fusión ya abierta: esas no se deshacen."""
+    args = list(args)
+    prefijo, i = [], 0
+    while i < len(args) and args[i] == "-C" and i + 1 < len(args):
+        prefijo += args[i:i + 2]
+        i += 2
+    resto = args[i:]
+    if not resto or resto[0] != "merge":
+        return False, prefijo
+    if any(a in ("--abort", "--continue", "--quit") for a in resto[1:]):
+        return False, prefijo
+    return True, prefijo
+
+
+def _hay_merge_head(prefijo, timeout):
+    """¿Hay una fusión abierta (MERGE_HEAD) en el repo de `prefijo`? Si no se puede saber, True:
+    ante la duda NO se aborta nada (el abort solo corre si antes era False y después True)."""
+    try:
+        p = subprocess.run(["git"] + prefijo + ["rev-parse", "-q", "--verify", "MERGE_HEAD"],
+                           capture_output=True, text=True, timeout=timeout)
+        return p.returncode == 0
+    except Exception:            # noqa: BLE001
+        return True
 
 
 def _ruta_worktree_remove(argv):
