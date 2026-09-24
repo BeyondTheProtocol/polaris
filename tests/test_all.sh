@@ -79,6 +79,7 @@ runpy test_modelo_coherente.py
 runpy test_agentes_ritmo.py
 runpy test_radar_personas.py
 runpy test_salida_guard.py
+runpy test_ok_envio_blindado.py
 runpy test_entrada_guard.py
 runpy test_audit_comites_uso.py
 runpy test_cost_guard.py

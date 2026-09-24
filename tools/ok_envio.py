@@ -21,34 +21,30 @@ Uso:
 
 El permiso NO se abre desde aquí: lo abre {{TITULAR}} al pedir el envío en su mensaje.
 """
-import json
 import os
 import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import _casa  # noqa: E402
+import permiso_envio as P  # noqa: E402
 
-TOKEN = os.path.join(_casa.state_dir(), "ok_envio.json")
-VIDA_S = 600
+TOKEN = P.token_path()
+VIDA_S = P.VIDA_S
 
 
 def estado():
+    """Consulta, no abre. Desde el 22-sep-26 dice también si el permiso VALE (firma, sesión,
+    prompt humano en el transcript), no solo si el fichero existe."""
     if not os.path.exists(TOKEN):
         print("sin permiso abierto (todo lo que sale al mundo está denegado).")
         return 0
-    try:
-        d = json.load(open(TOKEN, encoding="utf-8"))
-        quedan = VIDA_S - (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
-    except Exception:
-        print("permiso ilegible; lo borro por seguridad.")
-        os.remove(TOKEN)
+    d, motivo, _ctx = P.validar(P.clave())
+    if not d:
+        print("había un fichero de permiso, pero NO vale (%s); lo borro." % motivo)
         return 0
-    if quedan <= 0:
-        print("el permiso había caducado; lo borro.")
-        os.remove(TOKEN)
-        return 0
-    print("permiso ABIERTO para: %s\nle quedan %d s (un solo uso)." % (d.get("motivo", "?"), quedan))
+    quedan = VIDA_S - (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
+    print("permiso ABIERTO para: %s\nle quedan %d s (un solo uso, solo en la sesión donde lo "
+          "pidió y solo para lo que aprobó)." % (d.get("motivo", "?"), quedan))
     return 0
 
 

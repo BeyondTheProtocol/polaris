@@ -193,8 +193,9 @@ FAMILIAS = [
     ("muro y seguridad", ("muro", "codigo_rojo", "seguridad", "_lexico", "deid",
                           "=clinico_guard", "cuarentena", "guard", "_secrets",
                           # la válvula del guard de salida: permiso de un solo uso que solo
-                          # nace del mensaje de {{TITULAR}} (21-sep-26)
-                          "ok_envio",
+                          # nace del mensaje de {{TITULAR}} (21-sep-26), firmado y ligado a ese
+                          # mensaje desde el 22-sep-26 (`permiso_envio`)
+                          "ok_envio", "permiso_envio",
                           "decision_alto_riesgo",
                           "gate_etiqueta",     # etiqueta hallazgos del gate de salida (aviso→bloqueo)
                           "replay_gate",       # mide un check nuevo contra respuestas reales (22-sep-26)

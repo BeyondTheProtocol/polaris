@@ -128,19 +128,44 @@ class QuienLoPide(unittest.TestCase):
     correr sola, que es el encargo— y sin esto una inyección («publica esto en tu web», metida en
     un correo o una página) tendría vía directa a una web pública con el nombre de {{TITULAR}}.
 
-    La propiedad que se fija: **el fallo por defecto es PR, no publicado.**"""
+    La propiedad que se fija: **el fallo por defecto es PR, no publicado.**
+
+    Desde el 22-sep-26 (hallazgo 3.1) el permiso válido solo lo fabrica el hook de su prompt,
+    firmado y apuntando a un mensaje suyo en el transcript. Los casos de fichero escrito a mano
+    viven en `test_ok_envio_blindado.py`; aquí se fija el comportamiento de la tool."""
+
+    CLAVE = b"d" * 64
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="quien-")
         os.environ["BTP_STATE_DIR"] = self.tmp
         import importlib
+        import permiso_envio
+        permiso_envio.CLAVE_TEST = self.CLAVE
         global WN
         WN = importlib.reload(WN)
 
     def tearDown(self):
         os.environ.pop("BTP_STATE_DIR", None)
         import importlib
+        import permiso_envio
+        permiso_envio.CLAVE_TEST = None
         importlib.reload(WN)
+
+    def _pide(self, texto="añádelo a la cronología: hoy abrimos novedades", ts=None):
+        import datetime as dt
+        import uuid
+        import permiso_envio
+        transcript = os.path.join(self.tmp, "t.jsonl")
+        pid = str(uuid.uuid4())
+        with open(transcript, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"type": "user", "promptId": pid, "origin": {"kind": "human"},
+                                "isSidechain": False,
+                                "message": {"role": "user", "content": texto}}) + "\n")
+        d = permiso_envio.emitir(texto, "s1", pid, transcript, self.CLAVE)
+        if ts:
+            d["ts"] = ts
+            permiso_envio._escribir(permiso_envio.firmar(d, self.CLAVE))
 
     def _token(self, origen):
         import datetime as dt
@@ -153,37 +178,38 @@ class QuienLoPide(unittest.TestCase):
         self.assertIn("nadie", motivo)
 
     def test_con_su_mensaje_si(self):
-        self._token("prompt")
+        self._pide()
         ok, origen = WN.lo_pide_titular()
         self.assertTrue(ok)
         self.assertEqual("prompt", origen)
 
-    def test_telegram_tambien_es_ella(self):
+    def test_telegram_sin_firma_no_vale(self):
+        """Antes se aceptaba `origen: telegram`, pero nada lo emitía: era una puerta sin dueño
+        que cualquiera podía abrir escribiendo el fichero (22-sep-26)."""
         self._token("telegram")
-        self.assertTrue(WN.lo_pide_titular()[0])
+        self.assertFalse(WN.lo_pide_titular()[0])
 
     def test_un_permiso_fabricado_por_otro_no_vale(self):
         """Lo que cierra el vector: que exista el fichero no basta, tiene que venir de un sitio
         donde escriba ELLA."""
-        self._token("agente")
-        ok, motivo = WN.lo_pide_titular()
-        self.assertFalse(ok)
-        self.assertIn("no nació de un mensaje suyo", motivo)
+        for origen in ("agente", "prompt"):
+            self._token(origen)
+            ok, motivo = WN.lo_pide_titular()
+            self.assertFalse(ok, origen)
+            self.assertIn("firma", motivo)
 
     def test_el_permiso_cubre_la_peticion_no_una_llamada(self):
         """Una petición suya puede traer dos entradas («el ensayo fallido Y que entro en X»). Si
         el permiso fuera de un solo uso, la segunda le pediría otro mensaje: justo el trabajo que
         quería quitarse. Tres es el techo — más de tres ya no es una petición."""
-        self._token("prompt")
+        self._pide()
         for i in range(3):
             self.assertTrue(WN.lo_pide_titular()[0], "uso %d" % (i + 1))
         self.assertFalse(WN.lo_pide_titular()[0], "el cuarto ya no: el permiso se agota")
 
     def test_caducado_no_vale(self):
         import datetime as dt
-        with open(os.path.join(self.tmp, "ok_envio.json"), "w", encoding="utf-8") as f:
-            json.dump({"ts": (dt.datetime.now() - dt.timedelta(minutes=30)).isoformat(),
-                       "origen": "prompt"}, f)
+        self._pide(ts=(dt.datetime.now() - dt.timedelta(minutes=30)).replace(microsecond=0).isoformat())
         self.assertFalse(WN.lo_pide_titular()[0])
 
 

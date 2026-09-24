@@ -33,9 +33,16 @@ class GuardDeSalida(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="salidaguard-")
-        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp)
+        # Clave de firma de prueba: los hooks la aceptan por entorno (lo pone el harness), y así
+        # ningún test toca el Llavero real. Sesión y transcript falsos, con la forma del real.
+        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp, BTP_OK_ENVIO_CLAVE="c" * 64)
+        self.sesion = "sesion-test"
+        self.transcript = os.path.join(self.tmp, "transcript.jsonl")
+        open(self.transcript, "w").close()
 
     def _hook(self, payload):
+        payload = dict(payload, session_id=payload.get("session_id", self.sesion),
+                       transcript_path=payload.get("transcript_path", self.transcript))
         return subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                               capture_output=True, text=True, timeout=60, env=self.env)
 
@@ -45,9 +52,19 @@ class GuardDeSalida(unittest.TestCase):
         return json.loads(r.stdout)["hookSpecificOutput"].get("permissionDecision")
 
     def _ok_envio(self, texto):
-        """Abre el permiso como lo abre ella: escribiendo la orden en su mensaje."""
+        """Abre el permiso como lo abre ella: escribiendo la orden en su mensaje. Desde el
+        22-sep-26 el mensaje tiene que estar además en el transcript como prompt HUMANO."""
+        import uuid
+        pid = str(uuid.uuid4())
+        with open(self.transcript, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"type": "user", "promptId": pid, "origin": {"kind": "human"},
+                                "isSidechain": False, "message": {"role": "user", "content": texto}},
+                               ensure_ascii=False) + "\n")
         hook = os.path.join(ROOT, ".claude", "hooks", "ok_envio_prompt.py")
-        return subprocess.run([sys.executable, hook], input=json.dumps({"prompt": texto}),
+        return subprocess.run([sys.executable, hook],
+                              input=json.dumps({"prompt": texto, "prompt_id": pid,
+                                                "session_id": self.sesion,
+                                                "transcript_path": self.transcript}),
                               capture_output=True, text=True, timeout=60, env=self.env)
 
     # ── lo que tiene que frenar ───────────────────────────────────────────────

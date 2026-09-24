@@ -246,6 +246,9 @@ WRITE_CRIT = (".mcp.json", "/.git/", ".git/", ".github/", ".gitignore", ".gitlea
               # lazo. cost_guard escribe su ledger por open() de python (no por la tool)
               # → no se ve afectado; lo que se cierra es subir el tope / resetear gasto.
               ".claude/agents/", "tools/state/cost/", "tools/launchd/",
+              # El permiso de envío y su libro de usados, por NOMBRE (22-sep-26): segunda red
+              # por si la ruta real no se puede resolver (`$VAR/ok_envio.json`).
+              "ok_envio.json", "ok_envio_usados.jsonl",
               # Dotfiles de SHELL: un proceso permitido (cualquier shell nuevo, y el propio
               # muro_guard.sh corre bajo bash) los auto-ejecuta al arrancar -> misma clase B3
               # (plantar+autoejecutar saltandose el choke-point). .zshenv se lee en TODO zsh.
@@ -471,9 +474,18 @@ def _hits_crit(path):
 # cost_guard, el harness), que el muro no ve: cerrar la tool y la shell no rompe nada legítimo.
 _HOME = os.path.expanduser("~")
 PROYECTOS_CC = os.path.join(_HOME, ".claude", "projects")
+# El PERMISO DE ENVÍO (22-sep-26, hallazgo 3.1): `ok_envio.json` abría el freno de salida con
+# solo existir, y el lazo lo podía escribir con Write, `tee`, `cp` o `mv`. Lo emite únicamente
+# `.claude/hooks/ok_envio_prompt.py` (por open() de python, que el muro no ve); su libro de usados
+# lo escribe `salida_guard.py`. Se añaden también bajo `BTP_STATE_DIR` si el estado vive en otro
+# sitio. La firma HMAC (tools/permiso_envio.py) es la red de debajo si alguien encuentra otra vía.
+_STATE_REAL = os.environ.get("BTP_STATE_DIR") or os.path.join(REPO, "tools", "state")
+_PERMISO_ENVIO = tuple(os.path.join(d, n)
+                       for d in sorted({os.path.join(REPO, "tools", "state"), _STATE_REAL})
+                       for n in ("ok_envio.json", "ok_envio_usados.jsonl"))
 ZONAS_ESCRITURA = (os.path.join(REPO, "tools", "state", "cost"),
                    os.path.join(REPO, "tools", "state", "healthcheck"),
-                   PROYECTOS_CC)
+                   PROYECTOS_CC) + _PERMISO_ENVIO
 _EXPANSION = set("$*?[{")   # lo que la shell expande DESPUÉS de que el muro haya mirado
 _CWDS = [REPO]              # directorios posibles del comando actual (un proceso por llamada)
 
@@ -550,8 +562,8 @@ def _nuevo_cd(args):
             _CWDS.append(d)
 
 
-_MSG_ZONA = ("el lazo no toca el freno de gasto, la señal de presencia de {{TITULAR}} ni los "
-             "transcripts de Claude Code: %s")
+_MSG_ZONA = ("el lazo no toca el freno de gasto, la señal de presencia de {{TITULAR}}, los "
+             "transcripts de Claude Code ni el permiso de envío: %s")
 
 
 def check_subcommand(sub):

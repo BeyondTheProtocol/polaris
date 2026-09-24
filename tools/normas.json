@@ -3088,6 +3088,18 @@
    "auditable": true,
    "repetida": true,
    "nota": "A fuego, 22-sep-26. El rescate de ignorados (ramas.rescatar) quita la causa de la pregunta; este check caza la pregunta."
+  },
+  {
+   "slug": "feedback-permiso-que-vale-por-existir-no-es-permiso",
+   "que": "Un permiso o cuota en fichero no vale por existir: se firma (HMAC con clave del Llavero) y apunta al prompt humano que lo pidió, verificado contra el transcript; y escribir ese fichero se deniega en los dos guards",
+   "clase": "bloqueo",
+   "mecanismo": "tests/test_ok_envio_blindado.py + .claude/hooks/salida_guard.py (_escribe_protegido) + .claude/hooks/muro_guard.py (ZONAS_ESCRITURA)",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "22-sep-2026: hallazgo 3.1 de la auditoría externa. `tools/state/ok_envio.json` valía con decir origen=prompt y lo escribía cualquiera. Arreglado en tools/permiso_envio.py; canario y replay de 24.266 llamadas reales."
   }
  ]
 }

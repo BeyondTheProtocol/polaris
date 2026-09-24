@@ -57,8 +57,11 @@ sys.path.insert(0, HERE)
 import _casa  # noqa: E402
 import web_lint  # noqa: E402
 
-TOKEN = os.path.join(_casa.state_dir(), "ok_envio.json")
-ORIGENES = ("prompt", "telegram")   # los dos sitios donde escribe {{TITULAR}}, no una herramienta
+import permiso_envio as P  # noqa: E402
+
+# Su petición puede traer 2-3 entradas («el ensayo fallido Y que entro en X»); más ya no es una
+# petición. (El origen «telegram» que se aceptaba aquí no lo emitía nadie: se quita, 22-sep-26.)
+USOS_MAX = 3
 
 WEB = os.environ.get("BTP_WEB_REPO", "/Users/polaris/projects/titular-{{APELLIDO}}-case")
 BASE = "main"
@@ -83,34 +86,25 @@ def lo_pide_titular():
     """(bool, origen|motivo). Consume el permiso que abre su mensaje — el mismo de `ok_envio`.
 
     No es burocracia: sin esto, cualquier agente (o cualquier texto externo que uno se trague)
-    podría publicar en una web pública con su nombre, porque la herramienta está permitida."""
-    try:
-        with open(TOKEN, encoding="utf-8") as f:
-            d = json.load(f)
-    except Exception:
+    podría publicar en una web pública con su nombre, porque la herramienta está permitida.
+
+    Desde el 22-sep-26 (hallazgo 3.1) no basta con que el fichero diga `origen: "prompt"`: lo
+    comprueba `permiso_envio.validar` —firma del Llavero, su prompt en el transcript como mensaje
+    humano, el último suyo y con la orden— y el contador de usos va firmado, así que no se puede
+    rebobinar a mano. La clave NUNCA sale del entorno: esta tool la lanza el agente, y con
+    `BTP_OK_ENVIO_CLAVE=x` firmaría lo que quisiera."""
+    if not os.path.exists(P.token_path()):   # lo normal: nadie ha pedido nada (y sin tocar el Llavero)
         return False, "nadie lo ha pedido en un mensaje"
-    if d.get("origen") not in ORIGENES:
-        return False, "el permiso no nació de un mensaje suyo (origen %r)" % d.get("origen")
-    creado = d.get("ts", "")
+    k = P.clave(permitir_env=False)
+    if not k:
+        return False, "sin clave de firma en el Llavero: el permiso no se puede comprobar"
+    d, motivo, _ctx = P.validar(k)
+    if not d:
+        return False, motivo
     try:
-        edad = (datetime.datetime.now() - datetime.datetime.fromisoformat(creado)).total_seconds()
+        P.gastar_uno(d, k, USOS_MAX)
     except Exception:
-        return False, "permiso ilegible"
-    if edad > 600:
-        return False, "el permiso caducó"
-    usos = int(d.get("usos", 0)) + 1
-    if usos >= 3:             # su petición puede traer 2-3 entradas; más ya no es una petición
-        try:
-            os.remove(TOKEN)
-        except Exception:
-            pass
-    else:
-        d["usos"] = usos
-        try:
-            with open(TOKEN, "w", encoding="utf-8") as f:
-                json.dump(d, f, ensure_ascii=False)
-        except Exception:
-            pass
+        return False, "no se pudo apuntar el uso del permiso"
     return True, d.get("origen")
 
 
