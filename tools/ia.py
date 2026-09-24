@@ -597,11 +597,11 @@ def principal_para(nivel="critico", sensible=False, registro=None):
             "trusted": bool(top.get("trusted"))}
 
 
-def por_que(prompt, *, clinico=False, nivel=None, para=None, solo_gratis=False):
+def por_que(prompt, *, clinico=False, nivel=None, para=None, solo_gratis=False, sensible_forzado=False):
     """EXPLICA a quién le daría este prompt y por qué, SIN invocar a nadie y SIN gastar nada.
     Ni egress ni sello: solo el clasificador local del borde + el mismo orden de candidatos que
     usaría `ask`. Para auditar el mapa ('¿por qué esto fue a GLM?') y para los tests."""
-    sensible = bool(clinico) or borde.clasificar(prompt)[0]
+    sensible = bool(clinico) or bool(sensible_forzado) or borde.clasificar(prompt)[0]
     nivel_ef = _nivel_de(clinico, False, nivel)
     perfil, senales = perfil_de_tarea(prompt, sensible=sensible, para=para)
     cand = _candidatos(cargar_registro(), sensible, solo_gratis=solo_gratis,
@@ -612,7 +612,7 @@ def por_que(prompt, *, clinico=False, nivel=None, para=None, solo_gratis=False):
 
 # ── La puerta de entrada: ask() ──────────────────────────────────────────────────────────
 def ask(prompt, *, clinico=False, system=None, prefer=None, sesion=None, solo_gratis=False,
-        critico_tarea=False, nivel=None, interactivo=False, para=None):
+        critico_tarea=False, nivel=None, interactivo=False, para=None, sensible_forzado=False):
     """Enruta `prompt` al mejor cerebro disponible y RELEVA si falla. Devuelve dict:
     {text, brain, coste_usd, degradado, deferred, motivo}. Lo sensible solo va a cerebro de
     confianza (o se niega); todo pasa por el borde. `solo_gratis=True` restringe a cerebros gratis
@@ -626,7 +626,12 @@ def ask(prompt, *, clinico=False, system=None, prefer=None, sesion=None, solo_gr
     if not isinstance(prompt, str) or not prompt.strip():
         return {"text": None, "brain": None, "deferred": False, "parado": False,
                 "motivo": "prompt vacío"}
-    sensible = bool(clinico) or borde.clasificar(prompt)[0]
+    # SENSIBLE POR PROCEDENCIA (24-sep-26, auditoría externa 3.3). `clasificar` es el mismo
+    # detector que redacta en `deid`: un pasaje del caso que no reconoce (un nombre, un domicilio,
+    # un diagnóstico sin marcador) salía como NO sensible y podía ir a un cerebro de nube. Quien
+    # SABE de dónde viene el texto (`responder_con_datos`, con contexto de la KB del caso) lo dice
+    # con `sensible_forzado=True`: solo cerebros de confianza, SIN la parada ruidosa de `clinico`.
+    sensible = bool(clinico) or bool(sensible_forzado) or borde.clasificar(prompt)[0]
     nivel = _nivel_de(clinico, critico_tarea, nivel)
     # Dos ejes que no se solapan:
     #  · CRÍTICO EXPLÍCITO (critico_tarea, clínico o nivel="critico"): si no se sirve → PARADO + aviso

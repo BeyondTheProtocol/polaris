@@ -50,6 +50,16 @@ try:
 except Exception:                   # sin ella ningún permiso vale: fail-closed para los envíos
     P = None
 
+# A DÓNDE puede llevar datos una orden (24-sep-26, auditoría 3.2). Se carga por ruta, sin tocar
+# sys.path. Si no carga, NADA con carga sale: fail-closed para los envíos, como el permiso.
+try:
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("destinos_salida", os.path.join(HERE, "_destinos_salida.py"))
+    D = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(D)
+except Exception:
+    D = None
+
 TOKEN = os.path.join(STATE, "ok_envio.json")
 LOG = os.path.join(STATE, "salida_guard.jsonl")
 
@@ -67,7 +77,10 @@ ENVIAN = re.compile(
 # sesión interna (`ccd_session_mgmt__send_message`) es un mensaje entre sesiones, no un envío.
 NO_ES_FUERA = re.compile(
     r"(delete_draft|create_draft|update_draft|trash_|untrash_|label_|unlabel_|"
-    r"mark_.*spam|ccd_session_mgmt__send_message|ccd_)", re.I)
+    r"mark_.*spam|ccd_session_mgmt__send_message|ccd_|"
+    # `apply_sensitive_thread_label`: etiquetar sigue siendo etiquetar aunque el verbo vaya al final
+    # (falso positivo del replay MCP del 24-sep: 11 llamadas reales).
+    r"_label$)", re.I)
 
 # Publicar/pagar desde el navegador o el escritorio: el clic que no se puede deshacer.
 # Clic/tecla/script que publica o envía. Va sobre el nombre NORMALIZADO (ver _norm_tool): el
@@ -219,6 +232,185 @@ def _push_publica(args, repo):
     return any(RAMAS_PUBLICAS.search(r.split(":")[-1]) for r in refspecs)
 
 
+# ── DEL PROGRAMA AL DESTINO (24-sep-26, auditoría externa, hallazgo 3.2) ──────────────────────────
+# Lo de arriba reconoce programas que envían, y lo que no reconocía pasaba (14/14 vías reproducidas:
+# curl/wget/requests a un host cualquiera, scp, nc, ssh con orden remota, git push a un remoto nuevo,
+# un relay…). Aquí se pregunta otra cosa: ¿esta orden LLEVA DATOS a la red? Si sí, ¿a un destino de
+# `_destinos_salida.py`? Replay sobre 23.940 órdenes reales: lo legítimo cabe en ~15 hosts.
+_RE_URL_HOST = re.compile(r"(?i)\b(?:https?|wss?|ftp)://(?:[^\s/@'\"]*@)?(\[[0-9a-f:]+\]|[a-z0-9._-]+)")
+# Sin re.I: en curl las mayúsculas cuentan. `-D` es volcar cabeceras, no datos (falso positivo del
+# replay del 24-sep); `-x` es un proxy, no un método.
+_CURL_CARGA = re.compile(r"(^|\s)(-d|--data(-raw|-binary|-urlencode|-ascii)?|--json|-F|--form(-string)?|"
+                         r"-T|--upload-file)(\s|=|$)|(^|\s)(-X|--request)\s*(?i:POST|PUT|PATCH|DELETE)\b")
+_CURL_GET = re.compile(r"(^|\s)(-G|--get)(\s|$)")
+_CURL_CONFIG = re.compile(r"(^|\s)(-K|--config)(\s|=|$)")
+_WGET_CARGA = re.compile(r"--(post|body)-(data|file)|--method\s*=?\s*(POST|PUT|PATCH|DELETE)", re.I)
+# Código EJECUTADO (python -c, heredoc de un intérprete) que manda un cuerpo. Un heredoc que se escribe
+# a un fichero (`cat > x.py <<`) no se mira: es texto, no se ejecuta.
+_CODIGO_CARGA = re.compile(
+    r"requests\.(post|put|patch|delete)\s*\(|httpx\.(post|put|patch|delete)\s*\(|"
+    r"urlopen\s*\([^)]*\bdata\s*=|Request\s*\([^)]*\bdata\s*=|axios\.(post|put|patch)\s*\(|"
+    r"sendBeacon\s*\(|fetch\s*\([^)]*method\s*:", re.I)
+# La llamada tiene que estar en el CÓDIGO, no dentro de una cadena: un heredoc que EDITA una tool
+# (`s.replace('''…requests.post(…''', …)`) la lleva como texto. Replay del 24-sep: 2 de 2 así, y
+# este mismo guard frenó en vivo el heredoc que lo arreglaba. Los hosts se siguen sacando del
+# código entero (un destino casi siempre va entre comillas); solo la LLAMADA se busca fuera.
+_RE_CADENAS = re.compile(r"'''[\s\S]*?'''|\"\"\"[\s\S]*?\"\"\"|'(?:[^'\\\n]|\\.)*'|\"(?:[^\"\\\n]|\\.)*\"")
+_INTERP_CODIGO = re.compile(r"^(python(\d(\.\d+)?)?|node|deno|bun|ruby|perl|php)$")
+_SOCKETS = ("nc", "ncat", "netcat", "telnet")
+_COPIA_REMOTA = ("scp", "rsync", "sftp")
+_SSH_CON_VALOR = set("bcDEeFIiJLlmOopQRSWw")
+_RE_REMOTO = re.compile(r"^(?:[^@/\s]+@)?(\[[0-9a-f:]+\]|[A-Za-z0-9._-]+):")
+
+
+def _host_ok(h):
+    h = (h or "").lower().strip("[]")
+    return bool(D) and (h in D.LOCALES or h.strip("[]") in {x.strip("[]") for x in D.LOCALES}
+                        or h in D.HOSTS_CARGA)
+
+
+def _hosts(texto):
+    return [h.lower() for h in _RE_URL_HOST.findall(texto or "")]
+
+
+def _juzga_destinos(que, hosts, ilegible_es_envio=True):
+    """Motivo si algún destino está fuera de la lista; "" si todos están dentro."""
+    if D is None:
+        return "%s lleva datos y no se ha podido cargar la lista de destinos" % que
+    if not hosts:
+        return ("%s lleva datos a un destino que no se puede leer" % que) if ilegible_es_envio else ""
+    fuera = sorted({h for h in hosts if not _host_ok(h)})
+    return ("%s lleva datos a %s, que no está en la lista de destinos" % (que, ", ".join(fuera))) if fuera else ""
+
+
+def _ssh_partes(args):
+    """(host, orden_remota, opciones) de `ssh [opts] host [orden…]`."""
+    i, opciones = 0, []
+    while i < len(args) and args[i].startswith("-") and args[i] != "--":
+        a = args[i]
+        opciones.append(a)
+        if len(a) == 2 and a[1] in _SSH_CON_VALOR:
+            i += 1
+        i += 1
+    if i < len(args) and args[i] == "--":
+        i += 1
+    if i >= len(args):
+        return "", "", opciones
+    return args[i].rsplit("@", 1)[-1], " ".join(args[i + 1:]), opciones
+
+
+def _remoto_git(args, repo, cmd):
+    """URL (o ruta) del remoto al que va un `git push`, o None si no se sabe."""
+    libres = [a for a in args if not a.startswith("-")]
+    remoto = libres[0] if libres else ""
+    if remoto and (re.match(r"^[a-z]+://", remoto) or re.match(r"^[^/\s]+@[^:\s]+:", remoto)
+                   or remoto.startswith(("/", ".", "~"))):
+        return remoto
+    import subprocess
+    if not remoto:
+        try:
+            rama = _rama_actual(repo)
+            p = subprocess.run(["git", "-C", repo, "config", "branch.%s.remote" % rama],
+                               capture_output=True, text=True, timeout=3)
+            remoto = p.stdout.strip() or "origin"
+        except Exception:
+            remoto = "origin"
+    # ¿Se define en la MISMA orden? (`git remote add x URL && git push x …`)
+    m = re.search(r"git\s+(?:-C\s+\S+\s+)?remote\s+(?:add|set-url)\s+(?:-\S+\s+)*%s\s+(\S+)"
+                  % re.escape(remoto), cmd)
+    if m:
+        return m.group(1).strip("'\"")
+    try:
+        p = subprocess.run(["git", "-C", repo, "remote", "get-url", "--push", remoto],
+                           capture_output=True, text=True, timeout=3)
+        return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
+    except Exception:
+        return None
+
+
+def _es_repo(repo):
+    try:
+        import subprocess
+        return subprocess.run(["git", "-C", repo, "rev-parse", "--git-dir"], capture_output=True,
+                              timeout=3).returncode == 0
+    except Exception:
+        return True                        # ante la duda, se juzga el remoto
+
+
+def _git_remoto_fuera(args, repo, cmd):
+    en_la_orden = re.search(r"git\s+(?:-C\s+\S+\s+)?(init|clone|remote\s+(add|set-url))\b", cmd)
+    if not en_la_orden and (not os.path.isdir(os.path.expanduser(repo)) or not _es_repo(repo)):
+        return ""                          # no hay repo: el push fallará y no saca nada
+    url = _remoto_git(args, repo, cmd)
+    if url is None:
+        return "git push a un remoto que no sé resolver"
+    if url.startswith(("/", ".", "~", "file://")):
+        return ""                          # un remoto en disco no sale de la máquina
+    if D is not None and D.GIT_REMOTOS.search(url):
+        return ""
+    return "git push a %s, fuera de la organización" % url
+
+
+def _carga_red(prog, args, cuerpo, dirs, cmd):
+    """Motivo si esta orden simple lleva datos fuera de la lista de destinos; "" si no."""
+    junto = " ".join(args)
+    if D is not None and prog in D.RELAYS:
+        return "monta un relay o túnel (%s)" % prog
+    if prog == "curl":
+        if _CURL_CONFIG.search(junto):
+            return "curl -K lee destino y cuerpo de un fichero que no se ve"
+        if _CURL_CARGA.search(junto) and not _CURL_GET.search(junto):
+            return _juzga_destinos("curl", _hosts(junto))
+        return ""
+    if prog == "wget":
+        return _juzga_destinos("wget", _hosts(junto)) if _WGET_CARGA.search(junto) else ""
+    if prog in ("http", "https", "xh", "xhs", "httpie"):
+        metodo = next((a for a in args if a.upper() in ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE")), "")
+        campos = any(re.search(r"^[^-][^=:@]*(:=|=|@)", a) for a in args if not a.startswith("http"))
+        if metodo.upper() in ("POST", "PUT", "PATCH", "DELETE") or (campos and metodo.upper() not in ("GET", "HEAD")):
+            libres = [a for a in args if not a.startswith("-") and a.upper() != metodo.upper()]
+            destino = libres[0] if libres else ""
+            h = _hosts(destino) or ([re.split(r"[/:]", destino)[0].lower()] if destino else [])
+            return _juzga_destinos(prog, h)
+        return ""
+    if prog in _SOCKETS:
+        if "-l" in args or any(re.match(r"^-\w*l", a) for a in args if a.startswith("-") and not a.startswith("--")):
+            return "%s escucha en un puerto (relay)" % prog
+        if "-z" in args or any(re.match(r"^-\w*z", a) for a in args if a.startswith("-")):
+            return ""                      # sondeo de puerto: no lleva datos
+        libres = [a for a in args if not a.startswith("-") and not re.match(r"^\d+$", a)]
+        return _juzga_destinos(prog, [libres[0].lower()] if libres else [])
+    if prog in _COPIA_REMOTA:
+        hosts = [m.group(1) for m in (_RE_REMOTO.match(a) for a in args if not a.startswith("-")) if m]
+        return _juzga_destinos(prog, hosts, ilegible_es_envio=False)
+    if prog == "ssh":
+        host, remota, opciones = _ssh_partes(args)
+        if any(o in ("-L", "-R", "-D", "-w") or re.match(r"^-[LRDw]\S", o) for o in opciones):
+            return "ssh abre un túnel (-L/-R/-D)"
+        fuera = _juzga_destinos("ssh", [host.lower()] if host else [], ilegible_es_envio=False)
+        if fuera and host.lower() != "github.com":
+            return fuera
+        if remota:
+            dentro = _bash_envia(remota, dirs)
+            if dentro:
+                return "ssh con orden remota: " + dentro
+        return ""
+    if _INTERP_CODIGO.match(prog):
+        codigo = cuerpo or ""
+        for flag in ("-c", "-e", "-E"):
+            if flag in args[:-1]:
+                codigo += "\n" + args[args.index(flag) + 1]
+        if codigo and _CODIGO_CARGA.search(_RE_CADENAS.sub("''", codigo)):
+            # En código, un destino que no se lee casi siempre es código que se EDITA (un heredoc que
+            # reescribe una tool y la contiene): el replay dio 3 de 3. Pasa, y queda en el log.
+            hosts = [h for h in _hosts(codigo) if "." in h or h in (D.LOCALES if D else ())]
+            if not hosts:
+                _log("carga_ilegible_en_codigo", "Bash", prog)
+                return ""
+            return _juzga_destinos("código %s" % prog, hosts)
+    return ""
+
+
 def _bash_envia(cmd, cwd=""):
     dirs = cwd or os.getcwd()
     for pal, cuerpo in _ordenes(cmd):
@@ -230,6 +422,9 @@ def _bash_envia(cmd, cwd=""):
             continue
         if prog in ("sudo", "env", "nohup", "time") and args:
             prog, args = os.path.basename(args[0]), args[1:]
+        carga = _carga_red(prog, args, cuerpo, dirs, cmd)
+        if carga:
+            return carga
         if re.match(r"python(\d(\.\d+)?)?$", prog):
             if "-c" in args:
                 i = args.index("-c")
@@ -250,6 +445,10 @@ def _bash_envia(cmd, cwd=""):
                 args = args[2:]
             if args and args[0] == "push" and _push_publica(args[1:], repo):
                 return "git push que publica (casa base, o main/master) en " + repo
+            if args and args[0] == "push":
+                fuera = _git_remoto_fuera(args[1:], repo, cmd)
+                if fuera:
+                    return fuera
             continue
         if prog == "gh" and len(args) >= 2:
             if args[0] == "pr":
@@ -567,7 +766,20 @@ def _sale_fuera(tool, entrada):
         return "clic" if (not isinstance(txt, str) or JS_ACTUA.search(txt)) else None
     if ENVIAN.search(tool):
         return "envia"
+    verbo = tool.rsplit("__", 1)[-1] if tool.startswith("mcp__") else ""
+    # Verbos que mandan y se escapaban por el `$` de ENVIAN (`send_later`) o por no estar en la
+    # lista (`share_file`, `file_upload`, `upload_image`): 24-sep-26, auditoría 3.2.
+    if verbo and D is not None and D.VERBO_ENVIO_EXTRA.search(verbo):
+        return "envia"
     if CLIC_IRREVERSIBLE.search(tool):
+        return "clic"
+    # MCP de un servicio EXTERNO: antes se preguntaba «¿es un verbo de envío?» y lo desconocido
+    # pasaba (Drive `create_file` 21 veces, `update_file`, `create_trigger`…). Ahora al revés: si no
+    # es un verbo de LECTURA, escribe fuera de la máquina y se le pregunta a ella (o se le avisa).
+    if verbo and D is not None and not D.MCP_NO_EXTERNOS.search(tool) \
+            and not D.VERBO_LECTURA.search(verbo):
+        return "clic"
+    if verbo and D is None and not tool.startswith(("mcp__ccd_",)):
         return "clic"
     if tool == "bash":      # ya viene normalizado a minúsculas por _norm_tool
         global _POR_QUE

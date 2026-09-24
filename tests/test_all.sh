@@ -82,6 +82,7 @@ runpy test_modelo_coherente.py
 runpy test_agentes_ritmo.py
 runpy test_radar_personas.py
 runpy test_salida_guard.py
+runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos a la red se juzga por el DESTINO
 runpy test_ok_envio_blindado.py
 runpy test_correos_publicables.py
 runpy test_entrada_guard.py
@@ -102,6 +103,7 @@ runpy test_deuda_cerrar_ejecuta.py
 runpy test_ramas_fusionar.py
 runpy test_ocr_layout.py
 runpy test_salida_reintento.py
+runpy test_salida_idempotente.py   # 24-sep · auditoría 3.5: una aprobación entrega UNA vez; lo incierto no se reenvía solo
 runpy test_dominios_con_dueno.py
 runpy test_honestidad_lint.py
 runpy test_verifica_citas.py
@@ -180,6 +182,7 @@ runpy test_dm_inbox_buzones.py
 runpy test_borde.py
 runpy test_reescribe_consulta.py
 runpy test_deid.py
+runpy test_deid_procedencia.py   # 24-sep · auditoría 3.3: lo del caso es N2 por procedencia aunque el detector no vea nada
 runpy test_kb_pdf_avisos.py
 runpy test_kb_fts5.py
 runpy test_kb_hibrido.py

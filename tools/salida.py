@@ -565,13 +565,15 @@ def _now_iso():
 # ─────────────────────────────────────────────────────────────────────────────
 # Auditoría + outbox
 # ─────────────────────────────────────────────────────────────────────────────
-def _audit(channel, action, dest, veredicto, motivo, n):
+def _audit(channel, action, dest, veredicto, motivo, n, extra=None):
     """Apunta el intento en el log append-only del día. Nunca falla hacia el caller."""
     try:
         os.makedirs(OUTBOX, exist_ok=True)
         rec = {"ts": _now_iso(), "canal": channel, "accion": action,
                "dest_hash": _dest_hash(dest), "veredicto": veredicto,
                "motivo": motivo, "n": n}
+        if extra:
+            rec.update(extra)
         line = (json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8")
         path = os.path.join(OUTBOX, "audit-%s.jsonl" % time.strftime("%Y-%m-%d"))
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
@@ -606,13 +608,54 @@ def _draft(channel, action, dest, text, reason, avisos=None):
     return name
 
 
+def _sub(nombre):
+    """Carpeta del outbox derivada EN CADA LLAMADA: los tests reasignan `OUTBOX`/`PENDING` como
+    atributos del módulo, y una constante de import se escaparía de su sandbox al estado real."""
+    return PENDING if nombre == "pending" else os.path.join(OUTBOX, nombre)
+
+
+def _entrega_id(name, texto):
+    return hashlib.sha256(("%s|%s" % (name, texto or "")).encode("utf-8")).hexdigest()[:16]
+
+
+def _entregar(canal, dest, texto):
+    """(estado, info) con estado ∈ {"ok", "no_salio", "incierto"}.
+
+    Los entregadores devuelven `True` (llegó), `False` (es SEGURO que no salió: el servidor dijo que
+    no, o la conexión ni se abrió) o `None` (no se sabe: timeout DESPUÉS de conectar). Una excepción
+    que se escape también es «no se sabe»: ante la duda, no se reenvía."""
+    try:
+        r = _DELIVERERS[canal](dest, texto or "")
+        okv, info = r[0], (r[1] if len(r) > 1 else "")
+    except Exception as e:
+        return "incierto", "el entregador falló a mitad: %r" % (e,)
+    if okv is None:
+        return "incierto", info
+    return ("ok" if okv else "no_salio"), info
+
+
 def approve_and_deliver(draft_name, nonce):
     """Challenge-response (A4): entrega un borrador del outbox SOLO si el nonce coincide
     con el que el sistema generó, no hay HALT, y existe un canal de entrega real para esa
-    acción. REPORT retenido → se entrega; OUTWARD (publish/contact/pay) → hoy NO hay canal
-    de entrega → queda bloqueado (nada sale al mundo). Fail-closed en cada rama."""
-    path = os.path.join(PENDING, os.path.basename(draft_name))
+    acción. REPORT retenido → se entrega; OUTWARD contact por Instagram → se entrega tras validar
+    destinatario; el resto de OUTWARD no tiene canal → sigue como borrador. Fail-closed en cada rama.
+
+    TRANSACCIONAL (24-sep-26, auditoría externa, hallazgo 3.5). Antes se leía, se entregaba y
+    DESPUÉS se movía a `sent/`: dos aprobaciones a la vez daban dos entregas (reproducido), y un
+    timeout tras conectar dejaba el borrador en `pending/` para que ella lo aprobara otra vez.
+    Ahora el borrador se RECLAMA con un `rename` atómico pending→sending (el que pierde no entrega)
+    y sale de `sending/` según lo que pasó:
+        llegó            → sent/
+        seguro que no    → pending/  (se puede volver a aprobar)
+        no se sabe       → se queda en sending/ hasta que ella lo reconcilie (`reconciliar`)."""
+    base = os.path.basename(draft_name)
+    path = os.path.join(_sub("pending"), base)
+    en_curso = os.path.join(_sub("sending"), base)
     if not os.path.exists(path):
+        if os.path.exists(en_curso):
+            return _result(False, True, "este borrador ya se está entregando o su resultado es "
+                           "incierto: puede haberte llegado. Reconcilia antes de reenviar "
+                           "(«reconciliar %s entregado|reintentar»)" % base)
         return _result(False, True, "borrador no encontrado")
     if halted():
         return _result(False, True, "HALT activo: no se entrega nada")
@@ -624,32 +667,113 @@ def approve_and_deliver(draft_name, nonce):
         _audit(d.get("canal"), d.get("accion"), d.get("dest"), "rechazado", "nonce no coincide", len(d.get("texto") or ""))
         return _result(False, True, "nonce no coincide: no se entrega")
     canal, accion, dest, texto = d.get("canal"), d.get("accion"), d.get("dest"), d.get("texto")
-    # Solo REPORT a {{TITULAR}} tiene canal de entrega hoy; OUTWARD a terceros no.
-    if accion == REPORT and canal in _DELIVERERS and str(dest) == str(_self_chatid()):
-        ok, info = _DELIVERERS[canal](dest, texto or "")
-        if ok:
-            os.makedirs(os.path.join(OUTBOX, "sent"), exist_ok=True)
-            os.replace(path, os.path.join(OUTBOX, "sent", os.path.basename(path)))
-            _audit(canal, accion, dest, "entregado-aprobado", info, len(texto or ""))
-            return _result(True, False, "entregado (%s)" % info)
-        return _result(False, True, "entrega falló (%s)" % info)
-    # OUTWARD contact por Instagram: el gate del muro YA está pasado (nonce de {{TITULAR}}, arriba).
-    # Validar destinatario y entregar por la única boca. Si la entrega falla (hoy: sin
-    # instagram_manage_messages), el borrador NO se mueve a sent → se queda «a un clic».
-    if accion == "contact" and canal == "instagram":
-        if not _ig_dest_ok(dest):
-            _audit(canal, accion, dest, "bloqueado", "destinatario IG no permitido", len(texto or ""))
-            return _result(False, True, "destinatario de Instagram no permitido (allowlist) — no se envía")
-        ok, info = _DELIVERERS[canal](dest, texto or "")
-        if ok:
-            os.makedirs(os.path.join(OUTBOX, "sent"), exist_ok=True)
-            os.replace(path, os.path.join(OUTBOX, "sent", os.path.basename(path)))
-            _audit(canal, accion, dest, "entregado-aprobado", info, len(texto or ""))
-            return _result(True, False, "DM de Instagram entregado (%s)" % info)
-        _audit(canal, accion, dest, "bloqueado", "entrega IG falló: %s" % info, len(texto or ""))
-        return _result(False, True, "no se pudo enviar el DM (%s); sigue como borrador" % info)
-    _audit(canal, accion, dest, "bloqueado", "OUTWARD sin canal de entrega", len(texto or ""))
-    return _result(False, True, "no hay canal de entrega para %r (sigue como borrador)" % accion)
+    n = len(texto or "")
+    # ¿Hay canal de entrega para esto? Lo que no se puede entregar NO se reclama: sigue en pending/.
+    # Solo REPORT a {{TITULAR}} tiene canal de entrega hoy, y el DM de Instagram (con allowlist).
+    es_report = accion == REPORT and canal in _DELIVERERS and str(dest) == str(_self_chatid())
+    es_ig = accion == "contact" and canal == "instagram"
+    if es_ig and not _ig_dest_ok(dest):
+        _audit(canal, accion, dest, "bloqueado", "destinatario IG no permitido", n)
+        return _result(False, True, "destinatario de Instagram no permitido (allowlist) — no se envía")
+    if not (es_report or es_ig):
+        _audit(canal, accion, dest, "bloqueado", "OUTWARD sin canal de entrega", n)
+        return _result(False, True, "no hay canal de entrega para %r (sigue como borrador)" % accion)
+
+    eid = _entrega_id(base, texto)
+    if os.path.exists(os.path.join(_sub("sent"), base)):
+        return _result(False, True, "ya consta como entregado (sent/%s): no se repite" % base)
+    # RECLAMAR. `rename` es atómico en el mismo volumen (pending/ y sending/ cuelgan del mismo
+    # OUTBOX): de N aprobaciones simultáneas, gana una y las demás reciben FileNotFoundError.
+    os.makedirs(_sub("sending"), exist_ok=True)
+    try:
+        os.rename(path, en_curso)
+    except FileNotFoundError:
+        return _result(False, True, "otra aprobación lo está entregando ahora mismo: no se repite")
+    _audit(canal, accion, dest, "entregando", "reclamado", n, extra={"entrega_id": eid})
+
+    estado, info = _entregar(canal, dest, texto)
+    if estado == "ok":
+        os.makedirs(_sub("sent"), exist_ok=True)
+        os.replace(en_curso, os.path.join(_sub("sent"), base))
+        _audit(canal, accion, dest, "entregado-aprobado", info, n, extra={"entrega_id": eid})
+        return _result(True, False, ("DM de Instagram entregado (%s)" if es_ig else "entregado (%s)") % info)
+    if estado == "no_salio":
+        os.replace(en_curso, path)            # de vuelta a «a un clic»: es seguro reintentar
+        _audit(canal, accion, dest, "bloqueado", "no salió: %s" % info, n, extra={"entrega_id": eid})
+        if es_ig:
+            return _result(False, True, "no se pudo enviar el DM (%s); sigue como borrador" % info)
+        return _result(False, True, "entrega falló (%s); sigue como borrador" % info)
+    # INCIERTO: puede haber llegado. Se queda en sending/ con el motivo, y nada lo reenvía solo.
+    try:
+        d.update(estado="incierto", incierto_desde=_now_iso(), motivo_incierto=info, entrega_id=eid)
+        tmp = en_curso + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, en_curso)
+    except Exception as e:
+        sys.stderr.write("salida: aviso, no pude marcar el incierto: %r\n" % (e,))
+    _audit(canal, accion, dest, "incierto", info, n, extra={"entrega_id": eid})
+    return _result(False, True, "resultado INCIERTO (%s): puede haberte llegado. No lo reenvío; "
+                   "reconcilia con «reconciliar %s entregado» si te llegó, o «reintentar» si no"
+                   % (info, base))
+
+
+def listar_sending():
+    """Lo que está en `sending/`: entregándose ahora o con resultado incierto. Nunca el cuerpo."""
+    d = _sub("sending")
+    out = []
+    if not os.path.isdir(d):
+        return out
+    ahora = time.time()
+    for fn in sorted(os.listdir(d)):
+        if not fn.endswith(".json"):
+            continue
+        p = os.path.join(d, fn)
+        try:
+            meta = json.load(open(p, encoding="utf-8"))
+        except Exception:
+            meta = {}
+        try:
+            edad = int((ahora - os.path.getmtime(p)) // 60)
+        except OSError:
+            edad = 0
+        out.append({"nombre": fn, "edad_min": edad, "estado": meta.get("estado") or "entregando",
+                    "motivo": meta.get("motivo_incierto") or ""})
+    return out
+
+
+def reconciliar(draft_name, decision):
+    """La ÚNICA salida de `sending/`, y la decide {{TITULAR}}: Telegram no ofrece idempotencia en
+    sendMessage, así que solo ella sabe si le llegó.
+        entregado  → sent/   (le llegó: se da por cerrado)
+        reintentar → pending/ con nonce NUEVO (no le llegó: vuelve a estar «a un clic»)"""
+    base = os.path.basename(draft_name or "")
+    p = os.path.join(_sub("sending"), base)
+    if not base or not os.path.exists(p):
+        return {"ok": False, "reason": "no hay nada en sending/ con ese nombre"}
+    if decision not in ("entregado", "reintentar"):
+        return {"ok": False, "reason": "decisión desconocida: usa «entregado» o «reintentar»"}
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+    except Exception:
+        d = {}
+    if decision == "entregado":
+        os.makedirs(_sub("sent"), exist_ok=True)
+        os.replace(p, os.path.join(_sub("sent"), base))
+        _audit(d.get("canal"), d.get("accion"), d.get("dest"), "reconciliado-entregado", "", 0,
+               extra={"entrega_id": d.get("entrega_id")})
+        return {"ok": True, "reason": "dado por entregado: %s" % base}
+    for k in ("estado", "incierto_desde", "motivo_incierto", "entrega_id"):
+        d.pop(k, None)
+    d.update(estado="pendiente_OK", nonce=os.urandom(5).hex())
+    os.makedirs(_sub("pending"), exist_ok=True)
+    tmp = os.path.join(_sub("pending"), base + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, os.path.join(_sub("pending"), base))
+    os.remove(p)
+    _audit(d.get("canal"), d.get("accion"), d.get("dest"), "reconciliado-reintentar", "", 0)
+    return {"ok": True, "reason": "vuelve a pending con nonce nuevo: %s" % base}
 
 
 def _safe_draft(channel, action, dest, text, reason, avisos=None):
@@ -689,7 +813,11 @@ def _deliver_telegram(chat_id, text, reply_to=None):
             if espera is None or not _no_llego_seguro(e):
                 break
             time.sleep(espera)
-    return False, "error de red: %r" % (ultimo,)
+    # `False` solo si es SEGURO que no salió; si no, `None` = «no se sabe» (24-sep-26, 3.5). `None`
+    # es falsy: `send()` y `alerta_critica()` lo tratan como fallo igual que antes; solo
+    # `approve_and_deliver` lo distingue para no reenviar algo que pudo llegar.
+    seguro = isinstance(ultimo, urllib.error.HTTPError) or _no_llego_seguro(ultimo)
+    return (False if seguro else None), "error de red: %r" % (ultimo,)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -779,7 +907,7 @@ def _deliver_instagram_dm(dest, text):
             pass
         return False, "Meta rechazó (HTTP %s)%s" % (e.code, hint)
     except Exception as e:
-        return False, "error de red: %r" % (e,)
+        return (False if _no_llego_seguro(e) else None), "error de red: %r" % (e,)
 
 
 _DELIVERERS = {"telegram": _deliver_telegram, "instagram": _deliver_instagram_dm}
@@ -1481,6 +1609,13 @@ def _cli_status():
         print("    · %s : %s" % (p, "existe" if os.path.exists(p) else "—"))
     print("  chat de {{TITULAR}} configurado : %s" % ("sí" if cid else "NO (reportes → borrador)"))
     print("  borradores en outbox : %d  (%s)" % (n_pend, PENDING))
+    vivos = listar_sending()
+    if vivos:
+        print("  ⚠️  en sending (entregándose o resultado incierto): %d" % len(vivos))
+        for v in vivos:
+            print("    · %s — %s, hace %d min%s" % (v["nombre"], v["estado"], v["edad_min"],
+                                                  (" (%s)" % v["motivo"]) if v["motivo"] else ""))
+        print("    → salida.py reconciliar <nombre> entregado|reintentar")
 
 
 def main(argv):
@@ -1496,6 +1631,13 @@ def main(argv):
         res = report_to_titular(text, dry=(cmd == "report-dry"), urgente=(cmd == "report-urgente"))
         print(json.dumps(res, ensure_ascii=False))
         return 0 if (res["delivered"] or res.get("dry") or res.get("retenido")) else 1
+    if cmd == "reconciliar":
+        if len(argv) < 3:
+            print("uso: salida.py reconciliar <borrador> entregado|reintentar")
+            return 2
+        res = reconciliar(argv[1], argv[2])
+        print(json.dumps(res, ensure_ascii=False))
+        return 0 if res["ok"] else 1
     if cmd == "flush":
         res = flush_silencio()
         print(json.dumps(res, ensure_ascii=False))
@@ -1519,7 +1661,7 @@ def main(argv):
             print("· %s%s%s\n  %s\n" % (r.get("ts", "")[:19], fu, urg,
                                         (r.get("texto") or "").replace("\n", " ")))
         return 0
-    print("uso: salida.py [status | report \"<texto>\" | report-urgente \"<texto>\" | report-dry \"<texto>\" | flush | enviados [N]]")
+    print("uso: salida.py [status | report \"<texto>\" | report-urgente \"<texto>\" | report-dry \"<texto>\" | flush | enviados [N] | reconciliar <borrador> entregado|reintentar]")
     return 2
 
 

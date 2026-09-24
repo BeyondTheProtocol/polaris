@@ -23,7 +23,7 @@ Salió de `CLAUDE.md` el 11-sep-26 para bajar la carga fija. La **norma** (qué 
 modelo, y cómo se trata la evidencia) se queda en el muro de `CLAUDE.md`; aquí va el **cómo**.
 
 ## Tools de uso diario
-Catálogo entero: `ls tools/`. Las de siempre: `kb.py` (RAG) · `salida.py` (Telegram, HALT + anti-spam) · `seguimiento.py` (Tablero) · `archivar_nota.py` · `codigo_rojo.py` · `salud.py` · `coste.py` · `ramas.py` · `deid.py` (de-identificar, determinista y verificado por el juez del muro).
+Catálogo entero: `ls tools/`. Las de siempre: `kb.py` (RAG) · `salida.py` (Telegram, HALT + anti-spam) · `seguimiento.py` (Tablero) · `archivar_nota.py` · `codigo_rojo.py` · `salud.py` · `coste.py` · `ramas.py` · `deid.py` (de-identificar por patrones; «sin identificadores detectados» NO es anónimo: lo que sale del caso es N2 por procedencia, `ia.ask(sensible_forzado=True)`).
 - `honestidad_lint.py`: apoyo del sello de evidencia (caza el relay sin verificar).
 - `cosecha_entregables.py`: red de seguridad de «dónde quedó archivado» (encuentra entregables que se quedaron solo en el chat).
 - `ramas.py list`: quién trabaja ahora en qué rama.

@@ -467,7 +467,10 @@ def estado_borradores():
         name = os.path.basename(p)[:-5]
         partes = name.split("-")
         items.append({"cuando": partes[0] if partes else name, "tipo": " ".join(partes[1:3]) if len(partes) > 2 else name})
-    return {"n": len(files), "items": items}
+    # Lo reclamado y sin cerrar (entregándose o INCIERTO, 24-sep-26, 3.5): si no se enseña aquí,
+    # nadie lo ve y se queda para siempre en sending/.
+    n_inc = len(glob.glob(os.path.join(STATE, "outbox", "sending", "*.json")))
+    return {"n": len(files), "items": items, "inciertos": n_inc}
 
 
 def estado_sesiones():
@@ -666,6 +669,10 @@ def estado_tablero():
     if not br.get("_error") and br.get("n"):
         buckets["esperando_ok"].append(_tcard("Borradores por revisar", "%d esperan tu OK" % br["n"],
                                               "gold", etiqueta="NED", rank=1, fase="gestion", dia="hoy"))
+    if not br.get("_error") and br.get("inciertos"):
+        buckets["esperando_ok"].append(_tcard("Envío incierto", "%d pueden haberte llegado: reconcilia"
+                                              % br["inciertos"], "bad", etiqueta="NED", rank=0,
+                                              fase="gestion", dia="hoy"))
 
     # Ensamblar: dentro de cada columna, lo más URGENTE/IMPORTANTE arriba (rank). El sort es estable:
     # a igual rango, se respeta el orden de inserción (tus encargos antes que los hilos).
@@ -2213,7 +2220,8 @@ class Handler(BaseHTTPRequestHandler):
                 t = seguimiento.crear_tarea(str(data.get("titulo", "")),
                                             etiqueta=str(data.get("etiqueta", "NED")),
                                             vence=str(data.get("vence", "")),
-                                            origen=str(data.get("origen", "tablero")))
+                                            origen=str(data.get("origen", "tablero")),
+                                            hecho_cuando=str(data.get("hecho_cuando", "")))
             elif path == "/api/hilo/mover" or path == "/api/tarea/mover":
                 t = seguimiento.set_estado(str(data["id"]), str(data["estado"]))
             else:

@@ -3,16 +3,17 @@
 
 Plan-motor: typed-swinging-wand / F3b. Objetivo: que el cerebro GRATIS/LOCAL (Ollama, egress-cero)
 pueda responder CON contexto del caso SIN ver jamás clínico/PII en crudo. Esta capa convierte texto
-del caso → versión DE-IDENTIFICADA cuya salida queda **limpia de identificadores** (PII + huella
-clínica/genómica específica + términos vetados del muro).
+del caso → versión DE-IDENTIFICADA sin los identificadores que estos patrones reconocen (PII + huella
+clínica/genómica específica + términos vetados del muro). Lo que no reconocen pasa: ver HONESTIDAD.
 
 REUSA, NO REINVENTA (SOLO LECTURA sobre `borde.py`):
   · Las MISMAS regex y deny-lists del borde (`borde._RE_*`, `_NOMBRE_TITULAR`, y los deny-lists de
     `seguimiento` que el borde ya consolida: `_TERMINOS_VETADOS`, `_NOMBRES_DENY`).
   · El MISMO normalizador (`borde._normalizar`: NFKD + quita combinantes + zero-width) para cerrar
     la evasión por homoglifo/acento falso/espaciado, ANTES de enmascarar.
-  · La GARANTÍA se cierra con el propio juez del muro: tras de-identificar, `borde.clasificar()`
-    sobre la salida debe devolver LIMPIO (0 indicios). Si no, la de-id se considera fallida.
+  · La revalidación usa el propio juez del muro: tras de-identificar, `borde.clasificar()` sobre la
+    salida no debe ver nada. Si ve algo, la de-id se considera fallida. OJO: es el MISMO detector
+    que redacta, así que esto caza restos, no demuestra anonimato (auditoría 3.3, 24-sep-26).
 
 POR QUÉ existe (y no basta `borde.de_identificar`): el `de_identificar` de F0 es "mínimo" — cubre un
 subconjunto de las clases y NO los deny-lists ni variantes cortas/genotipos/citobandas/exones. Aquí se
@@ -28,7 +29,7 @@ del muro lo caza y el contexto se DESCARTA (fail-closed), no se envía a medio l
 
 CLI:
   python3 tools/deid.py "<texto>"            # imprime el texto de-identificado + nº de redacciones
-  python3 tools/deid.py --check "<texto>"    # ¿la salida pasa el juez del muro? (exit 0 sí / 3 no)
+  python3 tools/deid.py --check "<texto>"    # ¿quedan identificadores detectables? (exit 0 no / 3 sí)
   python3 tools/deid.py --selftest
 """
 import os
@@ -113,7 +114,7 @@ def _enmascarar_deny(texto):
 def de_identificar(texto):
     """(texto_deid, n_redacciones). Normaliza igual que el borde y enmascara la UNIÓN de todas las
     clases que `borde.clasificar` detecta. NO envía nada: solo transforma. El llamante DEBE revalidar
-    con `limpio()` antes de usar la salida (fail-closed)."""
+    con `sin_identificadores_detectados()` antes de usar la salida (fail-closed)."""
     if not isinstance(texto, str) or not texto.strip():
         return ("" if not isinstance(texto, str) else texto), 0
     # MISMO normalizador que el borde: cierra homoglifo/acento falso/zero-width antes de enmascarar.
@@ -130,26 +131,39 @@ def de_identificar(texto):
     return out, n
 
 
-def limpio(texto):
-    """(ok, motivo) — el JUEZ sobre la SALIDA ya de-identificada. ok=True solo si NO queda NINGÚN
-    indicio: (a) el juez del muro `borde.clasificar` (PII + clínico/genómico + términos vetados) Y
-    (b) el detector de fechas propio de F3b (el borde no trata fechas como sensibles, pero en el
-    contexto del caso son cuasi-identificadores). Gate duro: si algo escapó, devuelve False y el
-    contexto NO debe enviarse."""
+def sin_identificadores_detectados(texto):
+    """(ok, motivo) — ¿quedan identificadores QUE ESTOS PATRONES SEPAN VER? ok=True si ni el juez
+    del muro `borde.clasificar` (PII + clínico/genómico + términos vetados) ni el detector de fechas
+    de F3b encuentran nada. Si algo escapó, False y el contexto NO debe enviarse.
+
+    ⚠️ NO es un certificado de anonimato (24-sep-26, auditoría externa, hallazgo 3.3). Redacta y
+    verifica con los MISMOS patrones: un nombre, un domicilio o un diagnóstico que no reconocen
+    pasan los dos pasos igual (reproducido: 0 redacciones y «limpio»). Por eso se llamaba `limpio`
+    y ya no. Lo que decide si algo del caso puede salir es su PROCEDENCIA (`ia.ask(...,
+    sensible_forzado=True)`, ver `contexto_caso`), no este veredicto."""
     sensible, motivo = borde.clasificar(texto)
     if sensible:
         return False, motivo
     if _RE_FECHA.search(texto):
         return False, "fecha superviviente (cuasi-identificador)"
-    return True, "limpio"
+    return True, "sin identificadores detectados"
 
 
-def de_identificar_verificado(texto):
-    """(texto_deid|None, n, ok, motivo). De-identifica Y revalida con el juez del muro. Si la salida
-    NO queda limpia, devuelve texto=None (fail-closed): el contexto se DESCARTA, nunca se manda a
-    medio limpiar. Esta es la función que debe usar el cableado de contexto."""
+# Alias DEPRECADO: el nombre prometía más de lo que el código sabe. No lo uses en código nuevo.
+limpio = sin_identificadores_detectados
+
+
+def de_identificar_verificado(texto, procedencia=None):
+    """(texto_deid|None, n, ok, motivo). De-identifica Y revalida con los mismos patrones. Si queda
+    algo que reconocen, devuelve texto=None (fail-closed): el contexto se DESCARTA, nunca se manda a
+    medio redactar. `ok=True` significa «sin identificadores detectados», no «anónimo».
+
+    `procedencia="N2"` (lo que sale del caso): el motivo lo dice. La redacción es la misma; lo que
+    cambia es que quien llama NO puede tratar la salida como no sensible (ver `contexto_caso`)."""
     deid, n = de_identificar(texto)
-    ok, motivo = limpio(deid)
+    ok, motivo = sin_identificadores_detectados(deid)
+    if ok and procedencia == "N2":
+        motivo = "sin identificadores detectados — procedencia N2: sigue siendo sensible"
     return (deid if ok else None), n, ok, motivo
 
 
@@ -170,15 +184,16 @@ def main(argv):
         return _selftest()
     if argv[0] == "--check":
         deid, n, ok, motivo = de_identificar_verificado(" ".join(argv[1:]))
-        print(("✅ LIMPIO" if ok else "🛑 SUCIO") + " — %s  (redacciones: %d)" % (motivo, n))
+        print(("◻️ sin identificadores detectados (no certifica anonimato)" if ok else "🛑 quedan identificadores")
+              + " — %s  (redacciones: %d)" % (motivo, n))
         if ok:
             print(deid)
         return 0 if ok else 3
     deid, n = de_identificar(" ".join(argv))
-    ok, motivo = limpio(deid)
+    ok, motivo = sin_identificadores_detectados(deid)
     print(deid)
-    print("\n— %d redacciones · juez del muro: %s (%s)" %
-          (n, "LIMPIO" if ok else "SUCIO", motivo), file=sys.stderr)
+    print("\n— %d redacciones · %s (%s)" %
+          (n, "sin identificadores detectados" if ok else "quedan identificadores", motivo), file=sys.stderr)
     return 0
 
 

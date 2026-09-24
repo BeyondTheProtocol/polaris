@@ -88,7 +88,11 @@ def main():
 
         salida.urllib.request.urlopen = _urlopen_timeout
         enviado2, _ = salida._deliver_telegram("123", "otro aviso")
-        ok(enviado2 is False, "un timeout se reporta como no entregado")
+        # 24-sep-26 (auditoría 3.5): un timeout ya no es `False` («seguro que no salió») sino `None`
+        # («no se sabe»), que sigue siendo falsy para `send()`. Así `approve_and_deliver` no deja el
+        # borrador «a un clic» para que ella lo apruebe dos veces. Ver test_salida_idempotente.py.
+        ok(not enviado2, "un timeout se reporta como no entregado")
+        ok(enviado2 is None, "y como INCIERTO, no como «seguro que no salió» (%r)" % (enviado2,))
         ok(intentos["n"] == 1, "y NO se reintenta: pudo haber llegado (%d intento)" % intentos["n"])
 
         # --- Un 429 tampoco: el servidor decidió, reintentar sería insistir contra su criterio ---

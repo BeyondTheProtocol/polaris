@@ -145,6 +145,7 @@ def _rama_base():
 # entero no distinguiría un borrador vivo de la basura de siempre.
 _RUTAS_TRABAJO_VIVO = (
     "tools/state/outbox/pending",     # borradores esperando su OK (el gate de salida)
+    "tools/state/outbox/sending",     # entrega reclamada con resultado incierto (auditoría 3.5)
     "tools/state/queue/pending",      # encargos aún sin ejecutar
     "tools/state/queue/processing",   # encargos a medio ejecutar
 )

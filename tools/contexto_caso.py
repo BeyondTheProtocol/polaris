@@ -44,6 +44,10 @@ import deid  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Scopes de ACCESO PLENO a la KB del caso (los mismos que `kb._allowed` deja ver todo). Lo que sale
+# de aquí es N2 POR PROCEDENCIA, se detecte algo o no (24-sep-26, auditoría externa 3.3).
+_SCOPES_CASO = ("private", "all", "clinico")
+
 
 def _cargar_kb():
     """Importa kb.py (vive en el mismo tools/) sin ejecutar su CLI. SOLO LECTURA del índice."""
@@ -64,8 +68,15 @@ def recuperar_pasajes(pregunta, k=6, scope="private", index_path=None):
 
 def construir_contexto(pregunta, k=6, scope="private", max_chars=4000, index_path=None,
                        pre_bloqueo=True):
-    """dict {contexto, pasajes, descartados, limpio}. Recupera → de-identifica (REDACTA) cada
-    pasaje → ensambla. `limpio` reporta si el ensamblado final pasa el juez del muro (informativo).
+    """dict {contexto, pasajes, descartados, procedencia, sin_identificadores_detectados, motivo}.
+    Recupera → de-identifica (REDACTA) cada pasaje → ensambla.
+
+    `procedencia` = "N2" si entra al menos un pasaje de la KB del caso con acceso pleno, "" si no.
+    ESA es la señal que manda para el egress: quien llame a `ia.ask` con este contexto debe pasar
+    `sensible_forzado=True` cuando sea "N2". `sin_identificadores_detectados` es informativo y NO
+    certifica anonimato: redacta y verifica con los mismos patrones (auditoría 3.3, 24-sep-26:
+    un nombre + domicilio + diagnóstico ficticios dieron 0 redacciones). `limpio` queda como alias
+    deprecado de esa misma clave.
 
     `pre_bloqueo` (F3b/opción A):
       · True (defecto, carriles que NO son el local de confianza): además de redactar, REVALIDA cada
@@ -79,7 +90,8 @@ def construir_contexto(pregunta, k=6, scope="private", max_chars=4000, index_pat
     pasajes = recuperar_pasajes(pregunta, k=k, scope=scope, index_path=index_path)
     trozos, incluidos, descartados, usados = [], [], [], 0
     for path, title, text, sc in pasajes:
-        deid_txt, n, ok, motivo = deid.de_identificar_verificado(text)
+        deid_txt, n, ok, motivo = deid.de_identificar_verificado(
+            text, procedencia=("N2" if scope in _SCOPES_CASO else None))
         if pre_bloqueo and (not ok or deid_txt is None):
             # carril no-confiable: descarta lo que no quede limpio (fail-closed histórico)
             descartados.append({"path": path, "title": title, "motivo": motivo})
@@ -94,9 +106,13 @@ def construir_contexto(pregunta, k=6, scope="private", max_chars=4000, index_pat
         usados += len(deid_txt)
         incluidos.append({"path": path, "title": title, "score": round(sc, 2), "redacciones": n})
     contexto = "\n\n---\n\n".join(trozos)
-    ok_final, motivo_final = (deid.limpio(contexto) if contexto else (True, "sin contexto"))
+    ok_final, motivo_final = (deid.sin_identificadores_detectados(contexto) if contexto
+                              else (True, "sin contexto"))
+    procedencia = "N2" if (incluidos and scope in _SCOPES_CASO) else ""
     return {"contexto": contexto, "pasajes": incluidos, "descartados": descartados,
-            "limpio": ok_final, "motivo": motivo_final}
+            "procedencia": procedencia,
+            "sin_identificadores_detectados": ok_final, "limpio": ok_final,   # `limpio`: deprecado
+            "motivo": motivo_final}
 
 
 _SYSTEM_LOCAL = ("Eres un asistente que responde SOLO con el CONTEXTO de-identificado que se te da. "
@@ -125,10 +141,17 @@ def preguntar_local(pregunta, k=6, scope="private", index_path=None):
     # solo_gratis=True: este carril NO debe gastar Claude de pago; es el cerebro gratis/local. El
     # borde, dentro de ia.ask, deja pasar el contenido al destino local (confianza) y DENIEGA cualquier
     # destino de nube no-confiable (p. ej. el carril nvidia gratis) si el contexto es sensible.
-    r = ia.ask(prompt, clinico=False, system=_SYSTEM_LOCAL, solo_gratis=True)
+    # Procedencia (auditoría 3.3): «solo_gratis» incluye el carril gratis de NUBE (nvidia), que no
+    # es de confianza. Un pasaje del caso que el detector no reconoce iba a poder salir por ahí; con
+    # `sensible_forzado` solo queda el local de confianza, que es lo que este carril promete.
+    r = ia.ask(prompt, clinico=False, system=_SYSTEM_LOCAL, solo_gratis=True,
+               sensible_forzado=(ctx.get("procedencia") == "N2"))
+    respondio = r.get("text") is not None
     return {"respuesta": r.get("text"), "brain": r.get("brain"), "contexto": ctx["contexto"],
             "pasajes": ctx["pasajes"], "descartados": ctx["descartados"],
-            "enviado_limpio": (r.get("text") is not None), "motivo": r.get("motivo")}
+            "procedencia": ctx.get("procedencia"),
+            # `enviado_limpio` medía «el cerebro contestó», no limpieza: se queda como alias deprecado.
+            "respondio": respondio, "enviado_limpio": respondio, "motivo": r.get("motivo")}
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────────────────
@@ -138,17 +161,18 @@ def main(argv):
         return 0
     if argv[0] == "--ask":
         r = preguntar_local(" ".join(argv[1:]))
-        print("cerebro:", r["brain"], "| enviado limpio:", r["enviado_limpio"])
+        print("cerebro:", r["brain"], "| respondió:", r["respondio"], "| procedencia:", r["procedencia"] or "—")
         print("pasajes:", r["pasajes"])
         if r["descartados"]:
-            print("descartados (no limpios):", r["descartados"])
+            print("descartados (quedaban identificadores):", r["descartados"])
         print("\n--- RESPUESTA ---\n", r["respuesta"])
         return 0
     ctx = construir_contexto(" ".join(argv))
-    print("limpio:", ctx["limpio"], "(%s)" % ctx["motivo"])
+    print("sin identificadores detectados:", ctx["sin_identificadores_detectados"], "(%s)" % ctx["motivo"],
+          "· procedencia:", ctx["procedencia"] or "—", "(esto NO certifica anonimato)")
     print("pasajes incluidos:", ctx["pasajes"])
     if ctx["descartados"]:
-        print("descartados (no limpios):", ctx["descartados"])
+        print("descartados (quedaban identificadores):", ctx["descartados"])
     print("\n--- CONTEXTO DE-IDENTIFICADO ---\n", ctx["contexto"] or "(vacío)")
     return 0
 

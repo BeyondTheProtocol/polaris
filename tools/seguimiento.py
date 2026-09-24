@@ -48,6 +48,8 @@ CUMBRE = os.path.join(STATE, "cumbre.json")
 INVESTIGACION = os.path.join(STATE, "investigacion.json")
 EMBARGO_FLAG = os.path.join(STATE, "embargo_publico.json")
 OUTBOX_PENDING = os.path.join(STATE, "outbox", "pending")
+# Entrega reclamada y sin cerrar: entregándose ahora o con resultado INCIERTO (24-sep-26, 3.5).
+OUTBOX_SENDING = os.path.join(STATE, "outbox", "sending")
 QUEUE_FAILED = os.path.join(STATE, "queue", "failed")
 HEARTBEAT_DIR = os.path.join(STATE, "heartbeat")
 HOY = os.path.join(REPO, "00_FUENTE-DE-VERDAD", "Gestion", "HOY.md")
@@ -363,6 +365,17 @@ def _sellar_ultimo_aviso(hid, ahora):
             return
 
 
+HECHO_CUANDO_MAX = 300
+
+
+def _hecho_cuando(v):
+    """Criterio verificable de parada («está hecho cuando…»), fijado al ABRIR la tarea y mostrado
+    al CERRARLA para comprobarlo (24-sep-2026). Opcional y texto libre: no-str → "", recortado."""
+    if not isinstance(v, str):
+        return ""
+    return v.strip()[:HECHO_CUANDO_MAX]
+
+
 @_serializado
 def add_hilo(obj):
     """Sumidero VALIDADO para entradas nuevas (ingesta de Gmail por el agente, captura verbal).
@@ -423,6 +436,7 @@ def add_hilo(obj):
         "por_que": obj.get("por_que", ""),        # "🔓 por qué importa" en 1 frase (opcional)
         "rama": obj.get("rama", ""),              # rama/worktree de trabajo enlazada (puente ramas↔tareas)
         "ref_reserva": obj.get("ref_reserva"),    # id de reservas.json enlazado (puente reservas↔tareas)
+        "hecho_cuando": _hecho_cuando(obj.get("hecho_cuando")),  # criterio de parada; se enseña al cerrar
     }
     hoy_iso = datetime.now().strftime("%Y-%m-%d")
     hilos = seg.get("hilos", [])
@@ -445,6 +459,8 @@ def add_hilo(obj):
                     merged["aviso_estado"] = None
             if not obj.get("rama"):          # no machacar el enlace de rama si el update no lo trae
                 merged["rama"] = h.get("rama", "")
+            if "hecho_cuando" not in obj:    # ídem el criterio de hecho: un update parcial no lo borra
+                merged["hecho_cuando"] = h.get("hecho_cuando", "")
             hilos[i] = merged
             break
     else:
@@ -478,7 +494,7 @@ def sin_objetivo_ned():
 @_serializado
 def crear_tarea(titulo, etiqueta="NED", vence="", prioridad="normal", origen="manual",
                 quien_espera="tú", ref_cumbre=None, categoria="otros", estado="esperando",
-                dueno="", objetivo_ned="", icono="", por_que="", rama=""):
+                dueno="", objetivo_ned="", icono="", por_que="", rama="", hecho_cuando=""):
     """FUENTE ÚNICA de creación de tareas, para CUALQUIER canal (tablero, Vega, chat, Telegram, correo…).
     Toda tarea es un hilo de seguimiento → una sola lista, idéntica en el kanban y en el parte diario.
     Devuelve el id. Cambio LOCAL: no envía/publica/contacta (lo de fuera entra como dato no confiable)."""
@@ -492,7 +508,7 @@ def crear_tarea(titulo, etiqueta="NED", vence="", prioridad="normal", origen="ma
         "plazo": (vence or None), "quien_espera": quien_espera,
         "ref_cumbre": ref_cumbre, "categoria": categoria, "origen": origen,
         "dueno": dueno, "objetivo_ned": objetivo_ned, "icono": icono, "por_que": por_que,
-        "rama": rama,
+        "rama": rama, "hecho_cuando": hecho_cuando,
     })
 
 
@@ -946,11 +962,13 @@ def recopilar():
         items.append(h2)
     items += hilos_clinicos(cumbre)
     pend = _listdir_json(OUTBOX_PENDING)
+    en_curso = _listdir_json(OUTBOX_SENDING)
     fail = _listdir_json(QUEUE_FAILED)
     avisos = frescura(cumbre)
     if seg.get("_error"):
         avisos.insert(0, "⚠️ " + seg["_error"])
-    return {"cumbre": cumbre, "items": items, "pendientes_ok": pend, "fallos": fail, "avisos": avisos}
+    return {"cumbre": cumbre, "items": items, "pendientes_ok": pend, "entrega_incierta": en_curso,
+            "fallos": fail, "avisos": avisos}
 
 
 def _prueba_de_vida(data):
@@ -996,6 +1014,9 @@ def construir_digest(canal="local"):
         lineas.append("🔒 %d hilo(s) privado(s) (terceros) — no salen por aquí; míralos en local." % privados_ocultos)
     if data["pendientes_ok"]:
         lineas.append("✉️ %d borrador(es) esperando tu OK (outbox/pending)." % len(data["pendientes_ok"]))
+    if data.get("entrega_incierta"):
+        lineas.append("⚠️ %d envío(s) con resultado INCIERTO (outbox/sending): puede que te llegaran. "
+                      "Dime «reconciliar <nombre> entregado» o «reintentar»." % len(data["entrega_incierta"]))
     if data["fallos"]:
         vivos, viejos = _fallos_por_edad(data["fallos"], base=QUEUE_FAILED)
         if vivos:
@@ -1761,7 +1782,8 @@ def cerrar_por_indice(nums):
         hid = mapa.get(str(n))
         h = cerrar_tarea(hid, por="titular") if hid else None
         if h:
-            cerrados.append({"id": h["id"], "titulo": h.get("titulo", "")})
+            cerrados.append({"id": h["id"], "titulo": h.get("titulo", ""),
+                             "hecho_cuando": h.get("hecho_cuando", "")})
         else:
             no.append(n)
     return {"cerrados": cerrados, "no_encontrados": no}
@@ -1805,7 +1827,8 @@ def cerrar_por_texto(frase):
     if len(top) == 1:
         h = cerrar_tarea(top[0].get("id"), por="titular")
         if h:
-            return {"cerrado": {"id": h["id"], "titulo": h.get("titulo", "")}, "candidatos": []}
+            return {"cerrado": {"id": h["id"], "titulo": h.get("titulo", ""),
+                                "hecho_cuando": h.get("hecho_cuando", "")}, "candidatos": []}
     return {"cerrado": None,
             "candidatos": [{"id": h.get("id"), "titulo": h.get("titulo", "")} for sc, h in puntuados[:4]]}
 

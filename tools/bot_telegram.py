@@ -133,6 +133,22 @@ _CIERRE_TXT_RE = re.compile(
     r"descarta\b|cancela\b|olv[ií]dalo\b)", re.I)
 
 
+def _criterio_al_cerrar(cerrados):
+    """Sufijo «· comprueba: …» con el criterio de hecho de lo cerrado, para que {{TITULAR}} lo contraste.
+    El criterio puede venir de fuera (dato, no orden): si no pasa el filtro de PII/vetados de
+    `_titulo_seguro`, no se repite por Telegram y se remite al Tablero."""
+    partes = []
+    for c in cerrados:
+        crit = (c.get("hecho_cuando") or "").strip()
+        if not crit:
+            continue
+        if seguimiento._titulo_seguro(crit):
+            partes.append("comprueba: %s" % crit)
+        else:
+            partes.append("tiene criterio de hecho, míralo en el Tablero")
+    return "".join(" · " + p for p in partes)
+
+
 def _es_cierre(text):
     """Detecta intención de CIERRE de un hilo. Devuelve ('indice',[n]) | ('texto',frase) | None.
     Determinista. El cierre real lo deciden cerrar_por_indice/cerrar_por_texto (que solo cierran
@@ -272,6 +288,14 @@ def handle_message(msg):
         responder("✅ " + res["reason"] if res.get("delivered") else "⛔ " + res["reason"])
         return "aprobacion:%s" % ("ok" if res.get("delivered") else "no")
 
+    # «reconciliar <borrador> entregado|reintentar» (24-sep-26, auditoría 3.5): la única salida de
+    # outbox/sending, donde se queda lo que tuvo un resultado INCIERTO (pudo llegarle). Solo ella
+    # sabe si le llegó; determinista, sin LLM, igual que «aprobar».
+    if partes and partes[0].lower() == "reconciliar" and len(partes) >= 3:
+        res = salida.reconciliar(partes[1], partes[2].lower())
+        responder(("✅ " if res.get("ok") else "⛔ ") + res["reason"])
+        return "reconciliar:%s" % ("ok" if res.get("ok") else "no")
+
     # Cierre de un PENDIENTE de respuesta («ok <id>» / «ignora <id>», el id corto que va en el
     # nudge de tools/pendientes.py: "✉️ ESPERAN TU RESPUESTA... id abc1234"). DETERMINISTA, sin
     # LLM, 0 tokens — mismo espíritu que «aprobar»/«sube»: cierra al instante lo que {{TITULAR}} ya
@@ -329,7 +353,7 @@ def handle_message(msg):
             res = seguimiento.cerrar_por_indice(payload)
             if res["cerrados"]:
                 hechos = ", ".join(c["titulo"] for c in res["cerrados"])
-                msg = "✅ Cerrado: %s" % hechos
+                msg = "✅ Cerrado: %s%s" % (hechos, _criterio_al_cerrar(res["cerrados"]))
                 if res["no_encontrados"]:
                     msg += " · no encontré el nº " + ", ".join(map(str, res["no_encontrados"]))
                 responder(msg + " 💜")
@@ -338,7 +362,8 @@ def handle_message(msg):
         else:
             res = seguimiento.cerrar_por_texto(text)
             if res.get("cerrado"):
-                responder("✅ Cerrado: %s 💜" % res["cerrado"]["titulo"])
+                responder("✅ Cerrado: %s%s 💜" % (res["cerrado"]["titulo"],
+                                                  _criterio_al_cerrar([res["cerrado"]])))
                 return "cierre-texto"
             if res.get("candidatos"):
                 lst = "\n".join("· " + c["titulo"] for c in res["candidatos"])

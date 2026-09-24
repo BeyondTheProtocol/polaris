@@ -18,8 +18,11 @@ QUÉ HACE (y qué NO):
 EL MURO (estructural, no se reimplementa aquí):
   · Sensibilidad la decide `borde.clasificar` sobre el prompt completo dentro de `ia.ask`; lo sensible
     solo va a cerebro de CONFIANZA (Claude/local) o se NIEGA — un cerebro de nube nunca recibe crudo.
-  · El contexto de caso va DE-IDENTIFICADO (`contexto_caso`, pre_bloqueo=True = garantizado limpio); las
-    tareas van por el render TELEGRAM-safe de `seguimiento` (terceros redactados). Defensa en profundidad.
+  · El contexto de caso va REDACTADO (`contexto_caso`, pre_bloqueo=True) y, sobre todo, marcado por
+    PROCEDENCIA: si entra un pasaje de la KB del caso, `ia.ask` recibe `sensible_forzado=True` y solo
+    lo atiende un cerebro de confianza. La redacción NO certifica anonimato (auditoría 3.3, 24-sep-26:
+    nombre + domicilio + diagnóstico ficticios pasaron con 0 redacciones). Las tareas van por el render
+    TELEGRAM-safe de `seguimiento` (terceros redactados). Defensa en profundidad.
   · La pregunta entrante es DATO no confiable (no instrucción): se etiqueta como tal y nunca cambia el rol.
   · Si lo que se pide es JUICIO CLÍNICO y el principal no está, NO se inventa con un cerebro flojo (la
     criticidad de `ia.ask` lo frena): se entrega lo OBJETIVO de tus notas y se dice que el juicio espera.
@@ -111,7 +114,7 @@ def _leer_hoy(max_chars=1500):
 def reunir_contexto(pregunta, *, index_path=None, max_chars_caso=2500):
     """Reúne contexto del gabinete en SOLO-LECTURA. dict {bloques, texto, sensible_pregunta}.
     REUSA, no reinventa: `seguimiento.construir_digest('telegram')` (terceros redactados),
-    `contexto_caso.construir_contexto(pre_bloqueo=True)` (caso de-identificado, garantizado limpio),
+    `contexto_caso.construir_contexto(pre_bloqueo=True)` (caso redactado, con su PROCEDENCIA),
     y `HOY.md`. Nada de esto tiene efectos; solo lee."""
     bloques = []
     # 1) Tareas / hilos abiertos — render TELEGRAM-safe (los nombres de tercero ya van redactados).
@@ -126,18 +129,21 @@ def reunir_contexto(pregunta, *, index_path=None, max_chars_caso=2500):
     hoy = _leer_hoy()
     if hoy:
         bloques.append("TU PARTE DE HOY:\n" + hoy)
-    # 3) Contexto de CASO de-identificado — pre_bloqueo=True ⇒ garantizado limpio (puede ir a un
-    #    cerebro de nube si la PREGUNTA no es sensible). BM25 local: para preguntas no-caso casi no
-    #    recupera nada, así que no contamina ni encarece.
+    # 3) Contexto de CASO redactado. Si entra algún pasaje, la procedencia es N2 y el prompt entero
+    #    solo va a un cerebro de confianza (antes: «garantizado limpio» y podía ir a la nube si la
+    #    pregunta no parecía sensible). BM25 local: para preguntas no-caso casi no recupera nada, así
+    #    que la nube sigue sirviendo lo que no toca el caso.
+    procedencia = ""
     try:
         ctx = contexto_caso.construir_contexto(pregunta, max_chars=max_chars_caso,
                                                pre_bloqueo=True, index_path=index_path)
         if ctx.get("contexto"):
             bloques.append("CONTEXTO DE TU CASO (de-identificado):\n" + ctx["contexto"])
+            procedencia = ctx.get("procedencia") or ""
     except Exception as e:
         sys.stderr.write("responder: contexto_caso no disponible: %r\n" % (e,))
     texto = "\n\n".join(bloques)
-    return {"bloques": bloques, "texto": texto,
+    return {"bloques": bloques, "texto": texto, "procedencia": procedencia,
             "sensible_pregunta": bool(borde.clasificar(pregunta)[0])}
 
 
@@ -173,7 +179,8 @@ def responder(pregunta, *, nivel="sustantivo", index_path=None):
               "Responde solo con estos datos. Si la respuesta no está en ellos, dilo." %
               (contexto or "(no se recuperaron datos para esta pregunta)", pregunta))
     try:
-        r = ia.ask(prompt, clinico=False, system=_SYSTEM, nivel=nivel)
+        r = ia.ask(prompt, clinico=False, system=_SYSTEM, nivel=nivel,
+                   sensible_forzado=(ctx.get("procedencia") == "N2"))
     except Exception as e:
         sys.stderr.write("responder: ia.ask falló: %r\n" % (e,))
         r = {"text": None, "deferred": True, "parado": False, "motivo": "error interno"}
