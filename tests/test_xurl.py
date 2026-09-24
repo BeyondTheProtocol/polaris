@@ -187,6 +187,24 @@ def test_fail_soft_api_error_payload():
     check("payload {errors:[...]} -> XurlError con el mensaje de X", ok)
 
 
+def test_fail_soft_problem_402_creditos():
+    """24-sep-2026: con el saldo a cero X responde un problem+json SIN clave `errors`
+    ({"title":"Payment Required","status":402,"detail":"credits depleted"}). Antes pasaba el
+    filtro como respuesta vacía y x_guardados decía «✅ leídos: 0» (éxito sobre vacío)."""
+    body = json.dumps({"detail": "credits depleted", "status": 402, "title": "Payment Required",
+                       "type": "https://api.x.com/2/problems/credits-depleted"})
+    orig = _mock_run(lambda cmd: FakeCompleted(stdout=body))
+    try:
+        try:
+            _xurl.bookmarks(max_results=10)
+            ok = False
+        except _xurl.XurlError as e:
+            ok = "402" in str(e) and "credits depleted" in str(e)
+    finally:
+        _restore(orig)
+    check("problem 402 (sin crédito) -> XurlError, no lista vacía", ok)
+
+
 def test_fail_soft_binario_no_instalado():
     # Simula "no instalado": disponible() devuelve False.
     orig_disp = _xurl.disponible
@@ -241,6 +259,7 @@ def main():
     test_fail_soft_stdout_vacio()
     test_fail_soft_json_roto()
     test_fail_soft_api_error_payload()
+    test_fail_soft_problem_402_creditos()
     test_fail_soft_binario_no_instalado()
     test_fail_soft_timeout()
     test_max_results_se_acota()

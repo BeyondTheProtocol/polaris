@@ -76,6 +76,13 @@ def _run(args):
     if isinstance(data, dict) and "errors" in data and "data" not in data:
         msgs = "; ".join(str(e.get("message", e)) for e in data.get("errors", []))
         raise XurlError("X API devolvió error: %s" % (msgs or "desconocido"))
+    # Formato problem+json (p.ej. 402 «credits depleted»): no trae `errors` y sin este freno
+    # pasaba como respuesta vacía -> «✅ 0 nuevos» con la API caída (24-sep-2026).
+    if isinstance(data, dict) and "data" not in data and (
+            isinstance(data.get("status"), int) and data["status"] >= 400
+            or ("title" in data and "type" in data)):
+        raise XurlError("X API devolvió error %s: %s" % (
+            data.get("status", "?"), data.get("detail") or data.get("title") or "desconocido"))
     return data
 
 
