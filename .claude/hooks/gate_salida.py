@@ -516,6 +516,74 @@ def preclinico_aplanado(t, tools=None):
     return None
 
 
+def _ids_de(t):
+    """IDs de literatura de un trozo, en el formato que entiende `tools/soporte_cita.py`."""
+    return [x for x in _ids_cita(t) if not x.lower().startswith("arxiv")]
+
+
+def cita_no_respalda(t, tools=None):
+    """Una cita que EXISTE no basta: la cifra que le atribuyo tiene que estar en su abstract.
+
+    Nace el 24-sep-26 (deuda `cita-afirmacion-sin-soporte`, comparación con CureWise): «41 % de
+    respuesta (PMID X)» pasaba `citas_fabricadas` si X existía, aunque X dijera 14 %. Coteja cada
+    FRASE con cifras contra el abstract de su cita (`tools/soporte_cita.py`, determinista, sin LLM;
+    al registro solo sale el ID). La cita de una frase es la suya o, si no trae, la ÚNICA de su
+    párrafo; con varias en el párrafo no se adivina a cuál se refiere.
+
+    Nace en modo AVISO (normas.json): los falsos positivos esperables son cifras que están en el
+    texto completo y no en el abstract. Solo acusa NO_RESPALDA; PENDIENTE (red, HALT), DUDOSO y
+    NO_EVALUABLE callan aquí para no convertir cada respuesta con HALT en ruido — el que necesita el
+    detalle lo tiene en el CLI y en el acta de `decision_alto_riesgo`.
+    """
+    pares = []
+    for parrafo in _parrafos(t):
+        ids_p = _ids_de(parrafo)
+        for f in _frases(parrafo):
+            if not re.search(r"\d", _CITA_EN_FRASE.sub(" ", f)):
+                continue                           # sin cifras no hay nada literal que cotejar
+            sin_enlaces = re.sub(r"\]\([^)]*\)|\S*[/\\]\S*|https?://\S+", " ", f)
+            if not _CIFRA_DE_RESULTADO.search(sin_enlaces) or _SUS_DATOS.search(f):
+                continue                           # un NCT de etiqueta o un dato suyo, no un resultado
+            usa = _ids_de(f) or (ids_p if len(ids_p) == 1 else [])
+            for x in usa:
+                if len(pares) < MAX_IDS_CITA:
+                    pares.append({"afirmacion": f.strip(), "cita": x})
+    if not pares:
+        return None
+    herramienta = os.path.join(REPO, "tools", "soporte_cita.py")
+    if not os.path.exists(herramienta):
+        return None
+    try:
+        r = subprocess.run([sys.executable, herramienta, "--lote"], input=json.dumps(pares),
+                           capture_output=True, text=True, timeout=TIMEOUT_CITAS)
+        datos = json.loads(r.stdout or "[]")
+    except Exception:
+        return None                                # red o proceso caído: aviso, no acusación
+    malas = [d for d in datos if isinstance(d, dict) and d.get("estado") == "NO_RESPALDA"]
+    if not malas:
+        return None
+    detalle = "; ".join("%s no contiene %s (bajo «%s»)" % (
+        d.get("id"), ", ".join(d.get("faltan_numeros") or []), (d.get("afirmacion") or "")[:80])
+        for d in malas)
+    return ("La cita existe pero su abstract NO trae la cifra que le atribuyes: %s. Verificado con "
+            "`tools/soporte_cita.py` (abstract de PubMed/CT.gov, sin LLM). Corrige la cifra, cita "
+            "la fuente que sí la dice, o marca que sale del texto completo." % detalle)
+
+
+# Solo se coteja una frase que atribuye un RESULTADO al estudio. El replay del 24-sep (2338 turnos,
+# 108 disparos) enseñó que casi todo lo demás era un NCT usado de etiqueta en texto operativo
+# («Moffitt (NCT…): borrador con el PDF de 75 págs») o un dato de ella junto a una cita.
+_CIFRA_DE_RESULTADO = re.compile(
+    r"%|\bmedian[ae]?\b|\bsupervivencia|\bsurvival|\bSLP\b|\bSG\b|\bPFS\b|\bOS\b|\bORR\b|"
+    r"\bTRO\b|\btasa\b|\brespuesta\b|\bresponse\b|\bHR\b|\bhazard|\bIC\s*95|\bCI\b|"
+    r"\bp\s*[<=]|\bn\s*=|\bpacientes\b|\bpatients\b|\briesgo relativo|\bodds", re.I)
+# Un dato de ELLA junto a una cita («tu Ki-67 del 30 %, como en PMID X») no es la cifra del estudio.
+_SUS_DATOS = re.compile(r"\btus?\s+(?:ki-?67|tumor|lesi[oó]n|lesiones|biopsia|informe|anal[ií]tica|"
+                        r"marcador|marcadores|RM|TAC|PET|VAF|h[ií]gado|perfil|muestra)", re.I)
+# Lo que es la cita misma (PMID, DOI, NCT) no cuenta como cifra de la frase.
+_CITA_EN_FRASE = re.compile(r"10\.\d{4,9}/\S+|NCT\d{8}|PMID\s*[:#]?\s*\d{1,9}", re.I)
+
+
 def clinico_sin_comite(t, tools=None):
     """Ninguna cifra clinica sale de aqui sin que un comite la haya tocado (5-sep-26).
 
@@ -756,6 +824,7 @@ SIN_MINIMO = {"enrutado_incumplido"}
 CHECKS = {
     "citas_fabricadas": citas_fabricadas,
     "preclinico_aplanado": preclinico_aplanado,
+    "cita_no_respalda": cita_no_respalda,
     "convergencia": convergencia,
     "coste_no_bloquea": coste_no_bloquea,
     "no_puedo_falso": no_puedo_falso,

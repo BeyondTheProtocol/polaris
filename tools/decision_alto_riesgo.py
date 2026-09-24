@@ -226,6 +226,22 @@ _EXT_RE = re.compile(
 # si no se puede importar, se degrada FAIL-CLOSED (nunca fail-open).
 _COMPROBADOR = None
 
+# Soporte cita→afirmación (24-sep-26): que la cita EXISTA no basta; sus cifras tienen que estar en
+# el abstract (`tools/soporte_cita.py`). Inyectable en tests: `_SOPORTE(afirmacion, cita) -> dict`.
+# Si no se puede importar o el registro no responde, se comporta como antes (solo existencia): el
+# hallazgo que bloquea es NO_RESPALDA, que exige haber leído el abstract y no encontrar la cifra.
+_SOPORTE = None
+
+
+def _resolver_soporte():
+    if _SOPORTE is not None:
+        return _SOPORTE
+    try:
+        from soporte_cita import soporte
+        return soporte
+    except Exception:
+        return None
+
 
 def _resolver_comprobador(comprobador):
     if comprobador is not None:
@@ -369,6 +385,18 @@ def _resolver_verificado(v, comprobador=None):
     v["cotejo"] = {"estado": est}
     if est != "confirmada":
         return False, "`contra_fuente` sin confirmar en su registro (%s): %s" % (est, det)
+    # …y que DIGA lo que se le atribuye: las cifras del `porque` tienen que estar en su abstract.
+    sop_fn = _resolver_soporte()
+    afirma = v.get("porque") or ""
+    if sop_fn is not None and afirma.strip():
+        try:
+            sop = sop_fn(afirma, contra) or {}
+        except Exception as e:
+            sop = {"estado": "PENDIENTE", "motivo": "fallo del cotejo de soporte (%s)" % str(e)[:60]}
+        v["cotejo"]["soporte"] = sop.get("estado")
+        if sop.get("estado") == "NO_RESPALDA":
+            return False, ("%s existe, pero NO respalda la afirmación: %s (tools/soporte_cita.py)"
+                           % (contra, sop.get("motivo", "")))
     return True, "confirmado por «%s» contra %s (existe en su registro)" % (por, contra)
 
 

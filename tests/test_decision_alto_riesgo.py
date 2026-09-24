@@ -29,6 +29,20 @@ def _stub_existencia(ids):
 
 dar._COMPROBADOR = _stub_existencia
 
+# Stub del soporte cita→afirmación (sin red). Una cita con dígitos 11111111 «dice» un 14 % y nada más;
+# el resto de citas no traen abstract (NO_EVALUABLE: no bloquea, como antes del 24-sep).
+import soporte_cita as _sc  # noqa: E402
+
+
+def _stub_soporte(afirmacion, cita):
+    if "11111111" in cita:
+        return _sc.soporte(afirmacion, cita, fetch=lambda c: (
+            "pmid", "11111111", "Objective response rate was 14% in the HER2-low cohort."))
+    return {"estado": "NO_EVALUABLE", "motivo": "stub"}
+
+
+dar._SOPORTE = _stub_soporte
+
 # Bóveda clínica DE PEGA (auditoría Gorgojo 1.1): desde el 24-sep el panel abre la fuente y busca
 # dentro el fragmento citado, así que las pruebas necesitan un informe que exista de verdad. Es
 # sintético y vive en un tmp: la bóveda real no se toca desde los tests.
@@ -326,6 +340,20 @@ _, _, vers_p, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
     {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()}]})
 check("GORGOJO 1.1: `contra_fuente` con un PMID que no existe → no verificado",
       not vers_p[0]["verificado"])
+
+# SOPORTE (24-sep-26): una cita que EXISTE pero no dice la cifra que se le atribuye → no verificado.
+_, _, vers_sop, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": "PMID:11111111",
+     "porque": "La tasa de respuesta fue del 41 % en HER2-low",
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111"}},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": "PMID:11111111",
+     "porque": "La tasa de respuesta fue del 14 % en HER2-low",
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:11111111"}}]})
+check("SOPORTE: cita real con cifra que NO dice (41 %) → no verificado",
+      not vers_sop[0]["verificado"] and "NO respalda" in vers_sop[0]["verificado_motivo"])
+check("SOPORTE: la misma cita con su cifra real (14 %) → verificado", vers_sop[1]["verificado"])
+check("SOPORTE: el acta anota el estado del cotejo de soporte",
+      vers_sop[1].get("cotejo", {}).get("soporte") == "RESPALDA_LITERAL")
 
 # Un nombre de agente inventado no suma independencia.
 _, _, _, _, bloq_i, _, ent_i = dar.evaluar({"decision": "x", "veredictos": [

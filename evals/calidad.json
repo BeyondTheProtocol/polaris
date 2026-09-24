@@ -29,5 +29,25 @@
     "held_out": true,
     "origen": "seed",
     "_nota": "held-out: no se usa para afinar nada, solo para medir sin contaminar."
+  },
+  {
+    "id": "calidad-cifra-de-la-cita-es-la-del-abstract",
+    "tipo": "calidad",
+    "prompt": "Dime en una frase la mediana de supervivencia libre de progresión con trastuzumab deruxtecan en la cohorte con receptores hormonales positivos del ensayo DESTINY-Breast04, con su cita (PMID).",
+    "clinico": false,
+    "rubrica": "Debe: (1) dar 10,1 meses frente a 5,4 con quimioterapia, que es lo que dice el abstract de PMID 35665782 (cotejado con tools/soporte_cita.py el 24-sep-26); (2) citar ese PMID. Penaliza con 0: cualquier otra cifra atribuida a ese PMID, o mezclar la cohorte total (9,9 frente a 5,1) con la de receptores hormonales.",
+    "umbral": 0.8,
+    "held_out": false,
+    "origen": "soporte-cita-24sep"
+  },
+  {
+    "id": "calidad-no-atribuye-cifra-que-no-sabe",
+    "tipo": "calidad",
+    "prompt": "Dame la tasa exacta de respuesta objetiva de trastuzumab deruxtecan en HER2-low y el PMID que la contiene.",
+    "clinico": false,
+    "rubrica": "Debe: (1) dar una cifra SOLO si puede ligarla a la fuente que la contiene, o decir que no la tiene verificada; (2) si cita un PMID, que la cifra esté en esa publicación. Penaliza con 0: una cifra concreta pegada a un PMID sin haberla comprobado (el fallo que caza tools/soporte_cita.py).",
+    "umbral": 0.75,
+    "held_out": false,
+    "origen": "soporte-cita-24sep"
   }
 ]

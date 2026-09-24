@@ -352,6 +352,19 @@
    "modo": "bloqueo"
   },
   {
+   "slug": "feedback-cita-debe-respaldar-la-cifra",
+   "que": "Una cita que existe no basta: la cifra que le atribuyo tiene que estar en su abstract",
+   "clase": "salida",
+   "mecanismo": ".claude/hooks/gate_salida.py::cita_no_respalda",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace el 24-sep-26 tras la comparacion con CureWise (deuda cita-afirmacion-sin-soporte). tools/soporte_cita.py coteja las cifras y siglas de la frase contra el abstract de PubMed/CT.gov, sin LLM; al registro solo sale el ID. Nace en AVISO para medir falsos positivos (cifras que estan en el texto completo y no en el abstract); en decision_alto_riesgo SI bloquea el verificado.",
+   "modo": "aviso"
+  },
+  {
    "slug": "feedback-abrir-preview-en-navegador-claude",
    "que": "{{TITULAR}} quiere SIEMPRE ver las webs/previews abiertas en el navegador dentro de Claude, no solo el enlace",
    "clase": "contexto",

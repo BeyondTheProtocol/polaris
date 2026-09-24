@@ -1,0 +1,56 @@
+{
+  "_por_que": "Cada entrada es una defensa del gate cita→afirmación (24-sep-26). Si al quitarla test_soporte_cita sigue verde, esa defensa no está cubierta.",
+  "objetivo": "tools/soporte_cita.py",
+  "test": [
+    "python3",
+    "tests/test_soporte_cita.py"
+  ],
+  "env": "BTP_SOPORTE",
+  "mutaciones": [
+    {
+      "etiqueta": "cotejo: ninguna cifra falta nunca",
+      "viejo": "    faltan_n = [n for n in nums if n not in nums_abs]",
+      "nuevo": "    faltan_n = []"
+    },
+    {
+      "etiqueta": "cotejo: ninguna entidad falta nunca",
+      "viejo": "    faltan_e = [e for e in ents if not _entidad_en(e, plano_abs)]",
+      "nuevo": "    faltan_e = []"
+    },
+    {
+      "etiqueta": "alias: sin alias de fármacos",
+      "viejo": "    return any(a in plano_abs for a in ALIAS.get(ent, ()))",
+      "nuevo": "    return False"
+    },
+    {
+      "etiqueta": "números: fase/estadio cuentan como cifra",
+      "viejo": "        if _CATEGORIA.search(",
+      "nuevo": "        if False and _CATEGORIA.search("
+    },
+    {
+      "etiqueta": "números: sin miles en español",
+      "viejo": "        t = _MILES_ES.sub(lambda m: m.group(1).replace(\".\", \"\"), t)\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "red: sin respetar el HALT",
+      "viejo": "    if fetch is None and halt_activo():",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "red: registro mudo se trata como sin abstract",
+      "viejo": "    if abstract is None:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "CLI: NO_RESPALDA sale con 0",
+      "viejo": "    return 2 if any(r[\"estado\"] == NO_RESPALDA for r in res) else 0",
+      "nuevo": "    return 0"
+    },
+    {
+      "etiqueta": "texto completo: rescata aunque siga faltando la cifra",
+      "viejo": "            if e2 != NO_RESPALDA:",
+      "nuevo": "            if True:"
+    }
+  ]
+}

@@ -139,5 +139,90 @@ class ModosPorNorma(unittest.TestCase):
         self.assertGreaterEqual(mecs.count(".claude/hooks/gate_salida.py::coste_no_bloquea"), 2)
 
 
+
+# ── cita_no_respalda (24-sep-26): la cita existe, pero ¿dice la cifra que le atribuyo? ──────────
+ABSTRACT_14 = "Objective response rate was 14% (95% CI, 8 to 22) in the HER2-low cohort of 120 patients."
+ATRIBUYE_41 = ("Sobre lo que preguntabas del anticuerpo conjugado, la tasa de respuesta objetiva fue "
+               "del 41 % en la cohorte HER2-low (PMID: 12345678), así que podría merecer la pena "
+               "llevarlo a la consulta con tu oncóloga.")
+ATRIBUYE_14 = ATRIBUYE_41.replace("41 %", "14 %")
+
+
+def _mock_soporte(abstract):
+    """Sustituye el subproceso de soporte_cita por el cotejo REAL contra un abstract fijo."""
+    import soporte_cita as sc
+
+    def run(cmd, **kw):
+        pares = json.loads(kw.get("input") or "[]")
+        res = [dict(sc.soporte(p["afirmacion"], p["cita"], fetch=lambda c: ("pmid", c, abstract)),
+                    afirmacion=p["afirmacion"]) for p in pares]
+        return _Resp(json.dumps(res))
+    return run
+
+
+class CitaNoRespalda(unittest.TestCase):
+    def setUp(self):
+        self._real = g.subprocess.run
+
+    def tearDown(self):
+        g.subprocess.run = self._real
+
+    def test_cifra_que_el_abstract_no_dice_se_avisa(self):
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        m = g.cita_no_respalda(ATRIBUYE_41)
+        self.assertIsNotNone(m)
+        self.assertIn("41", m)
+
+    def test_cifra_correcta_calla(self):
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        self.assertIsNone(g.cita_no_respalda(ATRIBUYE_14))
+
+    def test_registro_mudo_calla(self):
+        g.subprocess.run = _mock_soporte(None)
+        self.assertIsNone(g.cita_no_respalda(ATRIBUYE_41))
+
+    def test_sin_cita_no_consulta(self):
+        llamado = []
+        g.subprocess.run = lambda *a, **k: llamado.append(1)
+        self.assertIsNone(g.cita_no_respalda(LIMPIO))
+        self.assertEqual(llamado, [])
+
+    def test_varias_citas_en_el_parrafo_no_adivina(self):
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        texto = ("La respuesta fue del 41 %. Lo cuentan dos trabajos (PMID: 12345678) y "
+                 "(PMID: 23456789) con poblaciones distintas que conviene no mezclar.")
+        # la frase con la cifra no trae cita y el párrafo trae dos: no se atribuye a ninguna
+        self.assertIsNone(g.cita_no_respalda(texto))
+
+    def test_nct_de_etiqueta_en_texto_operativo_calla(self):
+        """Replay 24-sep: «Moffitt (NCT…): borrador con el PDF de 75 págs» no es un resultado."""
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        texto = ("Te lo dejo a un clic: el borrador para Moffitt (NCT06691035) lleva el PDF de 75 "
+                 "páginas y la RM del 19-jun, y lo revisas tú antes de mandarlo mañana a las 10:30.")
+        self.assertIsNone(g.cita_no_respalda(texto))
+
+    def test_porcentaje_de_una_url_no_es_resultado(self):
+        """Etiquetado 24-sep: el %20 de un enlace hacía pasar «Apartado 7» por una cifra de resultado."""
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        texto = ("**Dónde quedó archivado** · Apartado 7 de [Notas/fiebre](00_FUENTE-DE-VERDAD/04%20·%20IA"
+                 "/Notas/fiebre-nct07222267.md) sobre NCT07222267, con el resto de lo que dice cada fuente.")
+        self.assertIsNone(g.cita_no_respalda(texto))
+
+    def test_dato_suyo_junto_a_la_cita_calla(self):
+        g.subprocess.run = _mock_soporte(ABSTRACT_14)
+        texto = ("Tu Ki-67 del 30 % encaja con la cohorte del trabajo (PMID: 12345678), que es de "
+                 "donde sale la comparación que te comentaba antes sobre la proliferación.")
+        self.assertIsNone(g.cita_no_respalda(texto))
+
+    def test_nace_en_aviso_no_bloquea(self):
+        """Modo aviso en normas.json: hasta medir falsos positivos, no frena la respuesta."""
+        self.assertNotIn("cita_no_respalda", g.SIEMPRE_BLOQUEA)
+        self.assertEqual(g._bloquean([("cita_no_respalda", "s", "m")], "aviso"), [])
+
+    def test_esta_registrado_en_normas(self):
+        activas, _ = g._reglas_activas()
+        self.assertIn("cita_no_respalda", [c for c, _s, _m in activas])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

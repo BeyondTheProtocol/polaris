@@ -63,6 +63,7 @@ runpy test_gate_citas.py
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
 runpy test_tier_evidencia.py
+runpy test_soporte_cita.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_deuda_texto_sin_alarma.py
 runpy test_deuda_duplicadas.py
@@ -261,6 +262,10 @@ echo "── mutantes: tests/mutantes/lector_clinico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/lector_clinico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes.log 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes (log: /tmp/rojo-mutantes.log)"; }
+echo "── mutantes: tests/mutantes/soporte_cita.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/soporte_cita.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-soporte.log 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes soporte_cita (log: /tmp/rojo-mutantes-soporte.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
