@@ -392,6 +392,45 @@ _YA_ETIQUETADO = (
     "no se ha probado en personas", "todavía no en humanos", "todavia no en humanos",
 )
 
+# Un hallazgo que empieza así es una verificación que NO se pudo hacer, no una violación: se avisa
+# y nunca bloquea (ver `_bloquean`). Existe para que un fallo de red no se convierta en un
+# «verificado» por defecto (auditoría Gorgojo 1.4).
+PENDIENTE = "⏳ PENDIENTE de comprobar:"
+# Fin de frase que NO es fin de frase: «Smith et al. mostraron…», «p. ej. en ratones».
+_ABREVIATURA = re.compile(r"(?:\bet al|\bp\. ej|\bvs|\betc|\bfig|\baprox|\bdra?|\bsra?|\b\w)\.$", re.I)
+
+
+def _parrafos(t):
+    """Sin bloques, sin código en línea y sin lo que va entre comillas: un `PMID: X` entre
+    backticks o «el inhibidor funciona (PMID: X)» entre comillas es un EJEMPLO o una cita (hablar
+    del propio gate), no una afirmación mía. Lo cazó el replay del 24-sep: dos respuestas que
+    explicaban el check quedaban BLOQUEADAS por la frase de su propio test.
+    Límite que se acepta: una promesa escrita entre comillas con su PMID dentro se escapa. Es más
+    raro que hablar del gate, y este check bloquea: un freno que para de más acaba apagado."""
+    t = re.sub(r"\"[^\"\n]{0,400}\"|«[^»\n]{0,400}»|“[^”\n]{0,400}”", " ", _sin_bloques(t))
+    return [p for p in re.split(r"\n\s*\n", t) if p.strip()]
+
+
+def _frases(parrafo):
+    """Frases: fin de oración o salto de línea (una fila de tabla o un bullet es SU unidad, con su
+    columna de tier), sin partir en una abreviatura."""
+    out = []
+    for trozo in re.split(r"(?<=[.!?])\s+|\s*\n\s*", parrafo):
+        if out and _ABREVIATURA.search(out[-1].rstrip()):
+            out[-1] += " " + trozo
+        else:
+            out.append(trozo)
+    return [f for f in out if f.strip()]
+
+
+def _etiquetada(frase):
+    b = frase.lower()
+    return any(k in b for k in _YA_ETIQUETADO)
+
+
+def _pmids(t):
+    return [x for x in _ids_cita(t) if x.upper().startswith("PMID")]
+
 
 def preclinico_aplanado(t, tools=None):
     """Un resultado en ratones o en células no puede salir con cara de que «funciona».
@@ -408,36 +447,73 @@ def preclinico_aplanado(t, tools=None):
       C. ¿la respuesta YA dice que es preclínico?
     Acusa solo con A y B y no C. Si la frase ya dice «en ratones», la norma se cumple y calla.
 
-    FAIL-OPEN ante la red y ante `desconocido`, igual que `citas_fabricadas`.
-    Porqué-no: bloquear ante `desconocido` frenaría cualquier paper recién indexado todavía
-    sin MeSH — sería ruido constante y acabaría con el gate desactivado, que es peor que el
-    hueco que tapa. El `desconocido` se ve en la herramienta, no frena la salida.
+    POR UNIDAD (auditoría Gorgojo 1.4, 24-sep-26). Antes los tres booleanos se miraban sobre el
+    texto ENTERO, y un «en ratones» sobre el fármaco B eximía una promesa de supervivencia sobre
+    el A: lo reproduje, y el registro ni se consultaba. Ahora la ETIQUETA cubre solo SU frase, y
+    la CITA de una afirmación es la de su frase o, si no trae, las de su párrafo que no estén ya
+    dichas como preclínicas en otra frase. («A reduce el tumor. Fuente: PMID X.» es una unidad.)
+
+    Fallo de verificación ≠ vía libre. Red caída, clasificador ausente o tier `desconocido` ya no
+    devuelven None en silencio (eso era dar la promesa por comprobada): devuelven un hallazgo que
+    empieza por PENDIENTE, que se AVISA y nunca bloquea (`_bloquean` lo excluye). Bloquear por la
+    red rompería conversaciones por algo que no es culpa de la respuesta, y un paper recién
+    indexado todavía no tiene MeSH; callar, en cambio, es sellar lo que nadie miró.
     """
-    bajo = t.lower()
-    if not any(k in bajo for k in _AFIRMA_EFICACIA):
-        return None                                # B falso: no hay promesa que aplanar
-    if any(k in bajo for k in _YA_ETIQUETADO):
-        return None                                # C cierto: la regla 17 ya se cumple
-    pmids = [x for x in _ids_cita(t) if x.upper().startswith("PMID")]
-    if not pmids:
-        return None                                # sin PMID no hay registro que consultar
+    candidatos = []                                # [(frase, [PMID…])]
+    for parrafo in _parrafos(t):
+        frases = _frases(parrafo)
+        pm_etiquetados = {x for f in frases if _etiquetada(f) for x in _pmids(f)}
+        pm_parrafo = _pmids(parrafo)
+        for f in frases:
+            if not any(k in f.lower() for k in _AFIRMA_EFICACIA):
+                continue                           # B falso en esta frase
+            if _etiquetada(f):
+                continue                           # C cierto EN ESTA frase: la regla se cumple
+            usa = _pmids(f) or [x for x in pm_parrafo if x not in pm_etiquetados]
+            if usa:
+                candidatos.append((f.strip(), usa))
+    if not candidatos:
+        return None                                # sin afirmación citada no hay registro que mirar
+    pmids = []
+    for _f, usa in candidatos:
+        pmids += [x for x in usa if x not in pmids]
+    pmids = pmids[:MAX_IDS_CITA]
     clasificador = os.path.join(REPO, "tools", "tier_evidencia.py")
     if not os.path.exists(clasificador):
-        return None
+        return (PENDIENTE + " no encuentro `tools/tier_evidencia.py` para saber si %s es "
+                "preclínico. Afirmas eficacia apoyándote en esa cita: nómbrale el tier en la misma "
+                "frase o dilo como no comprobado." % ", ".join(pmids))
     try:
         r = subprocess.run([sys.executable, clasificador, "--json"] + pmids,
                            capture_output=True, text=True, timeout=TIMEOUT_CITAS)
         datos = json.loads(r.stdout or "[]")
     except Exception:
-        return None                                # fail-open: nunca frenar por la red
-    malas = [(d.get("id"), d.get("etiqueta")) for d in datos if d.get("preclinico")]
-    if not malas:
-        return None
-    detalle = ", ".join("%s (%s)" % (i, e) for i, e in malas)
-    return ("Estás afirmando eficacia apoyándote en evidencia PRECLÍNICA sin decirlo: %s. "
-            "Verificado contra PubMed con `tools/tier_evidencia.py` (PublicationType + MeSH, "
-            "sin LLM). Regla 17: nombra el tier en la MISMA frase del hallazgo — «en ratones», "
-            "«en líneas celulares» — o quita la afirmación de eficacia." % detalle)
+        datos = None
+    if not isinstance(datos, list):
+        return (PENDIENTE + " el registro (PubMed vía `tools/tier_evidencia.py`) no respondió, así "
+                "que NO sé si %s es preclínico. Afirmas eficacia apoyándote en esa cita: nómbrale el "
+                "tier en la misma frase o dilo como no comprobado." % ", ".join(pmids))
+    por_id = {re.sub(r"\D", "", str(d.get("id"))): d for d in datos if isinstance(d, dict)}
+    malas, dudosas = [], []
+    for frase, usa in candidatos:
+        for x in usa:
+            d = por_id.get(re.sub(r"\D", "", x))
+            if d is None or d.get("tier") == "desconocido":
+                dudosas.append(x)
+            elif d.get("preclinico"):
+                malas.append((x, d.get("etiqueta"), frase))
+    if malas:
+        detalle = "; ".join("%s (%s) bajo «%s»" % (i, e, f[:90]) for i, e, f in malas)
+        return ("Estás afirmando eficacia apoyándote en evidencia PRECLÍNICA sin decirlo: %s. "
+                "Verificado contra PubMed con `tools/tier_evidencia.py` (PublicationType + MeSH, "
+                "sin LLM). Regla 17: nombra el tier en la MISMA frase del hallazgo — «en ratones», "
+                "«en líneas celulares» — o quita la afirmación de eficacia. Una etiqueta en otra "
+                "frase no cubre esta." % detalle)
+    if dudosas:
+        return (PENDIENTE + " el registro no sabe el tier de %s (sin MeSH o no encontrado). "
+                "Afirmas eficacia apoyándote en esa cita: si no sabes si es clínico, dilo en la "
+                "frase." % ", ".join(dict.fromkeys(dudosas)))
+    return None
 
 
 def clinico_sin_comite(t, tools=None):
@@ -748,11 +824,13 @@ def revisar(texto, tools=None):
 
 
 def _bloquean(hallazgos, modo_global):
-    """Checks de estos hallazgos que exigen bloquear: por modo propio de su norma, o por el global."""
+    """Checks de estos hallazgos que exigen bloquear: por modo propio de su norma, o por el global.
+    Un hallazgo PENDIENTE (no se pudo comprobar) nunca bloquea: se avisa."""
     activas, _ = _reglas_activas()
     propio = {c: m for c, _s, m in activas}
-    return [c for c, _s, _m in hallazgos
-            if (propio.get(c) or modo_global) == "bloqueo" or c in SIEMPRE_BLOQUEA]
+    return [c for c, _s, m in hallazgos
+            if not str(m or "").startswith(PENDIENTE)
+            and ((propio.get(c) or modo_global) == "bloqueo" or c in SIEMPRE_BLOQUEA)]
 
 
 def _es_mensaje_de_titular(d):

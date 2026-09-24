@@ -42,7 +42,7 @@ PATRON = re.compile(r"^\s*(ROOT|REPO|BASE|HERE)\s*=\s*os\.path\.dirname\(os\.pat
 CONOCIDOS = {
     "_lock.py", "archivar_nota.py", "bandeja.py", "borde.py", "borde_gateway.py",
     "calendar_sync.py", "calendar_write.py", "capacidades.py", "cascada_clinica.py",
-    "contexto_caso.py", "correo.py", "correo_responder.py", "cost_guard.py",
+    "contexto_caso.py", "correo.py", "correo_responder.py",
     "digest.py", "evals.py", "fugu.py", "healthcheck.py", "ia.py", "ig_inbox.py",
     "instagram_dm.py", "pendientes.py", "rebuild_agents.py",
     "responder_con_datos.py", "salida.py", "seguridad_sweep.py", "staging.py",

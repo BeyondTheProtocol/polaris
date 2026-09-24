@@ -348,7 +348,7 @@
    "aplicable": true,
    "auditable": true,
    "repetida": false,
-   "nota": "Regla 17 del protocolo, mecanizada el 17-sep-26. Vivia solo en el prompt: se cumplia cuando el modelo se acordaba. El tier lo resuelve tools/tier_evidencia.py contra PubMed (PublicationType + MeSH, sin LLM); el gate teje tres booleanos (cita preclinica / afirma eficacia / ya etiquetado) y solo acusa con los dos primeros y sin el tercero. Fail-open ante red y ante tier desconocido.",
+   "nota": "Regla 17 del protocolo, mecanizada el 17-sep-26. Vivia solo en el prompt: se cumplia cuando el modelo se acordaba. El tier lo resuelve tools/tier_evidencia.py contra PubMed (PublicationType + MeSH, sin LLM); el gate teje tres booleanos (cita preclinica / afirma eficacia / ya etiquetado) y solo acusa con los dos primeros y sin el tercero. Desde el 24-sep (auditoria Gorgojo 1.4) va POR UNIDAD: la etiqueta cubre solo su frase; y red caida o tier desconocido dan un hallazgo PENDIENTE que avisa y nunca bloquea (antes: fail-open silencioso).",
    "modo": "bloqueo"
   },
   {

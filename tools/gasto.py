@@ -23,6 +23,9 @@ y `coste.py` la sumaba como 0 sin decir nada. Ahora la tabla es la de `coste.py`
 
 Modelo sin tarifa → `usd: null` + `sin_tarifa: true`, NUNCA 0. Cero significa «no costó»;
 null significa «no lo sé». `tests/test_gasto_tarifa.py` vigila las dos cosas.
+
+Y lo que se sabe tarifar se AVISA a `cost_guard` (`via="api"`), que es quien gatea los topes: sin
+eso, las seis tools de pago gastaban fuera del contador. Avisa, no gatea — ver `_a_cost_guard`.
 """
 import json
 import os
@@ -44,8 +47,13 @@ def _ledger():
     base = os.environ.get("BTP_GASTO_LEDGER")
     if base:
         return base
-    repo = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
-    casa = os.path.join(repo, "tools")
+    try:
+        sys.path.insert(0, TOOLS_DIR)
+        from _casa import casa_base
+        raiz = casa_base()
+    except Exception:
+        raiz = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
+    casa = os.path.join(raiz, "tools")
     return os.path.join(casa if os.path.isdir(casa) else TOOLS_DIR, ".gasto_ledger.jsonl")
 
 
@@ -83,6 +91,32 @@ def _precio(model, tool=None):
         return None
 
 
+def _a_cost_guard(usd, tool):
+    """Apunta el gasto en el contador que gatean los topes. Best-effort, y NUNCA bloquea.
+
+    24-sep-2026, deuda `cost-guard-ciego-apis-de-pago`: verificado con grep que ninguna de las seis
+    tools de pago (grok, perplexity, gemini, chatgpt, glm, openrouter) llamaba a `cost_guard`. Su
+    gasto vivía solo en este ledger, que los topes diario y mensual NO leen: se tarifaban a cero
+    POR CONSTRUCCIÓN, y se podía pasar del tope sin que sonara nada.
+
+    AVISA, no GATEA, y es deliberado: `registrar` se llama DESPUÉS de una respuesta que ya se pagó,
+    así que frenar aquí no ahorraría ese dólar y sí podría cortar trabajo a mitad. Poner
+    `check_before_job` en las seis tools es otra decisión, con el filtro de «el coste nunca corta
+    el camino a NED» delante.
+
+    Se pasa un float y no un dict a propósito: aquí `usd` SIEMPRE es un número calculado, no un
+    campo que pueda faltar. Ese es justo el matiz que `tools/ia.py:387` se salta (hace `or 0.0`
+    sobre un campo ausente y esquiva el coste pesimista → deuda `ia-py-esquiva-el-coste-pesimista`).
+    Una llamada SIN tarifa no llega hasta aquí: cero significaría «no costó», y no lo sabemos."""
+    try:
+        if TOOLS_DIR not in sys.path:
+            sys.path.insert(0, TOOLS_DIR)
+        import cost_guard
+        cost_guard.add_cost(float(usd), job_id="api-%s" % (tool or "?"), via="api")
+    except Exception:
+        pass  # el contador NUNCA debe tumbar una respuesta del sistema
+
+
 def registrar(tool, model, input_tokens=0, output_tokens=0, usd=None):
     """Apunta una llamada de API de pago en el ledger. Best-effort: nunca rompe al llamador."""
     it = int(input_tokens or 0)
@@ -103,6 +137,8 @@ def registrar(tool, model, input_tokens=0, output_tokens=0, usd=None):
         # Explícito en el fichero: quien lea el ledger sabe que este gasto existió y no se
         # pudo tarifar, en vez de verlo desaparecer dentro de un total.
         linea["sin_tarifa"] = True
+    if isinstance(usd, (int, float)) and usd > 0:
+        _a_cost_guard(usd, tool)
     try:
         destino = _ledger()          # se re-resuelve por si BTP_* cambió (tests)
         os.makedirs(os.path.dirname(destino), exist_ok=True)

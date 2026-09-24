@@ -12,6 +12,17 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools"))
 import dosier_invariantes as di  # noqa: E402
 
+# Bóveda de pega (24-sep-26): `cotejo_invariante` exige que el informe citado EXISTA (auditoría
+# Gorgojo 1.1/1.6). El de `_COTEJO_OK` existe aquí, en un tmp; la bóveda real no se toca.
+import tempfile  # noqa: E402
+_BOVEDA = os.path.join(tempfile.mkdtemp(prefix="dosier_boveda_"), "_PRIVADO_CLINICO")
+os.makedirs(os.path.join(_BOVEDA, "demo"))
+with open(os.path.join(_BOVEDA, "demo", "informe.pdf"), "wb") as _f:
+    _f.write(b"%PDF-1.4 informe sintetico de prueba")
+os.environ["BTP_BOVEDA_CLINICA"] = _BOVEDA
+import fuente_clinica as _fc  # noqa: E402
+_fc._LOG = lambda *a: None   # no se escribe en el registro real de accesos clínicos
+
 AHORA = datetime(2026, 6, 27, tzinfo=timezone.utc)
 fallos = 0
 total = 0

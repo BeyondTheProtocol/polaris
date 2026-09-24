@@ -27,9 +27,30 @@ import time
 from datetime import datetime
 
 HOME = os.path.expanduser("~")
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Casa base SIEMPRE, no el árbol de al lado (`_casa.casa_base()`, migrado el 24-sep-2026 y borrado
+# de la lista de `tests/test_raices_casa_base.py`). Esto resolvía la raíz con `__file__`, así que
+# un `cost_guard` importado desde un worktree llevaba su PROPIA contabilidad, y los topes de casa
+# base no veían nada de lo que pasara ahí. Con {{TITULAR}} en varias sesiones a la vez, y cada una en
+# su worktree, ese caso es el NORMAL. De paso, `$REPO/.HALT` pasa a ser el de casa base: un HALT
+# puesto ahí ahora sí frena a una sesión de worktree.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _casa import casa_base  # noqa: E402
+
+REPO = casa_base()
 # BTP_STATE_DIR aísla el estado (tests / reubicación); por defecto tools/state.
-STATE = os.environ.get("BTP_STATE_DIR") or os.path.join(REPO, "tools", "state")
+# Y en batería (`BTP_TEST_BATTERY=1`) sin `BTP_STATE_DIR`, a un tmp y NUNCA a la contabilidad real
+# — mismo freno y misma historia que `panel.py`. Lo que lo destapó: mientras se migraba esto se
+# encontraron 2.263 eventos `borde-reescritura` de 6 segundos ($2,31) en el estado de coste de un
+# worktree. Seis segundos no son 2.263 llamadas de API: era un test sin aislar, dinero SIMULADO.
+# Mientras la raíz era el worktree, eso solo ensuciaba un árbol que se borra; apuntando a casa
+# base habría entrado en el dinero de verdad. Por eso la migración trae su freno en el mismo sitio.
+if os.environ.get("BTP_STATE_DIR"):
+    STATE = os.environ["BTP_STATE_DIR"]
+elif os.environ.get("BTP_TEST_BATTERY") == "1":
+    import tempfile
+    STATE = os.path.join(tempfile.gettempdir(), "btp-test-cost-%d" % os.getuid())
+else:
+    STATE = os.path.join(REPO, "tools", "state")
 COST = os.path.join(STATE, "cost")
 LOCKDIR = os.path.join(COST, "lock")
 LIMITS = os.path.join(COST, "limits.json")

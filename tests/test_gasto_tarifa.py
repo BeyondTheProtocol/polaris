@@ -21,6 +21,7 @@ Lo que vigila esta batería:
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -139,6 +140,75 @@ def main():
            % (len(reales), desconocidos))
         ok(all(coste.price_for(m, tabla, t) is None for (t, m) in sin_real),
            "lo que sale como «sin tarifa» es de verdad intarifable, no un fallo de lectura")
+
+    # --- 8. Lo tarifable llega al contador que gatea los topes ----------------
+    # En subproceso y con BTP_STATE_DIR: `cost_guard` fija sus rutas al importarse, y esta batería
+    # NO puede tocar la contabilidad real (es dinero, y un test que la ensucia miente por partida
+    # doble). Deuda `cost-guard-ciego-apis-de-pago`: ninguna de las 6 tools de pago avisaba.
+    codigo = r"""
+import json, os, sys, tempfile
+d = tempfile.mkdtemp()
+os.environ["BTP_STATE_DIR"] = d
+os.environ["BTP_GASTO_LEDGER"] = os.path.join(d, "l.jsonl")
+sys.path.insert(0, %r)
+import gasto, cost_guard
+antes = cost_guard.today_spent()
+gasto.registrar("grok", "grok-4.3", 1000000, 0)          # $3,00, tarifa conocida
+con_tarifa = cost_guard.today_spent()
+gasto.registrar("openrouter", "nadie/sabe", 9000000, 9000000)   # sin tarifa
+tras_desconocido = cost_guard.today_spent()
+ruta = os.path.join(d, "cost", os.popen("date +%%F").read().strip() + ".json")
+hoy = json.load(open(ruta)) if os.path.exists(ruta) else {"n_jobs": 0, "eventos": []}
+print(json.dumps({"antes": antes, "con_tarifa": con_tarifa, "tras": tras_desconocido,
+                  "n_jobs": hoy.get("n_jobs"),
+                  "vias": [e.get("via") for e in hoy.get("eventos", [])],
+                  "jobs": [e.get("job") for e in hoy.get("eventos", [])]}))
+""" % TOOLS
+    r = subprocess.run([sys.executable, "-c", codigo], capture_output=True, text=True)
+    ok(r.returncode == 0, "el subproceso de cost_guard corre (%s)" % r.stderr.strip()[-120:])
+    if r.returncode == 0:
+        d = json.loads(r.stdout.strip().splitlines()[-1])
+        ok(abs(d["con_tarifa"] - d["antes"] - 3.0) < 1e-6,
+           "una llamada tarifada suma su importe exacto al contador de los topes")
+        ok(abs(d["tras"] - d["con_tarifa"]) < 1e-9,
+           "una llamada SIN tarifa no entra como 0 en el contador")
+        ok(d["n_jobs"] == 1 and d["jobs"] == ["api-grok"],
+           "y tampoco deja un evento fantasma: solo hay el job tarifado")
+        ok(d["vias"] == ["api"], "se apunta como via=api (dinero real, el cubo que gatean los topes)")
+
+    # --- 9. Avisar no puede tumbar ni bloquear la llamada --------------------
+    import cost_guard
+    real = cost_guard.add_cost
+    cost_guard.add_cost = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["BTP_GASTO_LEDGER"] = os.path.join(tmp, "l.jsonl")
+        try:
+            linea = gasto.registrar("grok", "grok-4.3", 1000, 0)
+            ok(linea["usd"] is not None, "si cost_guard revienta, registrar sigue devolviendo la línea")
+            ok(os.path.exists(os.environ["BTP_GASTO_LEDGER"]),
+               "…y el ledger se escribe igual: el contador nunca tumba una respuesta")
+        finally:
+            cost_guard.add_cost = real
+            os.environ.pop("BTP_GASTO_LEDGER", None)
+
+    # --- 10. El estado de coste es de casa base, y la batería no lo toca -----
+    def _cost_dir(entorno):
+        env = dict(os.environ)
+        for k in ("BTP_STATE_DIR", "BTP_TEST_BATTERY", "BTP_REPO"):
+            env.pop(k, None)
+        env.update(entorno)
+        rr = subprocess.run(
+            [sys.executable, "-c", "import sys;sys.path.insert(0,%r);import cost_guard;print(cost_guard.COST)" % TOOLS],
+            capture_output=True, text=True, env=env)
+        return rr.stdout.strip()
+
+    ok(_cost_dir({}) == os.path.join(os.path.expanduser("~/claudecode"), "tools", "state", "cost"),
+       "sin variables, la contabilidad es la de CASA BASE (no la del worktree de turno)")
+    ok(_cost_dir({"BTP_REPO": "/tmp/otra-casa"}) == "/tmp/otra-casa/tools/state/cost",
+       "BTP_REPO manda")
+    en_bateria = _cost_dir({"BTP_TEST_BATTERY": "1"})
+    ok(en_bateria and "claudecode" not in en_bateria,
+       "en batería sin BTP_STATE_DIR, el coste va a un tmp: un test NO escribe en el dinero real")
 
     print("test_gasto_tarifa: %d OK, %d fallos" % (_pass, _fail))
     return 1 if _fail else 0

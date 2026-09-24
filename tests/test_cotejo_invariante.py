@@ -19,6 +19,20 @@ sys.path.insert(0, TOOLS)
 import cotejo_invariante as cot       # noqa: E402 — la capa bajo prueba
 import dosier_invariantes as di       # noqa: E402 — cableado al veredicto único
 
+# Bóveda DE PEGA (24-sep-26, auditoría Gorgojo 1.1/1.6): el cotejo ya no se conforma con la forma
+# del puntero, el informe tiene que existir. Los informes de estos fixtures existen aquí, en un tmp;
+# la bóveda real no se toca desde los tests.
+import tempfile  # noqa: E402
+_BOVEDA = os.path.join(tempfile.mkdtemp(prefix="cotejo_boveda_"), "_PRIVADO_CLINICO")
+for _rel in ("biopsia-{{FUENTE_A}}/informe.pdf", "{{FUENTE_B}}/guardant-informe.pdf", "x.pdf",
+             "{{FUENTE_B}}/guardant360-informe.pdf"):
+    os.makedirs(os.path.dirname(os.path.join(_BOVEDA, _rel)), exist_ok=True)
+    with open(os.path.join(_BOVEDA, _rel), "wb") as _f:
+        _f.write(b"%PDF-1.4 informe sintetico de prueba")
+os.environ["BTP_BOVEDA_CLINICA"] = _BOVEDA
+import fuente_clinica as _fc  # noqa: E402
+_fc._LOG = lambda *a: None   # no se escribe en el registro real de accesos clínicos
+
 AHORA = datetime(2026, 6, 27, tzinfo=timezone.utc)
 fallos = 0
 total = 0
@@ -193,6 +207,18 @@ except Exception as e:
     check("MURO: muro.py importable para el chequeo", False)
     sys.stderr.write("muro no importable: %r\n" % (e,))
 
+
+# ── Auditoría Gorgojo 1.6 (misma clase que 1.1): la forma del puntero no basta ─────────────────
+# Reproducido por el auditor: un puntero a la bóveda que NO existe pasaba el cotejo. Ahora se
+# resuelve contra la bóveda con el mismo módulo que usa el panel de alto riesgo.
+p = pieza("ERBB2 amplificado", cotejo={"fuente": "_PRIVADO_CLINICO/informe-que-no-existe-2099.pdf",
+          "fecha": "2026-06-01", "plataforma": "x", "tipo_resultado": "presencia"})
+check("GORGOJO 1.6: puntero a un informe que NO existe → BLOQUEADO",
+      any("no_existe" in b for b in cot.evaluar_cotejo([p])))
+p = pieza("ERBB2 amplificado", cotejo={"fuente": "_PRIVADO_CLINICO/../../fuera.pdf",
+          "fecha": "2026-06-01", "plataforma": "x", "tipo_resultado": "presencia"})
+check("GORGOJO 1.6: puntero que se escapa de la bóveda con `..` → BLOQUEADO",
+      any("fuera_de_boveda" in b for b in cot.evaluar_cotejo([p])))
 
 print("RESULTADO cotejo_invariante: %d OK, %d fallos" % (total - fallos, fallos))
 print("✅ CORTAFUEGOS DE COTEJO EN VERDE" if not fallos else "❌ revisar fallos")

@@ -2755,13 +2755,16 @@ FRASE_REVISION = ("Un radiólogo, en lectura informal y sin informe firmado, mar
                   "Polaris están entre ellas; el informe oficial dice M1 múltiples.")
 
 
-def marcas_radiologo(revision, serie, fecha, empareja=None, fuente_emparejado=None):
+def marcas_radiologo(revision, serie, fecha, empareja=None, fuente_emparejado=None,
+                     posiciones=None, fuente_posiciones=None):
     """lesiones_55.json (x, y en píxeles del corte, z = índice de corte, del volumen de la caché)
     → marcas.json + una esfera PLY por marca sin lesión automática.
 
     Reglas que no dependen de mirar a ojo (y por eso se pueden auditar):
       · `empareja` {marca: lesión} fuerza un emparejado verificado por otra vía (a ojo, sobre
         las superposiciones); queda escrito con su fuente en el JSON.
+      · `posiciones` {marca: (x, y, z)} corrige la posición (mismas unidades que la revisión)
+        cuando se ha re-medido sobre su captura; el segmento se recalcula en el sitio nuevo.
       · dos marcas emparejadas con la MISMA lesión automática: se la queda la de diámetro más
         cercano al automático; la otra, si comparte coordenadas exactas, se queda sin posición
         (el extractor le copió la del centroide: esa no es su sitio).
@@ -2779,6 +2782,16 @@ def marcas_radiologo(revision, serie, fecha, empareja=None, fuente_emparejado=No
     for mid, lid in (empareja or {}).items():
         marcas[mid]["lesion_polaris"] = lid
         marcas[mid]["_forzado"] = True
+    segm = None
+    for mid, (x, y, z) in (posiciones or {}).items():
+        m = marcas[mid]
+        m["x"], m["y"], m["z"], m["_corregida"] = x, y, z, True
+        if segm is None:
+            segm = _carga(os.path.join(destino, "segmentos.nii.gz"))
+        c = (aff @ np.array([x, y, z, 1.0]))[:3]
+        ijk = np.round(np.linalg.inv(segm[1]) @ np.append(c, 1.0))[:3].astype(int)
+        dentro = all(0 <= v < n for v, n in zip(ijk, segm[0].shape))
+        m["segmento"] = (int(segm[0][tuple(ijk)]) or None) if dentro else None
     motivo = {}
     # una lesión automática, una marca
     por_lesion = {}
@@ -2822,13 +2835,15 @@ def marcas_radiologo(revision, serie, fecha, empareja=None, fuente_emparejado=No
         ply_binario(os.path.join(destino, malla), c + u * (m["mm"] / 2.0), f)
         en_3d.append({"id": mid, "corte": m["corte"], "mm": m["mm"], "segmento": m["segmento"],
                       "centro_mm": [round(float(x), 1) for x in c], "origen": ORIGEN_RADIOLOGO,
-                      "malla": malla})
+                      "malla": malla, "posicion_corregida": bool(m.get("_corregida"))})
     sin_marca = sorted(set(auto) - {int(k) for k in automaticas})
     salida = {
         "_fuente": "revisión informal de un radiólogo (22-sep-26, sin informe firmado): %s · %s"
                    % (os.path.basename(revision), rev.get("metodo", "")),
         "_emparejado_forzado": {"marcas": {str(k): v for k, v in (empareja or {}).items()},
                                 "fuente": fuente_emparejado},
+        "_posiciones_corregidas": {"marcas": {str(k): list(v) for k, v in (posiciones or {}).items()},
+                                   "fuente": fuente_posiciones},
         "frase": FRASE_REVISION,
         "tc": rev.get("tc"),
         "automaticas": automaticas,
@@ -2851,7 +2866,14 @@ def _cmd_marcas(a):
         empareja[int(mid)] = int(lid)
     if empareja and not a.fuente:
         raise SystemExit("ABORTA: un emparejado forzado necesita --fuente (quién lo verificó).")
-    r = marcas_radiologo(a.revision, a.serie, a.fecha, empareja, a.fuente)
+    posiciones = {}
+    for par in a.posicion or []:
+        mid, xyz = par.split(":")
+        posiciones[int(mid)] = tuple(float(v) for v in xyz.split(","))
+    if posiciones and not a.fuente_posicion:
+        raise SystemExit("ABORTA: una posición corregida necesita --fuente-posicion.")
+    r = marcas_radiologo(a.revision, a.serie, a.fecha, empareja, a.fuente, posiciones,
+                         a.fuente_posicion)
     n = r["recuento"]
     print("marcas: %d · Polaris+radiólogo %d · solo radiólogo %d (en 3D %d, sin posición %d)"
           % (n["total"], n["polaris_revisadas"], n["solo_radiologo"], n["en_3d"],
@@ -4049,6 +4071,8 @@ def main(argv=None):
     pmr.add_argument("--fecha", required=True, help="carpeta de assets (AAAAMMDD)")
     pmr.add_argument("--empareja", action="append", help="MARCA:LESION verificado por otra vía")
     pmr.add_argument("--fuente", help="de dónde sale el emparejado forzado")
+    pmr.add_argument("--posicion", action="append", help="MARCA:x,y,z re-medida sobre su captura")
+    pmr.add_argument("--fuente-posicion", help="cómo se re-midieron las posiciones")
     pmr.set_defaults(fn=_cmd_marcas)
     pw = sub.add_parser("sirve", help="sirve el visor en 127.0.0.1")
     pw.add_argument("--puerto", type=int, default=8794)

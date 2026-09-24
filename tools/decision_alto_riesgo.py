@@ -7,15 +7,21 @@ comite-medico, watchdog de verificacion, validador≠constructor de herramientas
 un PROTOCOLO que se dispara solo y deja el debate POR ESCRITO:
 
   1. DISPARADOR objetivo — `disparar`: decide si una decisión exige el protocolo
-     (criterio: CLÍNICA + ALTO RIESGO/IRREVERSIBLE). Ante la duda → exige protocolo.
-  2. PANEL PARALELO — `acta`: ≥2-3 veredictos INDEPENDIENTES (lentes distintas), en vez
-     de uno en serie. Registra quién opinó qué, dónde discreparon y por qué.
+     (criterio: CLÍNICA + ALTO RIESGO/IRREVERSIBLE, o una ACCIÓN clínica de alto riesgo por sí
+     misma —dosis, suspensión, cambio de línea, procedimiento— que se está decidiendo).
+     Ante la duda → exige protocolo.
+  2. PANEL PARALELO — `acta`: ≥2-3 veredictos INDEPENDIENTES (agentes distintos del gabinete,
+     no nombres de lente), en vez de uno en serie. Registra quién opinó qué, dónde discreparon.
   3. VERIFICACIÓN OBLIGATORIA — (a) la EXISTENCIA de cada cita externa (DOI/PMID/NCT/arXiv)
      la confirma el REGISTRO vía `verifica_citas` (sin LLM): una cita inexistente = FABRICADA
      → se BLOQUEA; si no se puede confirmar (red/registro mudo) → fail-closed. (b) además,
-     cada veredicto debe venir pasado por `verificacion` (campo verificado). El gate NO se fía
-     del booleano que un agente se auto-declara — principio #0: el modelo no certifica; lo
-     certifican el CÓDIGO, el REGISTRO o el HUMANO. Si algo falla → se BLOQUEA (no llega a {{TITULAR}}).
+     cada veredicto debe venir con una `comprobacion` de otro agente, y el panel la COMPRUEBA:
+     un puntero a la bóveda se abre y el `fragmento` citado tiene que estar dentro
+     (`fuente_clinica`); una cita externa tiene que existir. El gate NO se fía del booleano que
+     un agente se auto-declara — principio #0: el modelo no certifica; lo certifican el CÓDIGO,
+     el REGISTRO o el HUMANO. Si algo falla → se BLOQUEA (no llega a {{TITULAR}}).
+     Límite: esto acredita que la fuente existe y contiene lo citado, no que lo citado sostenga
+     la afirmación. Eso sigue siendo revisión clínica.
   4. ACTA AUDITABLE — veredicto final con su CONFIANZA y las discrepancias explícitas, para
      que {{TITULAR}} y sus médicas vean el RAZONAMIENTO, no solo la conclusión.
 
@@ -40,11 +46,22 @@ import os
 import re
 import sys
 import time
+import unicodedata
 
-REPO = os.environ.get("BTP_REPO") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Registro vivo de actas: casa base (gitignored como tools/state); en tests, BTP_STATE_DIR.
-STATE = os.environ.get("BTP_STATE_DIR") or os.path.join(REPO, "tools", "state")
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import _casa  # noqa: E402
+import fuente_clinica  # noqa: E402
+
+REPO = os.environ.get("BTP_REPO") or os.path.dirname(HERE)
+# Registro vivo de actas: ESTADO, así que resuelve a casa base (`_casa.state_dir()`), no al árbol
+# donde corra el código. Hasta el 24-sep resolvía con `dirname(__file__)`: desde un worktree —el
+# caso normal— las actas se escribían en el árbol efímero, se perdían al podarlo, y la CLI decía
+# «acta guardada en…». Misma clase que `feedback-estado-vivo-resuelve-casa-base`. Tests: BTP_STATE_DIR.
+STATE = os.environ.get("BTP_STATE_DIR") or _casa.state_dir()
 ACTAS = os.path.join(STATE, "decisiones_alto_riesgo")
+# Los agentes son CÓDIGO versionado: se leen del árbol en el que se trabaja.
+AGENTES_DIR = os.path.join(os.path.dirname(HERE), ".claude", "agents")
 
 BANNER = ("Apoyo a la decisión. **NO es consejo médico.** El acta equipa y describe el "
           "debate; **no concluye**. Deciden {{TITULAR}} y sus médicas.")
@@ -84,29 +101,102 @@ _RIESGO = (
 # Señales de que NO es una decisión, solo info/organización (degrada hacia "no protocolo").
 _NO_DECISION = ("resumen", "organiza", "agenda", "recordatorio", "archivar", "formatear")
 
+# ── Eje ACCIÓN (auditoría Gorgojo 1.2, 24-sep-26) ────────────────────────────────────────────
+# Reproducido antes de arreglarlo: «¿debo duplicar la dosis?», «¿debo suspender el tratamiento?»,
+# «¿qué lesión conviene biopsiar?» y «¿es seguro continuar la medicación?» NO disparaban: el panel
+# exigía la palabra «riesgo» (o sinónimos), y su ausencia no prueba que la acción sea inocua.
+# Hay acciones clínicas que son de alto riesgo POR SÍ MISMAS: tocar la dosis, parar o seguir un
+# tratamiento, cambiar de línea, empezar uno, y abrir el cuerpo (biopsia, cirugía, ablación,
+# radioterapia). Esas disparan el panel cuando se están DECIDIENDO (marco deliberativo); si solo se
+# agendan, se archivan o se buscan papers sobre ellas, no. Se buscan sobre texto canónico (sin
+# tildes, minúsculas, k→c para «kambiar»/«kimio»), con tallos de verbo que aguantan conjugaciones.
+_TTO = (r"tratamiento|terapia|medicacion|farmaco|quimio\w*|hormonoterapia|letrozol|pastillas?|"
+        r"pauta")
+_ACCION = tuple(re.compile(p) for p in (
+    r"(?:duplic|dobl|subi|suba|baj|aument|reduc|escal|desescal|ajust|cambi|modific)\w*"
+    r"(?:\s+\w+){0,2}\s+(?:la\s+|de\s+)?do[sc]is",
+    r"do[sc]is\s+(?:doble|mas alta|mas baja|de carga|maxima)",
+    # «para» a secas es preposición («opciones para el tratamiento»): solo las formas de verbo.
+    r"(?:suspend\w*|interrump\w*|\bpar(?:ar|amos|o|e|emos|en|as|arlo|arla)\b|dej\w*|abandon\w*|"
+    r"retir\w*|discontinu\w*|descans\w*)(?:\s+\w+){0,3}?\s+(?:" + _TTO + r")",
+    # «seguimiento del tratamiento» no es seguir con él.
+    r"(?:continu\w*|segui(?!miento)\w*|\bsigo\b|mant[ei]n\w*)(?:\s+\w+){0,3}?\s+(?:" + _TTO + r")",
+    r"cambi\w*\s+de\s+linea", r"(?:siguiente|nueva|proxima|otra)\s+linea",
+    r"(?:empez|inici|comenz|arranc|entrar)\w*(?:\s+\w+){0,3}?\s+(?:" + _TTO + r"|ensayo)",
+    r"\bre-?biopsi\w*", r"\bbiopsi\w*", r"(?:que|cual)\s+lesion",
+    r"\bopera(?:r|rme|rla)\b", r"\bcirugia\b", r"\breseca\w*|\breseccion\b", r"\bablacion\b",
+    r"\bradiofrecuencia\b", r"\bradioterapia\b|\birradia\w*|\bsbrt\b|\bprrt\b",
+))
+# Marco DELIBERATIVO: se está decidiendo, no informando ni agendando. El FUERTE decide solo; el
+# DÉBIL (una interrogación, «¿podemos…?») no, si la frase es de logística: «¿podemos mover la
+# biopsia al jueves?» es agenda, no una decisión de alto riesgo.
+_DELIBERA_FUERTE = re.compile(
+    r"\bdebo\b|\bdeberi\w+|\bdebemos\b|\bme planteo\b|\bnos planteamos\b|\bconviene\b|"
+    r"\bmerece la pena\b|\bvale la pena\b|\bhay que decidir\b|\btengo que decidir\b|\bdecidir si\b|"
+    r"\bes seguro\b|\bo esperar\b|\bo seguir\b|\bque hago\b|\bque hacemos\b|\bpros y contras\b|"
+    r"\bvalorar si\b|\bvaloramos\b|\bes razonable\b|\by si\b")
+_DELIBERA_DEBIL = re.compile(r"[?¿]|\bpuedo\b|\bpodemos\b|\bmejor\b")
+_LOGISTICA = re.compile(
+    r"\bcita\b|\bhora\b|\bagend\w*|\bmover\b|\bmuev\w*|\breprogram\w*|\bfecha\b|\brecuerd\w*|"
+    r"\brecordatorio\b|\barchiv\w*|\bresum\w*|\bbusca\w*|\bpapers?\b|\bcronologia\b|"
+    r"\bformate\w*|\bborrador\b|\bcorreo\b|\bmanda\w*")
+
+
+def _delibera(c):
+    return bool(_DELIBERA_FUERTE.search(c) or (_DELIBERA_DEBIL.search(c) and not _LOGISTICA.search(c)))
+# «¿lo hacemos?» se refiere a algo dicho antes: solo cuenta si el turno anterior trae la acción.
+_ANAFORA = re.compile(r"\blo hacemos\b|\blo hago\b|\bla hacemos\b|\badelante\b|\bentonces\b|"
+                      r"\beso\b|\besto\b|\blo que (?:dijimos|hablamos|propone)\b|\bseguimos\b")
+
 
 def _norm(s):
     return (s or "").lower()
 
 
-def disparar(texto, clinica=None, riesgo=None, forzar=False):
+def _canon_txt(s):
+    """Minúsculas, sin tildes y k→c: lo que aguanta erratas sin inventar palabras."""
+    s = unicodedata.normalize("NFKD", str(s or ""))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower().replace("k", "c")
+
+
+def _acciones(t):
+    return [p.pattern[:40] for p in _ACCION if p.search(t)]
+
+
+def disparar(texto, clinica=None, riesgo=None, forzar=False, contexto=""):
     """Devuelve (aplica:bool, motivo:str, ejes:dict).
 
     `clinica`/`riesgo` (bool|None): override explícito del que invoca (un agente que YA sabe
     que es clínico lo marca; None = autodetecta por léxico). `forzar`=True dispara siempre
     (p. ej. el orquestador ante una duda real). El léxico es una RED, no la verdad: cualquier
     agente puede forzar el protocolo, nunca puede desactivarlo en silencio para algo clínico.
+    `contexto`: el turno anterior, para las referencias del tipo «¿lo hacemos?».
+    Una ACCIÓN clínica en marco deliberativo dispara aunque se pase `riesgo=False`.
     """
     t = _norm(texto)
     hit_clin = sorted({k for k in _CLINICO if k in t})
     hit_riesgo = sorted({k for k in _RIESGO if k in t})
     es_clinica = bool(hit_clin) if clinica is None else bool(clinica)
     es_riesgo = bool(hit_riesgo) if riesgo is None else bool(riesgo)
-    solo_info = any(k in t for k in _NO_DECISION) and not hit_riesgo and clinica is None and riesgo is None
+    c = _canon_txt(texto)
+    delibera = _delibera(c)
+    hit_accion = _acciones(c)
+    accion_previa = []
+    if delibera and not hit_accion and contexto and _ANAFORA.search(c):
+        accion_previa = _acciones(_canon_txt(contexto))
+    solo_info = (any(k in t for k in _NO_DECISION) and not hit_riesgo and clinica is None
+                 and riesgo is None and not (delibera and hit_accion))
     ejes = {"clinica": es_clinica, "riesgo": es_riesgo,
-            "lex_clinica": hit_clin, "lex_riesgo": hit_riesgo}
+            "lex_clinica": hit_clin, "lex_riesgo": hit_riesgo,
+            "accion": bool(hit_accion or accion_previa), "delibera": delibera}
     if forzar:
         return True, "forzado por el agente (duda razonable → protocolo)", ejes
+    if delibera and hit_accion:
+        return True, ("se está DECIDIENDO una acción clínica de alto riesgo por sí misma (dosis, "
+                      "suspensión, cambio de línea, procedimiento) → panel de élite obligatorio"), ejes
+    if accion_previa:
+        return True, ("la pregunta remite a una acción clínica del turno anterior → panel de élite "
+                      "obligatorio"), ejes
     if solo_info:
         return False, "parece organización/info, no una decisión clínica", ejes
     if es_clinica and es_riesgo:
@@ -187,7 +277,7 @@ def _existencia_citas(fuente, comp):
 # Reglas (fail-closed): sin `comprobacion` → NO verificado (da igual `verificado: true`); el
 # comprobador no puede ser el propio agente (auto-firma = sello de goma); resultado != confirmado
 # → no verificado; sin `contra_fuente` → no verificado (no hubo cotejo real contra nada).
-_COMP_CAMPOS = {"por", "resultado", "contra_fuente", "nota"}
+_COMP_CAMPOS = {"por", "resultado", "contra_fuente", "fragmento", "nota"}
 _COMP_RESULTADO = {"confirmado", "refutado", "no_concluyente"}
 
 # Allowlist CERRADA de comprobadores válidos: el comprobador es un ROL del gabinete cuyo oficio es
@@ -208,10 +298,29 @@ def _canon(nombre):
     return re.sub(r"[\s_\-]+", "", s)
 
 
-def _resolver_verificado(v):
+def _agente_base(nombre):
+    """«verificacion (abogado del diablo)» → «verificacion»: el agente, sin el papel que hace."""
+    return _canon(re.split(r"[(\[]", nombre or "", maxsplit=1)[0])
+
+
+def roster():
+    """Agentes REALES del gabinete (`.claude/agents/*.md`), canonicalizados. Un nombre inventado
+    no es una voz: dos «lentes» con nombres distintos no hacen un panel si no hay dos agentes."""
+    try:
+        return {_canon(f[:-3]) for f in os.listdir(AGENTES_DIR) if f.endswith(".md")}
+    except OSError:
+        return set()
+
+
+def _resolver_verificado(v, comprobador=None):
     """(verificado:bool, motivo:str). verificado=True SOLO si hay un veredicto de comprobación REAL
     de un comprobador VÁLIDO y DISTINTO del agente, con resultado confirmado contra una fuente real.
-    Determinista; ignora cualquier `verificado` auto-declarado."""
+    Determinista; ignora cualquier `verificado` auto-declarado.
+
+    «Fuente real» se COMPRUEBA, no se lee en la forma (auditoría Gorgojo 1.1, 24-sep-26): un
+    puntero a la bóveda tiene que existir y contener el `fragmento` que el comprobador dice haber
+    visto (`fuente_clinica.cotejar`); una cita externa tiene que existir en su registro. Deja el
+    resultado del cotejo en `v["cotejo"]` (hashes y estado, nunca el fragmento)."""
     comp = v.get("comprobacion")
     if not isinstance(comp, dict):
         return False, ("sin bloque `comprobacion`: el `verificado` auto-declarado NO cuenta "
@@ -228,7 +337,7 @@ def _resolver_verificado(v):
         return False, ("comprobador «%s» NO está en la allowlist de roles de verificación %s → no "
                        "cuenta (un nombre inventado no certifica)" % (por, sorted(_COMPROBADORES_VALIDOS)))
     # Auto-firma por nombre canónico: mata el alias («comite-medico» vs «comite», espacios, tildes).
-    if _canon(por) == _canon(agente):
+    if _canon(por) == _canon(agente) or _agente_base(por) == _agente_base(agente):
         return False, ("auto-comprobación: «%s» se comprobó a sí mismo (comprobador == agente, por "
                        "nombre canónico — sello de goma)" % por)
     res = comp.get("resultado")
@@ -243,7 +352,24 @@ def _resolver_verificado(v):
     if not (_EXT_RE.search(contra) or _CONTRA_CLINICA_RE.search(contra)):
         return False, ("`comprobacion.contra_fuente` no parece una fuente real (ni cita externa "
                        "PMID/NCT/DOI ni puntero a _PRIVADO_CLINICO): «%s» → no cuenta como cotejo" % contra)
-    return True, "confirmado por «%s» contra %s" % (por, contra)
+    # …y se COMPRUEBA. Puntero a la bóveda: que exista y que el fragmento citado esté dentro.
+    if _CONTRA_CLINICA_RE.search(contra):
+        frag = comp.get("fragmento")
+        if not isinstance(frag, str) or not frag.strip():
+            return False, ("puntero clínico sin `comprobacion.fragmento`: no consta QUÉ se vio en «%s». "
+                           "Copia el texto literal del informe que sostiene la afirmación" % contra)
+        r = fuente_clinica.cotejar(contra, frag, quien=por)
+        v["cotejo"] = {k: r.get(k) for k in ("estado", "sha256", "sha256_fragmento", "identidad")}
+        if not r["ok"]:
+            return False, "cotejo contra la fuente fallido (%s): %s" % (r["estado"], r["motivo"])
+        return True, "confirmado por «%s»: fragmento encontrado en %s (sha256 %s…)" % (
+            por, contra, (r["sha256"] or "")[:12])
+    # Cita externa: la existencia la da el registro, no la palabra del comprobador.
+    est, det = _existencia_citas(contra, _resolver_comprobador(comprobador))
+    v["cotejo"] = {"estado": est}
+    if est != "confirmada":
+        return False, "`contra_fuente` sin confirmar en su registro (%s): %s" % (est, det)
+    return True, "confirmado por «%s» contra %s (existe en su registro)" % (por, contra)
 
 
 # ── 2+3. PANEL PARALELO + VERIFICACIÓN OBLIGATORIA ──────────────────────────
@@ -260,6 +386,7 @@ def evaluar(data, comprobador=None):
            "porque": "…", "fuente": "PMID/NCT/ficha",
            "comprobacion": {"por": "verificacion", "resultado": "confirmado",
                             "contra_fuente": "_PRIVADO_CLINICO/... | PMID/NCT",
+                            "fragmento": "texto LITERAL del informe (obligatorio si es bóveda)",
                             "nota": "opcional"},
            "discrepa_en": "opcional: con quién/en qué discrepa"},
           ...
@@ -293,9 +420,16 @@ def evaluar(data, comprobador=None):
         if v["confianza"] not in ("alta", "media", "baja"):
             v["confianza"] = "media"
         # `verificado` NO es la palabra del modelo: lo deriva un veredicto de comprobación REAL.
-        v["verificado"], v["verificado_motivo"] = _resolver_verificado(v)
+        v["verificado"], v["verificado_motivo"] = _resolver_verificado(v, comprobador)
         if not v.get("fuente"):
             bloqueos.append("la lente «%s» no cita FUENTE (verifica antes de fiarte)" % v["lente"])
+        # Los punteros a la bóveda de la propia `fuente` tienen que EXISTIR (auditoría 1.1): una
+        # lente no puede apoyarse en un informe que no está.
+        for p in fuente_clinica.punteros(v.get("fuente")):
+            r = fuente_clinica.cotejar(p, quien=v["agente"])
+            if not r["ok"]:
+                bloqueos.append("la fuente de «%s» no existe o no vale (%s): %s"
+                                % (v["lente"], r["estado"], r["motivo"]))
         # EXISTENCIA determinista de la cita (no la palabra del modelo) — el cable #0.
         est, det = _existencia_citas(v.get("fuente"), comp)
         v["cita_existencia"], v["cita_detalle"] = est, det
@@ -308,12 +442,20 @@ def evaluar(data, comprobador=None):
                             "fail-closed: no entregable hasta confirmarla." % (v["lente"], det))
         vers.append(v)
 
-    # a) panel paralelo real: ≥2 lentes DISTINTAS
-    lentes = {v["lente"] for v in vers}
-    if len(lentes) < 2:
-        bloqueos.append("panel INCOMPLETO: solo %d lente(s) distinta(s) (%s). El protocolo "
-                        "exige ≥2 veredictos INDEPENDIENTES de lentes distintas"
-                        % (len(lentes), ", ".join(sorted(lentes)) or "ninguna"))
+    # a) panel paralelo real: ≥2 AGENTES distintos del gabinete, no ≥2 nombres de lente. Hasta el
+    #    24-sep se contaban lentes: dos «lentes» del mismo agente eran un panel (auditoría 1.1).
+    #    Límite honesto: `agente` lo escribe el mismo que rellena el JSON. Esto quita el fallo
+    #    obvio y los nombres inventados; no ACREDITA que corrieran dos procesos distintos.
+    reales = roster()
+    agentes = {_agente_base(v["agente"]) for v in vers}
+    validos = agentes & reales
+    fuera = sorted(agentes - reales)
+    if len(validos) < 2:
+        bloqueos.append("panel INCOMPLETO: solo %d agente(s) real(es) distinto(s) (%s)%s. El "
+                        "protocolo exige ≥2 veredictos INDEPENDIENTES de agentes distintos del "
+                        "gabinete; dos lentes del mismo agente son una sola voz"
+                        % (len(validos), ", ".join(sorted(validos)) or "ninguno",
+                           ("; no son agentes del gabinete: " + ", ".join(fuera)) if fuera else ""))
 
     # b) verificación obligatoria: TODOS con un VEREDICTO de comprobación REAL (no el booleano
     #    auto-declarado). El motivo concreto (por qué no cuenta) va en el bloqueo y en el acta.
@@ -378,6 +520,14 @@ def render(decision, contexto, vers, discrepancias, bloqueos, confianza_final, e
                    % ("sí" if v["verificado"] else "**NO**", v.get("verificado_motivo", "")))
         out.append("- Existencia de la cita (registro, determinista): %s — %s"
                    % (v.get("cita_existencia", "?"), v.get("cita_detalle", "")))
+        # Huella del cotejo, NUNCA el fragmento: es dato clínico y el acta la leen sus médicas.
+        cot = v.get("cotejo")
+        if cot:
+            out.append("- Cotejo contra la fuente (abierta por el panel): %s%s%s"
+                       % (cot.get("estado"),
+                          " · sha256 fuente %s…" % cot["sha256"][:12] if cot.get("sha256") else "",
+                          " · huella del fragmento %s…" % cot["sha256_fragmento"][:12]
+                          if cot.get("sha256_fragmento") else ""))
 
     out.append("\n## Dónde discrepan (el debate, no solo la conclusión)")
     if discrepancias:
@@ -429,7 +579,8 @@ def _cmd_disparar(a):
     texto = _arg(a, "--texto") or (a[0] if a and not a[0].startswith("--") else "")
     clinica = True if _flag(a, "--clinica") else (False if _flag(a, "--no-clinica") else None)
     riesgo = True if _flag(a, "--riesgo") else (False if _flag(a, "--no-riesgo") else None)
-    aplica, motivo, ejes = disparar(texto, clinica=clinica, riesgo=riesgo, forzar=_flag(a, "--forzar"))
+    aplica, motivo, ejes = disparar(texto, clinica=clinica, riesgo=riesgo, forzar=_flag(a, "--forzar"),
+                                    contexto=_arg(a, "--contexto"))
     if _flag(a, "--json"):
         print(json.dumps({"aplica": aplica, "motivo": motivo, "ejes": ejes}, ensure_ascii=False))
     else:
@@ -454,7 +605,7 @@ def _cmd_acta(a):
 def main(argv):
     if not argv:
         print("uso: decision_alto_riesgo.py disparar \"<texto>\" [--clinica|--no-clinica] "
-              "[--riesgo|--no-riesgo] [--forzar] [--json]")
+              "[--riesgo|--no-riesgo] [--forzar] [--contexto \"<turno anterior>\"] [--json]")
         print("     decision_alto_riesgo.py acta [--in fichero.json] [--guardar [--etiqueta X]]")
         return 2
     cmd, rest = argv[0], argv[1:]

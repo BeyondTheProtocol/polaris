@@ -197,6 +197,9 @@ FAMILIAS = [
                           # mensaje desde el 22-sep-26 (`permiso_envio`)
                           "ok_envio", "permiso_envio",
                           "decision_alto_riesgo",
+                          # abre la fuente y busca dentro lo citado: el acta ya no sella un puntero
+                          # a nada (auditoría Gorgojo 1.1, 24-sep-26)
+                          "fuente_clinica",
                           "gate_etiqueta",     # etiqueta hallazgos del gate de salida (aviso→bloqueo)
                           "replay_gate",       # mide un check nuevo contra respuestas reales (22-sep-26)
                           # a Grok/Perplexity sale el TEMA de la búsqueda, no su frase (22-sep-26)

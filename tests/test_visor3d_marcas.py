@@ -42,7 +42,10 @@ tmp = tempfile.mkdtemp()
 V._dir = lambda *p: os.path.join(tmp, *p)
 V._cache = lambda s: tmp
 V.exige_zona_clinica = lambda r: None
-V._carga = lambda r: (None, np.diag([1.0, 1.0, 2.0, 1.0]))       # vóxel 1×1×2 mm
+SEGM = np.zeros((200, 200, 200), np.uint8)
+SEGM[50:70, 50:70, 110:130] = 7                                    # segmento 7 en (60, 60, 120) mm
+V._carga = lambda r: ((SEGM, np.eye(4)) if r.endswith("segmentos.nii.gz")
+                      else (None, np.diag([1.0, 1.0, 2.0, 1.0])))  # vóxel 1×1×2 mm
 os.makedirs(os.path.join(tmp, "assets", "f"))
 json.dump({"lesiones": [{"id": 1, "diametro_mm": 10.0}, {"id": 2, "diametro_mm": 5.0},
                         {"id": 3, "diametro_mm": 8.0}]},
@@ -84,7 +87,16 @@ check(all(a["origen"] == V.ORIGEN_POLARIS for a in r["automaticas"].values())
       "cada marca lleva su procedencia")
 check("sin informe firmado" in r["frase"] and "55 metástasis" not in r["frase"]
       and "M1 múltiples" in r["frase"], "frase sellada, sin «55 metástasis»")
-M = r["marcas"][0]
+# posición re-medida: la marca 3 deja de ser copia de la 2 y pasa al 3D, con segmento nuevo
+r2 = V.marcas_radiologo(ruta, "s", "f", empareja={8: 3}, fuente_emparejado="a ojo",
+                        posiciones={3: (60.0, 60.0, 60.0)}, fuente_posiciones="re-medida")
+m3 = [x for x in r2["marcas"] if x["id"] == 3]
+check(m3 and m3[0]["centro_mm"] == [60.0, 60.0, 120.0] and m3[0]["segmento"] == 7
+      and m3[0]["posicion_corregida"] and r2["_posiciones_corregidas"]["fuente"] == "re-medida",
+      "posición corregida: al 3D, segmento recalculado y fuente escrita")
+check(r2["automaticas"]["2"]["marca"] == 2, "L2 sigue siendo de la marca 2")
+r = V.marcas_radiologo(ruta, "s", "f", empareja={8: 3}, fuente_emparejado="a ojo")
+M = [x for x in r["marcas"] if x["id"] == 4][0]
 check(M["centro_mm"] == [70.0, 70.0, 140.0], "centro en mm con la afín: %s" % M["centro_mm"])
 ply = open(os.path.join(tmp, "assets", "f", M["malla"]), "rb").read()
 cab = ply[:ply.index(b"end_header\n") + 11]

@@ -5,6 +5,7 @@ Local, sin red, sin LLM, sin estado vivo (BTP_STATE_DIR a un tmp). Demuestra que
 protocolo SE DISPARA con el criterio objetivo y que REGISTRA el debate (panel paralelo +
 verificación obligatoria + discrepancias + acta auditable), fail-closed.
 """
+import hashlib
 import os
 import sys
 import tempfile
@@ -28,11 +29,33 @@ def _stub_existencia(ids):
 
 dar._COMPROBADOR = _stub_existencia
 
+# Bóveda clínica DE PEGA (auditoría Gorgojo 1.1): desde el 24-sep el panel abre la fuente y busca
+# dentro el fragmento citado, así que las pruebas necesitan un informe que exista de verdad. Es
+# sintético y vive en un tmp: la bóveda real no se toca desde los tests.
+BOVEDA = os.path.join(tempfile.mkdtemp(prefix="dar_boveda_"), "_PRIVADO_CLINICO")
+os.makedirs(BOVEDA)
+os.environ["BTP_BOVEDA_CLINICA"] = BOVEDA
+FRAGMENTO = "HER2 IHC 0 en la biopsia hepática, Ki-67 del 30 %"
+_TEXTO_INFORME = "Informe sintético de prueba.\n\nResultado: " + FRAGMENTO + ".\nFin del informe.\n"
+INFORME = "_PRIVADO_CLINICO/informe-prueba.md"
+with open(os.path.join(BOVEDA, "informe-prueba.md"), "w", encoding="utf-8") as _f:
+    _f.write(_TEXTO_INFORME)
+HASH_INFORME = hashlib.sha256(_TEXTO_INFORME.encode("utf-8")).hexdigest()
+ACCESOS = []  # cada lectura de la bóveda tiene que dejar su línea (aquí, en memoria)
+try:
+    import fuente_clinica as fc  # noqa: E402
+    fc._IDENTIDAD = lambda texto, ruta: ("coincide", "stub de test")
+    fc._LOG = lambda agente, resultado, ruta: ACCESOS.append((agente, resultado, ruta))
+except ImportError:  # antes del arreglo el módulo no existe: los tests nuevos salen en rojo
+    fc = None
 
-def comprobado(por="verificacion", resultado="confirmado", contra="_PRIVADO_CLINICO/informe"):
+
+def comprobado(por="verificacion", resultado="confirmado", contra=INFORME, frag=FRAGMENTO):
     """Bloque `comprobacion` REAL (veredicto de un comprobador distinto). El nuevo `verificado`
-    NO es el booleano auto-declarado: lo deriva esto. `por` debe ser != del agente que afirma."""
-    return {"por": por, "resultado": resultado, "contra_fuente": contra}
+    NO es el booleano auto-declarado: lo deriva esto. `por` debe ser != del agente que afirma.
+    Con un puntero clínico, `fragmento` es el texto que el comprobador dice haber visto en la
+    fuente: el panel lo busca dentro del fichero (auditoría Gorgojo 1.1)."""
+    return {"por": por, "resultado": resultado, "contra_fuente": contra, "fragmento": frag}
 
 
 fallos = 0
@@ -248,6 +271,133 @@ data_sincontra = {"decision": "x", "veredictos": [
 _, _, _, _, _, _, entregable_sc = dar.evaluar(data_sincontra)
 check("comprobación sin contra_fuente → no verificado (no hubo cotejo real)", not entregable_sc)
 
+
+
+# ── AUDITORÍA GORGOJO 1.1 (22-sep-26): el acta no puede sellar una fuente que no existe ──────
+# Reproducido el 24-sep antes de arreglarlo: dos lentes del MISMO agente, «comprobadas» por
+# `verificacion` contra `_PRIVADO_CLINICO/informe-que-no-existe-2099.md`, daban entregable=True,
+# confianza alta y 0 bloqueos. Nadie abría nada: se validaba la FORMA del puntero con una regex.
+INEXISTENTE = "_PRIVADO_CLINICO/informe-que-no-existe-2099.md"
+data_gorgojo = {"decision": "¿biopsiar L1 o L3?", "veredictos": [
+    {"lente": "lente-alfa", "agente": "comite-medico", "postura": "a_favor", "confianza": "alta",
+     "porque": "x", "fuente": INEXISTENTE,
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": INEXISTENTE}},
+    {"lente": "lente-beta", "agente": "comite-medico", "postura": "a_favor", "confianza": "alta",
+     "porque": "y", "fuente": INEXISTENTE,
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": INEXISTENTE}}]}
+_, _, vers_g, _, bloq_g, conf_g, ent_g = dar.evaluar(data_gorgojo)
+check("GORGOJO 1.1: el caso reproducido del auditor ya NO es entregable", not ent_g)
+check("GORGOJO 1.1: un puntero a un fichero que NO existe no se sella como verificado",
+      not any(v["verificado"] for v in vers_g))
+check("GORGOJO 1.1: dos lentes del MISMO agente no cuentan como panel independiente",
+      any("agente" in b and "INCOMPLETO" in b for b in bloq_g))
+check("GORGOJO 1.1: la fuente propia inexistente de la lente también bloquea",
+      any("no existe" in b for b in bloq_g))
+
+# Con una fuente REAL, el fragmento citado tiene que estar DENTRO. Si no está, no verifica.
+_, _, vers_f, _, bloq_f, _, ent_f = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME,
+     "comprobacion": comprobado(frag="un texto que el informe de prueba no contiene en absoluto")},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME,
+     "comprobacion": comprobado()}]})
+check("GORGOJO 1.1: fuente real pero fragmento AUSENTE → no verificado",
+      (not ent_f) and not vers_f[0]["verificado"] and vers_f[1]["verificado"])
+
+# Un fragmento de 3 letras casa con cualquier informe: no es un cotejo.
+_, _, vers_c, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME,
+     "comprobacion": comprobado(frag="HER2")},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()}]})
+check("GORGOJO 1.1: un fragmento trivialmente corto no cuenta como cotejo", not vers_c[0]["verificado"])
+
+# Un puntero clínico SIN fragmento: existe el fichero, pero nadie dice qué se comprobó en él.
+_, _, vers_s, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME,
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": INFORME}},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()}]})
+check("GORGOJO 1.1: puntero clínico sin `fragmento` → no verificado", not vers_s[0]["verificado"])
+
+# La misma clase por la otra puerta: una cita externa INVENTADA en `contra_fuente`.
+_, _, vers_p, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": "PMID:39538331",
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:00000000"}},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()}]})
+check("GORGOJO 1.1: `contra_fuente` con un PMID que no existe → no verificado",
+      not vers_p[0]["verificado"])
+
+# Un nombre de agente inventado no suma independencia.
+_, _, _, _, bloq_i, _, ent_i = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()},
+    {"lente": "experto-que-no-existe", "postura": "a_favor", "fuente": INFORME,
+     "comprobacion": comprobado()}]})
+check("GORGOJO 1.1: un agente que no está en el roster no cuenta como voz independiente",
+      (not ent_i) and any("INCOMPLETO" in b for b in bloq_i))
+
+# El acta enseña la huella de la fuente, NUNCA el fragmento (es N2 y la leen sus médicas).
+txt_ok = dar.render(*dar.evaluar(data_ok))
+check("GORGOJO 1.1: el acta muestra el sha256 de la fuente cotejada", HASH_INFORME[:12] in txt_ok)
+check("GORGOJO 1.1: el acta NO reproduce el fragmento clínico", FRAGMENTO not in txt_ok)
+check("GORGOJO 1.1: cada lectura de la bóveda deja su línea en el registro de accesos",
+      any("COTEJO" in a[1] for a in ACCESOS))
+
+# Las actas se guardan en CASA BASE, no en el árbol efímero de un worktree (se perdían al podar).
+import subprocess as _sp  # noqa: E402
+_env = {k: v for k, v in os.environ.items() if k != "BTP_STATE_DIR"}
+_out = _sp.run([sys.executable, "-c", "import sys; sys.path.insert(0, %r); import decision_alto_riesgo "
+                "as d, _casa; print(d.ACTAS.startswith(_casa.state_dir()))" % os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools")],
+               capture_output=True, text=True, env=_env).stdout.strip()
+check("GORGOJO 1.1: el registro de actas resuelve a casa base (no al worktree)", _out == "True")
+
+
+# ── AUDITORÍA GORGOJO 1.2 (22-sep-26): el disparador clasifica por ACCIÓN, no por «riesgo» ──
+# Reproducido el 24-sep: las 4 preguntas del auditor daban aplica=False. La ausencia de la
+# palabra «riesgo» no prueba que la acción sea inocua.
+DEBEN_DISPARAR = [
+    "¿debo duplicar la dosis?",
+    "¿debo suspender el tratamiento?",
+    "¿qué lesión conviene biopsiar?",
+    "¿es seguro continuar la medicación?",
+    "me planteo dejar el letrozol una temporada",                       # paráfrasis
+    "kambiar de linea de tratamiento o seguir?",                        # errata
+    "no continuar con la medicacion, ¿es razonable?",                   # negación
+    "doblar la dosis de capecitabina, ¿pros y contras?",
+    "¿qué lesion biopsiamos, la hepatica o la del nodulo?",
+    "valorar si empezar el ensayo ahora o esperar",
+    "¿merece la pena la radioterapia sobre la L3?",
+    "¿deberia bajar la docis por la toxicidad?",                        # errata
+    "¿y si paramos la quimio un ciclo?",
+]
+NO_DEBEN_DISPARAR = [
+    "organiza la agenda de la semana y un resumen de los correos",
+    "archiva la nota de la biopsia del 18-ago en la fuente de verdad",
+    "recuérdame la cita de la biopsia del martes",
+    "resume el informe de anatomía patológica cuando llegue",
+    "formatea la tabla de los tratamientos que ya ha hecho",
+    "manda el borrador a {{CONTACTO}}",
+    "¿qué hora es la cita de mañana?",
+    "añade a la cronología que empezó el tratamiento en marzo",
+    "cuántos ensayos de vacuna hay abiertos en España",
+    "busca papers sobre biopsia líquida y neoantígenos",
+    "¿podemos mover la biopsia al jueves?",                             # logística con «?»
+    "¿cómo va el seguimiento del tratamiento?",                         # «seguimiento» ≠ seguir
+    "¿qué opciones hay para el tratamiento que ya conoces?",            # «para» preposición
+]
+for q in DEBEN_DISPARAR:
+    check("GORGOJO 1.2: dispara → %s" % q, dar.disparar(q)[0])
+for q in NO_DEBEN_DISPARAR:
+    check("GORGOJO 1.2: NO dispara → %s" % q, not dar.disparar(q)[0])
+
+# Referencia a un turno anterior: «¿lo hacemos?» solo no dice qué; con el contexto, sí.
+check("GORGOJO 1.2: «¿lo hacemos?» sin contexto no se inventa una decisión",
+      not dar.disparar("¿lo hacemos entonces?")[0])
+check("GORGOJO 1.2: «¿lo hacemos?» con una acción clínica en el turno anterior → dispara",
+      dar.disparar("¿lo hacemos entonces?",
+                   contexto="la oncóloga propone suspender el tratamiento dos semanas")[0])
+# Una acción clínica detectada no se apaga con --no-riesgo: el protocolo nunca se desactiva en
+# silencio para algo clínico (regla ya escrita en el docstring del disparador).
+check("GORGOJO 1.2: --no-riesgo no apaga una acción clínica detectada",
+      dar.disparar("¿debo duplicar la dosis?", riesgo=False)[0])
 
 print("RESULTADO decision_alto_riesgo: %d OK, %d fallos" % (total - fallos, fallos))
 print("✅ PROTOCOLO DE DECISIÓN DE ÉLITE EN VERDE" if not fallos else "❌ revisar fallos")

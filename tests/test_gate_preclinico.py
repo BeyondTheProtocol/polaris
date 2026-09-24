@@ -14,8 +14,10 @@ Fija las propiedades del check, sin tocar la red (subprocess mockeado):
   2. Si la frase YA dice «en ratones» / «in vitro», la norma se cumple y el check CALLA.
   3. Describir sin prometer no se toca (no es el check de estilo).
   4. Una cita clínica (RCT) no dispara nada.
-  5. Red caída o tier desconocido → FAIL-OPEN, nunca frenar por la red.
+  5. Red caída o tier desconocido → PENDIENTE: se avisa, nunca bloquea, nunca se da por
+     comprobado (auditoría Gorgojo 1.4; antes era fail-open silencioso).
   6. Sin PMID no se consulta el registro (ni coste ni latencia).
+  7. La etiqueta cubre SU frase, no el texto entero (auditoría Gorgojo 1.4).
 """
 import json
 import os
@@ -58,6 +60,24 @@ def _mock(preclinico, etiqueta="modelo animal (PRECLÍNICO)"):
     return run
 
 
+def _mock_por_id(mapa, llamadas=None):
+    """Veredicto por PMID: 'preclinico' | 'clinico' | 'desconocido'. Anota qué se consultó."""
+    def run(cmd, **kw):
+        ids = [a for a in cmd[3:]]
+        if llamadas is not None:
+            llamadas.extend(ids)
+        out = []
+        for i in ids:
+            v = mapa.get(i, "clinico")
+            out.append({"id": i, "tier": {"preclinico": "modelo_animal", "clinico": "rct"}.get(v, "desconocido"),
+                        "etiqueta": {"preclinico": "modelo animal (PRECLÍNICO)",
+                                     "clinico": "ensayo aleatorizado (RCT)"}.get(v, "desconocido"),
+                        "preclinico": v == "preclinico", "entregable": v != "desconocido",
+                        "motivo": "test"})
+        return _Resp(json.dumps(out))
+    return run
+
+
 class GatePreclinico(unittest.TestCase):
     def setUp(self):
         self._real = g.subprocess.run
@@ -87,25 +107,118 @@ class GatePreclinico(unittest.TestCase):
         g.subprocess.run = _mock(False, "ensayo aleatorizado (RCT)")
         self.assertIsNone(g.preclinico_aplanado(APLANADO))
 
-    def test_red_caida_es_fail_open(self):
+    def test_red_caida_queda_pendiente_y_no_bloquea(self):
+        """Auditoría Gorgojo 1.4: un fallo de verificación NO es vía libre silenciosa (antes
+        devolvía None y la promesa salía como si se hubiera comprobado). Tampoco es un bloqueo:
+        la red no puede romper una conversación. Queda PENDIENTE: aviso, nunca «verificado»."""
         def boom(*a, **k):
             raise OSError("red caída")
         g.subprocess.run = boom
-        self.assertIsNone(g.preclinico_aplanado(APLANADO))
+        motivo = g.preclinico_aplanado(APLANADO)
+        self.assertIsNotNone(motivo)
+        self.assertTrue(motivo.startswith(g.PENDIENTE))
+        self.assertEqual(g._bloquean([("preclinico_aplanado", "s", motivo)], "bloqueo"), [])
 
-    def test_tier_desconocido_no_frena(self):
-        """Un paper recién indexado aún no tiene MeSH. Bloquear ahí sería ruido constante."""
+    def test_tier_desconocido_queda_pendiente_y_no_bloquea(self):
+        """Un paper recién indexado aún no tiene MeSH. Bloquear ahí sería ruido constante; callar,
+        un «verificado» por defecto. Se avisa como pendiente."""
         def run(cmd, **kw):
             return _Resp(json.dumps([{"id": "x", "tier": "desconocido", "preclinico": False,
                                       "entregable": False}]))
         g.subprocess.run = run
-        self.assertIsNone(g.preclinico_aplanado(APLANADO))
+        motivo = g.preclinico_aplanado(APLANADO)
+        self.assertIsNotNone(motivo)
+        self.assertTrue(motivo.startswith(g.PENDIENTE))
+        self.assertEqual(g._bloquean([("preclinico_aplanado", "s", motivo)], "bloqueo"), [])
+
+    def test_un_pendiente_no_tapa_una_violacion_real(self):
+        """Si un PMID del párrafo es preclínico y otro no se pudo resolver, manda la violación."""
+        g.subprocess.run = _mock_por_id({"PMID:41299692": "preclinico", "PMID:30137196": "desconocido"})
+        texto = ("El inhibidor reduce el tumor de forma consistente (PMID: 41299692, PMID: 30137196), "
+                 "así que merece la pena llevárselo a tu oncóloga en la próxima visita del mes.")
+        motivo = g.preclinico_aplanado(texto)
+        self.assertIsNotNone(motivo)
+        self.assertFalse(motivo.startswith(g.PENDIENTE))
 
     def test_sin_pmid_no_toca_la_red(self):
         def boom(*a, **k):
             raise AssertionError("no debe consultar el registro sin PMID en el texto")
         g.subprocess.run = boom
         self.assertIsNone(g.preclinico_aplanado(SIN_CITA))
+
+    # ── Auditoría Gorgojo 1.4 (22-sep-26): la etiqueta cubre SU afirmación, no el texto entero ──
+    def test_gorgojo_14_etiqueta_en_otra_frase_no_exime(self):
+        """Reproducido el 24-sep: «A mejora la supervivencia (PMID A). B, en ratones (PMID B)»
+        pasaba sin consultar el registro porque «en ratones» aparecía en ALGÚN sitio."""
+        llamadas = []
+        g.subprocess.run = _mock_por_id({"PMID:30137196": "preclinico"}, llamadas)
+        texto = ("El fármaco A mejora la supervivencia en {{DIAGNOSTICO}} (PMID: 30137196). "
+                 "El fármaco B, en cambio, solo se ha probado en ratones (PMID: 12345678). "
+                 "Por eso el A es la opción que yo pondría encima de la mesa en la consulta.")
+        motivo = g.preclinico_aplanado(texto)
+        self.assertIn("PMID:30137196", llamadas, "no consultó el registro por la afirmación sobre A")
+        self.assertIsNotNone(motivo)
+        self.assertFalse(motivo.startswith(g.PENDIENTE))
+
+    def test_gorgojo_14_la_cita_de_la_frase_manda_sobre_la_del_parrafo(self):
+        """A cita su propio PMID (clínico); B, etiquetado, cita otro (preclínico). Juzgar A por el
+        PMID de B sería un falso positivo: se mira la cita de SU frase."""
+        g.subprocess.run = _mock_por_id({"PMID:30137196": "clinico", "PMID:12345678": "preclinico"})
+        texto = ("El fármaco A mejora la supervivencia en {{DIAGNOSTICO}} (PMID: 30137196). "
+                 "El fármaco B, en cambio, solo se ha probado en ratones (PMID: 12345678). "
+                 "Te lo dejo apuntado para la consulta del mes que viene con la oncóloga.")
+        self.assertIsNone(g.preclinico_aplanado(texto))
+
+    def test_gorgojo_14_la_cita_en_la_frase_siguiente_cuenta(self):
+        """«A reduce el tumor. Fuente: PMID X.» son dos frases y UNA unidad de evidencia."""
+        g.subprocess.run = _mock_por_id({"PMID:41299692": "preclinico"})
+        texto = ("Hay trabajo reciente que apunta a que el inhibidor reduce el tumor de forma clara. "
+                 "Fuente: PMID: 41299692. Merece la pena llevárselo a tu oncóloga en la visita.")
+        self.assertIsNotNone(g.preclinico_aplanado(texto))
+
+    def test_gorgojo_14_un_pmid_ya_etiquetado_no_contamina_otra_frase_sin_cita(self):
+        """«A funciona.» (sin cita) + «B, en ratones (PMID B).» → el PMID de B ya está dicho como
+        preclínico en su frase: no se le endosa a A."""
+        g.subprocess.run = _mock_por_id({"PMID:12345678": "preclinico"})
+        texto = ("En la consulta comentaron que el fármaco A funciona bien en casos como el tuyo. "
+                 "El fármaco B solo se ha probado en ratones (PMID: 12345678), así que es otra cosa.")
+        self.assertIsNone(g.preclinico_aplanado(texto))
+
+    def test_gorgojo_14_una_abreviatura_no_parte_la_frase(self):
+        """«et al.» no es fin de frase: la etiqueta de detrás sigue cubriendo la afirmación."""
+        g.subprocess.run = _mock_por_id({"PMID:41299692": "preclinico"})
+        texto = ("Según Smith et al. el inhibidor reduce el tumor, en ratones y con xenoinjerto "
+                 "(PMID: 41299692), así que sirve para preguntar, no para pedirlo todavía en consulta.")
+        self.assertIsNone(g.preclinico_aplanado(texto))
+
+    def test_hablar_del_gate_con_codigo_en_linea_no_bloquea(self):
+        """Falso positivo real del replay (24-sep): explicar el check citando su caso de prueba."""
+        g.subprocess.run = _mock(True)
+        texto = ("- Check vivo en casa base: la frase con `PMID: 41299692` bajo \"reduce el tumor\" "
+                 "**bloquea**, y `_bloquean` confirma que bloquea aunque el gate global esté en aviso.")
+        self.assertIsNone(g.preclinico_aplanado(texto))
+
+    def test_citar_la_frase_de_prueba_entre_comillas_no_bloquea(self):
+        """Segundo falso positivo real del replay: una fila de tabla que CITA el caso de prueba."""
+        g.subprocess.run = _mock(True)
+        texto = ("| Caso | Resultado |\n|---|---|\n"
+                 "| \"el inhibidor funciona y reduce el tumor (PMID: 41299692)\" | **bloquea** |\n"
+                 "| lo mismo con «en ratones» en la frase | pasa |")
+        self.assertIsNone(g.preclinico_aplanado(texto))
+
+    def test_una_fila_de_tabla_es_su_propia_unidad(self):
+        """La etiqueta de una fila no cubre la promesa de otra."""
+        g.subprocess.run = _mock_por_id({"PMID:41299692": "preclinico"})
+        texto = ("| Lead | Qué dice | Tier |\n|---|---|---|\n"
+                 "| Fármaco B (PMID 12345678) | frena el crecimiento | en ratones |\n"
+                 "| Fármaco A (PMID 41299692) | el inhibidor funciona y reduce el tumor | ensayo |")
+        self.assertIsNotNone(g.preclinico_aplanado(texto))
+
+    def test_gorgojo_14_etiqueta_en_otro_parrafo_no_exime(self):
+        g.subprocess.run = _mock_por_id({"PMID:41299692": "preclinico"})
+        texto = ("El inhibidor reduce el tumor de forma consistente (PMID: 41299692).\n\n"
+                 "Aparte: lo de la otra vía está visto solo in vitro, en líneas celulares.")
+        self.assertIsNotNone(g.preclinico_aplanado(texto))
 
     def test_check_registrado_en_el_gate(self):
         self.assertIn("preclinico_aplanado", g.CHECKS)

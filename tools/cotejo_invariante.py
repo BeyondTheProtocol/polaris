@@ -41,7 +41,8 @@ QUÉ NO HACE
 -----------
 NO concluye clínica (equipa, no concluye). NO decide qué alteración liga con qué ensayo (eso es la
 cuarentena de dominio, firma de {{CONTACTO}}). NO lee el contenido del informe: comprueba que el PUNTERO
-sea a una fuente clínica real y que la FORMA del cotejo sea completa y coherente con la afirmación.
+sea a un informe que EXISTE en la bóveda (`fuente_clinica`, desde el 24-sep-26: antes bastaba la
+forma, auditoría Gorgojo 1.6) y que la FORMA del cotejo sea completa y coherente con la afirmación.
 La FIDELIDAD del puntero (que el informe diga de verdad lo que la pieza afirma) la valida {{TITULAR}}.
 
 MURO: solo afirmaciones estructuradas + PUNTEROS a fuente (rutas), nunca secuencias/VCF/HLA crudos.
@@ -52,6 +53,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fuente_clinica  # noqa: E402
 
 # ── Léxico determinista (ES) ─────────────────────────────────────────────────
 # Una afirmación es de PRESENCIA/AUSENCIA si menciona el verbo de estado de una alteración.
@@ -235,6 +237,15 @@ def _validar_cotejo(cotejo):
                 v.append("`cotejo.fuente` no apunta a un INFORME (extensión reconocible %s): «%s» "
                          "→ fail-closed (el puntero debe ser al documento primario, no a una carpeta)"
                          % ("/".join(_EXT_INFORME), fuente))
+            else:
+                # La FORMA no basta: el informe tiene que EXISTIR en la bóveda (auditoría Gorgojo
+                # 1.1/1.6, 24-sep-26 — misma clase que el panel de alto riesgo, mismo resolvedor).
+                # La fidelidad del contenido sigue siendo de {{TITULAR}}; que el puntero no apunte a
+                # nada, ya no.
+                r = fuente_clinica.cotejar(fuente, quien="cotejo_invariante")
+                if not r["ok"]:
+                    v.append("`cotejo.fuente` no es un informe real de la bóveda (%s): %s"
+                             % (r["estado"], r["motivo"]))
     fecha = cotejo.get("fecha")
     if "fecha" in cotejo and not (isinstance(fecha, str) and _FECHA_RE.match(fecha)):
         v.append("`cotejo.fecha` no es AAAA-MM-DD: %r (hay que datar de qué fecha es la fuente)" % fecha)
