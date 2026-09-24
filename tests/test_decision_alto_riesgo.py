@@ -35,6 +35,10 @@ import soporte_cita as _sc  # noqa: E402
 
 
 def _stub_soporte(afirmacion, cita):
+    if "22222222" in cita:        # fase 2: las cifras están, pero el juez dice que se usan mal
+        return {"estado": "CONTRADICE", "motivo": "juez local: contradice (eje poblacion)"}
+    if "33333333" in cita:
+        return {"estado": "PARCIAL", "motivo": "juez local: parcial (eje direccion)"}
     if "11111111" in cita:
         return _sc.soporte(afirmacion, cita, fetch=lambda c: (
             "pmid", "11111111", "Objective response rate was 14% in the HER2-low cohort."))
@@ -354,6 +358,19 @@ check("SOPORTE: cita real con cifra que NO dice (41 %) → no verificado",
 check("SOPORTE: la misma cita con su cifra real (14 %) → verificado", vers_sop[1]["verificado"])
 check("SOPORTE: el acta anota el estado del cotejo de soporte",
       vers_sop[1].get("cotejo", {}).get("soporte") == "RESPALDA_LITERAL")
+
+# FASE 2 (24-sep-26): el juez semántico dice CONTRADICE → no verificado; PARCIAL → verificado con aviso.
+_, _, vers_j, _, _, _, _ = dar.evaluar({"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": "PMID:22222222",
+     "porque": "En la cohorte HR+ la SLP fue de 9,9 meses",
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:22222222"}},
+    {"lente": "oncologo-virtual", "postura": "a_favor", "fuente": "PMID:33333333",
+     "porque": "Mejoró la SLP y la SG",
+     "comprobacion": {"por": "verificacion", "resultado": "confirmado", "contra_fuente": "PMID:33333333"}}]})
+check("FASE 2: el juez dice CONTRADICE → no verificado",
+      not vers_j[0]["verificado"] and "juez" in vers_j[0]["verificado_motivo"])
+check("FASE 2: PARCIAL → verificado, con el aviso en el acta",
+      vers_j[1]["verificado"] and "PARCIAL" in vers_j[1].get("cotejo", {}).get("aviso", ""))
 
 # Un nombre de agente inventado no suma independencia.
 _, _, _, _, bloq_i, _, ent_i = dar.evaluar({"decision": "x", "veredictos": [

@@ -64,6 +64,7 @@ runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
 runpy test_tier_evidencia.py
 runpy test_soporte_cita.py
+runpy test_soporte_cita_juez.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_deuda_texto_sin_alarma.py
 runpy test_deuda_duplicadas.py

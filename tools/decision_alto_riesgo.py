@@ -237,8 +237,9 @@ def _resolver_soporte():
     if _SOPORTE is not None:
         return _SOPORTE
     try:
-        from soporte_cita import soporte
-        return soporte
+        from soporte_cita import soporte, JUEZ_ACTIVO
+        # Fase 2: el juez semántico local solo entra cuando pasó su benchmark (JUEZ_ACTIVO).
+        return lambda afirmacion, cita: soporte(afirmacion, cita, con_juez=JUEZ_ACTIVO)
     except Exception:
         return None
 
@@ -397,6 +398,11 @@ def _resolver_verificado(v, comprobador=None):
         if sop.get("estado") == "NO_RESPALDA":
             return False, ("%s existe, pero NO respalda la afirmación: %s (tools/soporte_cita.py)"
                            % (contra, sop.get("motivo", "")))
+        if sop.get("estado") == "CONTRADICE":
+            return False, ("%s existe y trae las cifras, pero el juez dice que NO dicen eso: %s "
+                           "(tools/soporte_cita.py, fase 2)" % (contra, sop.get("motivo", "")))
+        if sop.get("estado") == "PARCIAL":
+            v["cotejo"]["aviso"] = "respaldo PARCIAL: " + (sop.get("motivo") or "")[:160]
     return True, "confirmado por «%s» contra %s (existe en su registro)" % (por, contra)
 
 

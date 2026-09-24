@@ -46,6 +46,12 @@ class Cotejo(unittest.TestCase):
         self.assertEqual(sc.cotejar("HR de 0,5; 1.234 cribadas", ABSTRACT)[0], sc.RESPALDA)
         self.assertEqual(sc.numeros("un 41 % y un 41% y 12,50"), ["41", "12.5"])
 
+    def test_decimal_lancet_y_entidades_html(self):
+        """PubMed devuelve «14&#xb7;4» crudo; el punto medio de Lancet es un decimal."""
+        abs_lancet = "median 14&#xb7;4 months vs 11&#xb7;2 months; HR 0&#xb7;79; p&lt;0&#xb7;05"
+        e, d = sc.cotejar("mediana de 14,4 frente a 11,2 meses (HR 0,79)", abs_lancet)
+        self.assertEqual(e, sc.RESPALDA, d)
+
     def test_no_son_cifras(self):
         # siglas con dígito, la propia cita, fase y año no se cotejan como cifras
         self.assertEqual(sc.numeros("HER2 y CDK4/6, ensayo de fase 3 (PMID: 35665782) de 2022"), [])

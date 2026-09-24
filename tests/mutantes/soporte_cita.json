@@ -1,9 +1,10 @@
 {
-  "_por_que": "Cada entrada es una defensa del gate cita→afirmación (24-sep-26). Si al quitarla test_soporte_cita sigue verde, esa defensa no está cubierta.",
+  "_por_que": "Cada entrada es una defensa del gate cita→afirmación (24-sep-26; fase 2 del juez incluida). Si al quitarla test_soporte_cita sigue verde, esa defensa no está cubierta.",
   "objetivo": "tools/soporte_cita.py",
   "test": [
-    "python3",
-    "tests/test_soporte_cita.py"
+    "sh",
+    "-c",
+    "python3 tests/test_soporte_cita.py && python3 tests/test_soporte_cita_juez.py"
   ],
   "env": "BTP_SOPORTE",
   "mutaciones": [
@@ -44,13 +45,33 @@
     },
     {
       "etiqueta": "CLI: NO_RESPALDA sale con 0",
-      "viejo": "    return 2 if any(r[\"estado\"] == NO_RESPALDA for r in res) else 0",
+      "viejo": "    return 2 if any(r[\"estado\"] in (NO_RESPALDA, CONTRADICE) for r in res) else 0",
       "nuevo": "    return 0"
     },
     {
       "etiqueta": "texto completo: rescata aunque siga faltando la cifra",
       "viejo": "            if e2 != NO_RESPALDA:",
       "nuevo": "            if True:"
+    },
+    {
+      "etiqueta": "juez: sin comprobar que la cita es literal",
+      "viejo": "    if d[\"veredicto\"] != \"no_sabe\" and (len(nc) < 20 or nc not in _norm_cita(ctx)):",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "juez: acepta citas triviales",
+      "viejo": "(len(nc) < 20 or nc not in",
+      "nuevo": "(nc not in"
+    },
+    {
+      "etiqueta": "juez: corre aunque falte la cifra",
+      "viejo": "    if con_juez and estado == RESPALDA:",
+      "nuevo": "    if con_juez:"
+    },
+    {
+      "etiqueta": "juez: veredicto desconocido aceptado",
+      "viejo": "d.get(\"veredicto\") not in (\"respalda\", \"contradice\", \"parcial\", \"no_sabe\")",
+      "nuevo": "False"
     }
   ]
 }
