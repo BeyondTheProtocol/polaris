@@ -6,7 +6,7 @@
   <key>EnvironmentVariables</key><dict>
     <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>RADAR_NED_DIAS</key><string>3</string>
-    <key>RADAR_NED_TRIAJE</key><string>0</string>
+    <key>RADAR_NED_TRIAJE</key><string>1</string>
   </dict>
   <key>ProgramArguments</key><array>
     <string>/bin/bash</string>
