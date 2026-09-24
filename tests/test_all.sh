@@ -344,6 +344,7 @@ runpy test_publicar_fuga.py
 runpy test_publicar_overlay_casa_base.py
 runpy test_publicar_sync.py
 runpy test_publicar_sync_candado.py  # dos publicaciones a la vez NO se pisan el árbol
+runpy test_espejo_ensayo.py  # no se publica en rojo, y el espejo se reconoce por su marca
 runpy test_ci_barrido.py
 runpy test_capacidades.py
 runpy test_centralita_blacklist.py

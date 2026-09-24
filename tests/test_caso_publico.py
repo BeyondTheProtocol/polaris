@@ -305,6 +305,12 @@ class FallaCerrado(unittest.TestCase):
         self._falla(f, "clave administrativa")
 
     def test_lexico_vetado(self):
+        # En el espejo público «ingeniera» llega reescrita como «ingeniera»: no hay qué cazar.
+        # Se sabe por su marca; en casa base y en los worktrees se prueba de verdad (24-sep-26).
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from _entorno import es_espejo
+        if es_espejo():
+            self.skipTest("léxico reescrito por el espejo público: no hay palabra vetada que cazar")
         f = copy.deepcopy(FUENTE)
         f["fuentes"]["ap"]["publico"] = "Informe de la ingeniera del caso"
         self._falla(f, "ingeniera")

@@ -329,6 +329,7 @@ SUSTITUCIONES = (
     (re.compile(r"\bECOG\s*[0-4]\b", re.I), "ECOG {{N}}"),
 )
 RENOMBRAR = {"voz-titular.md": "voz-titular.md"}
+MARCA_ESPEJO = ".espejo-publico"   # la lee tests/_entorno.es_espejo()
 
 # ── El barrido final. Si algo de esto sobrevive, no se publica. ──────────────────────────
 # Nombre propio, y el vocabulario clínico que identifica a UNA persona (no el genérico:
@@ -544,6 +545,14 @@ def publicar(destino, forzar=False):
     for rel in entran:
         _copiar_uno(rel, destino)
     n = len(entran)
+    # La MARCA del espejo (24-sep-26). Los tests que dependen de los nombres reales o del
+    # léxico vetado no pueden correr aquí: este árbol los reescribe («ingeniera» llega como
+    # «ingeniera»). Antes lo adivinaban buscando `{{` en el texto, que solo deja la sustitución
+    # de nombres; un test sin nombre propio no se enteraba y el CI público se ponía rojo (21-22
+    # y 24-sep). Con la marca lo SABEN: `tests/_entorno.es_espejo()`.
+    with open(os.path.join(destino, MARCA_ESPEJO), "w", encoding="utf-8") as f:
+        f.write("Árbol derivado por tools/publicar.py: nombres sustituidos y léxico reescrito.\n"
+                "Los tests que necesitan los datos reales se saltan aquí con su motivo.\n")
 
     sucios = _barrer(destino)
     if sucios:

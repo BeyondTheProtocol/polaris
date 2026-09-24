@@ -18,7 +18,24 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import web_lint as W  # noqa: E402
+from _entorno import es_espejo  # noqa: E402
+
+
+def solo_con_datos_reales(test, t):
+    """El espejo público (tools/publicar.py) sustituye los nombres del caso por marcadores
+    y reescribe el léxico vetado: «{{TITULAR}} es una ingeniera» llega allí como «{{TITULAR}} es
+    una ingeniera». Justo lo que estos casos comprueban que se caza ya no está, así que en el
+    espejo NO se pueden probar. Se saltan con el motivo dicho, no se dan por buenos en
+    silencio: en casa base y en los worktrees, con los datos reales, se prueban de verdad.
+
+    Se sabe por la marca del espejo (`es_espejo()`), no adivinando. Adivinar por `{{` dejaba
+    fuera los casos sin nombre propio («según la ingeniera»), y el CI público estuvo rojo el
+    21-22 y el 24-sep-26 con el código bien."""
+    if es_espejo() or "{{" in t:
+        test.skipTest("dato de prueba reescrito por el espejo público: %r" % t[:60])
+
 
 WEB = "/Users/polaris/projects/titular-{{APELLIDO}}-case"
 
@@ -47,30 +64,18 @@ class NoDejaPasar(unittest.TestCase):
     def test_identificadores_directos(self):
         self.assertIn("pii", _clases("Escribeme a contacto@ejemplo.com si quieres ayudar."))
 
-    def _solo_en_casa_base(self, t):
-        """El espejo público (tools/publicar.py) sustituye los nombres del caso por marcadores
-        y reescribe el léxico vetado: «{{TITULAR}} es una ingeniera» llega allí como «{{TITULAR}} es
-        una ingeniera». Justo lo que este caso comprueba que se caza ya no está, así que en el
-        espejo NO se puede probar. Se salta con el motivo dicho, no se da por bueno en silencio:
-        en casa base, con los nombres reales, se sigue probando de verdad.
-
-        Sin esto el CI del repo público estuvo ROJO dos días (21-22 sep-2026) sin que el código
-        tuviera nada mal, con el badge «failing» en la portada del README."""
-        if "{{" in t:
-            self.skipTest("dato de prueba despersonalizado por el espejo público: %r" % t[:60])
-
     def test_medicos_e_instituciones(self):
         for t in ("Hemos hablado con la Dra. {{CONTACTO}} sobre el siguiente paso a dar.",
                   "El bloque ya ha llegado a {{CENTRO}} esta misma semana pasada."):
             with self.subTest(t=t):
-                self._solo_en_casa_base(t)
+                solo_con_datos_reales(self, t)
                 self.assertIn("terceros", _clases(t), t)
 
     def test_lexico_de_marca(self):
         for t in ("{{TITULAR}} es una ingeniera que construye su sistema.",
                   "Hoy hemos avanzado mucho con el proyecto {{CONTACTO}}."):
             with self.subTest(t=t):
-                self._solo_en_casa_base(t)
+                solo_con_datos_reales(self, t)
                 self.assertIn("marca", _clases(t), t)
 
     def test_tells_de_ia(self):
@@ -141,7 +146,10 @@ class LaExcepcionDelPanelDatos(unittest.TestCase):
                              ({"nota": "episodio 12345678"}, "pii"),
                              ({"nota": "escribe a nadie@caso.example"}, "pii"),
                              ({"nota": "según la ingeniera"}, "marca")):
-            self.assertIn(clase, {c for c, _ in W.revisar_caso(self._caso(**extra))}, extra)
+            with self.subTest(extra=extra):
+                if clase in ("terceros", "marca"):     # el espejo reescribe nombres y léxico
+                    solo_con_datos_reales(self, extra["nota"])
+                self.assertIn(clase, {c for c, _ in W.revisar_caso(self._caso(**extra))}, extra)
 
     def test_sin_estructura_no_hay_excepcion(self):
         self.assertTrue(W.revisar_caso({"texto": "ESR1 p.{{VARIANTE}} en plasma"}))

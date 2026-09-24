@@ -75,6 +75,22 @@ def _es_casa_base():
     return os.path.realpath(RAIZ) == os.path.realpath(os.path.expanduser("~/claudecode"))
 
 
+def es_espejo():
+    """¿Es este el árbol PÚBLICO que deriva `tools/publicar.py`? Lo dice su marca, no una pista.
+
+    Ahí los nombres van sustituidos y el léxico vetado reescrito («ingeniera» llega como
+    «ingeniera»), así que un test que comprueba que eso se caza no tiene qué cazar. Antes se
+    adivinaba buscando `{{` en el texto, y un caso sin nombre propio no se enteraba: el CI
+    público estuvo rojo el 21-22 y el 24-sep-26 con el código bien. En un worktree o en casa
+    base esto es False, así que ahí esos tests siguen corriendo de verdad.
+
+    La marca se busca junto al CÓDIGO (la raíz de este mismo fichero), no en `BTP_REPO`: la
+    marca describe el código, y hay tests que redirigen `BTP_REPO` a un tmp para aislarse
+    (`test_caso_publico`), con lo que desde ahí nunca la veían."""
+    codigo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.exists(os.path.join(codigo, ".espejo-publico"))
+
+
 REQUISITOS = {
     "sin-halt": (_sin_halt, "el lazo en marcha: hay un HALT activo y el sistema está en pausa total"),
     "contenido": (_hay_contenido, "la fuente de verdad (`00_FUENTE-DE-VERDAD/`), que no se publica"),
