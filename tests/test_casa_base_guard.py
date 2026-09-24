@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import shutil
 import tempfile
 import unittest
 
@@ -30,6 +31,108 @@ def correr(command, cwd=CASA, tool="Bash", env_extra=None):
     if not p.stdout.strip():
         return "allow"
     return json.loads(p.stdout)["hookSpecificOutput"]["permissionDecision"]
+
+
+class CaminoHastaCasaBase(unittest.TestCase):
+    """Formas de LLEGAR a casa base que se colaban (rondas adversariales de `verificacion`, 22 y
+    24-sep-26). Vienen de la regla `git-mueve-casa-base` de `regla_en_accion.py`, que hacía lo
+    mismo que este hook hasta que se unificaron en `_git_camino`."""
+
+    def test_se_cuelan_por_el_camino(self):
+        for cmd, cwd in (
+                ("git -c core.x=y checkout abc1234 --", CASA),
+                ("git --git-dir=%s/.git --work-tree=%s checkout abc1234 --" % (CASA, CASA), WT),
+                ("GIT_DIR=%s/.git git checkout abc1234 --" % CASA, WT),
+                ('GIT_DIR="%s/.git" git checkout abc1234 --' % CASA, WT),
+                ("env -i PATH=/usr/bin git checkout abc1234 --", CASA),
+                ("command git checkout abc1234 --", CASA),
+                ("Git checkout abc1234 --", CASA),
+                ("git chec''kout abc1234 --", CASA),
+                ("if true; then git checkout abc1234 --; fi", CASA),
+                ("x=$(git checkout abc1234 --)", CASA),
+                ("pushd %s && git stash" % CASA, WT),
+                ("cd %s && cd - && git stash" % WT, CASA),
+                ("sh -c 'git checkout abc1234 --'", CASA),
+                ("bash -lc 'cd %s && git reset --hard'" % CASA, WT),
+                ("(cd %s; git checkout abc1234 --)" % CASA, WT),
+                ("bash <<'EOF'\ncd %s\ngit checkout abc1234 --\nEOF" % CASA, WT),
+                ("git -C %s/tools checkout abc1234 --" % CASA, WT),
+                ("git --no-pager -C %s checkout abc1234 --" % CASA, WT),
+                ("git -C %s/.claude/worktrees checkout abc1234 --" % CASA, WT)):
+            self.assertEqual(correr(cmd, cwd=cwd), "deny", cmd)
+
+    def test_subcomandos_que_tambien_mueven(self):
+        for cmd in ("git reset feature-x", "git bisect start HEAD HEAD~10", "git apply x.patch",
+                    "git update-ref refs/heads/master HEAD~1", "git symbolic-ref HEAD refs/heads/otra",
+                    "git rebase master", "git cherry-pick abc1234", "git clean -fd", "git pull"):
+            self.assertEqual(correr(cmd), "deny", cmd)
+
+
+class NoSonMovimientos(unittest.TestCase):
+    """Lo legítimo que NO puede bloquearse (falsos positivos reales del replay y de verificacion)."""
+
+    def test_solo_leen_o_solo_tocan_el_indice(self):
+        for cmd in ("git stash list", "git stash show -p", "git restore --staged tools/x.json",
+                    "git reset HEAD tools/x.json", "git reset tools/x.json", "git clean -n",
+                    "git checkout --help", "git symbolic-ref --short HEAD", "git merge claude/x",
+                    "git show HEAD~1:tools/x.py", "git diff A B -- tools", "git log --oneline -3"):
+            self.assertEqual(correr(cmd), "allow", cmd)
+
+    def test_el_cd_de_un_subshell_no_contamina(self):
+        for cmd in ("pushd %s; git log -1; popd; git checkout -b foo" % CASA,
+                    "(cd %s && git log -1); git checkout -b foo" % CASA):
+            self.assertEqual(correr(cmd, cwd=WT), "allow", cmd)
+
+    def test_texto_que_solo_menciona_el_comando(self):
+        for cmd in ("echo 'git checkout master'",
+                    "python3 tools/deuda.py abrir x 'hice git checkout en casa base'",
+                    'python3 -c "print(\'GIT_DIR=%s/.git git checkout master\')"' % CASA):
+            self.assertEqual(correr(cmd), "allow", cmd)
+
+    def test_el_otro_escape_tambien_vale(self):
+        self.assertEqual(correr("git checkout abc1234 --",
+                                env_extra={"BTP_ALLOW_CASA_BASE": "1"}), "allow")
+
+
+class RondaDelDosCuatro(unittest.TestCase):
+    """Lo que encontró `verificacion` al unificar los dos frenos (24-sep-26)."""
+
+    def test_reset_a_una_rama_o_tag_mueve(self):
+        for cmd in ("git reset claude/otra-rama", "git reset origin/master", "git reset v1.0.0"):
+            self.assertEqual(correr(cmd), "deny", cmd)
+
+    def test_reset_a_un_fichero_no_mueve(self):
+        for cmd in ("git reset tools/x.json", "git reset -- tools/x.json",
+                    "git reset HEAD tools/x.json"):
+            self.assertEqual(correr(cmd), "allow", cmd)
+
+    def test_volver_a_master_no_vale_para_reescribirlo(self):
+        # `-B master` con HEAD desacoplado REESCRIBE master al commit viejo: el incidente, pero
+        # permanente. La excepción es para `checkout/switch master` a secas.
+        for cmd in ("git checkout -B master", "git switch -C master",
+                    "git checkout --detach master", "git checkout --orphan master"):
+            self.assertEqual(correr(cmd), "deny", cmd)
+        for cmd in ("git checkout master", "git switch -q master", "git checkout -q -f master"):
+            self.assertEqual(correr(cmd), "allow", cmd)
+
+    def test_si_el_troceo_no_carga_el_hook_calla(self):
+        """FAIL-OPEN: el analizador usa `salida_guard._ordenes`. Si ese fichero deja de importar,
+        esto no puede pasar a denegar TODO git de todas las sesiones (era un regex sin cwd)."""
+        sitio = tempfile.mkdtemp(prefix="camino_roto_")
+        for f in ("casa_base_guard.py", "_git_camino.py"):
+            shutil.copy(os.path.join(ROOT, ".claude", "hooks", f), os.path.join(sitio, f))
+        with open(os.path.join(sitio, "salida_guard.py"), "w") as fh:
+            fh.write("def _ordenes(  # roto a propósito\n")
+        env = dict(os.environ, BTP_CASA_BASE=CASA)
+        for k in ("BTP_CASA_BASE_OK", "BTP_ALLOW_CASA_BASE", "MURO_PROFILE"):
+            env.pop(k, None)
+        for cmd, cwd in (("git stash list", "/tmp"), ("git checkout -b feature-x", "/tmp"),
+                         ("git pull", "/tmp")):
+            p = subprocess.run([sys.executable, os.path.join(sitio, "casa_base_guard.py")],
+                               input=json.dumps({"tool_name": "Bash", "cwd": cwd,
+                                                 "tool_input": {"command": cmd}}),
+                               capture_output=True, text=True, env=env, timeout=20)
+            self.assertNotIn("deny", p.stdout, cmd)
 
 
 class Deniega(unittest.TestCase):

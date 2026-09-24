@@ -406,6 +406,46 @@ def main():
     ok(r._limpia_largo("una\nlinea\tcon  control") == "una linea con control",
        "_limpia_largo sigue saneando saltos, tabuladores y espacios dobles")
 
+    # --- despertar al comité médico (24-sep-2026) ---------------------------------------------
+    # El comité es el agente del cuello de botella y no tenía nada que lo despertara. Esto NO
+    # sustituye a las sesiones: es la red para los días sin sesión, y por eso va con umbral,
+    # antigüedad, anti-duplicado y anti-spam. La cola de jobs es la del tmp (BTP_STATE_DIR).
+    import datetime as _dt
+
+    def _cola(n, dias):
+        f = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=dias)).strftime("%Y-%m-%d")
+        return {"pendientes": [{"uid": "u%d" % i, "ref": "ref%d" % i, "encolado": f}
+                               for i in range(n)], "cerrados": []}
+
+    def _jobs_del_comite():
+        d = os.path.join(_TMP, "queue", "pending")
+        n = 0
+        for f in os.listdir(d) if os.path.isdir(d) else []:
+            with open(os.path.join(d, f), encoding="utf-8") as fh:
+                n += json.load(fh).get("agente") == "comite-medico"
+        return n
+
+    for f in (r.SELLO_COMITE,):
+        if os.path.exists(f):
+            os.remove(f)
+    ok(r.despierta_comite(_cola(r.COMITE_MINIMO - 1, 5))[0] is False,
+       "pocos leads: no se despierta al comité")
+    ok(r.despierta_comite(_cola(r.COMITE_MINIMO + 2, 0))[0] is False,
+       "leads recientes (<24 h): tampoco")
+    hecho, por_que = r.despierta_comite(_cola(r.COMITE_MINIMO + 2, 3))
+    ok(hecho and _jobs_del_comite() == 1, "leads de sobra y viejos: encola UN job (%s)" % por_que)
+    ok(r.despierta_comite(_cola(r.COMITE_MINIMO + 2, 3))[0] is False and _jobs_del_comite() == 1,
+       "segunda pasada seguida: no duplica")
+    os.remove(r.SELLO_COMITE)      # aunque caduque el anti-spam, el job en cola manda
+    ok(r.despierta_comite(_cola(r.COMITE_MINIMO + 2, 3))[0] is False and _jobs_del_comite() == 1,
+       "con un job suyo ya en la cola, no encola otro")
+    _j = [json.load(open(os.path.join(_TMP, "queue", "pending", f), encoding="utf-8"))
+          for f in os.listdir(os.path.join(_TMP, "queue", "pending"))]
+    _j = [x for x in _j if x.get("agente") == "comite-medico"][0]
+    ok(_j.get("tope_job_usd") == r.COMITE_TOPE_USD, "el job lleva tope de coste")
+    ok("cerrar --ref" in _j.get("intencion", ""), "la intención dice cómo cerrar cada lead")
+    ok("ref0" in _j.get("intencion", ""), "…y nombra los leads por su ref")
+
     print("test_radar_ned_diario: %d ok, %d fallos" % (_pass, _fail))
     return 1 if _fail else 0
 

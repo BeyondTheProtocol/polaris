@@ -1132,6 +1132,93 @@ def encola(res):
 
 
 
+# --- DESPERTAR AL COMITÉ MÉDICO (24-sep-2026) -------------------------------------------------
+# El comité médico es el agente del cuello de botella (dianas/neoantígenos) y NO tenía nada que lo
+# despertara: sin plist, sin nadie que lo encolara, su latido llevaba 4 días parado (deuda
+# `comite-medico-sin-disparador`). Hoy lo despiertan las sesiones, y funciona —154 leads cerrados,
+# 0 pendientes—, así que esto NO sustituye a nadie: es la red para los días sin sesión. Sin daemon
+# nuevo (los duplicados están prohibidos): el radar ya corre a diario y aquí solo encola.
+COMITE_MINIMO = 5             # leads sin abrir que justifican despertarlo
+COMITE_HORAS = 24             # …y que lleven ahí al menos este tiempo
+COMITE_TOPE_USD = 1.50        # gasto que se auto-adjudica sin que {{TITULAR}} lo vea: con techo
+SELLO_COMITE = os.path.join(DIR_ESTADO, "ultimo_aviso_comite.json")
+
+
+def _dias_desde(fecha):
+    """Días entre una fecha AAAA-MM-DD del radar y hoy. Fail-soft: ilegible → 0 (no dispara)."""
+    try:
+        d = datetime.strptime(str(fecha)[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return 0
+    return (datetime.now(timezone.utc) - d).total_seconds() / 86400
+
+
+def _ya_hay_job_del_comite():
+    """¿Hay ya un job del comité pendiente o en curso? Se mira la cola, no una marca aparte: una
+    marca miente en cuanto alguien encola a mano."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import cola as q
+        for sub in ("pending", "running"):
+            for j in q.listar(sub) if hasattr(q, "listar") else []:
+                if (j or {}).get("agente") == "comite-medico":
+                    return True
+        base = os.path.join(STATE, "queue")
+        for sub in ("pending", "running"):
+            d = os.path.join(base, sub)
+            for f in os.listdir(d) if os.path.isdir(d) else []:
+                try:
+                    with open(os.path.join(d, f), encoding="utf-8") as fh:
+                        if json.load(fh).get("agente") == "comite-medico":
+                            return True
+                except (OSError, ValueError):
+                    continue
+    except Exception:
+        return True            # ante la duda NO se encola: mejor no despertarlo que duplicarlo
+    return False
+
+
+def despierta_comite(cola_radar, *, ahora=None):
+    """Encola UN job para `comite-medico` si se le ha acumulado trabajo. Devuelve (encolado, por qué).
+
+    Condiciones (todas): ≥COMITE_MINIMO leads sin abrir · el más viejo lleva ≥COMITE_HORAS ·
+    no hay ya un job suyo en la cola · no se encoló otro en las últimas COMITE_HORAS."""
+    pend = cola_radar.get("pendientes") or []
+    if len(pend) < COMITE_MINIMO:
+        return False, "solo %d leads sin abrir (umbral %d)" % (len(pend), COMITE_MINIMO)
+    viejo = max((_dias_desde(p.get("encolado")) for p in pend), default=0)
+    if viejo * 24 < COMITE_HORAS:
+        return False, "los leads llevan menos de %d h en cola" % COMITE_HORAS
+    try:
+        with open(SELLO_COMITE, encoding="utf-8") as fh:
+            if (datetime.now(timezone.utc)
+                    - datetime.fromisoformat(json.load(fh)["ts"])).total_seconds() < COMITE_HORAS * 3600:
+                return False, "ya se le avisó hace menos de %d h" % COMITE_HORAS
+    except (OSError, ValueError, KeyError):
+        pass
+    if _ya_hay_job_del_comite():
+        return False, "ya tiene un job en la cola"
+    refs = ", ".join(str(p.get("ref") or p.get("uid")) for p in pend[:8])
+    intencion = (
+        "El radar NED tiene %d leads sin abrir, el más viejo de hace %d día(s). Ábrelos por orden "
+        "de la cola (`python3 tools/radar_ned_diario.py cola`), abre CADA fuente antes de afirmar "
+        "nada, y cierra cada uno con `cerrar --ref <ref> --veredicto '…'`. Primeros: %s"
+        % (len(pend), int(viejo), refs))
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import cola as q
+        q.enqueue(intencion, agente="comite-medico", prioridad="normal",
+                  procedencia="radar-ned-diario", tope_job_usd=COMITE_TOPE_USD)
+    except Exception as e:
+        return False, "no pude encolar (%r)" % (e,)
+    try:
+        with open(SELLO_COMITE, "w", encoding="utf-8") as fh:
+            json.dump({"ts": datetime.now(timezone.utc).isoformat(), "leads": len(pend)}, fh)
+    except OSError:
+        pass
+    return True, "%d leads sin abrir, el más viejo de hace %d día(s)" % (len(pend), int(viejo))
+
+
 # --- ORDEN POR JEV (21-sep-2026) --------------------------------------------------------------
 # Medido antes de enchufarlo (notas del 21-sep en 04 · IA/Notas): Jev (TypeSafe AI), viendo solo
 # titulo + tema, separa bien lo que es de {{DIAGNOSTICO}} HR+ de lo que no (AUC 0,82-0,85 sobre
@@ -1761,6 +1848,8 @@ def cmd_run(a):
     guarda_visto(carga_visto() | nuevos)
     guarda_ultimo(res)
     n_cola, total_cola, fuera = encola(res)
+    desperto, por_que = despierta_comite(lee_cola())
+    print("comité médico: %s (%s)" % ("job encolado" if desperto else "no se despierta", por_que))
     print(f"digest → {ruta}")
     print(f"cola de verificación: +{n_cola} · {total_cola} pendientes de abrir "
           f"(salen en la brújula de cada sesión)")
