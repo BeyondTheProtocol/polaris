@@ -110,9 +110,9 @@ os.makedirs(os.path.join(base, ".claude", "logs"), exist_ok=True)
 os.makedirs(os.path.join(u, ".claude", "logs"), exist_ok=True)
 open(os.path.join(base, LOG), "w").write("l1\nl2\n")
 open(os.path.join(u, LOG), "w").write("l1\nl2\n")
-ok("un log idéntico al de casa base es copia, no trabajo", LOG not in ramas._trabajo_vivo(u))
+ok("un log idéntico al de casa base no es trabajo (repetido)", LOG not in ramas._trabajo_vivo(u))
 open(os.path.join(base, LOG), "a").write("l3 (casa base siguió escribiendo)\n")
-ok("y si casa base siguió añadiendo líneas, también (es un prefijo)", LOG not in ramas._trabajo_vivo(u))
+ok("y si casa base siguió añadiendo líneas, tampoco", LOG not in ramas._trabajo_vivo(u))
 open(os.path.join(u, LOG), "a").write("acceso escrito SOLO en el worktree\n")
 ok("una línea que casa base no tiene lo hace trabajo vivo", LOG in ramas._trabajo_vivo(u))
 os.remove(os.path.join(base, LOG))
@@ -164,19 +164,19 @@ ok("el de commits sin fusionar no es «dudoso» (va por huerfanas)",
 ok("el aviso no se repite mientras siga igual", ramas._avisar_dudosos(ramas.dudosos()) == [])
 
 # ── Rescate: copiar a casa base antes de podar (24-sep-2026) ───────────────────────────
-ARCHIVO = os.path.join(base, ".claude", "logs", "archivo")
+CAJON = os.path.join(base, "tools", "state", "rescate-poda")
 antes = open(os.path.join(wt_real, REL), "rb").read()
 r = ramas_cli("autopoda")
 ok("autopoda termina bien", r.returncode == 0, "-> rc=%d %s" % (r.returncode, r.stderr[-300:]))
-copias = [f for f in os.listdir(ARCHIVO)] if os.path.isdir(ARCHIVO) else []
-esperado = [f for f in copias if f.endswith("--00_FUENTE-DE-VERDAD_Gestion_PANEL-LAZO.md")
-            and f.startswith("worktree-wt-panel-real-")]
-ok("rescata el panel de verdad al archivo de casa base", len(esperado) == 1, "-> %r" % copias)
-ok("la copia es byte a byte", bool(esperado) and
-   open(os.path.join(ARCHIVO, esperado[0]), "rb").read() == antes)
+cajones = sorted(os.listdir(CAJON)) if os.path.isdir(CAJON) else []
+mios = [d for d in cajones if d.startswith("wt-panel-real-")]
+ok("rescata el panel de verdad al cajón de casa base (el mismo que usa el cierre de sesión)",
+   len(mios) == 1, "-> %r · %s" % (cajones, r.stdout[-300:]))
+ok("la copia es byte a byte", bool(mios) and
+   open(os.path.join(CAJON, mios[0], REL), "rb").read() == antes)
 ok("y ENTONCES poda el worktree", not os.path.isdir(wt_real), r.stdout[-500:])
 ok("lo que tiene commits sin fusionar sigue sin rescatarse ni podarse",
-   os.path.isdir(wt_sin) and not [f for f in copias if f.startswith("worktree-wt-sin-fusionar-")])
+   os.path.isdir(wt_sin) and not [d for d in cajones if d.startswith("wt-sin-fusionar-")])
 
 # Restos: un directorio que git ya no registra se cuenta y se avisa, pero NO se borra.
 resto = os.path.join(base, ".claude", "worktrees", "resto-de-otra-sesion")
@@ -204,9 +204,8 @@ shutil.rmtree(resto)
 wt_otra = os.path.join(tmp, "wt-otra")
 git(base, "worktree", "add", "-q", "-b", "r-otra", wt_otra)
 escribe(wt_otra, antes.decode())
-os.rename(os.path.join(ARCHIVO, esperado[0]),
-          os.path.join(ARCHIVO, "worktree-wt-otra-19990101--" + REL.replace(os.sep, "_")))
-ok("una copia ya archivada (con otra fecha en el nombre) lo hace podable",
+os.rename(os.path.join(CAJON, mios[0]), os.path.join(CAJON, "otro-cajon-19990101-000000"))
+ok("una copia ya guardada en otro cajón (otra fecha, otro worktree) lo hace podable",
    ramas._trabajo_vivo(wt_otra) == [], "-> %r" % ramas._trabajo_vivo(wt_otra))
 escribe(wt_otra, antes.decode() + bloque("2026-09-21T21:00:00", "hh1"))
 ok("si el worktree tiene MÁS de lo archivado, vuelve a ser trabajo vivo",
@@ -216,11 +215,11 @@ ok("si el worktree tiene MÁS de lo archivado, vuelve a ser trabajo vivo",
 wt_falla = os.path.join(tmp, "wt-falla")
 git(base, "worktree", "add", "-q", "-b", "r-falla", wt_falla)
 escribe(wt_falla, bloque("2026-09-21T20:00:00", "gg1") + bloque("2026-09-21T20:30:00", "gg2"))
-os.chmod(ARCHIVO, 0o500)
+os.chmod(CAJON, 0o500)                      # el cajón, de solo lectura: la copia no puede salir bien
 r = ramas_cli("autopoda")
-os.chmod(ARCHIVO, 0o700)
+os.chmod(CAJON, 0o700)
 ok("si el rescate falla, el worktree NO se poda", os.path.isdir(wt_falla), r.stdout[-400:])
-ok("y lo dice en claro", "NO se pudo rescatar" in r.stdout, "-> %s" % r.stdout[-300:])
+ok("y lo dice en claro", "NO se pudo guardar" in r.stdout, "-> %s" % r.stdout[-400:])
 git(base, "worktree", "remove", "--force", wt_falla)
 git(base, "worktree", "remove", "--force", wt_otra)
 

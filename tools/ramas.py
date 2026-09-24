@@ -26,6 +26,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -223,50 +224,21 @@ def _es_residuo_de_tests(fichero):
 
 # COPIAS DE CASA BASE (22-sep-2026). La app, al crear un worktree, copia dentro los ignorados de
 # `.claude/` de casa base: 8 MB de `.claude/logs/clinico-access.log` y compañía en CADA worktree.
-# El freno los tomaba por trabajo vivo y ningún worktree nuevo se podaba nunca. Un fichero cuyo
-# contenido es PREFIJO del mismo fichero en casa base (idéntico, o casa base siguió añadiendo
-# líneas, que es lo que hacen los logs) no pierde nada al podarse. Una sola línea que casa base
-# no tenga (el caso del 20-sep: accesos escritos solo en el worktree) lo hace trabajo vivo.
+# El freno los tomaba por trabajo vivo y ningún worktree nuevo se podaba nunca. Si TODAS las líneas
+# del fichero están ya en el de casa base (`_lineas_ya_en`, de la otra mitad de este mismo arreglo),
+# no se pierde nada al podarlo. Una sola línea que casa base no tenga (el caso del 20-sep: accesos
+# escritos solo en el worktree) lo hace trabajo vivo.
+#
+# Y si tiene algo propio, no se bloquea para siempre: `rescatar()` lo COPIA al cajón de casa base
+# (`tools/state/rescate-poda/<worktree>-<fecha>/`) y entonces sí se poda. Copiar antes de borrar.
 _TROZO = 1 << 20
-
-
-def _es_copia_de_casa_base(fichero, rel):
-    import _casa
-    origen = os.path.join(_casa.casa_base(), rel)
-    if os.path.realpath(origen) == os.path.realpath(fichero):
-        return False
-    try:
-        if os.path.getsize(fichero) > os.path.getsize(origen):
-            return False
-        with open(fichero, "rb") as a, open(origen, "rb") as b:
-            while True:
-                x = a.read(_TROZO)
-                if not x:
-                    return True
-                if b.read(len(x)) != x:
-                    return False
-    except OSError:
-        return False
-
-
-# RESCATE (24-sep-2026). Cuando el fichero del worktree NO es copia ni residuo, tiene contenido
-# que solo existe ahí: 222 líneas de audit clínico en dos worktrees, porque casa base ROTÓ su log
-# (las viejas se fueron a .claude/logs/archivo/) y la copia dejó de ser prefijo. Bloquear para
-# siempre no es una solución: se COPIA a casa base primero —el mismo gesto, y el mismo nombre, que
-# se hizo a mano el 20 y el 22-sep— y solo entonces el worktree se puede podar. Copiar antes de
-# borrar: si el rescate falla, no se poda.
+_CAJON_REL = os.path.join("tools", "state", "rescate-poda")
 _ARCHIVO_REL = os.path.join(".claude", "logs", "archivo")
 
 
-def _nombre_rescate(path, rel):
-    return "worktree-%s-%s--%s" % (os.path.basename(path.rstrip("/")),
-                                   datetime.now().strftime("%Y%m%d"),
-                                   rel.replace(os.sep, "_"))
-
-
-def _dir_archivo():
-    import _casa
-    return os.path.join(_casa.casa_base(), _ARCHIVO_REL)
+def _casa():
+    import _casa as c
+    return c.casa_base()
 
 
 def _mismo_contenido(a, b):
@@ -285,38 +257,24 @@ def _mismo_contenido(a, b):
 
 
 def _ya_rescatado(path, rel):
-    """¿Hay ya en el archivo de casa base una copia BYTE A BYTE de este fichero? Entonces podarlo
-    no pierde nada. Se compara el contenido, no el nombre: un nombre con la fecha de otro día
-    sigue valiendo si el contenido es el mismo."""
-    d = _dir_archivo()
-    sufijo = "--" + rel.replace(os.sep, "_")
+    """¿Existe ya en casa base una copia BYTE A BYTE de este fichero —en el cajón de rescates o en
+    el archivo de logs—? Entonces podarlo no pierde nada. Se compara el CONTENIDO, no el nombre:
+    una copia guardada en otra pasada, con otra fecha en la ruta, sigue valiendo."""
     f = os.path.join(path, rel)
+    candidatos = []
+    cajon = os.path.join(_casa(), _CAJON_REL)
     try:
-        nombres = os.listdir(d)
+        for d in os.listdir(cajon):
+            candidatos.append(os.path.join(cajon, d, rel))
     except OSError:
-        return False
-    for n in nombres:
-        if n.endswith(sufijo) and _mismo_contenido(f, os.path.join(d, n)):
-            return True
-    return False
-
-
-def rescatar(path, si=False):
-    """Copia al archivo de casa base lo que solo existe en este worktree. [(rel, destino, hecho)]."""
-    import shutil
-    out = []
-    for rel in _trabajo_vivo(path):
-        destino = os.path.join(_dir_archivo(), _nombre_rescate(path, rel))
-        hecho = False
-        if si:
-            try:
-                os.makedirs(os.path.dirname(destino), exist_ok=True)
-                shutil.copy2(os.path.join(path, rel), destino)
-                hecho = _mismo_contenido(os.path.join(path, rel), destino)
-            except (OSError, shutil.Error):
-                hecho = False
-        out.append((rel, destino, hecho))
-    return out
+        pass
+    archivo = os.path.join(_casa(), _ARCHIVO_REL)
+    sufijo = "--" + rel.replace(os.sep, "_")
+    try:
+        candidatos += [os.path.join(archivo, n) for n in os.listdir(archivo) if n.endswith(sufijo)]
+    except OSError:
+        pass
+    return any(os.path.isfile(c) and _mismo_contenido(f, c) for c in candidatos)
 
 
 def _motivo_residuo(path, rel):
@@ -324,10 +282,10 @@ def _motivo_residuo(path, rel):
     f = os.path.join(path, rel)
     if rel == _PANEL_REL and _es_residuo_de_tests(f):
         return "residuo de tests"
-    if _es_copia_de_casa_base(f, rel):
-        return "copia de casa base"
+    if _lineas_ya_en(f, os.path.join(_casa(), rel)):
+        return "repetido en casa base"
     if _ya_rescatado(path, rel):
-        return "ya rescatado al archivo de casa base"
+        return "ya rescatado a casa base"
     return None
 
 
@@ -761,9 +719,17 @@ def limpia(si=False, avisar=False, rescatar_antes=False):
         # Rescate SOLO de lo ya fusionado: en una rama con commits propios el trabajo se decide
         # fusionando, no archivando ficheros sueltos.
         if rescatar_antes and _trabajo_vivo(w["path"]) and _ahead_ref(_ref_de(w), base) == 0:
-            for rel, destino, hecho in rescatar(w["path"], si=True):
-                print("  %s %s → %s" % ("📥 rescatado:" if hecho else "‼️ NO se pudo rescatar:",
-                                        rel, os.path.basename(destino)))
+            # MISMO rescate que el cierre de sesión (`cerrar_sesion.py`): lo repetido se descarta,
+            # lo propio se copia al cajón de casa base. Si algo no se pudo guardar, sigue en
+            # `_trabajo_vivo` y `_candidatas_vacias` no lo propondrá: no se poda.
+            cajon = os.path.join(_casa(), _CAJON_REL, "%s-%s" % (
+                os.path.basename(w["path"].rstrip("/")), time.strftime("%Y%m%d-%H%M%S")))
+            r = rescatar(w["path"], _casa(), cajon)
+            print("  📥 %s: %d repetido(s) en casa base, %d guardado(s) en %s%s"
+                  % (w.get("branch", "?"), len(r["repetidos"]), len(r["rescatados"]),
+                     os.path.join(_CAJON_REL, os.path.basename(cajon)),
+                     "" if not r["bloquean"] else
+                     " · ‼️ NO se pudo guardar: %s" % ", ".join(r["bloquean"][:3])))
         vivo = _trabajo_vivo(w["path"])
         if vivo:
             print("⏸️  %s NO se poda: tiene %d fichero(s) sin ejecutar/firmar (%s)"

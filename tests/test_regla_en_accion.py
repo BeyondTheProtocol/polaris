@@ -62,9 +62,28 @@ def check(cond, etiqueta):
         fallos.append(etiqueta)
 
 
+def _foto(d):
+    """{ruta: tamaño} de todo lo que hay dentro, para comparar antes/después de ESTA corrida."""
+    out = {}
+    for raiz, _dirs, ficheros in os.walk(d):
+        for f in ficheros:
+            p = os.path.join(raiz, f)
+            try:
+                out[p] = os.path.getsize(p)
+            except OSError:
+                pass
+    return out
+
+
 def main():
     import tempfile
     tmp = tempfile.mkdtemp(prefix="btp_regla_")
+    # El worktree simulado cuelga del repo REAL (hace falta un .gitignore de verdad detrás), así
+    # que esta batería no puede dejar NADA dentro. Se compara con la foto de antes: un resto de
+    # una pasada vieja no es culpa de esta corrida, pero crecer un byte sí.
+    WT_SIMULADO = os.path.join(RAIZ.split("/.claude/worktrees/")[0], ".claude", "worktrees",
+                               "prueba-freno")
+    foto_antes = _foto(WT_SIMULADO)
 
     print("── dispara donde importa ──")
     r = correr({"session_id": "a", "tool_name": "Bash",
@@ -396,15 +415,27 @@ def main():
     check(p.returncode == 0, "con entrada corrupta sale 0 y no estorba")
 
     import shutil
-    # El worktree simulado cuelga del repo REAL: la batería no puede dejar NADA dentro (24-sep-26).
     print("── el worktree simulado queda limpio ──")
-    sucio = []
-    for raiz, _d, ficheros in os.walk(os.path.join(RAIZ.split("/.claude/worktrees/")[0],
-                                                   ".claude", "worktrees", "prueba-freno")):
-        sucio += [os.path.join(raiz, f) for f in ficheros]
-    check(not sucio, "la batería no escribe dentro de .claude/worktrees/prueba-freno (%r)" % sucio[:3])
+    ahora = _foto(WT_SIMULADO)
+    tocado = [p for p, n in ahora.items() if foto_antes.get(p) != n]
+    check(not tocado, "esta corrida no escribe dentro de .claude/worktrees/prueba-freno (%r)"
+          % tocado[:3])
     check(os.path.isfile(os.path.join(tmp, "regla-en-accion.log")),
           "…porque el log de auditoría va al tmp (BTP_REGLA_LOG)")
+
+    # Y en producción, sin BTP_REGLA_LOG: un worktree se reconoce por la RUTA. Un `.git` fichero no
+    # basta (el simulado no tiene ninguno) y ahí es donde el log se quedaba dentro del worktree.
+    falso = os.path.join(tmp, "repo", ".claude", "worktrees", "loquesea")
+    os.makedirs(falso, exist_ok=True)
+    entorno = {k: v for k, v in os.environ.items() if k != "BTP_REGLA_LOG"}
+    entorno["CLAUDE_PROJECT_DIR"] = falso
+    ruta = subprocess.run([sys.executable, "-c",
+                           "import importlib.util,sys;e=importlib.util.spec_from_file_location('r',%r);"
+                           "m=importlib.util.module_from_spec(e);e.loader.exec_module(m);print(m.LOG)"
+                           % HOOK],
+                          capture_output=True, text=True, env=entorno).stdout.strip()
+    check(ruta.startswith(os.path.expanduser("~/claudecode/.claude/logs")),
+          "sin BTP_REGLA_LOG el log va a casa base, no dentro del worktree (%r)" % ruta)
 
     shutil.rmtree(tmp, ignore_errors=True)
 
