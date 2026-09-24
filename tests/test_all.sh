@@ -186,6 +186,7 @@ runpy test_dm_inbox_buzones.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_borde.py
 runpy test_canarios.py
+runpy test_cerebro_enlace.py
 runpy test_reescribe_consulta.py
 runpy test_deid.py
 runpy test_deid_procedencia.py   # 24-sep · auditoría 3.3: lo del caso es N2 por procedencia aunque el detector no vea nada

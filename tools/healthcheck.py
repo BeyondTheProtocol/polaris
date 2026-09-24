@@ -967,10 +967,52 @@ def _check_cerebro_alcanzable():
     except Exception as e:
         ok, info["error"] = False, repr(e)[:120]
     if not ok:
-        alertas.append(("cerebro_inalcanzable",
-                        "El LAZO encuentra el binario del cerebro (%s) pero NO puede ejecutarlo. "
-                        "Las tareas clínicas van a PARARSE." % ruta))
+        # AUTO-REPARACIÓN (24-sep-2026, deuda `cerebro_inalcanzable`, 4 detecciones desde el
+        # 15-sep). `~/.local/bin/claude` es un ENLACE a un binario CON VERSIÓN
+        # (…/versions/2.1.236): cuando Claude Code se actualiza y esa versión desaparece, el
+        # enlace queda colgando, `which` lo sigue encontrando y el lazo se queda sin cerebro. Aquí
+        # se repunta al binario más nuevo que SÍ exista. Acotado: solo si el destino actual no
+        # existe, solo dentro de `versions/`, y solo si el candidato ejecuta de verdad.
+        reparado = _repara_enlace_cerebro(ruta)
+        if reparado:
+            info["autofix"] = reparado
+            alertas.append(("cerebro_enlace_repuntado",
+                            "El enlace del cerebro apuntaba a una versión que ya no existe (una "
+                            "actualización de Claude Code) y el lazo se había quedado sin cerebro. "
+                            "Lo he repuntado a %s y responde. Queda dicho por si vuelve a pasar."
+                            % reparado))
+        else:
+            alertas.append(("cerebro_inalcanzable",
+                            "El LAZO encuentra el binario del cerebro (%s) pero NO puede "
+                            "ejecutarlo, y no he podido repararlo solo. Las tareas clínicas van a "
+                            "PARARSE." % ruta))
     return alertas, info
+
+
+def _repara_enlace_cerebro(ruta):
+    """Repunta `ruta` (un enlace colgante) al binario más nuevo de `versions/`. Devuelve la versión
+    nueva si quedó ejecutable, o None. No toca nada si el destino actual existe: entonces el fallo
+    es otro y hay que mirarlo, no taparlo."""
+    try:
+        if not os.path.islink(ruta) or os.path.exists(os.path.realpath(ruta)):
+            return None
+        versiones = os.path.join(os.path.dirname(os.path.realpath(ruta)))
+        if os.path.basename(versiones) != "versions":
+            return None
+        cands = [os.path.join(versiones, f) for f in os.listdir(versiones)]
+        cands = [c for c in cands if os.path.isfile(c) and os.access(c, os.X_OK)]
+        if not cands:
+            return None
+        nuevo = max(cands, key=os.path.getmtime)
+        tmp = ruta + ".nuevo"
+        os.symlink(nuevo, tmp)
+        os.replace(tmp, ruta)          # atómico: nadie ve el enlace a medias
+        r = subprocess.run([ruta, "--version"], capture_output=True, text=True, timeout=30)
+        if r.returncode != 0:
+            return None
+        return os.path.basename(nuevo)
+    except Exception:
+        return None
 
 
 def _check_roster_daemons():
