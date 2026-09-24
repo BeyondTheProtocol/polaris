@@ -148,7 +148,10 @@ rig = sitk.Euler3DTransform()
 rig.SetTranslation([1.0, 2.0, 3.0])
 campo = sitk.Image([16, 16, 16], sitk.sitkVectorFloat64)
 campo.CopyInformation(im)
-comp = sitk.CompositeTransform([rig, sitk.DisplacementFieldTransform(campo)])
+# Anidado, como el registro real: el rígido de ImageRegistrationMethod ya es un compuesto
+# (inicial + optimizado). Con un Euler suelto el test pasaba y los datos reales rompían.
+rig_real = sitk.CompositeTransform([sitk.TranslationTransform(3, [0.5, 0.0, 0.0]), rig])
+comp = sitk.CompositeTransform([rig_real, sitk.DisplacementFieldTransform(campo)])
 t = V.guarda_transformada(comp, os.path.join(V._dir("pet"), "P_D.tfm.h5"))
 ruta_t = os.path.join(V._dir("pet"), t["fichero"])
 ok(os.path.exists(ruta_t) and len(t["sha256"]) == 16 and t["sha256"] == V._sha256(ruta_t),

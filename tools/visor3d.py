@@ -3726,6 +3726,12 @@ def guarda_transformada(t, ruta):
     import SimpleITK as sitk
     exige_zona_clinica(os.path.dirname(ruta))
     os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    # El rígido que devuelve ImageRegistrationMethod ya es un CompositeTransform (inicial +
+    # optimizado), y HDF5 no acepta un compuesto dentro de otro («Composite Transform can only be
+    # 1st transform in a file», 24-sep-26 con datos reales). Se aplana: misma transformación.
+    if isinstance(t, sitk.CompositeTransform):
+        t = sitk.CompositeTransform(t)
+        t.FlattenTransform()
     sitk.WriteTransform(t, ruta)
     return {"fichero": os.path.basename(ruta), "sha256": _sha256(ruta),
             "sentido": "fijo (TC del PET) → móvil (TC diagnóstico), para sitk.Resample"}
