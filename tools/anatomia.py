@@ -224,6 +224,8 @@ FAMILIAS = [
     ("buscar y verificar", ("grok", "perplexity", "nvidia", "consensus",
                             "scite", "pubmed", "radar", "kb", "elicit",
                             "verifica", "cotejo",
+                            # ¿el paper citado RESPALDA la frase, o solo existe? (otra sesión, 24-sep)
+                            "soporte_cita",
                             "cn_fetch",      # lee webs chinas geobloqueadas para investigar (13-sep)
                             "cn.py", "cn_", # cn.py: buscar CUALQUIER cosa en la web china (20-sep)
                             "cde_fetch",     # el registro chino de ensayos, sin navegador (20-sep)
