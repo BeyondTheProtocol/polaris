@@ -457,6 +457,25 @@ def evaluar(data, comprobador=None):
                         % (len(validos), ", ".join(sorted(validos)) or "ninguno",
                            ("; no son agentes del gabinete: " + ", ".join(fuera)) if fuera else ""))
 
+    # a2) nadie es juez y parte: si A comprueba a B, B no puede comprobar a A (24-sep-26, decisión
+    #    de {{TITULAR}}; hueco que vio consejero-arquitectura). `verificacion` puede ser gate Y abogado
+    #    del diablo, pero su propio veredicto lo sella alguien a quien ella no ha sellado (por
+    #    diseño, `herramientas-medicas`). El veredicto del círculo deja de contar como verificado.
+    comprueba = {}                                       # agente → agentes cuyos veredictos sella
+    for v in vers:
+        por = _agente_base((v.get("comprobacion") or {}).get("por") if isinstance(
+            v.get("comprobacion"), dict) else "")
+        if por:
+            comprueba.setdefault(por, set()).add(_agente_base(v["agente"]))
+    for v in vers:
+        c = v.get("comprobacion") if isinstance(v.get("comprobacion"), dict) else {}
+        por, yo = _agente_base(c.get("por")), _agente_base(v["agente"])
+        if por and v["verificado"] and por in comprueba.get(yo, set()):
+            v["verificado"] = False
+            v["verificado_motivo"] = ("comprobación mutua: «%s» comprueba a «%s» y «%s» comprueba a "
+                                      "«%s» (juez y parte). El veredicto de «%s» lo tiene que sellar un "
+                                      "agente al que no haya sellado" % (por, yo, yo, por, yo))
+
     # b) verificación obligatoria: TODOS con un VEREDICTO de comprobación REAL (no el booleano
     #    auto-declarado). El motivo concreto (por qué no cuenta) va en el bloqueo y en el acta.
     for v in vers:

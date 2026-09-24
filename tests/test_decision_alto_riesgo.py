@@ -112,7 +112,9 @@ data_ok = {
         {"lente": "verificacion (abogado del diablo)", "postura": "matiz", "confianza": "media",
          "porque": "viable solo si el laboratorio confirma rendimiento de ARN del core",
          "fuente": "checklist {{CENTRO}} 13-core",
-         "comprobacion": comprobado(por="comite-medico"),
+         # El veredicto red-team de `verificacion` lo comprueba `herramientas-medicas`: si lo
+         # comprobara `comite-medico` (a quien `verificacion` comprueba), sería un círculo.
+         "comprobacion": comprobado(por="herramientas-medicas"),
          "discrepa_en": "condiciona a confirmación de rendimiento del tejido"},
     ],
 }
@@ -398,6 +400,27 @@ check("GORGOJO 1.2: «¿lo hacemos?» con una acción clínica en el turno anter
 # silencio para algo clínico (regla ya escrita en el docstring del disparador).
 check("GORGOJO 1.2: --no-riesgo no apaga una acción clínica detectada",
       dar.disparar("¿debo duplicar la dosis?", riesgo=False)[0])
+
+# ── JUEZ Y PARTE (24-sep-26, decisión de {{TITULAR}}): dos agentes no se comprueban el uno al otro ──
+# Hueco que vio `consejero-arquitectura`, no la auditoría: `verificacion` comprueba a
+# `comite-medico` y `comite-medico` comprueba el veredicto red-team de `verificacion` → cada uno
+# sella al otro. `verificacion` sigue pudiendo ser gate Y abogado del diablo; lo que no puede es
+# que su propio veredicto lo selle alguien a quien ella acaba de sellar.
+data_circulo = {"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()},
+    {"lente": "verificacion (abogado del diablo)", "postura": "matiz", "fuente": INFORME,
+     "comprobacion": comprobado(por="comite-medico")}]}
+_, _, vers_ci, _, bloq_ci, _, ent_ci = dar.evaluar(data_circulo)
+check("JUEZ Y PARTE: comprobación mutua (A comprueba a B y B a A) → no entregable",
+      (not ent_ci) and any("mutua" in b for b in bloq_ci))
+check("JUEZ Y PARTE: el bloqueo dice quién comprueba a quién", any("comite-medico" in b and "verificacion" in b
+                                                                   and "mutua" in b for b in bloq_ci))
+data_sin_circulo = {"decision": "x", "veredictos": [
+    {"lente": "comite-medico", "postura": "a_favor", "fuente": INFORME, "comprobacion": comprobado()},
+    {"lente": "verificacion (abogado del diablo)", "postura": "matiz", "fuente": INFORME,
+     "comprobacion": comprobado(por="herramientas-medicas")}]}
+*_, ent_sc = dar.evaluar(data_sin_circulo)
+check("JUEZ Y PARTE: el red-team de verificacion comprobado por herramientas-medicas → entregable", ent_sc)
 
 print("RESULTADO decision_alto_riesgo: %d OK, %d fallos" % (total - fallos, fallos))
 print("✅ PROTOCOLO DE DECISIÓN DE ÉLITE EN VERDE" if not fallos else "❌ revisar fallos")
