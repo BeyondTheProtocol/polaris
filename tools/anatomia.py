@@ -197,6 +197,8 @@ FAMILIAS = [
                           # mensaje desde el 22-sep-26 (`permiso_envio`)
                           "ok_envio", "permiso_envio",
                           "decision_alto_riesgo",
+                          # los señuelos del tripwire de exfiltración (24-sep-26)
+                          "canarios",
                           # abre la fuente y busca dentro lo citado: el acta ya no sella un puntero
                           # a nada (auditoría Gorgojo 1.1, 24-sep-26)
                           "fuente_clinica",
