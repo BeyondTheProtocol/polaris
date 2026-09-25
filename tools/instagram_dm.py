@@ -152,7 +152,7 @@ def cmd_responder(args):
         print("   %s" % res.get("reason"))
         if res.get("avisos_fuga"):
             print("   ⚠️ posible fuga: %s" % "; ".join(res["avisos_fuga"]))
-        print("   Lo apruebas tú por Telegram (aprobar <borrador> <nonce>). Borrador: %s"
+        print("   El código para aprobarlo le llega SOLO a {{TITULAR}} por Telegram. Borrador: %s"
               % res["draft"])
         return 0
     print("✗ no se pudo crear el borrador: %s" % res.get("reason"))

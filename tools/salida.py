@@ -33,6 +33,7 @@ por B1, y cp/mv/ln/tee/touch por B3) → el lazo no puede fabricar un emisor alt
 única vía al exterior es este script, que el lazo tampoco puede editar.
 """
 import hashlib
+import hmac
 import json
 import os
 import random
@@ -594,18 +595,77 @@ def _draft(channel, action, dest, text, reason, avisos=None):
     sufx = _dest_hash("%s|%s|%s" % (channel, dest, text)) or "x"
     name = "%s-%s-%s-%s.json" % (ts, channel, action, sufx)
     path = os.path.join(PENDING, name)
-    # Nonce del sistema (A4): lo genera el CÓDIGO, el agente nunca lo ve → un job no puede
-    # fabricar su propia aprobación. La entrega real exige re-teclear este nonce.
+    # Nonce del sistema (A4): lo genera el CÓDIGO y en disco solo queda su SELLO (26-sep-26, ver
+    # `_nuevo_nonce`). El nonce en claro va SOLO a {{TITULAR}} por Telegram (`_avisar_nonce`).
     payload = {"creado": _now_iso(), "canal": channel, "accion": action,
-               "dest": dest, "texto": text, "motivo": reason, "estado": "pendiente_OK",
-               "nonce": os.urandom(5).hex()}
+               "dest": dest, "texto": text, "motivo": reason, "estado": "pendiente_OK"}
+    nonce = _nuevo_nonce(payload)
     if avisos:
         payload["avisos_fuga"] = list(avisos)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
+    _avisar_nonce(payload, name, nonce)
     return name
+
+
+# ── El nonce A4 no se guarda en claro (26-sep-26, deuda nonce-a4-legible-aprobacion-fabricable) ──
+# Antes el nonce iba EN CLARO en `outbox/pending/*.json` (el comentario decía «el agente nunca lo
+# ve», y cualquiera que leyera el fichero lo veía) y no le llegaba a {{TITULAR}} por ninguna vía: solo
+# lo podía completar quien leyera el fichero. Con eso, un agente podía fabricarse la aprobación de
+# un DM de Instagram a un tercero. Ahora: 64 bits, en disco solo sal + PBKDF2 (inviable de sacar
+# por fuerza bruta), el nonce en claro va SOLO a su chat, y tras 5 fallos el borrador se bloquea.
+# Lo cazó el comité de arquitectura al revisar el plan F4 de P3 (idea de {{CONTACTO}},
+# https://contacto, con su agente KAI, revisión del 25-sep-2026).
+_NONCE_BYTES = 8
+_NONCE_ITER = 200_000
+_NONCE_MAX_FALLOS = 5
+
+
+def _sellar_nonce(nonce):
+    sal = os.urandom(16)
+    h = hashlib.pbkdf2_hmac("sha256", nonce.encode(), sal, _NONCE_ITER).hex()
+    return {"sal": sal.hex(), "h": h, "iter": _NONCE_ITER}
+
+
+def _nuevo_nonce(d):
+    """Pone en `d` el sello de un nonce nuevo (y quita cualquier nonce en claro). Devuelve el nonce."""
+    nonce = os.urandom(_NONCE_BYTES).hex()
+    d.pop("nonce", None)
+    d["nonce_sello"] = _sellar_nonce(nonce)
+    d["fallos"] = 0
+    return nonce
+
+
+def _nonce_ok(d, nonce):
+    s = d.get("nonce_sello")
+    if not isinstance(s, dict) or not nonce:
+        return False                  # un borrador viejo con nonce en claro ya no se aprueba
+    try:
+        h = hashlib.pbkdf2_hmac("sha256", str(nonce).strip().lower().encode(),
+                                bytes.fromhex(s["sal"]), int(s.get("iter", _NONCE_ITER))).hex()
+    except Exception:
+        return False
+    return hmac.compare_digest(h, str(s.get("h", "")))
+
+
+def _avisar_nonce(d, name, nonce):
+    """El nonce en claro va SOLO a {{TITULAR}}, por su chat allowlistado. Solo para lo que sale hacia
+    fuera (un REPORT retenido va a ella misma). Nunca lanza: si no llega, el borrador sigue «a un
+    clic» y nadie más tiene el código."""
+    if d.get("accion") == REPORT:
+        return False
+    try:
+        dest = str(d.get("dest") or "")
+        txt = ("📤 Hay un borrador esperando tu OK para salir: %s por %s%s.\n"
+               "Si quieres que salga, responde exactamente:\naprobar %s %s"
+               % ({"contact": "un mensaje", "publish": "una publicación", "pay": "un pago"}.get(
+                   d.get("accion"), d.get("accion")), d.get("canal"),
+                  (" a " + dest[:24]) if dest else "", name, nonce))
+        return bool(report_to_titular(txt, urgente=True).get("delivered"))
+    except Exception:
+        return False
 
 
 def _sub(nombre):
@@ -663,7 +723,18 @@ def approve_and_deliver(draft_name, nonce):
         d = json.load(open(path, encoding="utf-8"))
     except Exception as e:
         return _result(False, True, "borrador ilegible (%r)" % e)
-    if not nonce or str(nonce) != str(d.get("nonce")):
+    if int(d.get("fallos") or 0) >= _NONCE_MAX_FALLOS:
+        return _result(False, True, "borrador bloqueado tras %d intentos fallidos: no se entrega"
+                       % _NONCE_MAX_FALLOS)
+    if not _nonce_ok(d, nonce):
+        d["fallos"] = int(d.get("fallos") or 0) + 1
+        try:
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(d, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+        except Exception:
+            pass
         _audit(d.get("canal"), d.get("accion"), d.get("dest"), "rechazado", "nonce no coincide", len(d.get("texto") or ""))
         return _result(False, True, "nonce no coincide: no se entrega")
     canal, accion, dest, texto = d.get("canal"), d.get("accion"), d.get("dest"), d.get("texto")
@@ -765,13 +836,15 @@ def reconciliar(draft_name, decision):
         return {"ok": True, "reason": "dado por entregado: %s" % base}
     for k in ("estado", "incierto_desde", "motivo_incierto", "entrega_id"):
         d.pop(k, None)
-    d.update(estado="pendiente_OK", nonce=os.urandom(5).hex())
+    d.update(estado="pendiente_OK")
+    nonce = _nuevo_nonce(d)
     os.makedirs(_sub("pending"), exist_ok=True)
     tmp = os.path.join(_sub("pending"), base + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
     os.replace(tmp, os.path.join(_sub("pending"), base))
     os.remove(p)
+    _avisar_nonce(d, base, nonce)
     _audit(d.get("canal"), d.get("accion"), d.get("dest"), "reconciliado-reintentar", "", 0)
     return {"ok": True, "reason": "vuelve a pending con nonce nuevo: %s" % base}
 

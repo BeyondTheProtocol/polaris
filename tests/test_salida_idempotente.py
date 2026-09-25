@@ -64,10 +64,13 @@ salida._self_chatid = lambda: "999"
 DEST = "999"
 
 
+_NONCES = {}
+salida._avisar_nonce = lambda d, n, c: _NONCES.__setitem__(n, c)   # el nonce ya no está en disco
+
+
 def _nuevo(texto):
     name = salida._draft("telegram", salida.REPORT, DEST, texto, "test")
-    nonce = json.load(open(os.path.join(salida.PENDING, name), encoding="utf-8"))["nonce"]
-    return name, nonce
+    return name, _NONCES[name]
 
 
 def _donde(name):
@@ -139,7 +142,9 @@ def main():
     # ── 4. Reconciliar: la ÚNICA salida de sending/ ─────────────────────────────────────────
     r = salida.reconciliar(name, "reintentar")
     ok(r.get("ok") and _donde(name) == "pending", "reconciliar reintentar → pending/")
-    nonce_nuevo = json.load(open(os.path.join(salida.PENDING, name), encoding="utf-8"))["nonce"]
+    nonce_nuevo = _NONCES[name]
+    ok("nonce" not in json.load(open(os.path.join(salida.PENDING, name), encoding="utf-8")),
+       "reintentar tampoco deja el nonce en claro en disco")
     ok(nonce_nuevo != nonce, "reintentar estrena nonce (la aprobación vieja no vale)")
     ok(salida.approve_and_deliver(name, nonce).get("delivered") is False, "el nonce viejo ya no entrega")
 

@@ -92,12 +92,17 @@ def main():
     check("acción no permitida → rechazado", e4 == "rechazado")
 
     # 6. A4: crear un borrador OUTWARD y probar el nonce.
+    # El nonce ya no está en el borrador (26-sep-26): solo se le manda a {{TITULAR}}. Aquí se captura
+    # lo que se le habría mandado, igual que ella lo leería en Telegram.
+    _nonces = {}
+    salida._avisar_nonce = lambda d, n, c: _nonces.__setitem__(n, c)
     res = salida.send("telegram", "publish", "555", "publicar algo")
     check("OUTWARD se draftea (no entrega)", res["blocked"] and "draft" in res)
     draft = res["draft"]
     import json
     d = json.load(open(os.path.join(salida.PENDING, draft)))
-    nonce = d["nonce"]
+    check("el borrador no guarda el nonce en claro", "nonce" not in d and "nonce_sello" in d)
+    nonce = _nonces[draft]
     bad = salida.approve_and_deliver(draft, "0000000000")
     check("nonce incorrecto → no entrega", bad["blocked"] and not bad["delivered"])
     okn = salida.approve_and_deliver(draft, nonce)

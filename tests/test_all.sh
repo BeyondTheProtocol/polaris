@@ -223,6 +223,7 @@ runpy test_correo_triage.py
 runpy test_triage_route_correo.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_instagram_dm.py
+runpy test_nonce_a4_blindado.py   # 26-sep · el nonce A4 no queda en disco; solo le llega a {{TITULAR}}
 runpy test_dm_inbox_buzones.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_borde.py

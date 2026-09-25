@@ -61,6 +61,11 @@ def setup(tmp):
     salida.IG_ALLOWLIST = os.path.join(tmp, "noallow.json")
 
 
+# El nonce ya no está en el borrador (26-sep-26): se captura lo que se le mandaría a {{TITULAR}}.
+_NONCES = {}
+salida._avisar_nonce = lambda d, n, c: _NONCES.__setitem__(n, c)
+
+
 def _draft_payload(name):
     return json.load(open(os.path.join(salida.PENDING, name), encoding="utf-8"))
 
@@ -84,7 +89,7 @@ def main():
 
     # 2. approve con nonce correcto → invoca deliverer (mock OK) → mueve a sent.
     _ig_calls.clear()
-    nonce = _draft_payload(draft)["nonce"]
+    nonce = _NONCES[draft]
     res = salida.approve_and_deliver(draft, nonce)
     check("ig approve entrega con nonce", res["delivered"] and not res["blocked"])
     check("ig approve invoca deliverer 1 vez al dest", len(_ig_calls) == 1 and _ig_calls[0][0] == DEST)
@@ -96,7 +101,7 @@ def main():
     _ig_calls.clear()
     r2 = salida.send("instagram", "contact", DEST, "otro intento")
     d2 = r2["draft"]
-    res2 = salida.approve_and_deliver(d2, _draft_payload(d2)["nonce"])
+    res2 = salida.approve_and_deliver(d2, _NONCES[d2])
     check("ig entrega fallida no marca delivered", not res2["delivered"] and res2["blocked"])
     check("ig entrega fallida deja el borrador en pending", os.path.exists(os.path.join(salida.PENDING, d2)))
 
@@ -126,7 +131,7 @@ def main():
     salida._DELIVERERS["instagram"] = fake_ig_ok
     _ig_calls.clear()
     r5 = salida.send("instagram", "contact", DEST, "fuera de lista")
-    res5 = salida.approve_and_deliver(r5["draft"], _draft_payload(r5["draft"])["nonce"])
+    res5 = salida.approve_and_deliver(r5["draft"], _NONCES[r5["draft"]])
     check("ig dest no-allowlistado bloquea entrega", res5["blocked"] and len(_ig_calls) == 0)
     check("ig dest no-allowlistado deja borrador", os.path.exists(os.path.join(salida.PENDING, r5["draft"])))
     os.remove(salida.IG_ALLOWLIST)
@@ -136,7 +141,7 @@ def main():
     _ig_calls.clear()
     r6 = salida.send("instagram", "contact", DEST, "antes del HALT")
     open(salida.HALT_FILES[1], "w").close()
-    res6 = salida.approve_and_deliver(r6["draft"], _draft_payload(r6["draft"])["nonce"])
+    res6 = salida.approve_and_deliver(r6["draft"], _NONCES[r6["draft"]])
     check("HALT bloquea approve IG", res6["blocked"] and len(_ig_calls) == 0)
     os.remove(salida.HALT_FILES[1])
 

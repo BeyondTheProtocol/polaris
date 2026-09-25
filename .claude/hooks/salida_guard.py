@@ -611,6 +611,24 @@ _SERVICIO = "btp-ok-envio-mac"
 # heredoc que edita este mismo guard contiene todos estos nombres (falso positivo cazado en vivo al
 # escribirlo, 22-sep-26). Cuenta importar la librería de la firma, pedir la clave al Llavero o
 # EJECUTAR el emisor; y tocar el permiso o un transcript solo si además ESCRIBE.
+# Aprobar un borrador del outbox (A4) o fingir un mensaje de {{TITULAR}} al bot (26-sep-26, deuda
+# nonce-a4-legible-aprobacion-fabricable). Solo el daemon del bot, con un mensaje real de su chat,
+# llama a esto; el daemon corre bajo launchd y no pasa por este hook. Defensa en profundidad: el
+# nonce ya no está en disco en claro.
+_RE_CODIGO_APRUEBA = re.compile(r"\bapprove_and_deliver\b|\breconciliar\s*\(|\bhandle_message\s*\(")
+
+
+def _aprueba(codigo):
+    """¿El código LLAMA a la aprobación? Lo que va entre comillas no cuenta: un script que solo
+    NOMBRA la función (un grep, una regex, un informe) no aprueba nada. Falso positivo cazado en
+    vivo el 26-sep-26 al revisar el replay de este mismo cambio. Un nombre armado a trozos
+    (`getattr(s, 'approve_' + …)`) se escapa: esto es defensa en profundidad, la barrera de
+    verdad es que el nonce ya no está en disco."""
+    if not codigo:
+        return False
+    sin_cadenas = _RE_CADENAS.sub("''", codigo)
+    sin_comentarios = re.sub(r"(?m)#.*$", "", sin_cadenas)    # un comentario tampoco llama
+    return bool(_RE_CODIGO_APRUEBA.search(sin_comentarios))
 _RE_CODIGO_CLAVE = re.compile(
     r"(?:^|[\s;])(?:import|from)\s+permiso_envio\b|__import__\s*\(\s*['\"]permiso_envio|"
     r"btp-ok-envio[\s\S]{0,300}(?:security|find-generic|keyring)|"
@@ -686,6 +704,8 @@ def _escribe_bash(cmd, cwd):
         if not pal:
             if cuerpo and _RE_CODIGO_CLAVE.search(cuerpo):
                 return "código que toca la firma del permiso"
+            if cuerpo and _aprueba(cuerpo):
+                return "código que aprueba un borrador del outbox (eso lo hace {{TITULAR}} por Telegram)"
             continue
         prog, args = os.path.basename(pal[0]), pal[1:]
         while prog in ("sudo", "env", "nohup", "time", "command", "exec") and args:
@@ -729,6 +749,11 @@ def _escribe_bash(cmd, cwd):
                 return "lanza a mano el hook que emite el permiso"
             if _RE_CODIGO_CLAVE.search(codigo):
                 return "código que toca la firma del permiso"
+            # Con un script delante (`python3 x.py <<EOF`), el heredoc es la ENTRADA de ese script,
+            # datos y no código: el replay del 26-sep lo daba como llamada en una nota archivada.
+            ejecuta = codigo if (not libres or libres[0] == "-") else codigo[len(cuerpo or ""):]
+            if _aprueba(ejecuta):
+                return "código que aprueba un borrador del outbox (eso lo hace {{TITULAR}} por Telegram)"
             if _escribe_lo_protegido(codigo):
                 return "código que escribe el permiso o un transcript"
             continue
