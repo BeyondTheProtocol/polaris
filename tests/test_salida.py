@@ -87,7 +87,13 @@ def main():
     check("dry no entrega", not r["delivered"] and r.get("dry"))
     check("dry no toca deliverer", len(_delivers) == 0)
 
-    # 3. OUTWARD (las tres acciones) → borrador, NUNCA entrega, NUNCA toca el canal.
+    # 3. OUTWARD (las tres acciones) → borrador, NUNCA entrega, NUNCA toca el canal hacia fuera.
+    # Desde el 26-sep-26 un borrador hacia fuera le manda a {{TITULAR}} (y solo a ella) el código para
+    # aprobarlo (`_avisar_nonce`, cubierto en test_nonce_a4_blindado). Aquí se sustituye por un
+    # registrador: lo que se fija es que el texto hacia fuera no pasa por el canal.
+    avisos_nonce = []
+    avisar_real = salida._avisar_nonce
+    salida._avisar_nonce = lambda d, n, c: avisos_nonce.append((d.get("accion"), n))
     for act in ("publish", "contact", "pay"):
         _delivers.clear()
         before = n_drafts()
@@ -95,11 +101,14 @@ def main():
         check("outward %s no entrega" % act, not r["delivered"] and r["blocked"])
         check("outward %s draftea" % act, "draft" in r and n_drafts() == before + 1)
         check("outward %s no toca deliverer" % act, len(_delivers) == 0)
+        check("outward %s avisa a {{TITULAR}} con el código" % act,
+              avisos_nonce and avisos_nonce[-1] == (act, r.get("draft")))
 
     # 4. OUTWARD aunque el destino fuese el de {{TITULAR}} → sigue siendo gate.
     _delivers.clear()
     r = salida.send("telegram", "contact", SELF, "contactar")
     check("outward-a-self sigue gate", r["blocked"] and len(_delivers) == 0)
+    salida._avisar_nonce = avisar_real
 
     # 5. REPORT a un tercero (no {{TITULAR}}) → borrador, no entrega.
     _delivers.clear()

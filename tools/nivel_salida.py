@@ -51,6 +51,43 @@ _HOST_PAGO = re.compile(r"(^|\.)(checkout\.|pay\.|payments?\.|secure\.)|"
                         r"booking|airbnb|ryanair|iberia|vueling)\.", re.I)
 _NAVEGA = re.compile(r"(navigate|preview_start|tabs_create)", re.I)
 
+# ── Paso de PAGO (P3 · F3, 26-sep-26, EN SOMBRA) ─────────────────────────────────────────────────
+# El 25-sep un agente pulsó «Realizar pedido» en una tienda y solo lo paró el clasificador de Claude
+# Code, no el muro. El hook no ve el DOM, así que se mira lo que SÍ pasa por él: la URL del paso
+# final, un `find`/JS que busca o pulsa el botón de pedir, o pedir/rellenar una TARJETA. El verbo
+# del botón solo cuenta si va con «pedido/compra/pago»: un «Confirmar» a secas (facturas de Renfe,
+# 13-sep) no es pagar. Comité (verificacion + consejero-arquitectura): 7 días en sombra y luego se
+# decide. Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+_URL_PASO_PAGO = re.compile(
+    r"/(checkout|pago|pagar|payment|pay|spc|buy|purchase|place-?order|order/confirm|"
+    r"finalizar-?compra|tramitar|confirmar-?pedido)(?:/|\?|#|-|$)|placeOrder|/gp/buy/", re.I)
+_TEXTO_PAGO = re.compile(
+    r"(realizar|tramitar|confirmar|finalizar|completar)\s+(el\s+|la\s+|y\s+pagar\s+)?(pedido|compra|pago)|"
+    r"place\s+(your\s+)?order|pay\s+now|buy\s+now|comprar\s+ahora|pagar\s+(ahora|con|\d)|"
+    r"complete\s+(your\s+)?purchase|confirm\s+(and\s+)?pay|placeOrder", re.I)
+_TARJETA = re.compile(r"card|tarjeta|payment|pago|cvv|cvc|visa|mastercard", re.I)
+
+
+def senal_pago(tool, entrada):
+    """Motivo si esta llamada dice que la sesión está en el paso de pagar, o ""."""
+    t = (tool or "").lower()
+    acts = [(t, entrada or {})]
+    if "batch" in t and isinstance((entrada or {}).get("actions"), list):
+        acts = [(str(a.get("name", "")).lower(), a.get("input") or {})
+                for a in entrada["actions"] if isinstance(a, dict)]
+    for nombre, ip in acts:
+        if not isinstance(ip, dict):
+            continue
+        if _NAVEGA.search(nombre) and _URL_PASO_PAGO.search(str(ip.get("url") or "")):
+            return "URL de paso final (%s)" % host_de_url(ip.get("url"))
+        if nombre.endswith("find") and _TEXTO_PAGO.search(str(ip.get("query") or "")):
+            return "busca el botón de pedir/pagar"
+        if nombre.endswith("javascript_tool") and _TEXTO_PAGO.search(str(ip.get("text") or "")):
+            return "JS sobre el botón de pedir/pagar"
+        if ("credential" in nombre) and _TARJETA.search(json.dumps(ip, ensure_ascii=False)):
+            return "pide o rellena una tarjeta"
+    return ""
+
 
 def host_de_url(url):
     if not isinstance(url, str) or not url.strip():
@@ -83,12 +120,15 @@ def hash_contenido(entrada):
     return hashlib.sha256(canon.encode("utf-8", "replace")).hexdigest()[:16]
 
 
-def nivel(tool, entrada, que, por_que="", host=""):
+def nivel(tool, entrada, que, por_que="", host="", pago=""):
     """(nivel, etiqueta) de una salida ya reconocida por `salida_guard._sale_fuera`.
 
     `que`: "envia" | "clic" (lo que devolvió `_sale_fuera`); `por_que`: su motivo en Bash;
-    `host`: último host navegado en la sesión (para los clics). Nunca lanza: ante la duda, L3."""
+    `host`: último host navegado en la sesión (para los clics); `pago`: señal de paso de pago de
+    la sesión (`senal_pago`). Nunca lanza: ante la duda, L3."""
     try:
+        if que == "clic" and pago:
+            return L3, "clic en PASO DE PAGO (%s)" % pago
         t = (tool or "").lower().replace("-", "_")
         verbo = t.rsplit("__", 1)[-1] if t.startswith("mcp__") else t
         if t == "bash":
@@ -138,20 +178,45 @@ def _sesion_hash(session_id):
     return hashlib.sha256((session_id or "").encode()).hexdigest()[:12]
 
 
-def recordar_host(state, session_id, tool, entrada):
-    h = host_navegado(tool, entrada)
-    if not h:
-        return ""
-    ruta = _ruta_hosts(state)
+def _leer_sesiones(state):
     try:
-        with open(ruta, encoding="utf-8") as f:
-            d = json.load(f)
+        with open(_ruta_hosts(state), encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        d = {}
-    d[_sesion_hash(session_id)] = h
+        return {}
+
+
+def _de_sesion(state, session_id):
+    """{host, pago} de la sesión. Acepta el formato viejo (solo el host como texto)."""
+    v = _leer_sesiones(state).get(_sesion_hash(session_id), {})
+    return {"host": v, "pago": ""} if isinstance(v, str) else dict(v)
+
+
+def recordar_host(state, session_id, tool, entrada):
+    """Actualiza {host, pago} de la sesión. Navegar a OTRO host borra la señal de pago; la URL de
+    paso final o un find/JS/tarjeta de pago la ponen. Devuelve el host nuevo o ""."""
+    h = host_navegado(tool, entrada)
+    s = senal_pago(tool, entrada)
+    if not h and not s:
+        return ""
+    d = _leer_sesiones(state)
+    k = _sesion_hash(session_id)
+    v = d.get(k, {})
+    v = {"host": v, "pago": ""} if isinstance(v, str) else dict(v)
+    if h:
+        if h != v.get("host"):
+            v["pago"] = ""
+        v["host"] = h
+        if not s and _NAVEGA.search(tool or "") and not _URL_PASO_PAGO.search(
+                str((entrada or {}).get("url") or "")):
+            v["pago"] = ""                        # navegar a una URL que no es de pago la apaga
+    if s:
+        v["pago"] = s
+    d[k] = v
     if len(d) > 500:                              # acotado: se queda con los últimos
         d = dict(list(d.items())[-300:])
     os.makedirs(state, exist_ok=True)
+    ruta = _ruta_hosts(state)
     tmp = ruta + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f)
@@ -160,11 +225,7 @@ def recordar_host(state, session_id, tool, entrada):
 
 
 def host_de_sesion(state, session_id):
-    try:
-        with open(_ruta_hosts(state), encoding="utf-8") as f:
-            return json.load(f).get(_sesion_hash(session_id), "")
-    except Exception:
-        return ""
+    return _de_sesion(state, session_id).get("host", "")
 
 
 def anotar(state, registro):
@@ -184,10 +245,13 @@ def sombra(state, datos, que, por_que, decision, ts):
     recordar_host(state, sid, tool, entrada)
     if not que:
         return None
-    host = host_de_sesion(state, sid)
-    n, etiqueta = nivel(tool, entrada, que, por_que, host)
+    ses = _de_sesion(state, sid)
+    host, pago = ses.get("host", ""), ses.get("pago", "")
+    n, etiqueta = nivel(tool, entrada, que, por_que, host, pago)
     reg = {"ts": ts, "sesion": _sesion_hash(sid), "tool": tool, "que": que, "nivel": n,
            "etiqueta": etiqueta, "host": host, "hash_contenido": hash_contenido(entrada),
            "decision": decision}
+    if pago:
+        reg["paso_pago"] = pago
     anotar(state, reg)
     return reg

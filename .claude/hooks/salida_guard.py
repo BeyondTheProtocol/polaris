@@ -923,7 +923,10 @@ Un clic puede ser «Enviar», «Publicar» o «Pagar», y desde aquí no se ve c
 Si es navegación o lectura, dile qué vas a pulsar y sigue."""
 
 
-_NAVEGA_O_BATCH = re.compile(r"(navigate|preview_start|tabs_create|batch)", re.I)
+# Lo que la sombra tiene que ver aunque no salga fuera: navegar (host), y buscar/pulsar por JS el
+# botón de pedir o pedir una tarjeta (señal de paso de pago, P3 · F3, 26-sep-26).
+_NAVEGA_O_BATCH = re.compile(r"(navigate|preview_start|tabs_create|batch|__find$|javascript_tool|"
+                             r"credential)", re.I)
 
 
 def _sombra(datos, que, decision):

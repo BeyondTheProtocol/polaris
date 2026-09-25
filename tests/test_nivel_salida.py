@@ -71,6 +71,42 @@ class Niveles(unittest.TestCase):
         self.assertNotIn("secreto", h)
 
 
+class PasoDePago(unittest.TestCase):
+    """P3 · F3 (26-sep-26), EN SOMBRA. Casos sacados de sesiones reales: el 25-sep un agente buscó
+    «Realizar pedido» / «Tramitar pedido» y entró en URLs de paso final; el 13-sep un «Confirmar»
+    en Renfe generaba facturas de un reembolso (NO es pagar)."""
+
+    def test_senales_de_pago(self):
+        casos = [("mcp__claude-in-chrome__navigate", {"url": "https://www.amazon.es/gp/buy/spc/handlers/display.html"}),
+                 ("mcp__claude-in-chrome__navigate", {"url": "https://tienda.example/checkout/"}),
+                 ("mcp__claude-in-chrome__find", {"query": "Tramitar pedido button"}),
+                 ("mcp__claude-in-chrome__find", {"query": "Realizar pedido button"}),
+                 ("mcp__claude-in-chrome__javascript_tool", {"text": "document.querySelector('#placeOrder').click()"}),
+                 ("mcp__claude-in-chrome__autofill_credential", {"kind": "payment_card"})]
+        for tool, ent in casos:
+            self.assertTrue(N.senal_pago(tool, ent), (tool, ent))
+
+    def test_no_es_pagar(self):
+        casos = [("mcp__claude-in-chrome__find", {"query": "Confirmar"}),                 # Renfe, facturas
+                 ("mcp__claude-in-chrome__javascript_tool", {"text": "doConfirmaFacturas(); a.click()"}),
+                 ("mcp__claude-in-chrome__find", {"query": "Añadir al carrito button"}),
+                 ("mcp__claude-in-chrome__navigate", {"url": "https://www.amazon.es/gp/cart/view.html"}),
+                 ("mcp__claude-in-chrome__navigate", {"url": "https://www.renfe.com/es/es/viajar/pagos"})]
+        for tool, ent in casos[:4]:
+            self.assertFalse(N.senal_pago(tool, ent), (tool, ent))
+
+    def test_la_sesion_recuerda_el_paso_y_lo_olvida_al_salir(self):
+        st = tempfile.mkdtemp()
+        N.recordar_host(st, "s", "mcp__x__navigate", {"url": "https://www.amazon.es/gp/cart/view.html"})
+        self.assertFalse(N._de_sesion(st, "s")["pago"], "el carrito no es el paso de pago")
+        N.recordar_host(st, "s", "mcp__x__find", {"query": "Tramitar pedido"})
+        self.assertTrue(N._de_sesion(st, "s")["pago"])
+        self.assertEqual(N.nivel("x__computer", {}, "clic", host="www.amazon.es",
+                                 pago=N._de_sesion(st, "s")["pago"])[0], N.L3)
+        N.recordar_host(st, "s", "mcp__x__navigate", {"url": "https://github.com/x"})
+        self.assertFalse(N._de_sesion(st, "s")["pago"], "irse a otro host apaga la señal")
+
+
 class HookEnSombra(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="nivelsalida-")
@@ -105,6 +141,18 @@ class HookEnSombra(unittest.TestCase):
         reg = self._registros()
         self.assertEqual((reg[-1]["nivel"], reg[-1]["host"], reg[-1]["decision"]),
                          (3, "checkout.iherb.com", "avisado"))
+
+    def test_clic_en_paso_de_pago_se_anota_y_sigue_solo_avisando(self):
+        """En sombra: se anota L3 «PASO DE PAGO», pero la decisión del hook no cambia (avisa)."""
+        self._hook({"tool_name": "mcp__claude-in-chrome__navigate",
+                    "tool_input": {"url": "https://www.solgar.es/checkout/"}})
+        r = self._hook({"tool_name": "mcp__claude-in-chrome__computer",
+                        "tool_input": {"action": "left_click", "coordinate": [1, 1]}})
+        self.assertNotIn("permissionDecision", json.loads(r.stdout)["hookSpecificOutput"])
+        reg = self._registros()[-1]
+        self.assertEqual((reg["nivel"], reg["decision"]), (3, "avisado"))
+        self.assertIn("PASO DE PAGO", reg["etiqueta"])
+        self.assertIn("paso_pago", reg)
 
     def test_lectura_no_se_anota(self):
         self._hook({"tool_name": "Read", "tool_input": {"file_path": "/tmp/x"}})
