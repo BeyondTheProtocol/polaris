@@ -206,8 +206,17 @@ def _cwd_de(pid):
     return None
 
 
-def _redactar_truncar(cmd, n=200):
-    limpio = " ".join("[REDACTADO]" if "_PRIVADO" in tok else tok for tok in cmd.split())
+# El shell de Claude Code envuelve cada comando: `/bin/zsh -c source <snapshot> … && eval '<CMD>'
+# < /dev/null && pwd -P >| /tmp/claude-XXXX-cwd`. Hasta el 25-sep-2026 el extracto eran los
+# primeros 200 caracteres, que son SIEMPRE ese preámbulo: las cinco paradas del registro decían
+# «source …shell-snapshots…» y ninguna qué bucle era. Se guarda lo de dentro del `eval`.
+_RE_EVAL = re.compile(r"\beval '(.*)' < /dev/null", re.S)
+
+
+def _redactar_truncar(cmd, n=300):
+    m = _RE_EVAL.search(cmd or "")
+    nucleo = m.group(1).replace("'\\''", "'") if m else (cmd or "")
+    limpio = " ".join("[REDACTADO]" if "_PRIVADO" in tok else tok for tok in nucleo.split())
     return limpio[:n]
 
 

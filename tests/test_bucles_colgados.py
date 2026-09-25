@@ -219,5 +219,20 @@ try:
 finally:
     _deu._cargar = _cargar_real
 
+# El extracto del registro es el BUCLE, no el preámbulo del shell de Claude Code (25-sep-2026: las
+# cinco paradas registradas decían «source …shell-snapshots…» y ninguna qué bucle era).
+_envuelto = (r"/bin/zsh -c source /Users/x/.claude/shell-snapshots/snapshot-zsh-1-a.sh 2>/dev/null "
+             r"|| true && setopt NO_EXTENDED_GLOB NO_BARE_GLOB_QUAL 2>/dev/null || true && "
+             r"{ \builtin unalias -- 'unsetenv'; } >/dev/null 2>&1 || true && eval 'until grep -q "
+             r"LISTO /tmp/x.log; do sleep 5; done; echo '\''fin'\''' < /dev/null && pwd -P >| "
+             r"/tmp/claude-ab12-cwd")
+_ex = bc._redactar_truncar(_envuelto)
+check("el extracto es el bucle, no el preámbulo (%s)" % _ex,
+      _ex.startswith("until grep -q LISTO") and "shell-snapshots" not in _ex and "echo 'fin'" in _ex)
+check("sin envoltorio, el comando tal cual",
+      bc._redactar_truncar("while true; do sleep 1; done") == "while true; do sleep 1; done")
+check("lo _PRIVADO se sigue tachando dentro del eval",
+      "[REDACTADO]" in bc._redactar_truncar("eval 'until [ -f /a/_PRIVADO/b ]; do sleep 5; done' < /dev/null"))
+
 print("test_bucles_colgados: %d OK, %d fallos" % (_pass, _fail))
 sys.exit(1 if _fail else 0)
