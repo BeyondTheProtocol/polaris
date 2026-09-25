@@ -10,6 +10,10 @@ El 'ask' RECUPERA y cita; la SÍNTESIS la hace el agente Orquestador (que es qui
 Idempotente: 'index' regenera el índice desde cero (escritura atómica). Acentos/mayúsculas
 normalizados (ES) vía el tokenizador unicode61 de FTS5.
 
+PDF: se leen como máximo las primeras 80 páginas, sin aplicar OCR. Al reindexar,
+`pdf_cobertura` registra páginas totales/leídas/sin texto y errores; los títulos de pasajes
+truncados llevan el aviso que muestra `ask`. Los índices antiguos requieren reindexado.
+
 POR QUÉ FTS5: antes el índice era un .kb_index.json que se cargaba ENTERO (json.load) en cada
 consulta CLI en frío (~2,6 s / ~3 GB RAM sobre el corpus real). FTS5 es un índice invertido
 on-disk que lee páginas bajo demanda: misma recuperación BM25, ~0,05 s / ~20 MB por consulta.
@@ -126,13 +130,26 @@ def hay_pypdf():
         return False
 
 
-def read_text(path, rel=None):
+def read_text(path, rel=None, pdf_meta=None):
     if path.lower().endswith(".pdf"):
         _pdf_actual[0] = rel or path
+        meta = pdf_meta if pdf_meta is not None else {}
+        # OCR indica lo aplicado por ESTE extractor, no si el PDF traía una capa OCR.
+        meta.update(paginas_total=None, paginas_leidas=0, paginas_vacias=0,
+                    ocr_aplicado=False, truncado=False, error_extraccion=False)
         try:
             from pypdf import PdfReader
             _instalar_contador_pdf()
-            return "\n".join((pg.extract_text() or "") for pg in PdfReader(path).pages[:80])
+            pages = PdfReader(path).pages
+            meta["paginas_total"] = len(pages)
+            meta["truncado"] = len(pages) > 80
+            texts = []
+            for pg in pages[:80]:
+                text = pg.extract_text() or ""
+                meta["paginas_leidas"] += 1
+                meta["paginas_vacias"] += not text.strip()
+                texts.append(text)
+            return "\n".join(texts)
         except ImportError:
             # No es «este PDF está roto», es «este intérprete no sabe leer NINGÚN PDF». Con el
             # `except Exception` de antes las dos cosas se trataban igual y en silencio: correr
@@ -141,14 +158,15 @@ def read_text(path, rel=None):
             # campante. `build()` ahora se planta antes de llegar aquí; esto es el segundo cierre.
             raise
         except Exception:
+            meta["error_extraccion"] = True
             return ""
         finally:
             _pdf_actual[0] = None
     with open(path, encoding="utf-8", errors="ignore") as f:
         return f.read()
 
-def chunk_file(path, rel):
-    lines = read_text(path, rel).splitlines()
+def chunk_file(path, rel, pdf_meta=None):
+    lines = read_text(path, rel, pdf_meta).splitlines()
     out, cur, curlen = [], [], 0
     title = os.path.basename(rel); heading = title
     def flush():
@@ -296,17 +314,36 @@ def build():
         os.remove(tmp)
     con = sqlite3.connect(tmp)
     con.execute(_SCHEMA)
+    # Cobertura y pasajes se publican en el MISMO swap, incluso para PDFs sin texto.
+    con.execute("CREATE TABLE pdf_cobertura (path TEXT PRIMARY KEY, paginas_total INTEGER, "
+                "paginas_leidas INTEGER, paginas_vacias INTEGER, ocr_aplicado INTEGER, "
+                "truncado INTEGER, error_extraccion INTEGER)")
     _pdf_avisos.clear()   # cuenta fresca de avisos de PDF en cada build() (idempotente)
     rows, n = [], 0
+    cobertura = []
     for p in sorted(files):
         rel = os.path.relpath(p, FV)
         if rel.startswith("."):
             continue
+        meta = {}
         try:
-            for heading, text in chunk_file(p, rel):
+            chunks = chunk_file(p, rel, meta)
+            for heading, text in chunks:
+                if meta.get("truncado"):
+                    # Viaja con el pasaje: ask y los callers ven el aviso sin otra lectura
+                    # de la DB que pudiera pertenecer a una generación distinta. El título
+                    # NO entra en MATCH ni en embeddings, por lo que no altera el ranking.
+                    heading += (f" · ⚠ PDF truncado: leídas {meta['paginas_leidas']} de "
+                                f"{meta['paginas_total']} páginas")
                 rows.append((rel, heading, _sensitivity(rel, text), text)); n += 1
         except Exception:
-            pass
+            if meta:
+                meta["error_extraccion"] = True
+        if meta:
+            cobertura.append((rel, meta["paginas_total"], meta["paginas_leidas"],
+                              meta["paginas_vacias"], meta["ocr_aplicado"],
+                              meta["truncado"], meta["error_extraccion"]))
+    con.executemany("INSERT INTO pdf_cobertura VALUES (?,?,?,?,?,?,?)", cobertura)
     con.executemany(
         "INSERT INTO chunks(path, title, sensitivity, body) VALUES (?,?,?,?)", rows)
     con.commit()
@@ -325,6 +362,11 @@ def build():
     os.replace(tmp, DB)   # swap atómico: no corrompe si alguien consulta a la vez
     lock.close()          # sueltas el lock DESPUÉS del swap: hasta aquí el índice no es el nuevo
     print(f"✅ Indexados {n} pasajes de {len(files)} ficheros → .kb_index.db ({os.path.getsize(DB)//1024} KB)")
+    if cobertura:
+        print(f"· Cobertura PDF guardada en pdf_cobertura: {len(cobertura)} PDFs; "
+              f"{sum(r[5] for r in cobertura)} truncados; "
+              f"{sum(r[3] for r in cobertura)} páginas leídas sin texto; "
+              f"{sum(r[6] for r in cobertura)} errores de extracción. OCR no aplicado por kb.")
     if _pdf_avisos:
         nombres = ", ".join(os.path.basename(p) for p in sorted(_pdf_avisos))
         print(f"⚠️  {len(_pdf_avisos)} PDFs con partes ilegibles (no-fatal, pypdf saltó esos objetos/páginas "
