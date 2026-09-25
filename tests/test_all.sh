@@ -70,6 +70,7 @@ runpy test_deuda_texto_sin_alarma.py
 runpy test_deuda_duplicadas.py
 runpy test_rodaje_utc.py
 runpy test_rodaje_casa_base.py
+runpy test_rodaje_hook_fijo.py
 runpy test_replay_hook_roto.py
 runpy test_replay_guard_json.py
 runpy test_kpi_ned.py

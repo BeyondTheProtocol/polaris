@@ -24,8 +24,11 @@ USO
 """
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 
@@ -101,22 +104,81 @@ def _rama():
         return "?"
 
 
+def _huella(p):
+    with open(p, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def _hermanos(hook):
+    """Los módulos del MISMO directorio que el hook importa (zonas_clinicas, _git_camino…).
+
+    Sin ellos, la copia del hook cae a su lista de respaldo o no arranca: juzgaría otra cosa.
+    """
+    d = os.path.dirname(os.path.abspath(hook))
+    with open(hook, encoding="utf-8", errors="replace") as fh:
+        nombres = set(re.findall(r"(?:^|\s)(?:from|import)\s+([A-Za-z_]\w*)", fh.read()))
+    return sorted(os.path.join(d, n + ".py") for n in nombres
+                  if os.path.isfile(os.path.join(d, n + ".py"))
+                  and os.path.join(d, n + ".py") != os.path.abspath(hook))
+
+
+def _instantanea(hook, lado):
+    """Copia FIJA del hook en casa base, fuera de cualquier worktree.
+
+    25-sep-2026 (deuda rodaje-muro-worktree-podado-antes-de-tiempo, 2x). El estado apuntaba al
+    hook DENTRO del worktree de la rama, y el árbol no aguanta 24 h: `silly-chatelet` se podó a
+    media ventana (revisar habría dicho «no puede juzgar») y la app RECICLÓ `great-mahavira` para
+    otra rama, así que su session_start.sh pasó a ser el de master y el rodaje comparaba el viejo
+    consigo mismo sin avisar. Quién borra el árbol da igual; lo que se juzga no puede vivir en él.
+    """
+    destino = os.path.join(os.path.dirname(ESTADO), _rama_slug(), lado)
+    shutil.rmtree(destino, ignore_errors=True)
+    os.makedirs(destino)
+    copia = os.path.join(destino, os.path.basename(hook))
+    shutil.copy2(hook, copia)
+    for h in _hermanos(hook):
+        shutil.copy2(h, os.path.join(destino, os.path.basename(h)))
+    return copia, _huella(copia)
+
+
+def _no_puede_juzgar(e):
+    """Motivo por el que las copias ya no son lo que se rodó, o '' si están bien."""
+    for lado in ("viejo", "nuevo"):
+        hook = e["hook_" + lado]
+        huella = e.get("sha256_" + lado)
+        if not os.path.exists(hook):
+            if huella:
+                return "falta la copia fija del hook %s (%s)" % (lado, hook)
+            return ("el hook %s ya no existe (%s): su árbol se podó. Estado de antes de las copias "
+                    "fijas: sácalo del commit con `git show %s:<ruta>` a un sitio estable, "
+                    "o vuelve a `iniciar`." % (lado, hook, e.get("sha", "<sha>")))
+        if huella and _huella(hook) != huella:
+            return "la copia del hook %s cambió desde `iniciar` (%s)" % (lado, hook)
+        if not huella and lado == "nuevo" and e.get("sha"):
+            # Estado antiguo: la ruta vive en un árbol que pudo cambiar de rama.
+            arbol = e.get("arbol", "")
+            rel = os.path.relpath(hook, arbol) if arbol else ""
+            r = subprocess.run(["git", "-C", casa_base(), "show", "%s:%s" % (e["sha"], rel)],
+                               capture_output=True)
+            if r.returncode == 0:
+                with open(hook, "rb") as fh:
+                    if fh.read() != r.stdout:
+                        return ("el hook nuevo ya no es el de %s (%s): su árbol cambió de rama o de "
+                                "commit, y juzgaría otra cosa." % (e["sha"], hook))
+    return ""
+
+
 def iniciar(a):
     for h in (a.nuevo, a.viejo):
         if not os.path.exists(h):
             print("⛔ no existe: %s" % h)
             return 2
-        if h.startswith(("/tmp/", "/private/tmp/", "/var/folders/")):
-            # Un rodaje dura 24 h; un scratchpad, lo que dure la sesión. El 20-sep-26 el
-            # scratchpad con la copia del hook viejo desapareció a media ventana y el rodaje se
-            # puso ROJO con cinco hallazgos que no existían — no porque el hook fallara, sino
-            # porque ya no estaba. Los dos hooks tienen que vivir donde sobrevivan al reinicio.
-            print("⛔ %s está en un directorio temporal: no sobrevive las %g h del rodaje."
-                  % (h, a.horas))
-            print("   Usa el hook de casa base (/Users/polaris/claudecode/.claude/hooks/…) o")
-            print("   sácalo del repo: git show <sha>:.claude/hooks/clinico_guard.py > <sitio estable>")
-            return 2
+        # Antes (20-sep) se vetaban los hooks en /tmp: el scratchpad con el viejo desapareció a
+        # media ventana. Desde el 25-sep `_instantanea` copia los dos a casa base al iniciar, así
+        # que dónde viva el original ya no importa; el veto solo estorbaba.
     inicio = _ahora()
+    nuevo, sha_nuevo = _instantanea(a.nuevo, "nuevo")
+    viejo, sha_viejo = _instantanea(a.viejo, "viejo")
     estado = {
         "inicio": inicio.isoformat(),
         "inicio_utc": _ahora_utc().isoformat(),   # el corte del replay: los ts vienen en UTC
@@ -125,8 +187,12 @@ def iniciar(a):
         "arbol": _arbol(),
         "rama": _rama(),
         "sha": _sha(),
-        "hook_nuevo": os.path.abspath(a.nuevo),
-        "hook_viejo": os.path.abspath(a.viejo),
+        "hook_nuevo": nuevo,
+        "hook_viejo": viejo,
+        "sha256_nuevo": sha_nuevo,
+        "sha256_viejo": sha_viejo,
+        "origen_nuevo": os.path.abspath(a.nuevo),
+        "origen_viejo": os.path.abspath(a.viejo),
         "log_al_empezar": len(_lineas_log()),
         "nota": a.nota or "",
     }
@@ -135,6 +201,7 @@ def iniciar(a):
         json.dump(estado, fh, ensure_ascii=False, indent=1)
     print("⏱️  rodaje iniciado — %s (%s @ %s)" % (inicio.isoformat(), estado["rama"], estado["sha"]))
     print("   termina:  %s" % estado["hasta"])
+    print("   copias fijas: %s" % os.path.dirname(os.path.dirname(nuevo)))
     print("   log del árbol en la marca: %d líneas" % estado["log_al_empezar"])
     print("   revisa con: python3 tools/rodaje_muro.py revisar")
     return 0
@@ -160,6 +227,11 @@ def revisar(a):
     # 2) el tráfico real de TODAS las sesiones, reproducido contra los dos hooks
     sys.path.insert(0, AQUI)
     import replay_guard as RG                                          # noqa: E402
+    motivo = _no_puede_juzgar(e)
+    if motivo:
+        print("⛔ EL RODAJE NO PUEDE JUZGAR: %s" % motivo)
+        print("   No es un hallazgo, es la herramienta rota. Lo medido hasta ahora no vale.")
+        return 2
     for h in (e["hook_viejo"], e["hook_nuevo"]):
         try:
             RG.comprueba(h)

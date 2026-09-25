@@ -161,7 +161,11 @@ def comprueba(hook):
     if not os.path.exists(hook):
         raise HookRoto("no existe: %s" % hook)
     zc = os.path.join(os.path.dirname(os.path.abspath(hook)), "zonas_clinicas.py")
-    if not os.path.exists(zc):
+    with open(hook, encoding="utf-8", errors="replace") as fh:
+        usa_zonas = "zonas_clinicas" in fh.read()
+    # Solo si el hook la usa (25-sep): salida_guard no la importa y el aviso salía en cada
+    # revisión del rodaje. Un aviso del muro que siempre sale enseña a no leerlo.
+    if usa_zonas and not os.path.exists(zc):
         print("⚠️  %s no tiene zonas_clinicas.py al lado: el hook caerá a su lista de respaldo "
               "y protegerá MENOS que en su sitio." % os.path.basename(os.path.dirname(hook)),
               file=sys.stderr)

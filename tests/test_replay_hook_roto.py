@@ -11,7 +11,9 @@ El reverso es peor: si el que falta es el hook NUEVO, todo sale «DENY» — o s
 es la dirección que nadie mira con lupa — y el veredicto sería un 🟢 falso. Un vigía tiene que
 saber cuándo no está mirando.
 """
+import json
 import os
+import shutil
 import sys
 import tempfile
 
@@ -63,7 +65,8 @@ try:
 except RG.HookRoto:
     ok(True, "`comprueba` rechaza el que falta")
 
-# 4) el rodaje no acepta un hook que vive en un temporal: no dura las 24 h
+# 4) un hook en un temporal ya vale: `iniciar` lo COPIA a un sitio fijo (25-sep), y la copia
+#    sobrevive a que borren el temporal. Antes se vetaba porque el rodaje leía el original.
 efimero = os.path.join(tempfile.mkdtemp(dir="/tmp"), "clinico_guard.py")
 os.makedirs(os.path.dirname(efimero), exist_ok=True)
 with open(efimero, "w", encoding="utf-8") as fh:
@@ -80,9 +83,14 @@ class A:
 guardado, RM.ESTADO = RM.ESTADO, os.path.join(tempfile.mkdtemp(), "rodaje.json")
 try:
     rc = RM.iniciar(A())
-    ok(rc == 2, "el rodaje rechaza un hook guardado en un directorio temporal",
-       "devolvió rc=%s" % rc)
-    ok(not os.path.exists(RM.ESTADO), "y no deja un rodaje a medias escrito")
+    ok(rc == 0, "el rodaje acepta un hook en un temporal (lo copia)", "devolvió rc=%s" % rc)
+    with open(RM.ESTADO, encoding="utf-8") as fh:
+        est = json.load(fh)
+    ok(not est["hook_viejo"].startswith(os.path.dirname(efimero)),
+       "y juzga con la copia, no con el temporal", est["hook_viejo"])
+    shutil.rmtree(os.path.dirname(efimero), ignore_errors=True)
+    ok(RM._no_puede_juzgar(est) == "", "borrado el temporal, la copia sigue sirviendo",
+       RM._no_puede_juzgar(est))
 finally:
     RM.ESTADO = guardado
 
