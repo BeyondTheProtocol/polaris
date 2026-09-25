@@ -26,11 +26,19 @@ if [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$DRAIN_STAMP" +%s 
   [ -f "$REPO/tools/reel_digest.py" ] && ( "$PY" "$REPO/tools/reel_digest.py" --drain --remote polaris --max 5 >/dev/null 2>&1 & )
 fi
 
-# Guardarraíl de topología (12-jul): si este Mac tiene .HALT, es el PORTÁTIL (cliente congelado
-# a propósito). Recuérdalo para no escribir en la copia equivocada — el trabajo real va en el mini.
+# Guardarraíl de topología (12-jul): el Air lleva .HALT a propósito (cliente congelado). Recuérdalo
+# para no escribir en la copia equivocada — el trabajo real va en el mini.
+# 24-sep: el HALT NO identifica la máquina. El CÓDIGO ROJO también lo pone, y en el mini con código
+# rojo activo este aviso decía «este es el Air» (deuda sessionstart-miente-topologia). La máquina se
+# identifica por hostname, como en tools/ff_al_abrir.sh y tools/mini.sh. BTP_HOSTNAME solo es para el test.
+MAQUINA="${BTP_HOSTNAME:-$(hostname -s 2>/dev/null)}"
 HALT_MSG=""
 if [ -f "$REPO/.HALT" ] || [ -f "$HOME/.btp.HALT" ]; then
-  HALT_MSG=$'⚠️ TOPOLOGÍA: este es el PORTÁTIL (Air), cliente congelado a propósito (.HALT). El cerebro canónico 24/7 es el MINI (Polaris). Para trabajar de verdad —mismo repo, estado y memoria— abre `polaris-claude` (corre en el mini). Evita editar el estado local del Air (tareas, memoria): divergiría de la mini.\n\n'
+  if [ "$MAQUINA" = "Polaris" ]; then
+    HALT_MSG=$'⚠️ HALT activo en el MINI (Polaris): código rojo o parada manual. El lazo 24/7 está parado y hay tests que se saltan por eso. Esto NO es el Air: el repo, el estado y la memoria son los canónicos.\n\n'
+  else
+    HALT_MSG=$'⚠️ TOPOLOGÍA: este es el PORTÁTIL (Air), cliente congelado a propósito (.HALT). El cerebro canónico 24/7 es el MINI (Polaris). Para trabajar de verdad —mismo repo, estado y memoria— abre `polaris-claude` (corre en el mini). Evita editar el estado local del Air (tareas, memoria): divergiría de la mini.\n\n'
+  fi
 fi
 
 # Traspaso tras compactar (24-sep-26): SessionStart vuelve a disparar con source=compact. Si el hook

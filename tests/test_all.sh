@@ -398,6 +398,7 @@ runpy test_radar_encaje_n1.py     # 22-sep · encaje N1: sin trust o con perfil 
 runpy test_radar_gate_multicohorte.py # 21-sep · un «encaja» en un ensayo multicohorte exige citar SU cohorte
 runpy test_radar_archivo_cerrados.py # 21-sep · pasar de 200 cierres no borra veredictos ni re-encola leads
 runpy test_radar_reintentos.py     # 21-sep · un fallo de red pasajero no deja un tema del radar sin nada
+runpy test_session_start_topologia.py  # 24-sep · el HALT del código rojo no hace creer al mini que es el Air
 
 # ⛔ NO añadir aquí (a propósito, no por olvido): test_avisos_origen.py, test_casa_estilo.py,
 # test_observatorio.py, test_salida.py, test_tablero.py y test_triage.py importan `salida` SIN
