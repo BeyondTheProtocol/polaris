@@ -56,15 +56,23 @@ def es_automatico(texto):
     return bool(_AUTOMATICO.search(texto or ""))
 
 # Órdenes de envío de {{TITULAR}}. Imperativo y en segunda persona: «envíalo», «mándaselo», «publica».
-# NO entran las formas condicionales o de tercera persona («habría que enviar», «cuando lo envíe»),
-# que son conversación sobre el envío, no la orden. (Vivía en ok_envio_prompt.py; aquí la usan el
+# NO entran el condicional, el subjuntivo ni el pasado («habría que enviar», «cuando lo envíe»,
+# «lo envió ayer»), que son conversación sobre el envío, no la orden. La tercera persona del
+# presente SÍ entra aunque no sea orden («Vega los envía»): en español es la misma forma que el
+# imperativo y una regex no las distingue. Tampoco distingue una cita sin comillas («me dijo:
+# envíalo»). Declarado, no escondido: deuda `orden-envio-falsos-amigos` (verificacion, 25-sep-26). (Vivía en ok_envio_prompt.py; aquí la usan el
 # que emite el permiso y los que lo comprueban contra el transcript: una sola regex, no dos.)
+# El PLURAL entra (25-sep-26): pidió «Publicalos» para cinco comentarios y el permiso no se abrió,
+# porque aquí solo había singulares. No era esa palabra, era toda la clase (envíalos, mándaselos,
+# respóndelas, súbelos a la web…). `_CLITICO` lleva los dos números en un solo sitio para que no
+# vuelva a faltar en uno de los verbos. Medido antes de fusionar contra sus prompts reales.
+_CLITICO = r"(?:selos|selas|selo|sela|melos|melas|melo|mela|los|las|les|lo|la|le)"
 ORDEN = re.compile(
     r"(?:^|[\s,.;:¿?¡!])("
-    r"env[ií]a(?:lo|la|le|selo|sela|melo)?\b|env[ií]ame\b|"
-    r"m[áa]nda(?:lo|la|le|selo|sela|melo)?\b|"
-    r"publ[ií]ca(?:lo|la)?\b|"
-    r"resp[óo]nde(?:le|les|lo|la)?\b|contesta(?:le|les)?\b|"
+    r"env[ií]a" + _CLITICO + r"?\b|env[ií]ame\b|"
+    r"m[áa]nda" + _CLITICO + r"?\b|"
+    r"publ[ií]ca(?:los|las|lo|la)?\b|"
+    r"resp[óo]nde(?:les|los|las|le|lo|la)?\b|contesta(?:le|les)?\b|"
     r"dale\s+a\s+enviar\b|"
     r"ya\s+puedes\s+(?:enviar|mandar|publicar)\b|"
     r"adelante\s+con\s+el\s+(?:env[ií]o|correo|mensaje)\b|"
@@ -72,7 +80,7 @@ ORDEN = re.compile(
     # `a\s*la` y no `a\s+la` a propósito: ella escribió «Añade ala cronologia» (20-sep-26) y el
     # permiso no se abrió por un espacio. Un freno que exige escribir sin erratas es un freno que
     # acaba estorbando, y entonces se quita — que es peor que no tenerlo.
-    r"(?:p[óo]n|s[úu]be|a[ñn][áa]de|mete|a[ñn][áa]d[ae]?)(?:lo|la|le)?\s+"
+    r"(?:p[óo]n|s[úu]be|a[ñn][áa]de|mete|a[ñn][áa]d[ae]?)(?:los|las|lo|la|le)?\s+"
     r"(?:a|en)\s*la\s+(?:web|cronolog[íi]a|timeline|l[íi]nea\s+de\s+tiempo)\b|"
     r"que\s+salga\s+en\s+la\s+web\b"
     r")", re.I)
@@ -101,8 +109,15 @@ ORDEN_PROGRAMAR = re.compile(
 
 # Si el mensaje habla de dejarlo en borrador, NO es una orden de envío aunque use el verbo.
 # `(?:lo|la|los|las)`: «no la envíes, envíala mañana» abría un envío hoy (verificacion, 24-sep-26).
-FRENA = re.compile(r"(no\s+(?:(?:lo|la|los|las|le|les)\s+)?(?:env[ií]es|mandes|publiques)|"
-                   r"d[ée]ja(?:lo|la)\s+en\s+borrador|solo\s+(?:el\s+)?borrador|sin\s+enviar|"
+# Plural (25-sep-26): si la orden entiende «publícalos», el freno tiene que entender el plural y
+# los clíticos que lo acompañan, o una frase que frena y ordena a la vez abre el permiso HOY:
+# «déjalos en borrador, publícalos mañana», «solo los borradores, envíalos mañana», «no se los
+# envíes todavía, envíaselos mañana» (verificacion, con las frases compiladas contra las dos
+# versiones). Las formas con se/me ya se colaban en singular; se cierran a la vez.
+FRENA = re.compile(r"(no\s+(?:(?:me|te|se)\s+)?(?:(?:lo|la|los|las|le|les)\s+)?"
+                   r"(?:env[ií]es|mandes|publiques)|"
+                   r"d[ée]ja(?:se|me)?(?:los|las|lo|la)\s+en\s+borrador|"
+                   r"solo\s+(?:el\s+|los\s+)?borrador(?:es)?|sin\s+enviar|"
                    r"no\s+(?:(?:lo|la|los|las)\s+)?programes|sin\s+programar|"
                    r"no\s+(?:hay\s+que|hace\s+falta)\s+crear|no\s+(?:la\s+)?crees\b|sin\s+crear|"
                    r"antes\s+de\s+crear)", re.I)

@@ -259,6 +259,38 @@ class GuardDeSalida(unittest.TestCase):
             self.assertEqual(self._decision(self._hook({"tool_name": self.PROGRAMA, "tool_input": {}})),
                              "deny", texto)
 
+    # ── la orden en plural (25-sep-26) ──
+    SEND = "mcp__b47695e8__send_message"
+
+    def test_la_orden_en_plural_abre(self):
+        """Pidió «Publicalos» para cinco comentarios y el permiso no se abrió: solo había
+        singulares. Replay sobre sus 2.126 prompts reales antes de fusionar: la regla nueva abre
+        exactamente uno más que la vieja, y es ese."""
+        for texto in ("Publicalos", "publícalos", "envíalos", "envíalas ya", "mándaselos a los dos",
+                      "respóndelas", "súbelos a la web", "vale, publícalas"):
+            with self.subTest(texto=texto):
+                self._ok_envio(texto)
+                self.assertIsNone(self._decision(self._hook({"tool_name": self.SEND,
+                                                             "tool_input": {}})), texto)
+
+    def test_el_plural_no_abre_lo_que_no_es_orden(self):
+        """El plural tiene sus propios falsos amigos: negaciones, preguntas, pasado, subordinadas.
+        «déjalos en borrador» entra en FRENA a la vez que el plural en la orden: sin él,
+        «déjalos en borrador, publícalos mañana» abría el permiso hoy."""
+        for texto in ("no los publiques todavía", "¿los envías tú?", "cuando los mandemos",
+                      "prepara los correos sin enviarlos", "los publicaste ayer",
+                      "déjalos en borrador, publícalos mañana", "no las envíes, mándalas el lunes",
+                      # los tres que encontró verificacion (25-sep-26), abiertos con el plural:
+                      "solo los borradores, envíalos mañana",
+                      "déjaselos en borrador, mándaselos mañana",
+                      "no se los envíes todavía, envíaselos mañana",
+                      # …y su singular, que ya se colaba con la regla vieja
+                      "déjaselo en borrador, mándaselo mañana"):
+            with self.subTest(texto=texto):
+                self._ok_envio(texto)
+                self.assertEqual(self._decision(self._hook({"tool_name": self.SEND,
+                                                            "tool_input": {}})), "deny", texto)
+
     def test_no_la_envies_no_abre_el_envio(self):
         """Preexistente: FRENA solo conocía «no lo envíes»."""
         self._ok_envio("no la envíes todavía, envíala mañana")
