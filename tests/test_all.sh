@@ -98,6 +98,7 @@ runpy test_agentes_ritmo.py
 runpy test_radar_personas.py
 runpy test_salida_guard.py
 runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos a la red se juzga por el DESTINO
+runpy test_nivel_salida.py   # 25-sep · P3 F1: nivel de cada salida EN SOMBRA (anota, no manda)
 runpy test_ok_envio_blindado.py
 runpy test_correos_publicables.py
 runpy test_entrada_guard.py

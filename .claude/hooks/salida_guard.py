@@ -859,6 +859,25 @@ Un clic puede ser «Enviar», «Publicar» o «Pagar», y desde aquí no se ve c
 Si es navegación o lectura, dile qué vas a pulsar y sigue."""
 
 
+_NAVEGA_O_BATCH = re.compile(r"(navigate|preview_start|tabs_create|batch)", re.I)
+
+
+def _sombra(datos, que, decision):
+    """P3 · F1 (25-sep-26): anota el NIVEL que habría tenido esta salida (`tools/nivel_salida.py`).
+    SOLO ANOTA: se traga cualquier fallo y no imprime nada, así que no puede cambiar la decisión.
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026."""
+    try:
+        # Este hook corre en TODAS las llamadas: si no sale fuera y no navega (el host se recuerda
+        # para juzgar el clic siguiente), no se importa nada. Medido: +83 ms/llamada sin este atajo.
+        if not que and not _NAVEGA_O_BATCH.search(datos.get("tool_name") or ""):
+            return
+        import nivel_salida
+        nivel_salida.sombra(STATE, datos, que, _POR_QUE if que else "", decision,
+                            datetime.now().replace(microsecond=0).isoformat())
+    except BaseException:                            # noqa: BLE001 — la sombra nunca manda
+        pass
+
+
 def main():
     try:
         datos = json.load(sys.stdin)
@@ -877,10 +896,12 @@ def main():
         return 0
     que = _sale_fuera(tool, datos.get("tool_input"))
     if not que:
+        _sombra(datos, None, "libre")
         return 0
     permiso, por_que_no = _token_valido(datos, datos.get("tool_input"))
     if permiso:
         _consumir(permiso, tool)
+        _sombra(datos, que, "permitido")
         return 0
     # Lo que MANDA se deniega siempre. Un CLIC (22-sep-26): `ask` si el modo pregunta, y si no
     # (bypass, auto) se AVISA sin bloquear. Antes se denegaba en bypass creyendo que bypass era
@@ -895,8 +916,10 @@ def main():
         if modo in ("default", "plan", "acceptEdits"):
             salida.update(permissionDecision="ask", permissionDecisionReason=motivo)
             _log("preguntado", tool, modo)
+            _sombra(datos, que, "preguntado")
         else:
             _log("avisado", tool, modo or "modo-desconocido")
+            _sombra(datos, que, "avisado")
     else:
         if _POR_QUE:
             motivo += "\n\n(Lo que se ha leído como envío: %s.)" % _POR_QUE
@@ -905,6 +928,7 @@ def main():
         salida["additionalContext"] = motivo
         salida.update(permissionDecision="deny", permissionDecisionReason=motivo)
         _log("denegado", tool, (_POR_QUE + " · " if _POR_QUE else "") + modo)
+        _sombra(datos, que, "denegado")
     print(json.dumps({"hookSpecificOutput": salida}, ensure_ascii=False))
     return 0
 
