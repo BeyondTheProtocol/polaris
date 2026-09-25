@@ -1,0 +1,42 @@
+{
+  "_comment": "PILOTO item #1 (manos al lazo, 16-jul-26): settings scoped SOLO para com.btp.asistente-recordatorio, wired por BTP_SETTINGS en su plist. Clona la FORMA del molde del radar (env privileged + hook muro_guard) pero la allowlist se derivó POR EJECUCION del log real de la rutina (no de copiar el radar): su unica via primaria, seguimiento.py revisar --json, se auto-deniega hoy en headless -> la rutina corre muda. El muro (muro_guard.sh, exit 2, matcher '*') sigue siendo la barrera real; permissions.allow solo apaga el auto-deny del 'ask' de la puerta externa. NO relaja el muro. Patron a generalizar por FAMILIA tras validar el piloto (recomendacion de {{CONTACTO}}).",
+  "env": {
+    "MURO_PROFILE": "privileged"
+  },
+  "permissions": {
+    "_comment": "Allowlist MINIMA y derivada del charter+ejecucion. SOLO el subcomando 'revisar' de seguimiento.py (solo-lectura, imprime json): asi las rutas de ESCRITURA del script y su flag --send quedan FUERA tambien en la capa de permisos (segunda barandilla de intencion, mas estrecha que el muro). Read/Grep/Glob cubren el resto (leer seguimiento.json, buscar). NO se incluye salida.py (la entrega es via el texto final del agente -> dispatcher, run_agent.sh:274), NI leer_contacto.py (no lo nombra su charter y trae PII de WhatsApp al lazo), NI el piso del radar. LINEA ROJA intacta: no se toca ALLOW_PRIV/PY_BINS/GIT_ALLOW_SUB/NET_ALLOW/SAFE_MCP_TOOLS/SELF_PROTECT; jamas Bash(python3:*) ni Bash(*).",
+    "allow": [
+      "Bash(python3 tools/seguimiento.py revisar:*)",
+      "Read",
+      "Grep",
+      "Glob"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "P9 (25-sep-26): CANARIO del muro. Deja el testigo que run_agent.sh exige; si no aparece, los hooks de este fichero no se cargaron y el lazo falla CERRADO (código rojo). No inyecta contexto.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/canario_muro.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "IDENTICO al del molde del radar: matcher '*' = TODAS las tools pasan por el muro (Bash->checks, Write/Edit->check_write, SOLO lecturas locales SAFE_TOOLS->permitido, y TODO lo demas -MCP incl. biomcp/cbioportal, Task, WebFetch/WebSearch, ToolSearch- DENY, SAFE_MCP_TOOLS vacio). muro_guard.py es la barrera real (exit 2 anula cualquier allow).",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/muro_guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

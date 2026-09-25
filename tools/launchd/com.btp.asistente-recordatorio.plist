@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.asistente-recordatorio</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>BTP_ORQUESTADOR</key><string>claude-suscripcion</string>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MURO_PROFILE</key><string>privileged</string>
+    <key>BTP_AGENT</key><string>asistente</string>
+    <key>BTP_HEARTBEAT_NAME</key><string>asistente-recordatorio</string>
+    <key>BTP_MODEL</key><string>sonnet</string>
+    <key>BTP_SETTINGS</key><string>settings.recordatorio.json</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+    <string>Pasada de RECORDATORIO (modo follonera). Mira los hilos con fecha/hora inminente: prueba primero `python3 tools/seguimiento.py revisar --json 2>/dev/null`; si Bash no está disponible, usa el tool Read sobre `tools/state/seguimiento.json` directamente. Detecta lo que tiene FECHA/HORA y aprieta HOY o MAÑANA y NO consta hecho. Si hay algo: manda UN recordatorio corto y claro por salida.report_to_titular (qué · cuándo · qué hace ELLA), en voz humana sin jerga técnica ni rutas de ficheros. Si NO hay nada inminente: silencio total, nunca "nada pendiente". IMPORTANTE: tu respuesta completa es lo que recibe {{TITULAR}} — NUNCA escribas "sandbox", "bloqueo", "habría enviado", nombres de herramientas ni rutas internas, y NUNCA uses tablas markdown con pipes (Telegram no las renderiza, se ven como un churro de "|"); si quieres mostrar varios hilos, usa una lista con emoji + negrita (p. ej. "✈️ **lunes 29/6** confirmar vuelo"), nunca una tabla ni un "resumen del barrido" técnico. NUNCA contactes, envíes, pagues ni publiques. Respeta silencio nocturno (23-8) salvo código rojo.</string>
+  </array>
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Hour</key><integer>14</integer><key>Minute</key><integer>30</integer></dict>
+    <dict><key>Hour</key><integer>19</integer><key>Minute</key><integer>30</integer></dict>
+  </array>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/asistente-recordatorio.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/asistente-recordatorio.err</string>
+</dict></plist>

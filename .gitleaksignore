@@ -1,0 +1,7 @@
+# Falsos positivos verificados (setup day P0). Cada línea = fingerprint de gitleaks.
+# G0DM0D3/API.md: placeholders de documentación ("Bearer your-...-key"), no claves reales.
+G0DM0D3/API.md:curl-auth-header:24
+G0DM0D3/API.md:curl-auth-header:133
+G0DM0D3/API.md:curl-auth-header:146
+# Easter egg del frontend (string de juego, no secreto).
+G0DM0D3/src/hooks/useEasterEggs.ts:generic-api-key:27

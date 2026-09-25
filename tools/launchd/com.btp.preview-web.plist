@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Preview web PRIVADO por Tailscale: relay 100.114.113.73:3006 -> localhost:3005.
+     KeepAlive: revive si se cae o tras reinicio. NO expone a internet (solo tailnet).
+     Activado con OK explícito de {{TITULAR}} (22/6). Requiere que el dev server (:3005) esté en marcha. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.preview-web</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/preview_remoto.py</string>
+    <string>3005</string>
+    <string>3006</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/preview-web.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/preview-web.err</string>
+</dict></plist>

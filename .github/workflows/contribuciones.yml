@@ -1,0 +1,105 @@
+# Lo que ENTRA por PR al repo público pasa por aquí antes de que nadie lo mezcle.
+#
+# Por qué existe (19-sep-2026): este repo es un árbol DERIVADO de uno privado que sostiene
+# el caso clínico de una persona. `tools/publicar.py` vigila lo que sale; esto vigila lo que
+# entra. Un PR con una clave, un teléfono o un dato clínico pegado en un fixture acabaría
+# publicado con el nombre del proyecto encima.
+#
+# Permisos mínimos a propósito: este workflow LEE el código del PR y no escribe en ningún
+# sitio. El texto de un PR es dato no confiable; aquí solo se mira el DIFF, nunca se ejecuta
+# nada que venga escrito en su descripción.
+name: contribuciones
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  guardia:
+    name: barrido y sintaxis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # hace falta la base para el diff del PR
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Barrido de lo que trae el PR
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch -q origin "${{ github.base_ref }}"
+            python3 tools/ci_barrido.py --diff "origin/${{ github.base_ref }}...HEAD"
+          else
+            python3 tools/ci_barrido.py --todo
+          fi
+
+      - name: El barrido se prueba a sí mismo
+        run: python3 tools/ci_barrido.py --selftest
+
+      - name: Todo el Python compila
+        run: python3 -m compileall -q tools tests pipeline evals
+
+  tests:
+    name: batería
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Sin el contenido privado ni el estado vivo, muchas baterías se saltan solas: eso es
+      # lo esperado aquí. Lo que no puede es haber rojos.
+      # BTP_PORTABLE salta las baterías que solo pueden correr en un Mac con el sistema
+      # montado (Llavero, launchd, el binario xurl): aquí no hay con qué, y un rojo
+      # permanente convierte el CI en decoración.
+      # `lector_clinico.py` —la ventanilla clínica— sirve la capa de texto de un PDF con
+      # `pdftotext`, que busca por ruta fija (homebrew, /usr/local, /usr/bin). El runner de
+      # Ubuntu no trae poppler, así que 3 comprobaciones de `test_lector_clinico_binario.py`
+      # caían siempre, y con ese test roto la campaña de mutantes se planta sola («el test ya
+      # está ROJO sin mutar: con un test roto la campaña no mide nada»). Medido el 20-sep-26
+      # apuntando `_PDFTOTEXT` a una ruta inexistente en casa base: caen las MISMAS.
+      # `ocr_informes.py` es fail-loud: si le falta `tesseract` o `pdftoppm` sale con 1 antes
+      # de tocar nada, y `test_lector_clinico_binario.py` comprueba que la ventanilla LANZA ese
+      # comando (que esté en su allowlist), lo que exige rc=0. Medido el 20-sep-26 sacando
+      # tesseract del PATH en casa base: cae la misma comprobación que en el CI, 42/43. Se
+      # instala el binario en vez de relajar el test, que es lo que de verdad se quiere probar.
+      - name: poppler y tesseract, que los pide la ventanilla clínica
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils tesseract-ocr
+
+      - name: tests/test_all.sh
+        run: BTP_PORTABLE=1 bash tests/test_all.sh
+
+      # Qué falló, no solo que falló (20-sep-2026). `test_all.sh` imprime la última línea de
+      # cada batería y guarda la traza en /tmp/rojo-<test>.log, que se va con el runner: el CI
+      # llevaba 11 runs seguidos en rojo sin que se pudiera saber la causa desde fuera.
+      #
+      # Los logs NO se enseñan en crudo. Una traza puede arrastrar un fragmento de fixture, y
+      # este repo es público: se pasan antes por el mismo barrido que vigila lo que entra, y si
+      # encuentra algo no se muestra nada. Fail-closed, como el resto de la costura.
+      - name: Qué falló exactamente
+        if: failure()
+        run: |
+          shopt -s nullglob
+          logs=(/tmp/rojo-*.log)
+          if [ ${#logs[@]} -eq 0 ]; then echo "no hay logs de fallo que enseñar"; exit 0; fi
+          if ! python3 tools/ci_barrido.py "${logs[@]}"; then
+            echo "::error::el barrido encontró algo en los logs de fallo: no se muestran"
+            exit 0
+          fi
+          # Las LÍNEAS DE FALLO primero, y el final después. `tail -40` a secas no vale: un
+          # test con cien comprobaciones deja el ✗ arriba del todo y el corte solo enseña ✅.
+          # Pasó con `test_clinico_guard.py`, que tiene más de cien.
+          for f in "${logs[@]}"; do
+            echo "::group::$(basename "$f")"
+            grep -nE "✗|❌|FAIL|Traceback|Error" "$f" | head -30 || echo "(sin líneas de fallo marcadas)"
+            echo "— últimas líneas —"
+            tail -15 "$f"
+            echo "::endgroup::"
+          done

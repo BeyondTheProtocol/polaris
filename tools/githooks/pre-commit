@@ -1,0 +1,53 @@
+#!/bin/sh
+# tools/githooks/pre-commit — Fix (A) 11-jul-26 (radar `_cajita/radar-mejoras-10jul/C-guard-merge-master.md`).
+# Gate BLANDO NATIVO de git: frena commits directos a la base (master/main) cuando la
+# sesion no tiene el gate humano. Complementa (no sustituye) el gate software del muro
+# (Fix c en `.claude/hooks/muro_guard.py`) — este hook actua incluso en sesiones
+# --allow-dangerously-skip-permissions, que se saltan los hooks de Claude pero NO los de git.
+#
+# INERTE por defecto: solo actua si existe el MISMO toggle que activa el Fix (c),
+# `.claude/hooks/.base_gate_on`. Sin el toggle, exit 0 inmediato — cero cambio de
+# comportamiento hasta que alguien lo encienda a proposito.
+#
+# Defensivo: cualquier fallo al resolver el repo/la rama => exit 0 (nunca bloquear un
+# commit legitimo por un fallo del propio hook).
+#
+# LIMITACION HONESTA: `git commit --no-verify` se salta este hook. Ver README.md.
+
+# MARCAS DE CONFLICTO (22-sep-26) — SIEMPRE activo, en cualquier rama y sin interruptor.
+# El cierre automatico 05f897d commiteo `tools/run_agent.sh` con `<<<<<<<`/`>>>>>>>` dentro:
+# `bash -n` fallaba y el lazo no podia arrancar hasta que otra sesion lo limpio (4240df8).
+# `cerrar_sesion.py` ya se para ante eso (fb0e144), pero hay mas caminos que hacen commit; este
+# los cubre todos, `git merge --continue` incluido. Mira solo las lineas AÑADIDAS al indice.
+# Salida a proposito (un fixture que de verdad las necesita): BTP_GIT_MARCAS_OK=1.
+if [ "$BTP_GIT_MARCAS_OK" != "1" ]; then
+    marcas="$(git diff --cached -U0 --no-color --no-ext-diff 2>/dev/null \
+              | grep -nE '^\+(<<<<<<<|>>>>>>>)( |$)' | head -5)"
+    if [ -n "$marcas" ]; then
+        echo "BLOQUEADO (git hook nativo): el commit lleva MARCAS DE CONFLICTO sin resolver:" >&2
+        git diff --cached --name-only -G '^(<<<<<<<|>>>>>>>)( |$)' 2>/dev/null | sed 's/^/  · /' >&2
+        echo "Resuelvelas (o 'git merge --abort') y repite. Si son a proposito: BTP_GIT_MARCAS_OK=1." >&2
+        exit 1
+    fi
+fi
+
+toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -n "$toplevel" ] || exit 0
+
+toggle="$toplevel/.claude/hooks/.base_gate_on"
+[ -f "$toggle" ] || exit 0
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || exit 0
+
+case "$branch" in
+    master|main) ;;
+    *) exit 0 ;;
+esac
+
+if [ "$BTP_GIT_BASE_OK" = "1" ]; then
+    exit 0
+fi
+
+echo "BLOQUEADO (git hook nativo, fix A 11-jul-26): commit directo a '$branch' sin gate." >&2
+echo "Trabaja en una rama (git checkout -b ...), o exporta BTP_GIT_BASE_OK=1 con OK humano explicito." >&2
+exit 1

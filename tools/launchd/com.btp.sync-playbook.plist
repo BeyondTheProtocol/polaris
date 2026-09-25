@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.sync-playbook</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- Heartbeat del sync del playbook clínico (ESTADO-ACTUAL.md), Fase 2 pieza A.
+       CORRE SOLO EN EL MINI (Polaris, primario 24/7 = el ancla del sync programado). El mini
+       alcanza a la Air (que a veces está apagada → fail-soft, no pasa nada). DETERMINISTA:
+       invoca python directo, NO run_agent.sh, cero tokens. Conflict-safe por hash-baseline;
+       si ambas copias cambiaron, avisa y NO pisa.
+       PRERREQUISITOS antes de cargarlo (gated, decisión de {{TITULAR}}):
+         1) haber hecho el BOOTSTRAP (sync_playbook.py con las opciones elige y apply) — si no, alertará cada vez
+         2) un alias ssh `air` en el mini que alcance la Air por Tailscale (BatchMode, sin passphrase)
+       Cargar (SOLO en el mini):  launchctl load ~/Library/LaunchAgents/com.btp.sync-playbook.plist -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/sync_playbook.py</string>
+    <string>--apply</string>
+    <string>--remoto</string>
+    <string>air</string>
+  </array>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/sync-playbook.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/sync-playbook.err</string>
+</dict></plist>

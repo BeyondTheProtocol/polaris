@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.seguridad-sweep</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- Barrido de seguridad DESACOPLADO de auto-mejora (C, 2/7/26): antes solo corría dentro del
+       prompt de auto-mejora (paso 0b) — si esa rutina caía por cualquier motivo (crédito, tope
+       local, fallo del agente) el barrido simplemente no corría esa vuelta. Ahora es su propio
+       daemon determinista, con heartbeat propio, sin depender de un agente LLM. DETERMINISTA
+       (sin tokens): invoca python directo, NO run_agent.sh. Rojo → código rojo (dentro del propio
+       script); harness caído → aviso operativo. Corre tras el barrido de git (5:40). -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/seguridad_sweep_daemon.py</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/seguridad-sweep.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/seguridad-sweep.err</string>
+</dict></plist>

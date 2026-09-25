@@ -1,0 +1,63 @@
+{
+  "_comment": "Config del LAZO 24/7 para auto-mejora (perfil privilegiado), item #1 aplicado a la rutina MAS POTENTE (16-jul-26). La carga run_agent.sh via BTP_SETTINGS, NO la sesion interactiva. auto-mejora llevaba bloqueada intermitentemente desde el 27-jun: corre con settings.autonomous.json (solo permite correo.py aviso), asi que TODOS sus scripts deterministas (audit_comites, cosecha_correcciones, radar_taller...) se auto-denegaban en headless. El muro (muro_guard.sh, matcher '*') sigue siendo la barrera real; esto solo apaga el auto-deny del 'ask' para scripts YA deterministas/locales/auditados. Allowlist AUDITADA (mas estrecha que la que la propia auto-mejora propuso el 15-jul en HOY.md).",
+  "env": {
+    "MURO_PROFILE": "privileged"
+  },
+  "permissions": {
+    "_comment": "Solo los scripts que auto-mejora usa a diario, auditados flag por flag. TIGHTENINGS sobre su autopropuesta: (1) seguimiento.py SOLO subcomando 'revisar' -> el flag --send (rutea OUTWARD) y las escrituras quedan fuera tambien en la capa de permisos; (2) cola.py enqueue FUERA a proposito -> congela la cascada 'adoptar-idea auto-ejecuta encolando trabajo a otros agentes' (riesgo que marcaron {{CONTACTO}} y la propia auto-mejora); esos candidatos caen a PROPUESTA en vez de auto-encolarse; (3) nvidia.py FUERA -> rail de modelo por red, atado a la decision de politica del rail esencial (F1) que es gate de {{TITULAR}}. LINEA ROJA intacta: no se toca ALLOW_PRIV/PY_BINS/GIT_ALLOW_SUB/NET_ALLOW/SAFE_MCP_TOOLS/SELF_PROTECT; jamas Bash(python3:*) ni Bash(*).",
+    "allow": [
+      "Bash(python3 tools/audit_comites.py:*)",
+      "Bash(python3 tools/audit_herramientas.py:*)",
+      "Bash(python3 tools/cosecha_correcciones.py:*)",
+      "Bash(python3 tools/cosecha_entregables.py:*)",
+      "Bash(python3 tools/memoria_radar.py:*)",
+      "Bash(python3 tools/radar_taller.py:*)",
+      "Bash(python3 tools/radar_contacto.py:*)",
+      "Bash(python3 tools/radar_personas.py:*)",
+      "Bash(python3 tools/x_guardados.py:*)",
+      "Bash(python3 tools/kb.py:*)",
+      "Bash(python3 tools/coste.py:*)",
+      "Bash(python3 tools/archivar_nota.py:*)",
+      "Bash(python3 tools/seguimiento.py revisar:*)",
+      "Bash(python3 tools/salida.py:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(pwd)",
+      "Read",
+      "Grep",
+      "Glob"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "P9 (25-sep-26): CANARIO del muro. Deja el testigo que run_agent.sh exige; si no aparece, los hooks de este fichero no se cargaron y el lazo falla CERRADO (código rojo). No inyecta contexto.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/canario_muro.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "IDENTICO al molde del radar/recordatorio: matcher '*' = TODAS las tools pasan por el muro. muro_guard.py es la barrera real (exit 2 anula cualquier allow); MCP/Task/WebFetch/WebSearch denegados en privileged (SAFE_MCP_TOOLS vacio).",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/muro_guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

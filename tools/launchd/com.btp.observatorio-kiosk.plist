@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Kiosko: al iniciar sesión, abre El Observatorio en Safari a pantalla completa en el 4K de Polaris.
+     RunAtLoad una vez (no KeepAlive: no queremos relanzar Safari en bucle). La auto-pantalla-completa
+     usa AppleScript y puede pedir permiso de Automatización la primera vez. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.observatorio-kiosk</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/observatorio.py</string>
+    <string>abrir</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio-kiosk.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio-kiosk.err</string>
+</dict></plist>

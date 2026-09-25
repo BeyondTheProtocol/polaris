@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- El Observatorio: servidor de la sala de control (solo-lectura) en 127.0.0.1:8787.
+     stdlib, sin LLM (~0 tokens). KeepAlive: revive si se cae o tras reinicio.
+     NO expone a internet (solo loopback; al móvil se llega por com.btp.observatorio-remoto). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.observatorio</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/observatorio.py</string>
+    <string>serve</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/observatorio.err</string>
+</dict></plist>

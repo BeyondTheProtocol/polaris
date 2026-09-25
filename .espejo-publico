@@ -1,0 +1,2 @@
+Árbol derivado por tools/publicar.py: nombres sustituidos y léxico reescrito.
+Los tests que necesitan los datos reales se saltan aquí con su motivo.

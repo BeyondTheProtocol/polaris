@@ -1,0 +1,61 @@
+{
+  "_por_que": "24-sep-26. tools/caso_publico.py es la única puerta de dato clínico a la web pública (/datos). Si al quitar una de estas piezas test_caso_publico.py sigue verde, esa pieza no está defendida.",
+  "objetivo": "tools/caso_publico.py",
+  "test": [
+    "python3",
+    "tests/test_caso_publico.py"
+  ],
+  "env": "BTP_CASO_PUBLICO",
+  "mutaciones": [
+    {
+      "etiqueta": "el freno de contenido (web_lint.revisar_caso) deja de llamarse",
+      "viejo": "    fallos = web_lint.revisar_caso(publico)",
+      "nuevo": "    fallos = []"
+    },
+    {
+      "etiqueta": "un rango de meses («ene–feb 2024») se dibuja como si fuera un día",
+      "viejo": "                return {\"desde\": _iso(a, m1, 1), \"hasta\": _fin_mes(a, m2), \"precision\": \"mes\"}",
+      "nuevo": "                return {\"desde\": _iso(a, m1, 1), \"hasta\": _fin_mes(a, m2), \"precision\": \"dia\"}"
+    },
+    {
+      "etiqueta": "los puntos de confianza baja (OCR dudoso) se grafican",
+      "viejo": "                if p.get(\"confianza\") == \"baja\":\n                    continue",
+      "nuevo": "                if False:\n                    continue"
+    },
+    {
+      "etiqueta": "×LSN con la banda más frecuente en vez del rango de SU informe",
+      "viejo": "                hi = p.get(\"ref_high\") if propio else ref.get(\"high\")",
+      "nuevo": "                hi = ref.get(\"high\")"
+    },
+    {
+      "etiqueta": "las rutas privadas de las fuentes salen en el público",
+      "viejo": "                   fuentes={k: {\"publico\": v[\"publico\"]}\n                            for k, v in fuente[\"fuentes\"].items()})",
+      "nuevo": "                   fuentes=fuente[\"fuentes\"])"
+    },
+    {
+      "etiqueta": "un informe sin rango deja el punto sin LSN (clave presente a None)",
+      "viejo": "        propio = p.get(\"ref_high\") is not None",
+      "nuevo": "        propio = \"ref_high\" in p"
+    },
+    {
+      "etiqueta": "sin rango propio, el punto se dibuja a 2× LSN pero «dentro»",
+      "viejo": "                if not fuera and not propio:",
+      "nuevo": "                if False:"
+    },
+    {
+      "etiqueta": "lo que es solo del privado (molecular) sale al público",
+      "viejo": "    publico = dict({k: v for k, v in comun.items() if k not in SOLO_PRIVADO},",
+      "nuevo": "    publico = dict(comun,"
+    },
+    {
+      "etiqueta": "una clave fuera del esquema se publica",
+      "viejo": "            if k in permitidas:",
+      "nuevo": "            if True:"
+    },
+    {
+      "etiqueta": "una fecha ilegible se dibuja igual",
+      "viejo": "        if fecha is None:\n            avisos.append",
+      "nuevo": "        if fecha is None and False:\n            avisos.append"
+    }
+  ]
+}

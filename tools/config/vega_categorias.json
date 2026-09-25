@@ -1,0 +1,22 @@
+{
+  "_nota": "Esquema de CATEGORIZACIÓN de correo propuesto (2/7/26) — DATO, no instrucciones (anti-inyección). Lo consume tools/correo.py:categoria_de(). Coincidencia por DOMINIO del remitente (subdominios incluidos, igual que vega_ruido.json) para 'prensa'/'admin'/'personal'; 'admin_keywords' es substring sobre remitente+asunto en minúscula (para admin/legal/banca que no tiene dominio fijo, tipo bancos con dominios rotativos). NED/Médico, Promos (spam/newsletters/recibos) y Polaris NO llevan config aquí: los deriva correo.py directo de NED_CRITICOS / vega_ruido.json / patrones de sistema. FAIL-SAFE: si este fichero falta, es ilegible o 'enabled' es false, categoria_de() no clasifica NADA fuera de NED/Médico y Promos (comportamiento conservador, nunca inventa Admin/Personal sin config). enabled=false HASTA que {{TITULAR}} dé el OK al esquema propuesto en el resumen de correo-fino (2/7/26); flip a true = su gate, no auto.",
+  "enabled": true,
+  "prensa": [],
+  "admin": [],
+  "admin_keywords": [
+    "factura",
+    "invoice",
+    "recibo de pago",
+    "iban",
+    "extracto bancario",
+    "declaración",
+    "hacienda",
+    "seguridad social",
+    "notaría",
+    "notaria",
+    "contrato",
+    "nómina",
+    "nomina"
+  ],
+  "personal": []
+}

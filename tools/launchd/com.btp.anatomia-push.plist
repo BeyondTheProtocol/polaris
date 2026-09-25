@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Empuja el mapa de La Anatomía al panel (panel.helptitular.com) cada 5 minutos.
+     Polaris SALE, nadie entra: no abre ningún puerto ni túnel hacia casa base.
+     Renderiza, cifra con la clave del Llavero y fuerza el push a la rama `datos`
+     del repo privado. Sin LLM (~0 tokens); cada empujón son ~6 KB.
+     PREPARADO, NO ENCENDIDO — y no se enciende hasta que el panel esté verde de
+     punta a punta, porque si no estaría empujando a un sitio que aún no sirve:
+       python3 tools/activar_daemon.py com.btp.anatomia-push -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.anatomia-push</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/anatomia_push.py</string>
+  </array>
+  <key>StartInterval</key><integer>300</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/anatomia-push.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/anatomia-push.err</string>
+</dict></plist>

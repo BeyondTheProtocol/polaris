@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self' blob: data:">
+<meta name="referrer" content="no-referrer">
+<title>Mapa hepático</title>
+<style>
+  :root { --fondo:#faf6f0; --tinta:#3a3340; --suave:#6b6270; --berenjena:#2d1b3d; --negativo:#1c1126;
+          --coral:#ff6b47; --linea:#e6ddd0; --sel:#ffd666; }
+  @media (prefers-color-scheme: dark) { :root { --fondo:#1c1126; --tinta:#f5efe6; --suave:#c9bfcf; --linea:#3d2b4d; } }
+  * { box-sizing: border-box }
+  body { margin:0; background:var(--fondo); color:var(--tinta); font:15px/1.45 "Hanken Grotesk",system-ui,sans-serif }
+  header, main, footer { max-width:1400px; margin:0 auto; padding:12px 16px }
+  h1 { font-family:Fraunces,Georgia,serif; font-weight:600; font-size:1.6rem; margin:.2em 0 }
+  .aviso-caja { border-left:4px solid var(--coral); background:color-mix(in srgb,var(--coral) 8%,transparent); padding:10px 14px; margin:8px 0 }
+  .controles { display:flex; flex-wrap:wrap; gap:12px; align-items:center; margin:10px 0 }
+  select { font:inherit; padding:4px 8px }
+  #resumen { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:10px 0 }
+  #resumen div { border:1px solid var(--linea); border-radius:8px; padding:8px 12px }
+  #resumen b { display:block; font-size:1.25rem; font-variant-numeric:tabular-nums }
+  #resumen span { color:var(--suave); font-size:.85rem }
+  .visor { display:grid; grid-template-columns:2fr 1fr; gap:8px; height:min(62vh,640px) }
+  .visor > div { background:var(--negativo); border-radius:8px; overflow:hidden; position:relative }
+  .visor small { position:absolute; left:8px; top:6px; color:#f5efe6; opacity:.8; font-size:.75rem; pointer-events:none }
+  canvas { width:100%; height:100%; display:block; touch-action:none }
+  #cursor, #estado { font:12px "JetBrains Mono",ui-monospace,monospace; color:var(--suave); min-height:1.2em }
+  table { border-collapse:collapse; width:100%; font-variant-numeric:tabular-nums; margin:10px 0 }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--linea) }
+  tbody tr { cursor:pointer } tbody tr:hover { background:color-mix(in srgb,var(--sel) 15%,transparent) }
+  tbody tr.sel { background:color-mix(in srgb,var(--sel) 35%,transparent) }
+  tbody tr:focus-visible { outline:2px solid var(--coral); outline-offset:-2px }
+  tbody tr.marca th { color:#2f8f80 }
+  @media (prefers-color-scheme: dark) { tbody tr.marca th { color:#78cdbe } }
+  .aviso { font-size:.75rem; background:var(--linea); border-radius:4px; padding:0 4px }
+  details { margin:12px 0 } summary { cursor:pointer; font-weight:600 }
+  @media (max-width: 900px) { .visor { grid-template-columns:1fr; height:auto } .visor > div { height:52vh } }
+</style>
+<script type="module" src="bundle.js"></script>
+</head>
+<body>
+<header>
+  <h1>Mapa hepático · TC portal</h1>
+  <div class="aviso-caja" role="note">
+    <b>Reconstrucción automática sin validación radiológica. No es un informe ni un diagnóstico.</b>
+    Las medidas oficiales son las del informe del radiólogo, que se muestran al lado cuando existen.
+    Las marcas de la revisión informal de un radiólogo (sin informe firmado) se distinguen por su procedencia en cada fila.
+  </div>
+</header>
+<main>
+  <div class="controles">
+    <label>Estudio <select id="fecha" aria-label="Fecha del estudio"></select></label>
+    <label>Cortes <select id="vista" aria-label="Vista de cortes">
+      <option value="mpr">3 planos</option><option value="axial">axial</option>
+      <option value="coronal">coronal</option><option value="sagittal">sagital</option></select></label>
+    <span id="estado" aria-live="polite"></span>
+  </div>
+  <div id="resumen"></div>
+  <div class="visor">
+    <div><small>Cortes TC · convención radiológica (derecha del paciente a la izquierda) · regla 10 cm</small><canvas id="gl2" aria-label="Cortes del TC con lesiones y vasos superpuestos"></canvas></div>
+    <div><small>3D · hígado translúcido · <span style="color:#ff6b47">●</span> malla de Polaris · <span style="color:#78cdbe">●</span> marca puntual del radiólogo (esfera de su diámetro, no segmentación) · porta y vasos</small><canvas id="gl3" aria-label="Reconstrucción 3D del hígado"></canvas></div>
+  </div>
+  <div id="cursor"></div>
+  <table id="tabla">
+    <caption style="text-align:left;color:var(--suave)">Lesiones de este estudio: L = detección automática de Polaris, M = marca de un radiólogo sin lesión automática debajo. Clic o Enter en una fila lleva el cursor a la lesión en los cortes y en el 3D.</caption>
+    <thead><tr><th scope="col">Lesión</th><th scope="col">Procedencia</th><th scope="col">Segmento</th><th scope="col">Diámetro axial mayor (mm, automático)</th>
+      <th scope="col">Radiólogo (mm)</th><th scope="col">Volumen (ml, exploratorio)</th><th scope="col">SUVmax PET</th><th scope="col">Cambio de diámetro vs. el otro estudio</th>
+      <th scope="col">Acuerdo con 2º modelo</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <section id="marcas" aria-live="polite"></section>
+  <section id="focos" aria-live="polite"></section>
+  <details open>
+    <summary>Límites de esta reconstrucción (léelos antes de interpretar nada)</summary>
+    <ol>
+      <li>Detección automática: la sensibilidad publicada para lesiones de menos de 10 mm es ~10 %, con ~0,5 falsos positivos por estudio. Pueden faltar o sobrar lesiones pequeñas.</li>
+      <li>La comparación entre fechas solo vale entre la misma fase de contraste (aquí, portal en ambas). El emparejado de lesiones es automático y aproximado; el bueno es el del radiólogo. «Sin pareja automática» NO significa lesión nueva: puede ser una lesión que el modelo no detectó en el otro estudio o un falso positivo.</li>
+      <li>El diámetro manda (RECIST); el volumen es exploratorio.</li>
+      <li>Segmentos de Couinaud y vasos: modelos que sus autores marcan como «menos robustos». Solo troncos vasculares; fronteras aproximadas, no quirúrgicas.</li>
+      <li>Volumen no es función hepática. Cualquier planificación de terapia local la hace el equipo con sus propias herramientas.</li>
+      <li>Que aquí no se vea una lesión no significa que no exista: la RM detecta mejor las de menos de 10 mm.</li>
+      <li>SUV: PET y TC son estudios distintos (distinta respiración y postura). El SUVmax de cada lesión se mide tras un registro deformable del hígado, con un vóxel de PET (4 mm) de margen; las lesiones pequeñas pierden captación por volumen parcial. El SUV depende de la reconstrucción: aquí, la estándar del centro (LOR-RAMLA con corrección de atenuación). Comparar SUV entre fechas exige tiempos de captación parecidos: el tiempo tras la inyección de cada PET se muestra arriba; si difieren mucho, la comparación es orientativa.</li>
+    </ol>
+  </details>
+</main>
+<footer><small>Segmentación: TotalSegmentator (total, liver_segments, liver_lesions, liver_vessels), 100 % local. Visor: NiiVue. Generado por Polaris.</small></footer>
+</body>
+</html>

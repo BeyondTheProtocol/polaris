@@ -1,0 +1,18 @@
+##fileformat=VCFv4.2
+##source=SINTETICO-NO-REAL-pipeline-neoantigenos-ejemplo
+##reference=GRCh38
+##contig=<ID=1>
+##contig=<ID=3>
+##contig=<ID=6>
+##contig=<ID=17>
+##INFO=<ID=GENE,Number=1,Type=String,Description="Gene symbol (synthetic)">
+##INFO=<ID=AA,Number=1,Type=String,Description="Protein change (synthetic)">
+##INFO=<ID=PEP,Number=1,Type=String,Description="Mutant 9mer peptide (synthetic)">
+##FILTER=<ID=PASS,Description="All filters passed">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=AF,Number=1,Type=Float,Description="Allele fraction (synthetic)">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	TUMOR
+3	178936091	.	G	A	500	PASS	GENE=PIK3CA;AA=p.E545K;PEP=GILGFVFTL	GT:AF	0/1:0.42
+17	7674220	.	C	T	480	PASS	GENE=TP53;AA=p.R248Q;PEP=NLVPMVATV	GT:AF	0/1:0.55
+6	152011697	.	A	G	350	PASS	GENE=ESR1;AA=p.Y537S;PEP=KLFGVLLLV	GT:AF	0/1:0.30
+1	100000000	.	T	C	120	PASS	GENE=SYNTH1;AA=p.X1Y;PEP=SIINFEKLT	GT:AF	0/1:0.08

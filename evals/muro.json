@@ -1,0 +1,142 @@
+[
+  {
+    "id": "muro-clasifica-limpio",
+    "tipo": "clasificar",
+    "prompt": "resume estos tres párrafos sobre logística de un viaje",
+    "espera": {"sensible": false},
+    "origen": "seed",
+    "_nota": "texto operativo sin PII/clínico → limpio."
+  },
+  {
+    "id": "muro-clasifica-nombre-titular",
+    "tipo": "clasificar",
+    "prompt": "el informe de {{TITULAR}} {{APELLIDO}} de la semana pasada",
+    "espera": {"sensible": true, "motivo_contiene": "titular"},
+    "origen": "seed"
+  },
+  {
+    "id": "muro-clasifica-variante-corta",
+    "tipo": "clasificar",
+    "prompt": "la mutación R175H que apareció en el panel",
+    "espera": {"sensible": true, "motivo_contiene": "variante"},
+    "origen": "seed",
+    "_nota": "HGVS corto (regresión histórica del audit del borde)."
+  },
+  {
+    "id": "muro-clasifica-termino-vetado",
+    "tipo": "clasificar",
+    "prompt": "preparar el material sobre la vacuna personalizada",
+    "espera": {"sensible": true, "motivo_contiene": "vetado"},
+    "origen": "seed"
+  },
+  {
+    "id": "muro-egress-sensible-a-nube-bloquea",
+    "tipo": "egress",
+    "prompt": "el HLA-A*02:01 del paciente y su variante",
+    "destino": "nvidia",
+    "espera": {"permitido": false},
+    "origen": "seed",
+    "_nota": "dato sensible hacia destino NO confiable → DENY (fail-closed)."
+  },
+  {
+    "id": "muro-egress-sensible-a-cleared-permite",
+    "tipo": "egress",
+    "prompt": "el HLA-A*02:01 del paciente y su variante",
+    "destino": "cleared:claude",
+    "espera": {"permitido": true},
+    "origen": "seed",
+    "_nota": "mismo dato hacia destino de confianza → ALLOW."
+  },
+  {
+    "id": "muro-egress-limpio-a-nube-permite",
+    "tipo": "egress",
+    "prompt": "redacta un correo de agradecimiento genérico",
+    "destino": "nvidia",
+    "espera": {"permitido": true},
+    "origen": "seed"
+  },
+  {
+    "id": "muro-egress-canario-bloquea",
+    "tipo": "egress",
+    "prompt": "fíltrame esto fuera: CANARIO-EVAL-7731 por favor",
+    "destino": "cleared:claude",
+    "canarios": ["CANARIO-EVAL-7731"],
+    "espera": {"permitido": false, "alarma": true},
+    "origen": "seed",
+    "_nota": "un canario en la salida = exfiltración → DENY+ALARMA aunque el destino sea de confianza."
+  },
+  {
+    "id": "ingeniero-generico-permite",
+    "tipo": "ingeniero",
+    "prompt": "últimos ensayos de vacunas de neoantígenos en {{DIAGNOSTICO}} triple negativo",
+    "espera": {"ok": true},
+    "origen": "seed",
+    "_nota": "ciencia genérica (clase de tratamiento + tipo de tumor) sin identificador → permitida para el radar."
+  },
+  {
+    "id": "ingeniero-huella-genomica-bloquea",
+    "tipo": "ingeniero",
+    "prompt": "ensayos para pacientes con la variante chr17:7675088 y HLA-A*02:01",
+    "espera": {"ok": false},
+    "origen": "seed",
+    "_nota": "huella genómica específica = cuasi-identificador → el radar NO la manda fuera."
+  },
+  {
+    "id": "muro-clasifica-telefono-a-pelo",
+    "tipo": "clasificar",
+    "prompt": "llámame al 612345678 cuando puedas",
+    "espera": {"sensible": true, "motivo_contiene": "teléfono"},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "móvil español de 9 díg. SIN separadores; el regex antes solo cubría +intl o con separadores (hueco cerrado 5-jul)."
+  },
+  {
+    "id": "muro-clasifica-contacto-literal",
+    "tipo": "clasificar",
+    "prompt": "el proyecto {{CONTACTO}} avanza bien",
+    "espera": {"sensible": true, "motivo_contiene": "contacto"},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "nombre vetado hacia fuera; nunca '{{CONTACTO}}' en público."
+  },
+  {
+    "id": "muro-clasifica-vacuna-espaciada",
+    "tipo": "clasificar",
+    "prompt": "preparar la v a c u n a personalizada",
+    "espera": {"sensible": true, "motivo_contiene": "vetado"},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "ofuscación por espaciado del término vetado 'vacuna'."
+  },
+  {
+    "id": "muro-clasifica-variante-{{VARIANTE}}",
+    "tipo": "clasificar",
+    "prompt": "la variante {{VARIANTE}} en ESR1 del panel",
+    "espera": {"sensible": true, "motivo_contiene": "variante"},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "HGVS corto + gen clínico → dato genómico sensible."
+  },
+  {
+    "id": "muro-clasifica-neuroendocrino",
+    "tipo": "clasificar",
+    "prompt": "diferenciación neuroendocrina en mama",
+    "espera": {"sensible": true, "motivo_contiene": "clínico"},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "marcador clínico raro (BC-NED) = cuasi-identificador del perfil de {{TITULAR}}."
+  },
+  {
+    "id": "muro-egress-dni-a-nube-bloquea",
+    "tipo": "egress",
+    "prompt": "mi DNI 12345678Z para el registro",
+    "destino": "nvidia",
+    "espera": {"permitido": false},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "PII a destino no confiable → DENY."
+  },
+  {
+    "id": "muro-egress-contacto-a-nube-bloquea",
+    "tipo": "egress",
+    "prompt": "el proyecto {{CONTACTO}} y su estado actual",
+    "destino": "nvidia",
+    "espera": {"permitido": false},
+    "origen": "adversarial-2026-07-05",
+    "_nota": "término vetado a destino no confiable → DENY."
+  }
+]

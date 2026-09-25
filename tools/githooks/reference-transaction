@@ -1,0 +1,70 @@
+#!/bin/sh
+# tools/githooks/reference-transaction — cierra el hueco del freno de la base (11-sep-26).
+#
+# EL HUECO: `pre-commit` solo corre en `git commit`. Un `git merge` limpio crea su commit sin
+# llamarlo (git llama a `pre-merge-commit`), y fast-forward, reset, cherry-pick, update-ref o
+# `branch -f` mueven master sin crear commit ninguno. Visto en vivo: el 11-sep una fusión a
+# casa base pasó sin BTP_GIT_BASE_OK=1 y el commit de después sí se frenó. Informe:
+# 00_FUENTE-DE-VERDAD/04 · IA/Notas/hueco-del-freno-de-casa-base-…-2026-09-11.md
+#
+# EL ARREGLO: este hook corre en CUALQUIER cambio de una ref, venga de donde venga. En la fase
+# `prepared` (antes de escribir nada) mira si alguna de las refs es refs/heads/master o main y,
+# si cambia de verdad (old != new), exige el mismo gate que pre-commit: BTP_GIT_BASE_OK=1 puesto
+# tras un OK humano explícito. Las ramas de trabajo no se tocan.
+#
+# Mismo interruptor que el resto del freno: `.claude/hooks/.base_gate_on`, buscado en la raíz
+# de la casa base (vía --git-common-dir), para que un worktree no pueda saltárselo.
+#
+# Defensivo: cualquier fallo al resolver el repo => exit 0. LIMITACIONES HONESTAS: quien tenga
+# shell puede editar este fichero o `core.hooksPath`; esto frena lo accidental, no lo decidido.
+# Y un borrado de master CON valor esperado (`update-ref -d master <sha>`) se confunde con el
+# segundo paso de pack-refs y pasa; git ya se niega a borrar la rama que está en uso.
+
+[ "$1" = "prepared" ] || exit 0
+
+comun="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || exit 0
+[ -n "$comun" ] || exit 0
+raiz="$(cd "$comun/.." 2>/dev/null && pwd)" || exit 0
+[ -f "$raiz/.claude/hooks/.base_gate_on" ] || exit 0
+
+[ "$BTP_GIT_BASE_OK" = "1" ] && exit 0
+
+CERO=0000000000000000000000000000000000000000
+bloquear=""
+while read -r viejo nuevo ref; do
+    case "$ref" in
+        refs/heads/master|refs/heads/main)
+            # Borrado sin valor esperado (update-ref -d): git lo pasa como cero → cero.
+            if [ "$viejo" = "$CERO" ] && [ "$nuevo" = "$CERO" ]; then
+                bloquear="$ref"; continue
+            fi
+            # Reescritura sin cambio.
+            [ "$viejo" = "$nuevo" ] && continue
+            # pack-refs / gc: mueven la ref entre el fichero suelto y packed-refs en dos pasos
+            # (cero → X y X → cero) con X = el valor que YA tiene. El valor efectivo no cambia.
+            # Sin esto, el `git gc` automático quedaba bloqueado (visto en el test del 11-sep).
+            actual="$(git rev-parse --verify -q "$ref" 2>/dev/null)"
+            if [ -n "$actual" ]; then
+                if { [ "$viejo" = "$CERO" ] && [ "$nuevo" = "$actual" ]; } || \
+                   { [ "$nuevo" = "$CERO" ] && [ "$viejo" = "$actual" ]; }; then
+                    continue
+                fi
+            fi
+            bloquear="$ref"
+            ;;
+    esac
+done
+
+[ -z "$bloquear" ] && exit 0
+
+# ARRANQUE (11-sep-26). El freno solo manda cuando la PROPIA base ya lo lleva commiteado. Sin esto,
+# el fast-forward que TRAE este fichero a otra máquina (el portátil, vía deploy_ff/ff_al_abrir con
+# el script viejo, que no abre el gate) quedaba abortado a medias: ficheros nuevos escritos, master
+# sin mover, repo sucio. Reproducido en un repo desechable. Mirando la base (y no HEAD), un
+# worktree nacido antes del arreglo tampoco se lo salta.
+git cat-file -e "$bloquear:tools/githooks/reference-transaction" 2>/dev/null || exit 0
+
+echo "BLOQUEADO (freno de la base, reference-transaction 11-sep-26): '$bloquear' cambiaría sin gate." >&2
+echo "Merge, fast-forward, reset o cherry-pick sobre la base también cuentan. Trabaja en una rama," >&2
+echo "o exporta BTP_GIT_BASE_OK=1 con OK humano explícito." >&2
+exit 1

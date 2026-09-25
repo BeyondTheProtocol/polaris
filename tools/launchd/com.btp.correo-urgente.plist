@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>BTP_ORQUESTADOR</key>
+		<string>claude-suscripcion</string>
+		<key>BTP_AGENT</key>
+		<string>asistente</string>
+		<key>BTP_GATE</key>
+		<string>1</string>
+		<key>BTP_GATE_SOURCES</key>
+		<string>buzon</string>
+		<key>BTP_HEARTBEAT_NAME</key>
+		<string>correo-urgente</string>
+		<key>BTP_MAX_TURNS</key>
+		<string>40</string>
+		<key>BTP_MODEL</key>
+		<string>sonnet</string>
+		<key>BTP_QUIET_NIGHT</key>
+		<string>1</string>
+		<key>MURO_PROFILE</key>
+		<string>privileged</string>
+		<key>PATH</key>
+		<string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+	<key>Label</key>
+	<string>com.btp.correo-urgente</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+		<string>Revisa SOLO el correo nuevo de {{TITULAR}} desde la última vez (incremental, tools/correo.cargar_procesados; fuente FRESCA sin lag = tools/state/correo/buzon.json, que escribe correo_imap). Si algo es urgente (correo.es_urgente), avísale AL MOMENTO por salida.report_to_titular en cristiano: "oye, te ha escrito X sobre Y — qué quiere/para cuándo". ANTI-DUPLICADOS: el poller correo_imap ya pinga lo urgente al instante; ANTES de avisar de un correo ejecuta python3 tools/correo.py aviso «correo_del_remitente» «asunto»: si imprime YA, NO lo repitas (como mucho añade en UN mensaje un dato del cuerpo que cambie qué tiene que hacer); si imprime NUEVO, avisa tú (ya queda reclamado). Conservador: si nada urgente, no avises. NO etiquetes en masa aquí, NO envíes. Casos sensibles = aviso genérico.</string>
+	</array>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardErrorPath</key>
+	<string>/Users/polaris/claudecode/tools/launchd/logs/correo-urgente.err</string>
+	<key>StandardOutPath</key>
+	<string>/Users/polaris/claudecode/tools/launchd/logs/correo-urgente.out</string>
+	<key>StartInterval</key>
+	<integer>14400</integer>
+	<key>WorkingDirectory</key>
+	<string>/Users/polaris/claudecode</string>
+</dict>
+</plist>

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔐 Fallo de seguridad o fuga de datos
+    url: https://github.com/BeyondTheProtocol/polaris/security/advisories/new
+    about: No lo abras como issue público. Usa un aviso de seguridad privado.

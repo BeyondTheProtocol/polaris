@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "borde": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Borde (gateway enjaulado)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8799/v1",
+        "apiKey": "{env:BORDE_GATEWAY_TOKEN}"
+      },
+      "models": {
+        "local-ollama": { "name": "local-ollama (gratis, via borde)" }
+      }
+    }
+  },
+  "model": "borde/local-ollama",
+  "disabled_providers": [
+    "opencode", "anthropic", "openai", "openrouter", "google",
+    "groq", "azure", "amazon-bedrock", "github-copilot", "ollama",
+    "deepseek", "mistral", "xai", "vercel", "huggingface", "cerebras", "fireworks"
+  ]
+}

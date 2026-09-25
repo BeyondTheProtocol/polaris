@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Persigue lo que ESPERA RESPUESTA de {{TITULAR}} (tools/pendientes.py), MODO SUAVE.
+     Gate nombrado de {{TITULAR}} (11-jul-2026): arranca en modo SOLO-PARTE — solo actualiza
+     tools/state/correo/pendientes.json (el ledger que lee HOY.md vía seguimiento.py); NUNCA
+     manda nada por Telegram. Corre 'sincroniza' (nunca 'ciclo'/'nudge') + el flag
+     BTP_PENDIENTES_SOLO_PARTE=1 como cinturón-y-tirante (si algún día alguien cambia el
+     comando a 'ciclo' por error, nudge() sigue siendo un no-op — ver tools/pendientes.py).
+     Re-apuntado al CHECKOUT VIVO (12-jul-2026, landing feat/correo-loop-limpio → casa base
+     fix/halt-deadlock-barrido, commit 885d9d70): tools/pendientes.py ya vive en
+     ~/claudecode, deja de depender del worktree dedicado (que se poda tras este landing).
+     Subir a Telegram más adelante (con el OK de {{TITULAR}}): quitar BTP_PENDIENTES_SOLO_PARTE=1
+     de este plist y cambiar 'sincroniza' por 'ciclo' en ProgramArguments. Fail-closed: si
+     pendientes.py revienta, no toca nada (solo-lectura de buzon.json + su propio ledger). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.correo-pendientes</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+    <key>BTP_PENDIENTES_SOLO_PARTE</key><string>1</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/pendientes.py</string>
+    <string>sincroniza</string>
+  </array>
+  <key>StartInterval</key><integer>2700</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-pendientes.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-pendientes.err</string>
+</dict></plist>

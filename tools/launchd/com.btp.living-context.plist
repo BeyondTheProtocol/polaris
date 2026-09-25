@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Ritual de LUNES (patrón robado del "AI Chief of Staff" de Notion; la cadencia, no la plataforma).
+     Foto del "estado de tu mundo" para arrancar la semana con contexto. DETERMINISTA, $0, sin LLM,
+     solo-lectura sobre seguimiento.json; entrega por el canal gratis. NO escribe memoria ni contacta
+     a nadie (muro). RunAtLoad false. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.living-context</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/rituales.py</string>
+    <string>living-context</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>20</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/living-context.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/living-context.err</string>
+</dict></plist>

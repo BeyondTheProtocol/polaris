@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Lector de correo en TIEMPO REAL por IMAP (solo lectura, determinista, sin LLM/sin tokens).
+     PRODUCTOR de tools/state/correo/buzon.json: la señal que hace morder al semáforo de Vega
+     (vega_gate, BTP_GATE_SOURCES=buzon) → el daemon LLM correo-urgente solo se enciende con correo
+     NUEVO de verdad. Cada 120 s refresca buzon.json y, si hay urgente, avisa al momento vía
+     salida.report_to_titular (con anti-dup correo.reclamar_aviso para no doblar al daemon LLM).
+     Cuentas = LAS DOS de {{TITULAR}} (CUENTAS_DAEMON): titular@ y titular.mgp@, cada una con su
+     App Password en el Llavero. Hasta el 20-sep-26 esto corría `once` con
+     BTP_GMAIL_USER=titular@, así que buzon.json era el buzón de UNA cuenta y el correo
+     personal de {{TITULAR}} no lo veía NADIE — ni el gate, ni el centinela, ni los pendientes.
+     Por eso aquí NO hay BTP_GMAIL_USER: con la variable puesta, `todas` barría dos veces la
+     misma cuenta (once_todas llamaba a once(user=None) y _login resuelve BTP_GMAIL_USER
+     primero). Las cuentas las decide el código, no el entorno. RunAtLoad false: NO arranca
+     hasta el OK de {{TITULAR}} (gate de encendido). Si falta la clave, fail-closed (no hace nada). -->
+<!-- 20-sep-2026: este pulso vigila LAS DOS cuentas (`todas`). Antes corría `once` con
+     BTP_GMAIL_USER=titular@, y eso hacía que buzon.json -el fichero que leen
+     vega_gate, correo_triage, centinela_ned, pendientes, triage_route_correo,
+     buzon_ideas, reel_digest, reconciliar_estado y elevenlabs_voz- contuviera la cuenta
+     SECUNDARIA, no la principal. El codigo esta escrito al reves (correo_imap.py:69,
+     DEFAULT_USER = titular.mgp@gmail.com, y la docstring de once_todas lo dice). Llevaba
+     asi desde el 25-jun. NO volver a poner BTP_GMAIL_USER aqui: cambia que cuenta vive
+     en buzon.json. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.correo-imap</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+  </dict>
+  <key>ProgramArguments</key><array><string>/Users/polaris/claudecode/.venv/bin/python</string><string>/Users/polaris/claudecode/tools/correo_imap.py</string><string>todas</string></array>
+  <key>StartInterval</key><integer>120</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-imap.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/correo-imap.err</string>
+</dict></plist>

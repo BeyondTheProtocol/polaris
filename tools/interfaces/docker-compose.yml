@@ -1,0 +1,76 @@
+# tools/interfaces/docker-compose.yml — las DOS caras de Polaris (cajas intercambiables).
+# Open WebUI + LibreChat, AMBAS hablando SOLO con el borde_gateway (:8799) -> ia.ask -> borde.
+# Arranca con tools/interfaces.sh up (inyecta GATEWAY_TOKEN del Llavero/estado; nunca va en este fichero).
+#
+# MURO / endurecido:
+#  · bind SOLO a loopback (127.0.0.1): el acceso remoto es por el relay Tailscale, no exponiendo el contenedor.
+#  · cada UI apunta su "OpenAI base URL" al gateway (host.docker.internal:8799); ese es su ÚNICO camino a un LLM.
+#  · telemetría/analytics OFF por entorno; funciones agénticas/web propias de la UI apagadas (la inteligencia
+#    y las herramientas las pone Polaris, no la cara).
+#  · el muro real es estructural (gateway+borde): aunque una UI intentara más, el borde sella/deniega.
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: polaris-openwebui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OWUI_PORT:-3030}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - OPENAI_API_BASE_URL=http://host.docker.internal:8799/v1
+      - OPENAI_API_KEY=${GATEWAY_TOKEN}
+      - WEBUI_AUTH=true                 # login local (no abrir sin cuenta)
+      - ENABLE_OLLAMA_API=false         # solo el gateway, nada de otros backends
+      - ENABLE_OPENAI_API=true
+      - ANONYMIZED_TELEMETRY=false      # telemetría OFF
+      - DO_NOT_TRACK=true
+      - SCARF_NO_ANALYTICS=true
+      - ENABLE_WEB_SEARCH=false         # funciones agénticas/web propias OFF
+      - ENABLE_IMAGE_GENERATION=false
+      - ENABLE_RAG_WEB_LOADER=false
+      - WEBUI_NAME=Polaris              # marca de la cara
+      - DEFAULT_LOCALE=es               # interfaz en español
+      - ENABLE_EVALUATION_ARENA_MODELS=false   # fuera el "arena-model" (solo los cerebros del muro)
+      - ENABLE_COMMUNITY_SHARING=false  # nada de compartir fuera
+      - ENABLE_AUTOCOMPLETE_GENERATION=false   # sin llamadas extra al cerebro mientras escribes
+      - DEFAULT_MODELS=polaris-vivir    # por defecto el modo Vivir; el desplegable ES el botón de modo (Vivir/Construir, en tools/personas/modos.json)
+      - TASK_MODEL_EXTERNAL=polaris-vivir  # títulos/etiquetas por el modo Vivir (el borde enruta barato por debajo: ollama/nvidia, no Claude)
+      - TASK_MODEL=polaris-vivir
+    volumes:
+      - openwebui-data:/app/backend/data
+
+  # LibreChat = la otra cara. Lleva Mongo (más pesada). Custom endpoint en ./librechat.yaml.
+  librechat:
+    image: ghcr.io/danny-avila/librechat:latest
+    container_name: polaris-librechat
+    restart: unless-stopped
+    depends_on:
+      - librechat-mongo
+    ports:
+      - "127.0.0.1:${LC_PORT:-3031}:3080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HOST=0.0.0.0
+      - MONGO_URI=mongodb://librechat-mongo:27017/LibreChat
+      - CONFIG_PATH=/app/librechat.yaml
+      - GATEWAY_TOKEN=${GATEWAY_TOKEN}  # lo usa librechat.yaml (apiKey del custom endpoint)
+      - ALLOW_REGISTRATION=true         # 1ª vez creas tu usuario; luego ponlo a false
+      - CONSOLE_JSON=false
+    volumes:
+      - ./librechat.yaml:/app/librechat.yaml:ro
+      - librechat-data:/app/client/public/images
+
+  librechat-mongo:
+    image: mongo:7
+    container_name: polaris-librechat-mongo
+    restart: unless-stopped
+    command: ["--noauth"]              # solo accesible dentro de la red interna del compose
+    volumes:
+      - librechat-mongo:/data/db
+
+volumes:
+  openwebui-data:
+  librechat-data:
+  librechat-mongo:

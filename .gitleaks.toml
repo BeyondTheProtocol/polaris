@@ -1,0 +1,37 @@
+# .gitleaks.toml — configuración del detector de secretos del barrido de seguridad.
+#
+# POR QUÉ EXISTE (27-jul-26)
+#   El barrido (`tools/seguridad_sweep.py`) trata gitleaks como check de BRECHA: si sale
+#   rojo, dispara CÓDIGO ROJO y para el lazo entero. Es lo correcto para un secreto de
+#   verdad. Pero sin fichero de configuración, gitleaks usa solo sus reglas genéricas y
+#   no sabe distinguir un secreto real de un literal de prueba.
+#
+#   Resultado medido: el 26-jul a las 06:00 marcó como «API key» la cadena
+#   CLAVE-DE-PRUEBA-QUE-NO-DEBE-SALIR= de `tests/test_anatomia_push.py` — un literal cuyo
+#   único propósito es comprobar que los secretos NO se imprimen. O sea: el test que
+#   verifica que no se filtran secretos disparó el detector de secretos filtrados, y el
+#   sistema estuvo PARADO 37 horas por ello (26-jul 06:00 → 27-jul 19:03, seis disparos).
+#
+# CRITERIO PARA TOCAR ESTE FICHERO
+#   Aquí solo se silencia lo que se ha VERIFICADO que no es un secreto, una huella
+#   concreta cada vez. Nunca se silencia una regla entera ni un directorio: eso convierte
+#   un check de brecha en decorado. Si dudas, no lo añadas: que salte y se investigue.
+
+title = "Beyond the Protocol — reglas del barrido"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Falsos positivos verificados uno a uno"
+
+# Cada línea: huella exacta (commit:fichero:regla:línea) + por qué es seguro.
+#
+# 1) Literal de prueba del test del panel. Verificado el 27-jul leyendo el fichero: la
+#    cadena es el señuelo con el que el test comprueba que un secreto NO acaba impreso
+#    en el HTML. No abre ninguna puerta: no es una credencial de nada.
+# Se silencia por el CONTENIDO exacto del señuelo, no por fichero ni por regla: si
+# mañana aparece un secreto de verdad en ese mismo test, seguirá saltando.
+regexes = [
+  '''CLAVE-DE-PRUEBA-QUE-NO-DEBE-SALIR''',
+]

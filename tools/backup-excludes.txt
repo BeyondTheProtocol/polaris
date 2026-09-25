@@ -1,0 +1,17 @@
+# Exclusiones del backup restic — SOLO cosas regenerables (no clínico, no fuente de verdad).
+# restic casa estos patrones contra nombres de directorio/fichero en cualquier nivel.
+.venv
+.venv-biomcp
+.venv-cbioportal
+node_modules
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+.kb_index
+.kb_index.json
+*.kb_index*
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.log

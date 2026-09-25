@@ -1,0 +1,15 @@
+{
+  "name": "visor3d-web",
+  "private": true,
+  "description": "Visor hepático local de Polaris (NiiVue). El bundle se genera en la carpeta clínica de salida; nunca se versiona.",
+  "scripts": {
+    "build": "esbuild main.js --bundle --format=esm --minify --outfile=${OUT:-dist}/bundle.js"
+  },
+  "dependencies": {
+    "@niivue/niivue": "0.69.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

@@ -1,0 +1,95 @@
+[
+  {
+    "id": "router-no-sensible-gratis-primero",
+    "tipo": "router",
+    "prompt": "resume estos tres párrafos",
+    "clinico": false,
+    "registro": [
+      {"name": "nvidia-free", "kind": "carril_gratis", "destino": "nvidia", "trusted": false, "free": true, "orden": 10, "enabled": true},
+      {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": true, "orden": 20, "enabled": true, "models": ["sonnet"]}
+    ],
+    "stub": {"nvidia-free": ["ok", "DESDE-FREE"], "claude": ["ok", "DESDE-CLAUDE"]},
+    "espera": {"brain": "nvidia-free", "degradado": false, "deferred": false},
+    "origen": "seed"
+  },
+  {
+    "id": "router-relevo-gratis-a-claude",
+    "tipo": "router",
+    "prompt": "resume esto",
+    "clinico": false,
+    "registro": [
+      {"name": "nvidia-free", "kind": "carril_gratis", "destino": "nvidia", "trusted": false, "free": true, "orden": 10, "enabled": true},
+      {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": true, "orden": 20, "enabled": true, "models": ["sonnet"]}
+    ],
+    "stub": {"nvidia-free": ["fail", "limite"], "claude": ["ok", "DESDE-CLAUDE"]},
+    "espera": {"brain": "claude", "degradado": true, "deferred": false},
+    "origen": "seed"
+  },
+  {
+    "id": "router-clinico-solo-confianza",
+    "tipo": "router",
+    "prompt": "pregunta clínica genérica sobre la pauta",
+    "clinico": true,
+    "registro": [
+      {"name": "nvidia-free", "kind": "carril_gratis", "destino": "nvidia", "trusted": false, "free": true, "orden": 10, "enabled": true, "capability": 4},
+      {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": true, "orden": 20, "enabled": true, "models": ["sonnet"], "capability": 9}
+    ],
+    "stub": {"nvidia-free": ["ok", "NO-DEBE-SALIR"], "claude": ["ok", "DESDE-CLAUDE"]},
+    "espera": {"brain": "claude", "deferred": false},
+    "origen": "seed"
+  },
+  {
+    "id": "router-clinico-gana-capacidad",
+    "tipo": "router",
+    "prompt": "pregunta clínica genérica",
+    "clinico": true,
+    "registro": [
+      {"name": "local", "kind": "openai_local", "destino": "local:x", "trusted": true, "free": true, "orden": 5, "capability": 4, "enabled": true},
+      {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": true, "free": false, "orden": 20, "capability": 9, "enabled": true, "models": ["sonnet"]}
+    ],
+    "stub": {"local": ["ok", "LOCAL"], "claude": ["ok", "CLAUDE"]},
+    "espera": {"brain": "claude", "deferred": false},
+    "origen": "seed",
+    "_nota": "clínico: manda la CAPACIDAD (Claude) sobre el local de orden menor."
+  },
+  {
+    "id": "router-sensible-sin-confianza-niega",
+    "tipo": "router",
+    "prompt": "datos de {{TITULAR}}: marcador alto",
+    "clinico": true,
+    "registro": [
+      {"name": "nvidia-free", "kind": "carril_gratis", "destino": "nvidia", "trusted": false, "free": true, "orden": 10, "enabled": true}
+    ],
+    "stub": {"nvidia-free": ["ok", "NO-DEBE-SALIR"]},
+    "espera": {"texto_nulo": true, "deferred": false, "motivo_contiene": "confianza"},
+    "origen": "seed",
+    "_nota": "sensible y ningún cerebro de confianza → se NIEGA, nunca a nube."
+  },
+  {
+    "id": "router-cadena-agotada-deferred",
+    "tipo": "router",
+    "prompt": "trabajo no sensible",
+    "clinico": false,
+    "registro": [
+      {"name": "nvidia-free", "kind": "carril_gratis", "destino": "nvidia", "trusted": false, "free": true, "orden": 10, "enabled": true},
+      {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": true, "orden": 20, "enabled": true, "models": ["sonnet"]}
+    ],
+    "stub": {"nvidia-free": ["fail", "limite"], "claude": ["fail", "credito"]},
+    "espera": {"deferred": true, "texto_nulo": true},
+    "origen": "seed",
+    "_nota": "todos sin saldo/límite → aplaza (no muere)."
+  },
+  {
+    "id": "router-borde-bloquea-trusted-mal-configurado",
+    "tipo": "router",
+    "prompt": "variante R175H del tumor",
+    "clinico": true,
+    "registro": [
+      {"name": "nube-falsa", "kind": "carril_gratis", "destino": "nvidia", "trusted": true, "free": true, "orden": 5, "enabled": true}
+    ],
+    "stub": {"nube-falsa": ["ok", "NO-DEBE-SALIR"]},
+    "espera": {"texto_nulo": true},
+    "origen": "seed",
+    "_nota": "defensa en profundidad: el registro miente (trusted) pero el destino es de nube → el borde bloquea el contenido sensible."
+  }
+]

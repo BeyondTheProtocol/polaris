@@ -1,0 +1,201 @@
+{
+ "_por_que": "Benchmark del juez semántico de tools/soporte_cita.py (fase 2, 24-sep-26). Fuentes: abstracts PUBLICOS de PubMed bajados y limpiados ese día (PMID como clave). Casos: frases correctas y volteos de dirección, cohorte, endpoint y brazo sobre esas mismas cifras. Sin datos de la paciente. Umbral: recall de contradice >= 0.8 y falsos positivos sobre correctas <= 0.1.",
+ "fuentes": {
+  "35665782": "Trastuzumab Deruxtecan in Previously Treated HER2-Low Advanced Breast Cancer. Among breast cancers without human epidermal growth factor receptor 2 (HER2) amplification, overexpression, or both, a large proportion express low levels of HER2 that may be targetable. Currently available HER2-directed therapies have been ineffective in patients with these \"HER2-low\" cancers. We conducted a phase 3 trial involving patients with HER2-low metastatic breast cancer who had received one or two previous lines of chemotherapy. (Low expression of HER2 was defined as a score of 1+ on immunohistochemical [IHC] analysis or as an IHC score of 2+ and negative results on in situ hybridization.) Patients were randomly assigned in a 2:1 ratio to receive trastuzumab deruxtecan or the physician's choice of chemotherapy. The primary end point was progression-free survival in the hormone receptor-positive cohort. The key secondary end points were progression-free survival among all patients and overall survival in the hormone receptor-positive cohort and among all patients. Of 557 patients who underwent randomization, 494 (88.7%) had hormone receptor-positive disease and 63 (11.3%) had hormone receptor-negative disease. In the hormone receptor-positive cohort, the median progression-free survival was 10.1 months in the trastuzumab deruxtecan group and 5.4 months in the physician's choice group (hazard ratio for disease progression or death, 0.51; P<0.001), and overall survival was 23.9 months and 17.5 months, respectively (hazard ratio for death, 0.64; P = 0.003). Among all patients, the median progression-free survival was 9.9 months in the trastuzumab deruxtecan group and 5.1 months in the physician's choice group (hazard ratio for disease progression or death, 0.50; P<0.001), and overall survival was 23.4 months and 16.8 months, respectively (hazard ratio for death, 0.64; P = 0.001). Adverse events of grade 3 or higher occurred in 52.6% of the patients who received trastuzumab deruxtecan and 67.4% of those who received the physician's choice of chemotherapy. Adjudicated, drug-related interstitial lung disease or pneumonitis occurred in 12.1% of the patients who received trastuzumab deruxtecan; 0.8% had grade 5 events. In this trial involving patients with HER2-low metastatic breast cancer, trastuzumab deruxtecan resulted in significantly longer progression-free and overall survival than the physician's choice of chemotherapy. (Funded by Daiichi Sankyo and AstraZeneca; DESTINY-Breast04 ClinicalTrials.gov number, NCT03734029.).",
+  "37633306": "Overall survival with sacituzumab govitecan in hormone receptor-positive and human epidermal growth factor receptor 2-negative metastatic breast cancer (TROPiCS-02): a randomised, open-label, multicentre, phase 3 trial. Sacituzumab govitecan demonstrated significant progression-free survival benefit over chemotherapy in the phase 3 TROPiCS-02 trial in patients with pretreated, endocrine-resistant hormone receptor-positive, human epidermal growth factor receptor 2-negative (HR+ and HER2-) metastatic breast cancer with limited treatment options. Here, we report the protocol-specified final analysis of overall survival and endpoints by trophoblast cell-surface antigen 2 (Trop-2) expression and other variables. In this randomised, open-label, multicentre, phase 3 trial, which took place in 91 centres across North America (the USA and Canada) and Europe (Belgium, France, Germany, Italy, the Netherlands, Spain, and the UK), patients were randomly assigned (1:1) to receive sacituzumab govitecan or chemotherapy (eribulin, vinorelbine, capecitabine, or gemcitabine). Patients had confirmed HR+ and HER2- locally recurrent inoperable or metastatic breast cancer and had received at least one previous endocrine therapy, a taxane, and a CDK4/6 inhibitor in any setting and two to four previous chemotherapy regimens for metastatic disease. The primary endpoint was progression-free survival (previously reported and not included in this analysis), and secondary endpoints included overall survival, objective response rate (ORR), and patient-reported outcomes. Overall survival was assessed using stratified log-rank tests and Cox regression. Trop-2 expression was assessed in tumour tissue by immunohistochemistry. In the statistical testing hierarchy, ORR and patient-reported outcomes were tested sequentially if overall survival was significant. This study is registered with ClinicalTrials.gov, NCT03901339. At the data cutoff date of July 1, 2022, 543 of 776 screened patients were randomly assigned between May 30, 2019, and April 5, 2021, with 272 patients in the sacituzumab govitecan group and 271 patients in the chemotherapy group. With a 12.5-month (IQR 6.4-18.8) median follow-up, 390 deaths occurred among 543 patients. Overall survival was significantly improved with sacituzumab govitecan versus chemotherapy (median 14.4 months [95% CI 13.0-15.7] vs 11.2 months [10.1-12.7]; hazard ratio [HR] 0.79, 95% CI 0.65-0.96; p=0.020); survival benefit was consistent across Trop-2 expression-level subgroups. ORR was significantly improved with sacituzumab govitecan compared with chemotherapy (57 [21%] patients vs 38 [14%]; odds ratio 1.63 [95% CI 1.03-2.56]; p=0.035), as was time to deterioration of global health status and quality of life (median 4.3 months vs 3.0 months; HR 0.75 [0.61-0.92]; p=0.0059) and fatigue (median 2.2 months vs 1.4 months; HR 0.73 [0.60-0.89]; p=0.0021). The safety profile of sacituzumab govitecan was consistent with previous studies (including the TROPiCS-02 primary analysis and the ASCENT trial). One fatal adverse event (septic shock caused by neutropenic colitis) was determined to be related to sacituzumab govitecan treatment. Sacituzumab govitecan demonstrated statistically significant and clinically meaningful benefit over chemotherapy, with a 3.2-month median overall survival improvement and a manageable safety profile. These data support sacituzumab govitecan as a new treatment option for patients with pretreated, endocrine-resistant HR+ and HER2- metastatic breast cancer. Gilead Sciences.",
+  "39265124": "Datopotamab Deruxtecan Versus Chemotherapy in Previously Treated Inoperable/Metastatic Hormone Receptor-Positive Human Epidermal Growth Factor Receptor 2-Negative Breast Cancer: Primary Results From TROPION-Breast01. The global, phase 3, open-label, randomized TROPION-Breast01 study assessed the trophoblast cell surface antigen 2-directed antibody-drug conjugate datopotamab deruxtecan (Dato-DXd) versus investigator's choice of chemotherapy (ICC) in hormone receptor-positive/human epidermal growth factor receptor 2-negative (HR+/HER2-) breast cancer. Adult patients with inoperable/metastatic HR+/HER2‒ breast cancer, who had disease progression on endocrine therapy, for whom endocrine therapy was unsuitable, and had received one to two previous lines of chemotherapy in the inoperable/metastatic setting, were randomly assigned 1:1 to Dato-DXd (6 mg/kg once every 3 weeks) or ICC (eribulin/vinorelbine/capecitabine/gemcitabine). Dual primary end points were progression-free survival (PFS) by blinded independent central review (BICR) and overall survival (OS). Patients were randomly assigned to Dato-DXd (n = 365) or ICC (n = 367). Dato-DXd significantly reduced the risk of progression or death versus ICC (PFS by BICR hazard ratio [HR], 0.63 [95% CI, 0.52 to 0.76];  P  < .0001). Consistent PFS benefit was observed across subgroups. Although OS data were not mature, a trend favoring Dato-DXd was observed (HR, 0.84 [95% CI, 0.62 to 1.14]). The rate of grade ≥3 treatment-related adverse events (TRAEs) with Dato-DXd was lower than ICC (20.8%  v  44.7%). The most common TRAEs (any grade; grade ≥3) were nausea (51.1%; 1.4%) and stomatitis (50%; 6.4%) with Dato-DXd and neutropenia (grouped term, 42.5%; 30.8%) with ICC. Patients receiving Dato-DXd had statistically significant and clinically meaningful improvement in PFS and a favorable and manageable safety profile, compared with ICC. Results support Dato-DXd as a novel treatment option for patients with inoperable/metastatic HR+/HER2‒ breast cancer who have received one to two previous lines of chemotherapy in this setting.",
+  "41062831": "Trastuzumab deruxtecan in HER2-low metastatic breast cancer: long-term survival analysis of the randomized, phase 3 DESTINY-Breast04 trial. In DESTINY-Breast04 ( NCT03734029 ), trastuzumab deruxtecan (T-DXd) significantly improved overall survival (OS) and progression-free survival compared with treatment of physician's choice of chemotherapy (TPC) for patients with human epidermal growth factor receptor 2-low (HER2-low) (immunohistochemistry (IHC) 1+ or IHC 2+/in situ hybridization-negative) metastatic breast cancer. After an extended median follow-up of 32.0 months, median OS in the overall cohort was 22.9 months for T-DXd and 16.8 months for TPC (hazard ratio 0.69; 95% confidence interval 0.55-0.86). For the hormone receptor-positive cohort, median OS was 23.9 and 17.6 months for T-DXd and TPC, respectively (hazard ratio 0.69; 95% confidence interval 0.55-0.87). Median OS also favored T-DXd in exploratory analyses of hormone receptor-negative, estrogen receptor IHC 1%-10% and estrogen receptor IHC >10% cohorts. The overall safety profile of T-DXd was acceptable and generally manageable. Results confirm T-DXd as standard of care after prior chemotherapy in patients with HER2-low metastatic breast cancer. ClinicalTrials.gov identifier: NCT03734029 .",
+  "39087959": "Elacestrant in ER+, HER2- Metastatic Breast Cancer with ESR1-Mutated Tumors: Subgroup Analyses from the Phase III EMERALD Trial by Prior Duration of Endocrine Therapy plus CDK4/6 Inhibitor and in Clinical Subgroups. Elacestrant significantly prolonged progression-free survival (PFS) with manageable safety versus standard-of-care (SOC) endocrine therapy (ET) in patients with estrogen receptor-positive (ER+), HER2- metastatic breast cancer and tumors harboring estrogen receptor 1 (ESR1) mutation following ET plus a cyclin-dependent kinase 4/6 inhibitor (ET+CDK4/6i). In patients with ESR1-mutated tumors, we evaluated the efficacy and safety of elacestrant versus SOC based on prior ET+CDK4/6i duration and in clinical subgroups with prior ET+CDK4/6i ≥12 months. EMERALD, an open-label phase III trial, randomly assigned patients with ER+, HER2- metastatic breast cancer who had received 1-2 prior lines of ET, mandatory CDK4/6i, and ≤1 chemotherapy to elacestrant (345 mg daily) or SOC (aromatase inhibitor or fulvestrant). PFS was assessed across subgroups in post hoc exploratory analyses without adjustment for multiple testing. In patients with ESR1-mutated tumors and prior ET+CDK4/6i ≥12 months, the median PFS for elacestrant versus SOC was 8.6 versus 1.9 months (HR, 0.41; 95% confidence interval, 0.26-0.63). In this population, the median PFS (in months) for elacestrant versus SOC was 9.1 versus 1.9 (bone metastases), 7.3 versus 1.9 (liver and/or lung metastases), 9.0 versus 1.9 (<3 metastatic sites), 10.8 versus 1.8 (≥3 metastatic sites), 5.5 versus 1.9 (PIK3 catalytic subunit α mutation), 8.6 versus 1.9 (tumor protein p53 gene mutation), 9.0 versus 1.9 (HER2-low), 9.0 versus 1.9 ({{GEN}}{{VARIANTE}}-mutated tumors), and 9.0 versus 1.9 (ESR1Y537S/N-mutated tumors). Subgroup safety was consistent with the overall population. The duration of prior ET+CDK4/6i ≥12 months in metastatic breast cancer was associated with a clinically meaningful improvement in PFS for elacestrant compared with SOC and was consistent across all subgroups evaluated in patients with ER+, HER2-, ESR1-mutated tumors."
+ },
+ "casos": [
+  {
+   "id": "db04-1",
+   "fuente": "35665782",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de SLP fue de 10,1 meses con T-DXd frente a 5,4 con quimioterapia.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "db04-2",
+   "fuente": "35665782",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de SLP fue de 9,9 meses con T-DXd frente a 5,1 con quimioterapia.",
+   "esperado": "contradice",
+   "eje": "poblacion"
+  },
+  {
+   "id": "db04-3",
+   "fuente": "35665782",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de supervivencia global con T-DXd fue de 10,1 meses frente a 5,4.",
+   "esperado": "contradice",
+   "eje": "endpoint"
+  },
+  {
+   "id": "db04-4",
+   "fuente": "35665782",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de SLP fue de 10,1 meses con quimioterapia frente a 5,4 con T-DXd.",
+   "esperado": "contradice",
+   "eje": "brazo"
+  },
+  {
+   "id": "db04-5",
+   "fuente": "35665782",
+   "afirmacion": "La enfermedad pulmonar intersticial relacionada con el fármaco apareció en el 12,1 % de las pacientes con T-DXd.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "db04-6",
+   "fuente": "35665782",
+   "afirmacion": "Los efectos adversos de grado 3 o más fueron más frecuentes con T-DXd (67,4 %) que con quimioterapia (52,6 %).",
+   "esperado": "contradice",
+   "eje": "brazo"
+  },
+  {
+   "id": "db04-7",
+   "fuente": "35665782",
+   "afirmacion": "En el total de pacientes, la supervivencia global fue de 23,4 meses con T-DXd frente a 16,8 (HR 0,64).",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "db04-8",
+   "fuente": "35665782",
+   "afirmacion": "En la cohorte HR+, T-DXd duplicó tanto la SLP (10,1 frente a 5,4 meses) como la supervivencia global (23,9 frente a 17,5 meses).",
+   "esperado": "parcial",
+   "eje": "direccion"
+  },
+  {
+   "id": "tr02-1",
+   "fuente": "37633306",
+   "afirmacion": "Sacituzumab mejoró la supervivencia global: mediana de 14,4 meses frente a 11,2 con quimioterapia (HR 0,79).",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "tr02-2",
+   "fuente": "37633306",
+   "afirmacion": "Sacituzumab no mejoró la supervivencia global frente a quimioterapia (14,4 frente a 11,2 meses).",
+   "esperado": "contradice",
+   "eje": "direccion"
+  },
+  {
+   "id": "tr02-3",
+   "fuente": "37633306",
+   "afirmacion": "La tasa de respuesta objetiva fue del 21 % con sacituzumab frente al 14 % con quimioterapia.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "tr02-4",
+   "fuente": "37633306",
+   "afirmacion": "La tasa de respuesta objetiva fue del 14 % con sacituzumab frente al 21 % con quimioterapia.",
+   "esperado": "contradice",
+   "eje": "brazo"
+  },
+  {
+   "id": "tr02-5",
+   "fuente": "37633306",
+   "afirmacion": "La mediana de supervivencia libre de progresión con sacituzumab fue de 14,4 meses frente a 11,2.",
+   "esperado": "contradice",
+   "eje": "endpoint"
+  },
+  {
+   "id": "tb01-1",
+   "fuente": "39265124",
+   "afirmacion": "Dato-DXd redujo el riesgo de progresión o muerte frente a la quimioterapia (HR 0,63).",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "tb01-2",
+   "fuente": "39265124",
+   "afirmacion": "Dato-DXd mejoró de forma significativa la supervivencia global frente a la quimioterapia (HR 0,84).",
+   "esperado": "contradice",
+   "eje": "direccion"
+  },
+  {
+   "id": "tb01-3",
+   "fuente": "39265124",
+   "afirmacion": "Con Dato-DXd la estomatitis apareció en el 50 % de las pacientes y fue de grado 3 o más en el 6,4 %.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "tb01-4",
+   "fuente": "39265124",
+   "afirmacion": "Los efectos adversos de grado 3 o más relacionados con el tratamiento fueron más frecuentes con Dato-DXd (44,7 %) que con quimioterapia (20,8 %).",
+   "esperado": "contradice",
+   "eje": "brazo"
+  },
+  {
+   "id": "tb01-5",
+   "fuente": "39265124",
+   "afirmacion": "Dato-DXd mejoró la SLP (HR 0,63) y la supervivencia global de forma significativa (HR 0,84).",
+   "esperado": "parcial",
+   "eje": "direccion"
+  },
+  {
+   "id": "db04l-1",
+   "fuente": "41062831",
+   "afirmacion": "Con un seguimiento mediano de 32 meses, la mediana de supervivencia global en la cohorte total fue de 22,9 meses con T-DXd frente a 16,8 (HR 0,69).",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "db04l-2",
+   "fuente": "41062831",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de supervivencia global fue de 22,9 meses con T-DXd frente a 16,8.",
+   "esperado": "contradice",
+   "eje": "poblacion"
+  },
+  {
+   "id": "db04l-3",
+   "fuente": "41062831",
+   "afirmacion": "En la cohorte con receptores hormonales positivos, la mediana de supervivencia global fue de 23,9 meses con T-DXd frente a 17,6.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "em-1",
+   "fuente": "39087959",
+   "afirmacion": "En tumores con ESR1 mutado y 12 meses o más de CDK4/6 previo, la mediana de SLP fue de 8,6 meses con elacestrant frente a 1,9 con el tratamiento estándar (HR 0,41).",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "em-2",
+   "fuente": "39087959",
+   "afirmacion": "En tumores con ESR1 mutado y 12 meses o más de CDK4/6 previo, la mediana de SLP fue de 1,9 meses con elacestrant frente a 8,6 con el tratamiento estándar.",
+   "esperado": "contradice",
+   "eje": "brazo"
+  },
+  {
+   "id": "em-3",
+   "fuente": "39087959",
+   "afirmacion": "Con metástasis hepáticas o pulmonares, la mediana de SLP con elacestrant fue de 7,3 meses frente a 1,9.",
+   "esperado": "respalda",
+   "eje": "-"
+  },
+  {
+   "id": "em-4",
+   "fuente": "39087959",
+   "afirmacion": "Con mutación de PIK3CA, la mediana de SLP con elacestrant fue de 9,1 meses frente a 1,9.",
+   "esperado": "contradice",
+   "eje": "poblacion"
+  },
+  {
+   "id": "em-5",
+   "fuente": "39087959",
+   "afirmacion": "Elacestrant prolongó la supervivencia global en tumores con ESR1 mutado: 8,6 frente a 1,9 meses.",
+   "esperado": "contradice",
+   "eje": "endpoint"
+  },
+  {
+   "id": "em-6",
+   "fuente": "39087959",
+   "afirmacion": "Con mutación de PIK3CA, la mediana de SLP fue de 5,5 meses con elacestrant frente a 1,9 con el estándar.",
+   "esperado": "respalda",
+   "eje": "-"
+  }
+ ]
+}

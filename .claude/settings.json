@@ -1,0 +1,229 @@
+{
+  "worktree": {
+    "baseRef": "head"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.sh",
+            "timeout": 8
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "_comment": "Traspaso antes de compactar (24-sep-26). Lo que inyecta SessionStart y lo decidido en el chat se perdia con /compact. Sin matcher: manual y auto. Escribe en tools/state/traspasos/<session_id>.md (via tools/continuity.py, procedencia confiable, fuera del INDEX a proposito) rama, lo sin commitear, ficheros tocados, 'Paso N de M', planes aprobados, respuestas a AskUserQuestion y un prompt de continuacion; session_start.sh lo reinyecta cuando source=compact. Sin LLM. NUNCA bloquea la compactacion (fail-open, exit 0 siempre). Bypass BTP_TRASPASO_OFF=1.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precompact_traspaso.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_nudge.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/memoria_recall.sh",
+            "timeout": 12
+          },
+          {
+            "_comment": "Enrutado de COMITE (5-sep-26). plan_nudge mira el ALCANCE del prompt; este mira QUIEN debe analizarlo, y lo RECLASIFICA en cada vuelta: una sesion que entra por 'interpreta esta imagen' y acaba analizando el panel molecular del nodo NED hereda el nivel del contexto, no se queda con la clasificacion del primer mensaje. Avisa, no bloquea ni invoca (el coste es decision consciente). Un aviso por comite y sesion. Fail-open; bypass BTP_ENRUTADO_OFF=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enrutado_guard.py",
+            "timeout": 10
+          },
+          {
+            "_comment": "Presencia por Claude Code (11-sep-26). El dead-man de healthcheck solo oia a Telegram y daba a {{TITULAR}} por ausente mientras trabajaba aqui (deuda dead_man_ausencia, 1241 veces). Este hook solo APUNTA el prompt_id en una cola (sin el texto); healthcheck lo coteja contra el transcript (origin human, sin envoltorio de automatismo) y solo entonces llama a mark_seen. Fail-open para el prompt, fail-closed para la presencia.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/presencia_cc.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/ok_envio_prompt.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_comment": "Gate de SALIDA (25-jul-26). Revisa mi respuesta final ANTES de que {{TITULAR}} la lea, contra las normas de tools/normas.json marcadas clase=salida. Existe porque las memorias son CONTEXTO, no enforcement (lo dice la doc oficial), y el recall llega cuando ella escribe mientras el incumplimiento pasa cuando yo respondo. Determinista, sin LLM, FAIL-OPEN (cualquier error deja pasar), nunca frena una urgencia (🔴/CÓDIGO ROJO), sin bucles (respeta stop_hook_active), bypass con BTP_GATE_OFF=1. Modo en normas.json: arranca en 'aviso' y pasa a 'bloqueo' cuando estén medidos los falsos positivos.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/gate_salida.py",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "_comment": "La caja, paso 3 (13-sep-26). Si en este turno trabajaron 2 o más COMITÉS, junta lo que dijeron en UN dossier (tools/caja.py) y avisa de dónde está, en vez de entregar N volcados. Lo deja junto a los transcripts de esos subagentes (no crea sitio nuevo para datos del caso) y apunta en tools/state/caja/dossiers.jsonl quién participó, sin contenido. Modo AVISO: nunca bloquea. FAIL-OPEN, no repite, respeta stop_hook_active, bypass BTP_CAJA_OFF=1. Va aparte de traza_subagente.py porque este SÍ lee respuestas.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/cosecha_panel.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_comment": "Sandbox de LECTURA clinica (14-jul-26). En interactivo NO habia ningun hook: cualquier agente (prensa, diseno...) podia abrir el disco clinico y no quedaba registro de un solo acceso. Este guard es ESTRECHO: solo vigila la lectura de rutas clinicas y obliga a pasar por tools/lector_clinico.py (la ventanilla auditada). NO se engancha aqui el muro_guard entero porque es una allowlist fail-closed pensada para el lazo 24/7 y romperia la sesion.",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/clinico_guard.py",
+            "timeout": 8
+          },
+          {
+            "_comment": "Recordatorio de la regla EN EL MOMENTO de actuar (25-jul-26). No bloquea: eso es cosa del muro (muro_guard) y del guard clinico. Existe porque lo que inyectan los hooks al empezar la sesion no sobrevive a /compact, y la accion arriesgada llega 40 turnos despues. Fail-open.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/regla_en_accion.py",
+            "timeout": 8
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/salida_guard.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "_comment": "Un correo, UN borrador (18-sep-26, norma feedback-borrador-mejorado-borra-el-anterior, clase BLOQUEO y repetida). Medido sobre los transcripts reales: 47 llamadas a create_draft y 8 pares (destinatario, asunto) con mas de un borrador, uno de ellos SEIS veces — 14 borradores redundantes de 47. Lleva una libreta local de que hilos ya tienen borrador nuestro (tools/state/borradores_correo.json) y deniega un create_draft repetido; update_draft NO se toca, que es justo lo que la norma pide hacer en su lugar. La clave es el threadId si viene y si no (destinatario, asunto SIN Re:/RE:/Fwd:/[Extern]) — sin normalizar los prefijos se colaban justo los casos reales. Caduca a 30 dias por si ella borro el borrador a mano en Gmail. FAIL-OPEN. Escotilla: BTP_BORRADOR_OK=1.",
+        "matcher": "mcp__.*__(create|update)_draft",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/borrador_unico_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "_comment": "El worktree no pisa casa base (18-sep-26, norma feedback-worktree-editar-rutas-del-worktree, clase BLOQUEO y repetida). Medido sobre los transcripts reales de las 56 sesiones con worktree: de 1122 escrituras, 245 salieron del worktree hacia casa base y 117 cayeron dentro del worktree de OTRA sesion viva — asi es como un commit se cae de master. Deniega Write/Edit/MultiEdit/NotebookEdit hacia arbol VERSIONADO de casa base (criterio: el directorio existe tambien dentro de mi worktree) y hacia cualquier otro worktree; deja pasar el contenido y el estado vivo, que solo existen en casa base (51 de esas 245). FAIL-OPEN al reves que el muro: esto atrapa un despiste mio en interactivo, y fallar cerrado la dejaria sin poder editar. Escotilla: BTP_CASA_BASE_OK=1. NO cubre Bash (cd + git commit) — eso es feedback-sesion-paralela-seguridad-primero.",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "_comment": "Contrato de asiento de la caja (13-sep-26). Añade al prompt de cada asiento de ANÁLISIS (lista en tools/caja.py) el contrato JSON que cosecha_panel.py necesita para juntar un dossier; sin él, los subagentes del chat no lo recibían (medido: 0 decisiones en el último panel real). Devuelve updatedInput con la entrada ENTERA y solo el prompt cambiado; NO pone permissionDecision (no toca permisos). Matcher propio, no el * del muro; ningún otro hook reescribe la entrada. FAIL-OPEN, no repite, bypass BTP_CONTRATO_OFF=1.",
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/contrato_asiento.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/casa_base_guard.py",
+            "timeout": 5
+          },
+          {
+            "_comment": "Los 3 singletons van por su puerta con candado (18-sep-26, norma feedback-sesion-paralela-seguridad-primero, clase BLOQUEO y repetida). Las puertas existen desde el 10-jul-26 — tools/git_mutex.py (candado 'git-mutex') y tools/activar_daemon.py (candado 'launchd') — y el charter .claude/agents/git.md YA prohibe por escrito el git crudo. Medido con clasificador tokenizado sobre los transcripts reales: 107 de 112 fusiones a base y 46 de 46 launchctl mutantes fueron por Bash a pelo. El texto no era enforcement; esto lo es. ENRUTA, no cierra candados (un hook no puede sostener un lock entre tool-calls, ver tools/_lock.py): deniega la forma cruda y nombra la puerta. Ambito: solo casa base y sus worktrees, rastreando el cd. NO entra `commit` ni `push`, y falta el tercer singleton (control de pantalla) porque no tiene puerta que nombrar. FAIL-OPEN. Escotilla: BTP_SINGLETON_OK=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/singleton_guard.py",
+            "timeout": 5
+          },
+          {
+            "_comment": "La rama no cambia bajo tus pies (18-sep-26, norma feedback-web-repo-checkout-compartido, clase BLOQUEO y repetida). Es un TOCTOU: entre que miras la rama y commiteas, otra sesion hace checkout. Apunta por SESION la ultima rama que esa sesion vio en cada repo (tools/state/rama_vista/<session_id>.json) y deniega `git commit`/`git push` si la rama actual no es esa. Un checkout PROPIO actualiza el apunte; si el destino no se puede leer sin ambiguedad, se borra el apunte en vez de inventarlo. Vigila CUALQUIER repo, no solo el web: medido sobre 366 eventos git con sello de tiempo de 41 sesiones, los 28 candidatos de deriva estan en casa base y NINGUNO en el repo web — la norma nombra el web porque es donde le mordio, pero el dano ocurre en casa base. Sin apunte previo se permite: detecta que la rama CAMBIO, no exige haber mirado. FAIL-OPEN. Escotilla: BTP_RAMA_OK=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/rama_vista_guard.py",
+            "timeout": 8
+          },
+          {
+            "_comment": "El copy publicado de la web no se toca solo (18-sep-26, norma feedback-no-tocar-copy-web-sin-ok, clase BLOQUEO). El gate va en `git commit` y NO en Write/Edit porque el copy se edita por Bash: medido sobre todos los transcripts hay 0 llamadas a Write/Edit contra i18n/locales o content/, y 23 comandos Bash que las tocan con python3 <<EOF y sed — sobre el diff de git da igual como se escribio. TRES NIVELES, medidos replicando los 86 commits directos del repo web: FRENA (27) si cambia una clave de HERO/H1 o si BORRA una clave publicada; AVISA sin bloquear (32) si cambia otro copy existente; PASA en silencio (27) si solo anade claves, paginas o lineas, que es zona autonoma por la propia norma. Denegarlo todo habria saltado en 59 de 86 y un gate que se esquiva siempre ensena a esquivarlo; `ask` tampoco vale, este repo lo probo el 25-jul-26 y se resolvio solo sin que nadie lo viera (ver regla_en_accion.py). Precedente: el hero se cambio y hubo que revertirlo DOS veces (26514d8->02ccb94, 4187131->4084efa). Ambito: cualquier clon del repo web (nuxt.config.ts + i18n/locales), incluidos los .mgc-staging. FAIL-OPEN. Escotilla: BTP_COPY_OK=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/copy_web_guard.py",
+            "timeout": 10
+          },
+          {
+            "_comment": "Canjear un refresh token es de UN SOLO USO (18-sep-26, norma feedback-refresh-token-es-de-un-solo-uso, clase BLOQUEO). Un grant_type=refresh_token devuelve un par nuevo E INVALIDA el viejo: hacerlo 'para ver si sigue vivo' sin guardar lo que vuelve QUEMA el token guardado y obliga a un login humano con navegador — asi estuvo Consensus 28 dias mudo con el panel en verde (lo cuenta tools/_oauth_refresh.py). La puerta que canjea Y GUARDA el par nuevo a 0600 ya existe: _oauth_refresh.renovar(). El marcador es el parametro del propio estandar OAuth 2.0, no una heuristica, y aparece 0 veces en los ~2.900 comandos reales de los transcripts: no puede romper nada que se estuviera haciendo. FAIL-OPEN. Escotilla: BTP_TOKEN_OK=1.",
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/token_rotacion_guard.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "_comment": "Borrar libera (24-sep-26). La otra mitad de borrador_unico_guard: tras create_draft apunta el id que devuelve Gmail, y tras delete_draft suelta la entrada de ese id. Sin esto, borrar el borrador viejo (lo que el propio aviso pide) no contacto: la libreta seguia bloqueando el nuevo. FAIL-OPEN, nunca bloquea.",
+        "matcher": "mcp__.*__(create|delete)_draft",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/borrador_unico_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "_comment": "Cuaderno de bitacora de sub-agentes (25-jul-26). run_agent.sh ya trazaba los comites que corren como daemon, pero los 29 que se invocan DENTRO de una sesion no dejaban ni una linea: el sistema no sabia a quien habia usado. Este hook apunta solo el NOMBRE del comite, la hora y si fue bien; nunca el prompt ni la respuesta. Fail-open: no puede bloquear nada.",
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/traza_subagente.py",
+            "timeout": 8
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/entrada_guard.py"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "_comment": "Respaldo del muro (25-sep-26). Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026. Un hook que agota su timeout NO bloquea (code.claude.com/docs/en/hooks.md, «Timeouts»); estas reglas SÍ, en todo modo (bypassPermissions incluido) y aunque un hook devuelva allow (docs/en/permissions.md). Un deny de Read bloquea también Edit y Write en esa ruta. (1) Código del muro EN CASA BASE: se cambia por fusión, nunca con Edit; las rutas de un worktree (.claude/worktrees/…) no casan. (2) Zonas clínicas que clinico_guard ya deniega; las de los settings de usuario de este Mac (desde el 14-ago) más las que faltaban, ahora versionadas y con test. Sin nombres propios: los del overlay local no pueden ir a git. Lo vigila tests/test_guard_timeout.py.",
+    "allow": [
+      "Bash(python3 tools/web_novedad.py:*)",
+      "Bash(python3 tools/web_revertir.py:*)",
+      "Bash(python3 tools/web_lint.py:*)"
+    ],
+    "deny": [
+      "Edit(~/claudecode/.claude/hooks/**)",
+      "Edit(~/claudecode/.claude/settings*.json)",
+      "Read(//**/_PRIVADO_CLINICO/**)",
+      "Read(//**/_PRIVADO_EXPEDIENTE/**)",
+      "Read(//**/_PRIVADO_NUCLEO/**)",
+      "Read(//**/_PRIVADO_CORREO/**)",
+      "Read(~/Clinico-PRIVADO/**)",
+      "Read(~/DICOM_Seattle/**)",
+      "Read(//**/00_Salud/**)",
+      "Read(//**/00 - Salud/**)",
+      "Read(//**/Historial clinico*/**)"
+    ]
+  }
+}

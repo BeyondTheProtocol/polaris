@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.radar-lit</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>MURO_PROFILE</key><string>privileged</string>
+    <key>BTP_AGENT</key><string>comite-medico</string>
+    <key>BTP_MODEL</key><string>fable</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/tools/run_agent.sh</string>
+    <string>Ejecuta el radar mensual de literatura hacia las dianas del tumor.</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Day</key><integer>1</integer><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/radar-lit.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/radar-lit.err</string>
+</dict></plist>

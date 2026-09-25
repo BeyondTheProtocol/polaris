@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Higiene mensual de logs (rotar_logs.py, determinista, \$0, sin LLM).
+     OJO - EXCEPCION al "NUNCA a launchd" del docstring (OK de {{TITULAR}}, 15-jul): este daemon esta
+     configurado para NO tocar las TRAZAS DE AUDITORIA. BTP_ROT_DIAS_BORDE/OUTBOX=99999 => el
+     ledger del borde y el audit del outbox NUNCA son "viejos" => solo trunca logs .out/.err
+     gordos y archiva observabilidad vieja (>14d, a archive/, nunca borra). Nunca en modo borrado permanente.
+     RunAtLoad false: NO arranca hasta el OK de {{TITULAR}} (gate de encendido). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.rotar-logs</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+    <key>BTP_ROT_DIAS_BORDE</key><string>99999</string>
+    <key>BTP_ROT_DIAS_OUTBOX</key><string>99999</string>
+  </dict>
+  <key>ProgramArguments</key><array><string>/Users/polaris/claudecode/.venv/bin/python</string><string>/Users/polaris/claudecode/tools/rotar_logs.py</string><string>--run</string></array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Day</key><integer>1</integer>
+    <key>Hour</key><integer>4</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/rotar-logs.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/rotar-logs.err</string>
+</dict></plist>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- La Anatomía: el mapa vivo del sistema en 127.0.0.1:8791. stdlib, solo lectura,
+     sin LLM (~0 tokens). Concern distinto al de El Observatorio (8787): aquel es la
+     sala de control (todo a la vez, para vigilar), este es el mapa (una capa cada vez,
+     para entender y para enseñar). NO expone a internet: solo loopback.
+     PREPARADO, NO ENCENDIDO. Encenderlo es acto de {{TITULAR}}, y solo por la vía sancionada:
+       python3 tools/activar_daemon.py com.btp.anatomia
+     (valida label único, no-worktree y concern único, y reescribe el home de esta máquina). -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.anatomia</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/anatomia.py</string>
+    <string>serve</string>
+    <string>--puerto</string>
+    <string>8791</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/anatomia.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/anatomia.err</string>
+</dict></plist>

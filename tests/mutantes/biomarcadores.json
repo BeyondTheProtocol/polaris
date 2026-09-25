@@ -1,0 +1,32 @@
+{
+  "_por_que": "24-sep-26. test_biomarcadores_vhio.py es la única defensa de que las 3 analíticas {{CENTRO}} transcritas (CA15.3 509,5, Hb 7,8) siguen entrando y marcándose fuera de rango. Si al quitar una de estas piezas el test sigue verde, esa pieza no está cubierta.",
+  "objetivo": "tools/biomarcadores.py",
+  "test": [
+    "sh",
+    "-c",
+    "python3 tests/test_biomarcadores_vhio.py && python3 tests/test_biomarcadores_ggt_alias.py"
+  ],
+  "env": "BTP_BIOMARCADORES",
+  "mutaciones": [
+    {
+      "etiqueta": "fuera de rango: nunca se calcula por valor/rango (solo el asterisco del OCR)",
+      "viejo": "    if not fuera and valor is not None and ref_low is not None and ref_high is not None:\n        fuera = valor < ref_low or valor > ref_high",
+      "nuevo": "    if False:\n        fuera = valor < ref_low or valor > ref_high"
+    },
+    {
+      "etiqueta": "unidad: la familia x10e3 deja de reconocerse (el 10^9/L transcrito no casaría)",
+      "viejo": "    if \"10^3\" in s or \"10e3\" in s or \"10³\" in s or \"x103\" in s:\n        return \"x10e3\"",
+      "nuevo": "    if False:\n        return \"x10e3\""
+    },
+    {
+      "etiqueta": "número: la coma decimal deja de convertirse (509,5 y 7,8 no parsean)",
+      "viejo": "        return float(s.replace(\",\", \".\"))",
+      "nuevo": "        return float(s)"
+    },
+    {
+      "etiqueta": "alias GGT: 'gamma gt' se cae de la lista (vuelve a perder el corpus histórico)",
+      "viejo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\", \"gamma gt\"",
+      "nuevo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\""
+    }
+  ]
+}

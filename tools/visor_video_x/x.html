@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Hígado y mama · X</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#0b0710;overflow:hidden}
+  #marco{position:relative;width:1080px;height:1080px;background:#1c1126;overflow:hidden}
+  canvas{display:block;width:1080px;height:1080px}
+  .cap{position:absolute;font:600 26px/1 'JetBrains Mono',ui-monospace,monospace;color:#f5efe6;
+       letter-spacing:.02em;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+  .anillo{position:absolute;border:3px solid #f5efe6;border-radius:50%;transform:translate(-50%,-50%);
+          box-shadow:0 0 14px rgba(0,0,0,.45)}
+  .rot{position:absolute;transform:translate(-50%,-100%);background:rgba(28,17,38,.82);
+       padding:5px 11px;border-radius:7px;white-space:nowrap;
+       font:600 21px/1 'JetBrains Mono',ui-monospace,monospace;color:#f5efe6}
+  #pie{position:absolute;left:0;right:0;bottom:0;padding:22px 30px 26px;
+       background:linear-gradient(to top,rgba(11,7,16,.96),rgba(11,7,16,.82) 58%,rgba(11,7,16,0));
+       font:400 23px/1.42 ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:#f5efe6}
+  #pie .l{display:flex;align-items:flex-start;gap:11px;margin-top:5px}
+  #pie .p{width:15px;height:15px;margin-top:6px;flex:0 0 auto;border-radius:50%}
+  #pie .url{margin-top:12px;font-size:20px;opacity:.82}
+  .div{position:absolute;bottom:0;width:1px;background:rgba(245,239,230,.10)}
+  #barra{position:absolute;left:0;right:0;top:0;height:74px;background:#241630;
+         border-bottom:1px solid rgba(245,239,230,.09);display:none;align-items:center;gap:10px;padding:0 24px;
+         font:400 24px/1 ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+  #barra .d{width:13px;height:13px;border-radius:50%}
+  #barra .u{flex:1;margin-left:14px;background:#160d1f;border-radius:999px;padding:13px 20px;
+            color:#d9cfe4;letter-spacing:.01em}
+  #barra .u b{color:#f5efe6;font-weight:600}
+  body.web #barra{display:flex}
+</style></head>
+<body>
+<div id="marco">
+  <canvas id="gl"></canvas>
+  <div id="barra">
+    <span class="d" style="background:#f2b23c"></span><span class="d" style="background:#7c5cf0"></span>
+    <span class="d" style="background:#4a3557"></span>
+    <span class="u">🔒 <b>helptitular.com</b>/lesiones</span>
+  </div>
+  <div id="cap-h" class="cap"></div>
+  <div id="cap-m" class="cap"></div>
+  <div id="overlay"></div>
+  <div id="pie"></div>
+</div>
+<script type="importmap">{"imports":{"three":"./three/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+<script type="module" src="x.js"></script>
+</body></html>
