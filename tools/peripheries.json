@@ -106,7 +106,7 @@
   {
    "name": "nvidia-deepseek",
    "kind": "carril_gratis",
-   "model": "deepseek-ai/deepseek-v4-pro",
+   "model": "deepseek-ai/deepseek-v4.1-flash",
    "destino": "nvidia",
    "trusted": false,
    "free": true,
@@ -119,7 +119,7 @@
    "para": [
     "volumen"
    ],
-   "_nota": "Fila 7 del mapa: volumen barato = Nemotron gratis, con DeepSeek V4 como el mejor ratio. GRATIS vía NIM (la corrección del comité del 28/6: los $0.43/$0.87 son la API directa, no lo que paga {{TITULAR}}). Modelo verificado en el catálogo de NIM el 27/7/26. capability 4 A PROPÓSITO = por debajo del listón SUSTANTIVO (5), así que sirve rutina/volumen y NO le quita a Gemini el trabajo que importa. NUNCA clínico/PII (untrusted: lo niega el borde)."
+   "_nota": "Fila 7 del mapa: volumen barato = Nemotron gratis, con DeepSeek V4 como el mejor ratio. GRATIS vía NIM (la corrección del comité del 28/6: los $0.43/$0.87 son la API directa, no lo que paga {{TITULAR}}). Modelo verificado en el catálogo de NIM el 27/7/26; el 25/9/26 deepseek-v4-pro ya no salía en --models y se cambió a deepseek-v4.1-flash (respondió, verificado con una llamada apuntada en el ledger de gasto). capability 4 A PROPÓSITO = por debajo del listón SUSTANTIVO (5), así que sirve rutina/volumen y NO le quita a Gemini el trabajo que importa. NUNCA clínico/PII (untrusted: lo niega el borde)."
   },
   {
    "name": "nvidia-kimi",

@@ -3333,6 +3333,18 @@
    "auditable": true,
    "repetida": false,
    "nota": "Nace del 25-sep-26: 3 de 6 clips de Flow inventaron texto («104%»), pintaron líneas sobre un gráfico o recortaron «+8,8 %» a «8 %», con un prompt que lo prohibía. Montador local de referencia: 05 · Web/piloto-video-el-caso-en-datos (fuente de verdad)."
+  },
+  {
+   "slug": "feedback-recomprobar-base-antes-de-construir",
+   "que": "Justo antes del primer edit (y antes de fusionar), volver a mirar casa base y el libro de deuda: otra sesión puede haberlo resuelto mientras se planeaba",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: bucle_tope_guard construido y descartado por duplicar c5a71ca, fusionado por otra sesión mientras se planeaba. ramas.py en-vuelo no ve lo ya fusionado ni arreglos en ficheros con otro nombre. Mecanizable: parcial (aviso en ramas.py con el git log reciente de master por tema). Propuesta: no por ahora."
   }
  ]
 }
