@@ -41,6 +41,7 @@ import cola as q
 import salida
 import cost_guard
 import bucles_colgados
+import estado_rutina   # al día / atrasada / rota: lo usa _frescura_rutina (25-sep-2026)
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # `BTP_STATE_DIR` manda, como en `_casa.state_dir()`, `_lock.py` y el resto del repo (20-sep-26).
@@ -162,10 +163,20 @@ ESTADOS_HB_SANOS = {"ok", "gate_sin_novedad", "ok_sin_novedad", "centralita", "r
 # (sin una pasada 'ok' más reciente que lo tape). 'centralita' cuenta aquí como NO sano a propósito:
 # para el watchdog general es un salto frugal aceptable, pero que una rutina NED lleve días sin ser
 # atendida por el agente real (solo por el cerebro de respaldo) SÍ es degradación sostenida.
+# `periodo_h` + `margen_h` (25-sep-2026): lo más que puede pasar entre dos pasadas SANAS según su
+# plist, más holgura para lo que tarda la pasada. Con eso `estado_rutina.clasificar` caza la rutina
+# que deja de correr sin fallar (su último latido sigue en «ok» y el watchdog de abajo no la veía).
+# tests/test_healthcheck.py comprueba que periodo_h no es menor que el hueco real de su plist.
+# Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
 RUTINAS_NED = (
-    {"agente": "auto-mejora",   "label": "la auto-mejora del sistema (lun/mié/vie/dom)"},
-    {"agente": "git",           "label": "el barrido diario de git"},
-    {"agente": "comite-medico", "label": "el radar del comité médico"},
+    {"agente": "auto-mejora",   "label": "la auto-mejora del sistema (lun/mié/vie/dom)",
+     "plist": "com.btp.auto-mejora", "periodo_h": 48, "margen_h": 6},
+    {"agente": "git",           "label": "el barrido diario de git",
+     "plist": "com.btp.git-barrido", "periodo_h": 24, "margen_h": 6},
+    # comite-medico: su latido lo escribe también radar_ned_dia.sh (diario), así que esto mide la
+    # actividad del AGENTE; el mensual de radar-lit es el peor caso, no lo que se ve a diario.
+    {"agente": "comite-medico", "label": "el radar del comité médico",
+     "plist": "com.btp.radar-lit", "periodo_h": 31 * 24, "margen_h": 48},
 )
 ESTADOS_NED_MALOS = {
     "fallo", "critico_bloqueado", "centralita",
@@ -544,15 +555,44 @@ def _roster_meta():
         if isinstance(d.get("StartInterval"), int):
             cad = d["StartInterval"]
         elif "StartCalendarInterval" in d:
-            sci = d["StartCalendarInterval"]
-            entradas = sci if isinstance(sci, list) else [sci]
-            claves = set()
-            for e in entradas:
-                if isinstance(e, dict):
-                    claves |= set(e)
-            cad = 7 * 86400 if "Weekday" in claves else (30 * 86400 if "Day" in claves else 86400)
+            cad = _cadencia_calendario(d["StartCalendarInterval"])
         meta[label] = (cad, d.get("StandardOutPath") or d.get("StandardErrorPath"))
     return meta
+
+
+def _cadencia_calendario(sci):
+    """Segundos del MAYOR hueco entre dos disparos de un StartCalendarInterval (lo más que puede
+    pasar sin correr estando sano), o None si no se puede leer.
+
+    25-sep-2026: antes, cualquier entrada con `Weekday` contaba como SEMANAL. La auto-mejora dispara
+    lun/mié/vie/dom (hueco máximo: 2 días) y salía con cadencia de 7, así que el aviso de inactividad
+    (INACTIVO_FACTOR × cadencia) llegaba a los 21 días en vez de a los 6. Ahora se cuentan los
+    disparos reales de una semana tipo (una clave ausente es comodín, como en launchd) y se toma el
+    hueco circular más grande. Con `Day`/`Month` se queda en 30 días: los meses no son iguales y
+    ahí el conservador es el umbral largo.
+    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    entradas = sci if isinstance(sci, list) else [sci]
+    entradas = [e for e in entradas if isinstance(e, dict)]
+    if not entradas:
+        return None
+    if any("Day" in e or "Month" in e for e in entradas):
+        return 30 * 86400
+    minutos = set()                                    # minuto de la semana (0 = domingo 00:00)
+    try:
+        for e in entradas:
+            dias = [int(e["Weekday"]) % 7] if "Weekday" in e else range(7)   # 0 y 7 = domingo
+            horas = [int(e["Hour"])] if "Hour" in e else range(24)
+            mins = [int(e["Minute"])] if "Minute" in e else range(60)
+            for wd in dias:
+                for h in horas:
+                    for m in mins:
+                        minutos.add(wd * 1440 + h * 60 + m)
+    except (TypeError, ValueError):
+        return None
+    orden = sorted(minutos)
+    semana = 7 * 1440
+    huecos = [b - a for a, b in zip(orden, orden[1:])] + [orden[0] + semana - orden[-1]]
+    return max(huecos) * 60
 
 
 def _check_boca_muda():
@@ -2681,6 +2721,28 @@ def _salud_daemons():
     return alertas, info
 
 
+def _frescura_rutina(d, edad_h):
+    """Estado de `estado_rutina` para una rutina NED cuyo último latido es SANO y tiene `edad_h`
+    horas: el éxito y la ejecución son el mismo instante. Con periodo P = periodo_h + margen_h:
+    hasta P «al-dia», pasado P «atrasada», desde 2P «rota». Sin periodo declarado, o con el .HALT
+    puesto (las rutinas no corren a propósito, como en `daemon_inactivo`), devuelve None: no alarma.
+    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    if not d.get("periodo_h"):
+        return None
+    try:
+        if salida.halted():
+            return None
+    except Exception:
+        pass
+    ahora = datetime.now()
+    ultima = ahora - timedelta(hours=edad_h)
+    try:
+        return estado_rutina.clasificar(
+            ultima, ultima, timedelta(hours=d["periodo_h"] + d.get("margen_h", 0)), ahora)
+    except ValueError:
+        return None
+
+
 def _check_rutinas_ned():
     """WATCHDOG de rutinas NED (C, 2/7/26): auto-mejora / git / comite-medico llevan ≥2 días
     CLAVADAS en un estado NO sano (fallo/aplazado/critico/centralita) sin que nadie lo note.
@@ -2702,8 +2764,26 @@ def _check_rutinas_ned():
             continue
         if edad_h is None or est is None:
             continue                             # nunca corrió aún → sin baseline, no se alarma (igual que el dead-man)
+        if est == "arranca":
+            # run_agent escribe «arranca» al empezar y lo pisa al acabar. Si sigue ahí pasado el
+            # periodo + margen, la pasada se colgó o murió sin dejar estado (25-sep-2026, cazado por
+            # verificación: 5 días en «arranca» no avisaban).
+            if _frescura_rutina(d, edad_h) in ("atrasada", "rota"):
+                info[agente]["frescura"] = "colgada"
+                alertas.append(("rutina_ned_%s_sin_correr" % agente,
+                                "%s arrancó hace %d día(s) y no ha terminado: la pasada se colgó "
+                                "o murió sin dejar estado." % (d["label"], int(edad_h / 24.0))))
+            continue
         if est in ESTADOS_HB_SANOS and est not in ESTADOS_NED_MALOS:
-            continue                             # última pasada sana → nada que vigilar
+            # Última pasada sana. Lo que falta ver es si ha DEJADO de correr (25-sep-2026).
+            frescura = _frescura_rutina(d, edad_h)
+            info[agente]["frescura"] = frescura
+            if frescura in ("atrasada", "rota"):
+                alertas.append(("rutina_ned_%s_sin_correr" % agente,
+                                "%s no corre desde hace %d día(s) y le tocaba cada %d h: su última "
+                                "pasada salió bien, pero no ha vuelto a arrancar (%s)."
+                                % (d["label"], int(edad_h / 24.0), d["periodo_h"], frescura)))
+            continue
         if est not in ESTADOS_NED_MALOS:
             continue                             # estado desconocido/no clasificado → conservador, no alarma
         dias = edad_h / 24.0

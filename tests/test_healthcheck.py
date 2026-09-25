@@ -206,6 +206,30 @@ def rutinas_ned_tests():
     clear(); hb("auto-mejora", "ok", 0.1); hb("git", "ok", 0.1); hb("comite-medico", "ok", 20)
     ok(claves() == [], "comite-medico ok de hace 20 días → silencio (mensual, no exige frescura)")
 
+    # 7-bis (25-sep-2026, estado_rutina). La rutina que DEJA de correr sin fallar: su último latido
+    # sigue en «ok» y antes no avisaba nadie. Periodo + margen declarados en RUTINAS_NED.
+    clear(); hb("auto-mejora", "ok", 1.9); hb("git", "ok", 0.5); hb("comite-medico", "ok", 20)
+    ok(claves() == [], "auto-mejora ok de hace 1,9 días → dentro de 48+6 h, silencio")
+    clear(); hb("auto-mejora", "ok", 3); hb("git", "ok", 0.5); hb("comite-medico", "ok", 20)
+    ok(claves() == ["rutina_ned_auto-mejora_sin_correr"],
+       "auto-mejora ok de hace 3 días → avisa (antes: 21 días de silencio)")
+    ok(hc._check_rutinas_ned()[1]["auto-mejora"]["frescura"] == "atrasada", "3 días = atrasada, aún no rota")
+    clear(); hb("auto-mejora", "ok", 0.1); hb("git", "ok", 3); hb("comite-medico", "ok", 20)
+    ok(hc._check_rutinas_ned()[1]["git"]["frescura"] == "rota", "git diario sin correr 3 días = rota")
+    clear(); hb("auto-mejora", "ok", 0.1); hb("git", "ok", 0.1); hb("comite-medico", "ok", 40)
+    ok(claves() == ["rutina_ned_comite-medico_sin_correr"], "comite-medico mensual sin correr 40 días → avisa")
+    clear(); hb("auto-mejora", "arranca", 5); hb("git", "arranca", 0.1); hb("comite-medico", "ok", 20)
+    ok(claves() == ["rutina_ned_auto-mejora_sin_correr"],
+       "auto-mejora en «arranca» hace 5 días → colgada, avisa; git arrancando ahora → silencio")
+    import salida as _sal
+    _halted_real = _sal.halted
+    _sal.halted = lambda: True
+    try:
+        clear(); hb("auto-mejora", "ok", 3); hb("git", "ok", 3); hb("comite-medico", "ok", 40)
+        ok(claves() == [], "con el .HALT puesto no corren a propósito → no se avisa")
+    finally:
+        _sal.halted = _halted_real
+
     # 8. heartbeat corrupto → auto-heal (se aparta, se avisa del reset, categoría luego se filtra a operativo)
     clear(); hb("auto-mejora", "ok", 0.1); hb("git", "ok", 0.1)
     open(os.path.join(hb_dir, "comite-medico.json"), "w").write("{ esto no es json")

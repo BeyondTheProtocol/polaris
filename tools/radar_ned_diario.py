@@ -1159,12 +1159,11 @@ def _ya_hay_job_del_comite():
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import cola as q
-        for sub in ("pending", "running"):
-            for j in q.listar(sub) if hasattr(q, "listar") else []:
-                if (j or {}).get("agente") == "comite-medico":
-                    return True
-        base = os.path.join(STATE, "queue")
-        for sub in ("pending", "running"):
+        # 25-sep-2026: se miraba `running/`, que no existe (la cola es pending/processing/done/
+        # failed) y `q.listar`, que tampoco: un comité YA en marcha no se veía y se podía encolar
+        # otro encima. Se toman los nombres de la propia cola para que no vuelvan a divergir.
+        base = q.QUEUE
+        for sub in ("pending", "processing"):
             d = os.path.join(base, sub)
             for f in os.listdir(d) if os.path.isdir(d) else []:
                 try:
