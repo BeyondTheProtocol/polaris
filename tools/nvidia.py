@@ -86,6 +86,21 @@ def _veto_borde(body):
     return None
 
 
+def _apunta_envio(body, uso):
+    """Una línea en el ledger de gasto por cada respuesta de NVIDIA (carril gratis → usd 0, no
+    toca el tope). Hasta el 25-sep NVIDIA no se apuntaba, y su «uso» se leía del ledger del
+    borde, que mezcla bloqueos por HALT, pings y tests (10.065 filas = 134 respuestas de verdad).
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+    Best-effort: el contador nunca rompe la llamada."""
+    try:
+        import gasto
+        u = uso or {}
+        gasto.registrar("nvidia", body.get("model", "?"), u.get("prompt_tokens") or 0,
+                        u.get("completion_tokens") or 0, usd=0)
+    except Exception:
+        pass
+
+
 def chat_stream(key, body, espera_s=120):
     """Chat recibiendo la respuesta POR TROZOS (stream). (texto, error).
 
@@ -101,6 +116,7 @@ def chat_stream(key, body, espera_s=120):
         texto, _uso = stream_chat(CHAT_URL, body, {"Authorization": "Bearer " + key,
                                                    "Content-Type": "application/json"},
                                   timeout=espera_s)
+        _apunta_envio(body, _uso)
         return texto, None
     except urllib.error.HTTPError as e:
         return None, f"NVIDIA API error {e.code}: {e.read().decode()[:600]}"
@@ -152,6 +168,7 @@ def post(url, key, body):
                           "responder" % TOPE_TOTAL_S)
         if "err" in res:
             raise res["err"]
+        _apunta_envio(body, (res["data"] or {}).get("usage") if isinstance(res["data"], dict) else None)
         return res["data"], None
     except urllib.error.HTTPError as e:
         detail = e.read().decode()[:600]

@@ -138,6 +138,10 @@ def registrar(tool, model, input_tokens=0, output_tokens=0, usd=None):
         "tool": tool, "model": model,
         "input_tokens": it, "output_tokens": ot, "usd": usd,
     }
+    # Quién llamó, si lo dice el entorno: `enruta.probar` lanza sus pings con BTP_ORIGEN=ping,
+    # para que el contador por carril separe «Responde solo: OK» de contenido real.
+    if os.environ.get("BTP_ORIGEN"):
+        linea["origen"] = os.environ["BTP_ORIGEN"][:40]
     if sin_tarifa:
         # Explícito en el fichero: quien lea el ledger sabe que este gasto existió y no se
         # pudo tarifar, en vez de verlo desaparecer dentro de un total.

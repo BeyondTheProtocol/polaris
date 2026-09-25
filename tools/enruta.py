@@ -330,7 +330,8 @@ def probar(nombre, *, timeout=None):
         return False, "falta %s" % tool
     try:
         r = subprocess.run([sys.executable, ruta, "Responde solo: OK"],
-                           capture_output=True, text=True, timeout=timeout)
+                           capture_output=True, text=True, timeout=timeout,
+                           env=dict(os.environ, BTP_ORIGEN="ping"))   # el contador lo separa
         salida = (r.stdout or "").strip()
         err = (r.stderr or "").strip()
         if r.returncode == 0 and salida and "error" not in salida.lower()[:40]:
