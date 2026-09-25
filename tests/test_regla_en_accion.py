@@ -317,11 +317,30 @@ def main():
     print("── bucles de espera sin tope (20-sep-26) ──")
     # El 14-sep un `until … do sleep 5 … done` sin tope corrió 14 h 34 min y dejó pillados la
     # tarea y el worktree. Medido sobre 13.069 comandos Bash de 7 días: 100 traen bucle y 95 no
-    # llevan tope. Por eso AVISA y no pregunta: 13 confirmaciones al día se aprenden a ignorar.
+    # llevan tope. El 20-sep se eligió AVISAR (13 confirmaciones al día se aprenden a ignorar);
+    # desde el 25-sep DENIEGA: el aviso no bastó (cinco bucles matados en cinco días) y `deny` no
+    # interrumpe a {{TITULAR}}, frena al agente, que reescribe con tope.
     r = correr({"session_id": "buc1", "tool_name": "Bash",
                 "tool_input": {"command": "until [ -f /tmp/x ]; do sleep 5; done; echo listo"}}, tmp)
-    check(r and "tope" in r["additionalContext"], "bucle sin tope: avisa")
-    check(r and r.get("permissionDecision") is None, "…y NO pide confirmación (avisa, no interrumpe)")
+    check(r and "tope" in r["additionalContext"], "bucle sin tope: lo explica")
+    check(r and r.get("permissionDecision") == "deny", "…y lo DENIEGA (el aviso no bastó)")
+    check(r and "fin=$(( $(date +%s)" in r.get("permissionDecisionReason", ""),
+          "…con la plantilla del tope en el motivo, para reescribirlo a la primera")
+    r = correr({"session_id": "buc1", "tool_name": "Bash",
+                "tool_input": {"command": "while true; do curl -s localhost:1 && break; sleep 2; done"}}, tmp)
+    check(r and r.get("permissionDecision") == "deny",
+          "la MISMA sesión, segundo bucle: vuelve a denegar (antes callaba tras el primer aviso)")
+    os.environ["BTP_BUCLE_OK"] = "1"
+    try:
+        r = correr({"session_id": "buc1b", "tool_name": "Bash",
+                    "tool_input": {"command": "until [ -f /tmp/x ]; do sleep 5; done"}}, tmp)
+        check(r is None or r.get("permissionDecision") != "deny",
+              "BTP_BUCLE_OK=1: espera larga deliberada, pasa")
+    finally:
+        os.environ.pop("BTP_BUCLE_OK", None)
+    r = correr({"session_id": "buc1c", "tool_name": "Monitor",
+                "tool_input": {"command": "while true; do date; sleep 30; done"}}, tmp)
+    check(r is None, "la tool Monitor (esperas largas a propósito) no se toca")
 
     r = correr({"session_id": "buc2", "tool_name": "Bash",
                 "tool_input": {"command": "fin=$(( $(date +%s) + 600 )); until [ -f /tmp/x ]; do "

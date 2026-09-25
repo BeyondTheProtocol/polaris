@@ -400,16 +400,24 @@ REGLAS = [
         False,
     ),
     (
+        # DENY desde el 25-sep-2026 (antes avisaba, una vez por sesión). El aviso no bastó:
+        # `bucles_colgados` tuvo que matar cinco bucles en cinco días (20, 22 y 25-sep), y la
+        # deuda `bucle_espera_sin_tope` volvió a escalar. Se descartó `ask` el 20-sep porque 13
+        # confirmaciones al día se aprenden a ignorar; `deny` no interrumpe a {{TITULAR}}, frena al
+        # agente, que reescribe con la plantilla de abajo. Salida deliberada: BTP_BUCLE_OK=1.
+        # Las esperas largas de verdad van por la tool Monitor, que este hook no mira.
         "bucle-sin-tope",
-        lambda e, t: t == "Bash" and _bucle_sin_tope(_cmd(e)),
-        "⏳ Ese bucle de espera no tiene tope. El 14-sep uno así (`until … do sleep 5 … done`) "
-        "corrió 14 h 34 min esperando algo que nunca llegó y dejó pillados la tarea y el "
-        "worktree. Ponle reloj — aquí NO hay `timeout` ni `gtimeout`:\n"
+        lambda e, t: (t == "Bash" and os.environ.get("BTP_BUCLE_OK") != "1"
+                      and _bucle_sin_tope(_cmd(e))),
+        "⏳ BLOQUEADO: ese bucle de espera no tiene tope. El 14-sep uno así (`until … do sleep 5 "
+        "… done`) corrió 14 h 34 min esperando algo que nunca llegó y dejó pillados la tarea y el "
+        "worktree; hasta el 25-sep `bucles_colgados` tuvo que matar cinco más. Reescríbelo con "
+        "reloj — aquí NO hay `timeout` ni `gtimeout`:\n"
         "    fin=$(( $(date +%s) + 600 )); until <cond>; do \\\n"
         "      [ $(date +%s) -lt $fin ] || { echo 'tope alcanzado'; break; }; sleep 5; done\n"
-        "Si de verdad hay que esperar más, súbelo a propósito. `tools/bucles_colgados.py` mata "
-        "lo que pase de 45 min, pero llegar a eso ya te ha costado la tarde.",
-        False,
+        "Si de verdad hay que esperar más, sube el tope a propósito, usa la tool Monitor, o "
+        "(espera larga deliberada) BTP_BUCLE_OK=1.",
+        "deny",
     ),
     (
         "dinero",

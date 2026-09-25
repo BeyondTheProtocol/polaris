@@ -150,13 +150,36 @@ def _es_shell(cmd):
 # de espera y solo 5 llevaban alguna de estas marcas. OJO: en este Mac NO existe `timeout` ni
 # `gtimeout` (command not found), así que el idioma bueno de aquí es el del reloj:
 #   fin=$(( $(date +%s) + 600 )); until COND; do [ $(date +%s) -lt $fin ] || break; sleep 5; done
-_MARCAS_DE_TOPE = ("timeout ", "gtimeout ", "date +%s", "$SECONDS", "SECONDS -",
+# `date +%H` (25-sep-2026): `while [ "$(date +%H%M)" -lt 1357 ]; do sleep 60; done` espera a una
+# HORA, y la hora llega sola; el replay lo daba por bucle sin tope.
+_MARCAS_DE_TOPE = ("timeout ", "gtimeout ", "date +%s", "date +%H", "$SECONDS", "SECONDS -",
                    "for _ in", "for i in")
+
+
+# Cuerpo de un heredoc (25-sep-2026). El replay de 4.000 comandos reales para pasar el hook a
+# `deny` sacó un falso positivo: un `python3 - <<'EOF'` cuyo código llevaba, dentro de una cadena,
+# el texto «until grep …; do sleep 5; done». Lo que va a python/node/cat no es shell y no se lee
+# como shell; lo que va a bash/sh/zsh (`bash <<EOF … EOF`) sí, porque eso sí se ejecuta.
+_RE_HEREDOC = re.compile(
+    r"^(?P<cab>[^\n]*?<<-?[ \t]*(?P<q>['\"]?)(?P<tag>\w+)(?P=q)[^\n]*)\n"
+    r"(?P<cuerpo>.*?)(?:\n[ \t]*(?P=tag)[ \t]*(?=\n|$)|\Z)", re.S | re.M)
+
+
+def _sin_heredocs(cmd):
+    def _sub(m):
+        antes = m.group("cab").split("<<", 1)[0]
+        ultimo = re.split(r"&&|\|\||;|\|", antes)[-1].split()
+        prog = os.path.basename(ultimo[0]) if ultimo else ""
+        return m.group(0) if prog in _SHELLS else m.group("cab") + "\n"
+    try:
+        return _RE_HEREDOC.sub(_sub, cmd)
+    except Exception:
+        return cmd
 
 
 def es_bucle_espera(cmd):
     """¿El comando trae un bucle de espera de shell (`until|while … do … sleep … done`)?"""
-    return bool(_RE_BUCLE_ESPERA.search(cmd or ""))
+    return bool(_RE_BUCLE_ESPERA.search(_sin_heredocs(cmd or "")))
 
 
 def tiene_tope(cmd):

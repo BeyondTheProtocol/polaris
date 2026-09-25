@@ -234,5 +234,20 @@ check("sin envoltorio, el comando tal cual",
 check("lo _PRIVADO se sigue tachando dentro del eval",
       "[REDACTADO]" in bc._redactar_truncar("eval 'until [ -f /a/_PRIVADO/b ]; do sleep 5; done' < /dev/null"))
 
+# Los dos falsos positivos del replay de 4.000 comandos (25-sep-2026), al pasar el hook a `deny`.
+check("heredoc a python con «until … do sleep … done» en una cadena: NO es bucle de shell",
+      not bc.bucle_sin_tope("python3 - <<'EOF'\ns = '''until grep -q X /tmp/l; do sleep 5; done'''\n"
+                            "print(s)\nEOF"))
+check("…y escrito a un fichero con cat tampoco",
+      not bc.bucle_sin_tope("cat > /tmp/w.sh <<'EOF'\nuntil [ -f /tmp/x ]; do sleep 5; done\nEOF"))
+check("pero un heredoc a bash SÍ se ejecuta: se sigue cazando",
+      bc.bucle_sin_tope("cd /tmp && bash <<'EOF'\nuntil [ -f /tmp/x ]; do sleep 5; done\nEOF"))
+check("y el bucle de shell FUERA del heredoc se sigue viendo",
+      bc.bucle_sin_tope("python3 - <<'EOF'\nprint(1)\nEOF\nuntil [ -f /tmp/x ]; do sleep 5; done"))
+check("esperar a una HORA (`date +%H%M`) cuenta como tope",
+      not bc.bucle_sin_tope('while [ "$(date +%H%M)" -lt 1357 ]; do sleep 60; done; date'))
+check("el caso que motivó el deny sigue cazado: esperar a un pid sin reloj",
+      bc.bucle_sin_tope("while kill -0 76684 2>/dev/null; do sleep 60; done; tail -45 /tmp/b.log"))
+
 print("test_bucles_colgados: %d OK, %d fallos" % (_pass, _fail))
 sys.exit(1 if _fail else 0)
