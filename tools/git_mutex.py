@@ -198,6 +198,59 @@ def _gate_encendido():
     return os.path.exists(os.path.join(_casa(), ".claude", "hooks", ".base_gate_on"))
 
 
+# Opciones de `git merge` que llevan valor: su valor no es una rama.
+_MERGE_CON_VALOR = ("-m", "-F", "-s", "-X", "--message", "--file", "--strategy", "--strategy-option",
+                    "--cleanup", "--into-name", "-S", "--gpg-sign")
+
+
+def _ramas_del_merge(args):
+    """Las ramas/commits que un `git merge <args>` fusiona (sin las opciones ni sus valores)."""
+    fuera, salta = [], False
+    for a in args:
+        if salta:
+            salta = False
+            continue
+        if a in _MERGE_CON_VALOR:
+            salta = True
+            continue
+        if a.startswith("-"):
+            continue
+        fuera.append(a)
+    return fuera
+
+
+def _rama_ajena(argv, cwd=None, _sesiones=None, _worktrees=None):
+    """Motivo (str) si `argv` fusiona a casa base una rama cuyo worktree tiene sesiones VIVAS de
+    otra sesión; "" si la rama es de quien llama, no tiene worktree o nadie trabaja en ella.
+
+    Por qué (26-sep-2026, deuda `fusion-de-rama-ajena-sin-ok`): la rama de un hook del muro llegó
+    dos veces a casa base el 25-sep desde OTRA sesión (1a22fe8 y b3c8462), sin el OK que {{TITULAR}} da
+    en la suya, porque este gate solo miraba BTP_GIT_BASE_OK=1. Override deliberado, y solo para
+    ESA rama: BTP_FUSION_AJENA_OK=<nombre exacto>. Si no se puede saber de quién es → se rechaza."""
+    repo, resto = _partir(argv)
+    if not resto or resto[0] != "merge" or any(a in ("--abort", "--quit", "--continue") for a in resto):
+        return ""
+    cwd = os.path.realpath(cwd or os.getcwd())
+    try:
+        if _sesiones is None or _worktrees is None:
+            import ramas
+            _worktrees = ramas.worktrees() if _worktrees is None else _worktrees
+            _sesiones = ramas.sesiones() if _sesiones is None else _sesiones
+    except Exception as e:            # noqa: BLE001
+        return "no pude saber de quién es la rama (%r)" % (e,)
+    for rama in _ramas_del_merge(resto[1:]):
+        wts = [w for w in _worktrees if w.get("branch") == rama and not w.get("es_base")]
+        for w in wts:
+            p = os.path.realpath(w["path"])
+            if cwd == p or cwd.startswith(p.rstrip("/") + "/"):
+                break                                   # es la rama de quien llama
+            vivas = [s for s in _sesiones if s.get("rama") == rama]
+            if vivas and os.environ.get("BTP_FUSION_AJENA_OK") != rama:
+                return ("la rama %s es de otra sesión viva (pid %s, en %s)"
+                        % (rama, ", ".join(str(s.get("pid")) for s in vivas[:3]), w["path"]))
+    return ""
+
+
 def _git_dir(repo):
     try:
         return subprocess.run(["git", "-C", repo, "rev-parse", "--absolute-git-dir"],
@@ -220,6 +273,13 @@ def main(argv):
             "git_mutex: NO lanzo %s sin BTP_GIT_BASE_OK=1. Mover master de casa base es gate de "
             "{{TITULAR}}, y el freno nativo lo rechazaría tarde, con el árbol ya a medio escribir. Con su "
             "OK explícito: BTP_GIT_BASE_OK=1 (mejor, `cerrar_sesion.py --apply`).\n" % motivo)
+        return 3
+    ajena = _rama_ajena(argv) if motivo and _gate_encendido() else ""
+    if ajena:
+        sys.stderr.write(
+            "git_mutex: NO fusiono a casa base: %s. Fusionar a base es gate de {{TITULAR}}, y su OK se da "
+            "en la sesión dueña de la rama (esa sesión cierra con `cerrar_sesion.py --apply`). Si de "
+            "verdad toca desde aquí: BTP_FUSION_AJENA_OK=<nombre exacto de la rama>.\n" % ajena)
         return 3
     repo, resto = _partir(argv)
     vigilar = bool(resto) and resto[0] in ("pull", "cherry-pick", "revert") \
