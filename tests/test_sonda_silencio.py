@@ -50,6 +50,20 @@ ok(m and m[0]["tarea"] == "rodaje-guard-clinico", "la muda es la del rodaje: %s"
 ok(m and abs(m[0]["vivio_s"] - 7) < 0.5, "vivió 7 s: %s" % m)
 ok(m and abs(m[0]["hace_h"] - 5) < 0.1, "fue hace 5 h: %s" % m)
 
+# Caso real del 25-sep-2026 (deuda `tarea-programada-exito-falso`): la tarea
+# `verificar-parte-aplazados-25sep` se paró en su primer Bash a los 3,4 s y la app la dio por
+# «succeeded». Ese estado lo da la API de la app y NO está en el fichero de la sesión; la sonda
+# mide cuánto vivió, así que un «éxito» falso no la esconde. Se fija con los campos reales.
+tmp3 = tempfile.mkdtemp(prefix="sonda-silencio-exito-")
+json.dump({"scheduledTaskId": "verificar-parte-aplazados-25sep", "sessionId": "local_exito",
+           "title": "Comprobar el primer parte con los avisos atrasados (25-sep)",
+           "isArchived": False, "createdAt": (AHORA - 3600) * 1000,
+           "lastActivityAt": (AHORA - 3600 + 3.4) * 1000},
+          open(os.path.join(tmp3, "local_exito.json"), "w"))
+me = S.tareas_mudas(ahora=AHORA, patron=os.path.join(tmp3, "local_*.json"))
+ok(len(me) == 1 and me[0]["tarea"] == "verificar-parte-aplazados-25sep",
+   "una tarea que la app da por «succeeded» tras 3,4 s se caza igual: %s" % me)
+
 # Marcas en segundos (por si la app cambia de unidad): el mismo caso se sigue cazando.
 tmp2 = tempfile.mkdtemp(prefix="sonda-silencio-s-")
 json.dump({"scheduledTaskId": "t", "createdAt": AHORA - 100, "lastActivityAt": AHORA - 95},
