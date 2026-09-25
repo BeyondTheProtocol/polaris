@@ -15,13 +15,17 @@ PY="$(command -v python3 || echo /usr/bin/python3)"
 # Drenaje auto de enlaces de vídeo (12-jul, aprobado por {{TITULAR}}): entiende los reels que manda por
 # Telegram (caption + VOZ vía Whisper + TEXTO EN PANTALLA vía Apple Vision), SIN que esté pendiente.
 # Detachado + fail-open + THROTTLE (1/15min) + cap 5/pasada. Opera sobre el buzón CANÓNICO del mini.
-# MURO: la descarga usa la sesión de IG SOLO aquí — SessionStart solo corre en sesiones INTERACTIVAS
-# (atendidas); las autónomas tienen SessionStart vacío → NUNCA toca la sesión en el lazo 24/7. En una
-# máquina sin Chrome-IG la descarga falla y se difiere (⏳ intacto). Ver tools/reel_digest.py.
+# MURO: la descarga usa la sesión de IG SOLO en sesiones INTERACTIVAS (atendidas), nunca en el lazo
+# 24/7. En una máquina sin Chrome-IG la descarga falla y se difiere (⏳ intacto). Ver tools/reel_digest.py.
+# 25-sep-26: el comentario decía que el lazo tenía SessionStart vacío, y era falso: `claude -p` carga
+# también los hooks del .claude/settings.json del proyecto, así que cada job del lazo lanzaba este
+# drenaje (verificado en vivo con 2.1.236). Se distingue por BTP_AGENT_DEPTH, que run_agent.sh exporta
+# siempre y es el único que lanza `claude -p`. Test: tests/test_session_start_lazo.py.
 DRAIN_STAMP="${TMPDIR:-/tmp}/.btp_reel_drain.stamp"
 # `date -r <fichero>` vale en macOS y en Linux; `stat -f %m` era solo de Mac, y en Linux no falla:
 # devuelve basura, la cuenta de abajo revienta y el hook sale con 1 (CI público rojo, 24-sep-26).
-if [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$DRAIN_STAMP" +%s 2>/dev/null || echo 0) ))" -gt 900 ]; then
+if [ -n "${BTP_AGENT_DEPTH:-}" ]; then :   # lazo: sin sesión de IG
+elif [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$DRAIN_STAMP" +%s 2>/dev/null || echo 0) ))" -gt 900 ]; then
   touch "$DRAIN_STAMP" 2>/dev/null
   [ -f "$REPO/tools/reel_digest.py" ] && ( "$PY" "$REPO/tools/reel_digest.py" --drain --remote polaris --max 5 >/dev/null 2>&1 & )
 fi

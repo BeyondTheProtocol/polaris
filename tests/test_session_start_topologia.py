@@ -33,7 +33,12 @@ def correr(hostname, halt):
         if halt:
             open(os.path.join(repo, ".HALT"), "w").close()
         env = dict(os.environ, BTP_REPO=repo, HOME=home, BTP_HOSTNAME=hostname, TMPDIR=tmp)
-        r = subprocess.run(["bash", HOOK], env=env, capture_output=True, text=True, timeout=30)
+        # stdin CERRADO, como lo da Claude Code (25-sep-26, deuda test-session-start-topologia-
+        # cuelgue-transitorio, 4x): sin `input`, el hook heredaba el stdin del padre, y su
+        # `cat` esperaba para siempre cuando el padre era un pipe abierto (test_all.sh lanzado
+        # desde una herramienta). No era la carga: con un pipe abierto fallaba 4/4 a carga 13.
+        r = subprocess.run(["bash", HOOK], env=env, capture_output=True, text=True, timeout=30,
+                           input='{"source": "startup"}')
         assert r.returncode == 0, r.stderr
         out = r.stdout.strip()
         if not out:

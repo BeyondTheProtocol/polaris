@@ -12,6 +12,11 @@ if [ -n "$BTP_ROJO_DIR" ]; then ROJO_DIR="$BTP_ROJO_DIR"; mkdir -p "$ROJO_DIR"
 elif [ -n "$CI" ]; then ROJO_DIR=/tmp
 else _t="${TMPDIR:-/tmp}"; ROJO_DIR=$(mktemp -d "${_t%/}/rojo.XXXXXX"); fi
 ROJO_DIR="${ROJO_DIR%/}"
+# Toda la suite corre con stdin CERRADO (25-sep-26, deuda test-session-start-topologia-cuelgue-
+# transitorio): lanzada desde el Bash de un agente, su stdin es un pipe que nunca se cierra, y cada
+# test que lanzaba algo que lee stdin sin darle `input` lo heredaba y esperaba para siempre.
+# Test: test_all_stdin_cerrado.py.
+exec </dev/null
 # 19-sep-2026 — BTP_PORTABLE=1 (lo usa el CI del repo público en Linux): salta las baterías
 # que solo pueden pasar en la casa base: Llavero de macOS, plists de launchd, el binario
 # `xurl`, el panel técnico de la anatomía. No son opcionales, es que allí no hay con qué
@@ -71,6 +76,7 @@ runpy test_gate_etiqueta.py
 runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} + KAI)
 runpy test_gate_citas.py
 runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU carpeta (deuda test-all-log-rojo-tmp-compartido)
+runpy test_all_stdin_cerrado.py   # 25-sep · la suite cierra stdin: ningún test hereda un pipe que no se cierra
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
@@ -435,6 +441,7 @@ runpy test_radar_gate_multicohorte.py # 21-sep · un «encaja» en un ensayo mul
 runpy test_radar_archivo_cerrados.py # 21-sep · pasar de 200 cierres no borra veredictos ni re-encola leads
 runpy test_radar_reintentos.py     # 21-sep · un fallo de red pasajero no deja un tema del radar sin nada
 runpy test_session_start_topologia.py  # 24-sep · el HALT del código rojo no hace creer al mini que es el Air
+runpy test_session_start_lazo.py      # 25-sep · el lazo no lanza el drenaje de reels (sesión de IG)
 
 # ⛔ NO añadir aquí (a propósito, no por olvido): test_avisos_origen.py, test_casa_estilo.py,
 # test_observatorio.py, test_salida.py, test_tablero.py y test_triage.py importan `salida` SIN
