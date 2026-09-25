@@ -319,6 +319,7 @@ runpy test_visor3d_mps.py
 runpy test_esqueleto_niveles.py
 runpy test_secretos_largos.py
 runpy test_guarda_memoria.py
+runpy test_visor3d_cuelgue.py
 runpy test_visor3d_malla_recorte.py
 runpy test_visor3d_ficha.py
 runpy test_visor3d_carga.py

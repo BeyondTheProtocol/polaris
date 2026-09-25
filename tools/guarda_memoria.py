@@ -30,10 +30,19 @@ Dos cosas que este script hace y la guarda anterior no:
    contándolo, se mata igual (en memoria unificada la GPU también es RAM). Lo que ya no pasa es
    matar a un árbol pequeño por el swap de otros.
 
+4. **25-sep-2026: también vigila que el árbol NO SE QUEDE QUIETO** (`inactivo_s`). El 24-sep un
+   `visor3d suv` se quedó en interbloqueo dentro de nnU-Net: el principal esperando un lock y 7
+   hijos `multiprocessing.spawn` en `sem_wait`, todo al 0 % de CPU más de 8 min, y habría seguido
+   así para siempre. Se mide el tiempo de CPU ACUMULADO del árbol (no el %cpu instantáneo, que un
+   proceso sano a ratos también marca 0): si en `inactivo_s` no avanza más de `INACTIVO_CPU_S`, se
+   vuelca un `sample` de cada proceso (para cazar la causa, que aún no sabemos) y se mata el
+   grupo con código 98. `corre_con_reintento` lo relanza UNA vez; si se repite, falla cerrado.
+
 Avisa y mata; no negocia. Matar es irreversible y puede tirar media hora de cómputo, así que el
 techo se pone a mano y con criterio, no por defecto alegre.
 
 Uso:  python3 tools/guarda_memoria.py --tope-gb 8 -- <comando…>
+      python3 tools/guarda_memoria.py --inactivo-min 10 --reintentos 1 -- <comando…>
 """
 import argparse
 import os
@@ -164,8 +173,84 @@ def _arbol(raiz):
     return fuera
 
 
-def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_gb=3.0):
+CODIGO_MEMORIA = 99
+CODIGO_CUELGUE = 98
+# CPU que el árbol entero tiene que gastar en la ventana para contar como vivo. Un árbol colgado
+# gasta centésimas (los hilos de fondo de Python y torch); uno trabajando, segundos por segundo.
+INACTIVO_CPU_S = 2.0
+
+
+def _a_segundos(t):
+    """`ps -o time=` de macOS: «M:SS.ss», «H:MM:SS» o «D-HH:MM:SS» → segundos."""
+    dias = 0
+    if "-" in t:
+        d, t = t.split("-", 1)
+        dias = int(d)
+    s = 0.0
+    for parte in t.split(":"):
+        s = s * 60 + float(parte)
+    return dias * 86400 + s
+
+
+def _cpu_por_pid(pids):
+    """{pid: segundos de CPU acumulados} de los que siguen vivos. {} si `ps` falla."""
+    try:
+        salida = subprocess.run(["ps", "-o", "pid=,time=", "-p", ",".join(str(p) for p in pids)],
+                                capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return {}
+    fuera = {}
+    for linea in salida.split("\n"):
+        p = linea.split()
+        if len(p) == 2 and p[0].isdigit():
+            try:
+                fuera[int(p[0])] = _a_segundos(p[1])
+            except ValueError:
+                pass
+    return fuera
+
+
+def _vuelca_sample(pids, carpeta, verbose=True):
+    """`sample <pid> 1` de cada proceso del árbol a un fichero. Es la traza que faltó el 24-sep
+    para saber en QUÉ lock estaba el interbloqueo. Local; son pilas de llamadas, no datos."""
+    if not carpeta:
+        return None
+    try:
+        os.makedirs(carpeta, exist_ok=True)
+        ruta = os.path.join(carpeta, "cuelgue-%s-%d.txt" % (time.strftime("%Y%m%d-%H%M%S"), pids[0]))
+        with open(ruta, "w", encoding="utf-8") as f:
+            for p in pids[:12]:
+                f.write("===== pid %d =====\n" % p)
+                f.flush()
+                try:
+                    r = subprocess.run(["sample", str(p), "1"], capture_output=True, text=True,
+                                       timeout=30)
+                    f.write(r.stdout or r.stderr)
+                except Exception as e:     # noqa: BLE001
+                    f.write("sample falló: %s\n" % e)
+        if verbose:
+            print("GUARDA: traza del cuelgue en %s" % ruta, file=sys.stderr, flush=True)
+        return ruta
+    except OSError:
+        return None
+
+
+def _mata_grupo(proc, pids):
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except Exception:
+        for p in pids:
+            try:
+                os.kill(p, signal.SIGKILL)
+            except Exception:
+                pass
+    proc.wait(timeout=30)
+
+
+def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_gb=3.0,
+          inactivo_s=None, volcado_dir=None, env=None):
     """Devuelve (codigo, pico_gb). codigo 99 = lo mató la guarda. pico = uso del árbol sin Metal.
+    codigo 98 = colgado: el árbol pasó `inactivo_s` sin gastar CPU. `tope_gb=None` = sin techo.
 
     Mata si (a) la huella del árbol SIN Metal pasa del techo dos muestreos seguidos, o (b) la
     máquina ya ha empujado `tope_swap_gb` al swap desde que esto empezó Y el árbol, contando
@@ -175,13 +260,33 @@ def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_g
     Sirve para la pregunta que el techo NO responde: el techo dice CUÁNDO se pasó, nunca cuánto
     pedía de verdad ni quién.
     """
-    swap0 = _swap_gb()
-    proc = subprocess.Popen(comando, start_new_session=True)
+    swap0 = _swap_gb() if tope_gb is not None else 0.0
+    proc = subprocess.Popen(comando, start_new_session=True, env=env)
     pico, t0, seguidas, avisado = 0.0, time.time(), 0, False
+    # CPU por pid, el MÁXIMO visto: un hijo que termina no puede restar a la suma y fingir quietud
+    cpu_visto, cpu_ref, t_ref = {}, 0.0, time.time()
     reg = open(traza, "w", encoding="utf-8") if traza else None
     try:
         while proc.poll() is None:
             pids = _arbol(proc.pid)
+            if inactivo_s:
+                for p, c in _cpu_por_pid(pids).items():
+                    cpu_visto[p] = max(c, cpu_visto.get(p, 0.0))
+                cpu = sum(cpu_visto.values())
+                if cpu - cpu_ref > INACTIVO_CPU_S:
+                    cpu_ref, t_ref = cpu, time.time()
+                elif time.time() - t_ref >= inactivo_s and proc.poll() is None:
+                    if verbose:
+                        print("GUARDA: el árbol (%d procesos) lleva %.0f s sin gastar CPU "
+                              "(%.2f s en la ventana): colgado, lo mato"
+                              % (len(pids), time.time() - t_ref, cpu - cpu_ref),
+                              file=sys.stderr, flush=True)
+                    _vuelca_sample(pids, volcado_dir, verbose)
+                    _mata_grupo(proc, _arbol(proc.pid))
+                    return CODIGO_CUELGUE, pico
+            if tope_gb is None:
+                time.sleep(intervalo)
+                continue
             huella = _huella_gb(pids)
             swap = _swap_gb() - swap0
             neto = huella
@@ -215,16 +320,8 @@ def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_g
                 if verbose:
                     print("GUARDA: %s — matando %d proceso(s)" % (motivo, len(pids)),
                           file=sys.stderr, flush=True)
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except Exception:
-                    for p in pids:
-                        try:
-                            os.kill(p, signal.SIGKILL)
-                        except Exception:
-                            pass
-                proc.wait(timeout=30)
-                return 99, pico
+                _mata_grupo(proc, pids)
+                return CODIGO_MEMORIA, pico
             time.sleep(intervalo)
     except KeyboardInterrupt:
         try:
@@ -235,9 +332,31 @@ def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_g
     return proc.returncode, pico
 
 
+def corre_con_reintento(comando, tope_gb=None, reintentos=1, al_reintentar=None, **kw):
+    """`corre` y, si acaba COLGADO (98), lo relanza hasta `reintentos` veces. Solo el cuelgue se
+    reintenta: un 99 de memoria volvería a pasar igual, y un error del programa también.
+    Es seguro porque visor3d escribe cada caché en `.parcial` y la sella con `os.replace`: lo
+    que deja a medias un intento matado no pasa por bueno en el siguiente.
+    Devuelve (codigo, pico_gb, intentos). Si el último intento también se cuelga: 98 (cerrado)."""
+    intentos = 0
+    while True:
+        intentos += 1
+        codigo, pico = corre(comando, tope_gb, **kw)
+        if codigo != CODIGO_CUELGUE or intentos > reintentos:
+            return codigo, pico, intentos
+        if al_reintentar:
+            al_reintentar(intentos)
+        print("GUARDA: reintento %d de %d tras el cuelgue" % (intentos, reintentos),
+              file=sys.stderr, flush=True)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--tope-gb", type=float, required=True)
+    p.add_argument("--tope-gb", type=float, default=None)
+    p.add_argument("--inactivo-min", type=float, default=None,
+                   help="mata el árbol (código 98) si pasa estos minutos sin gastar CPU")
+    p.add_argument("--reintentos", type=int, default=0, help="relanzamientos tras un cuelgue")
+    p.add_argument("--volcado", help="carpeta para la traza `sample` del cuelgue")
     p.add_argument("--intervalo", type=float, default=3.0)
     p.add_argument("--traza", help="fichero con segundos, RSS, huella, sin-Metal y swap por muestreo")
     p.add_argument("--tope-swap-gb", type=float, default=3.0,
@@ -247,9 +366,14 @@ def main(argv=None):
     cmd = a.comando[1:] if a.comando and a.comando[0] == "--" else a.comando
     if not cmd:
         raise SystemExit("falta el comando: guarda_memoria.py --tope-gb 8 -- <comando…>")
-    codigo, pico = corre(cmd, a.tope_gb, a.intervalo, traza=a.traza,
-                         tope_swap_gb=a.tope_swap_gb)
-    print("guarda: pico %.1f GB sin Metal (techo %.1f)" % (pico, a.tope_gb), file=sys.stderr)
+    if a.tope_gb is None and a.inactivo_min is None:
+        raise SystemExit("falta qué vigilar: --tope-gb y/o --inactivo-min")
+    codigo, pico, _ = corre_con_reintento(
+        cmd, a.tope_gb, reintentos=a.reintentos, intervalo=a.intervalo, traza=a.traza,
+        tope_swap_gb=a.tope_swap_gb, volcado_dir=a.volcado,
+        inactivo_s=a.inactivo_min * 60 if a.inactivo_min else None)
+    if a.tope_gb is not None:
+        print("guarda: pico %.1f GB sin Metal (techo %.1f)" % (pico, a.tope_gb), file=sys.stderr)
     return codigo
 
 

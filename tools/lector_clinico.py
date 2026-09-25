@@ -412,7 +412,32 @@ def procesa(agent, argv):
         return 1
     _log(agent, "PROCESA-%s" % nombre, " ".join(args)[:400])
     env = dict(os.environ, BTP_VENTANILLA="1")
+    if nombre in VIGILA_CUELGUE:
+        return _procesa_vigilado(agent, nombre, [interprete, script] + args, env)
     return subprocess.call([interprete, script] + args, env=env)
+
+
+# Procesadores que corren nnU-Net (TotalSegmentator, MAMA-MIA) y pueden quedarse en interbloqueo
+# con sus workers `multiprocessing.spawn`: el 24-sep un `visor3d suv` pasó más de 8 min al 0 % de
+# CPU y sin vigilante habría seguido así para siempre (deuda visor3d-nnunet-cuelgue-multiproceso).
+# Minutos sin gastar CPU → traza + matar el grupo + UN reintento; si se repite, código 98.
+VIGILA_CUELGUE = {"visor3d": 10}
+CUELGUES_DIR = os.path.join(REPO, ".claude", "logs", "cuelgues")
+
+
+def _procesa_vigilado(agent, nombre, comando, env):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import guarda_memoria
+    codigo, _, intentos = guarda_memoria.corre_con_reintento(
+        comando, None, reintentos=1, intervalo=5.0, env=env, volcado_dir=CUELGUES_DIR,
+        inactivo_s=VIGILA_CUELGUE[nombre] * 60,
+        al_reintentar=lambda n: _log(agent, "CUELGUE-%s-reintento" % nombre, "intento %d" % n))
+    if codigo == guarda_memoria.CODIGO_CUELGUE:
+        _log(agent, "CUELGUE-%s-fallo-cerrado" % nombre, "%d intentos colgados" % intentos)
+        print("FALLO: %s se colgó %d veces seguidas (0 %% de CPU %d min). Nada de lo que dejó a "
+              "medias vale; traza en %s" % (nombre, intentos, VIGILA_CUELGUE[nombre], CUELGUES_DIR),
+              file=sys.stderr)
+    return codigo
 
 
 CHUNK = 1 << 20   # 1 MiB: copia en streaming, sin cargarse un DICOM entero en RAM
