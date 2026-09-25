@@ -135,6 +135,22 @@ check("la ventanilla rechaza una ruta que ni siquiera es zona clínica (antes qu
       p.returncode == 1 and "zona clínica" in (p.stderr or ""))
 check("   …y no ha escrito el contenido por stdout", "Anselmo" not in (p.stdout or ""))
 
+# Desde un worktree el overlay no está en el checkout: tiene que encontrarse en casa base
+# (deuda identidad-paciente-overlay-no-viaja-al-worktree, 25-sep-26). Antes rechazaba TODO.
+_VACIO = tempfile.mkdtemp(prefix="identidad_wt_")
+_root, _base = ip.ROOT, ip.CASA_BASE
+ip.ROOT, ip.CASA_BASE = _VACIO, _TMP
+try:
+    check("desde un worktree sin overlay, el titular se lee del de casa base",
+          ip.titular().get("nombre") == "Prudencia")
+    check("   …y un informe ajeno se sigue rechazando igual",
+          ip.verificar(AJENO)[0] == "otro_paciente")
+    ip.CASA_BASE = _VACIO
+    check("sin overlay en ninguno de los dos, no hay titular (no se inventa)", ip.titular() == {})
+finally:
+    ip.ROOT, ip.CASA_BASE = _root, _base
+    shutil.rmtree(_VACIO, ignore_errors=True)
+
 for desc, ok in casos:
     print(("  ✅ " if ok else "  ❌ ") + desc)
 shutil.rmtree(_TMP, ignore_errors=True)

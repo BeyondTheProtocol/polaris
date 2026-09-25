@@ -177,6 +177,7 @@ _data/
 00_FUENTE-DE-VERDAD/.kb_index.db-*
 .claude/logs/
 .venv-omica/
+.venv-deid/
 
 # Overlay local del detector de zonas clínicas: lleva nombre y fecha de nacimiento.
 .claude/hooks/zonas_clinicas.local.json

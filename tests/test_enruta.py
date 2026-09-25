@@ -529,12 +529,72 @@ class LasConsultasSeMidenComoBusqueda(unittest.TestCase):
             else:
                 os.environ[borde.ENV_CONSULTA] = viejo
 
+class LaSondaDelLocalExigeInferencia(unittest.TestCase):
+    """25-sep-26 (feedback {{CONTACTO}}+KAI, P4): la sonda miraba solo `ollama list`. Un servidor que
+    lista modelos pero no genera salía «vivo» y el enrutado le mandaba la de-identificación.
+    Ahora el carril solo está vivo si el modelo configurado RESPONDE BIEN a una inferencia.
+    Se falsea local.modelos/_pedir: sin red y sin gastar una llamada real."""
+
+    def setUp(self):
+        import local
+        self.local = local
+        self._orig = (local.modelos, local._pedir)
+        local.modelos = lambda: [local.MODELO, "otro:1b"]
+
+    def tearDown(self):
+        self.local.modelos, self.local._pedir = self._orig
+
+    def _con_respuesta(self, fn):
+        self.local._pedir = fn
+        return enruta.probar("local")
+
+    def test_responde_bien_esta_vivo(self):
+        ok, det = self._con_respuesta(lambda p, **k: "5")
+        self.assertTrue(ok, det)
+        self.assertIn("infiere", det)
+
+    def test_listar_sin_inferir_cae(self):
+        """El caso que la sonda vieja daba por bueno: ollama lista, el modelo no genera."""
+        def colgado(p, **k):
+            raise TimeoutError("timed out")
+        ok, det = self._con_respuesta(colgado)
+        self.assertFalse(ok, "ollama list responde pero el modelo no infiere: tiene que caer")
+        self.assertIn("no infiere", det)
+
+    def test_respuesta_vacia_o_erronea_cae(self):
+        for mala in ("", "7", "15", "Claro, la respuesta a tu pregunta es cinco " * 3):
+            ok, _ = self._con_respuesta(lambda p, m=mala, **k: m)
+            self.assertFalse(ok, "respuesta %r no puede contar como viva" % mala)
+
+    def test_modelo_del_carril_ausente_cae_aunque_haya_otros(self):
+        self.local.modelos = lambda: ["llama3.2:3b"]
+        ok, det = self._con_respuesta(lambda p, **k: "5")
+        self.assertFalse(ok, "otro modelo descargado no vale: el carril usa local.MODELO")
+        self.assertIn(self.local.MODELO, det)
+
+    def test_ollama_caido_cae(self):
+        self.local.modelos = lambda: []
+        ok, _ = self._con_respuesta(lambda p, **k: "5")
+        self.assertFalse(ok)
+
+    def test_la_sonda_pasa_el_timeout_y_no_lleva_nada_clinico(self):
+        vistos = {}
+        def espia(p, **k):
+            vistos.update(prompt=p, **k)
+            return "5"
+        self.local._pedir = espia
+        enruta.probar("local", timeout=33)
+        self.assertEqual(vistos.get("timeout"), 33)
+        self.assertFalse(enruta._crudo_identificador(vistos["prompt"])[0])
+
+
 if __name__ == "__main__":
     casos = unittest.TestSuite([
         unittest.TestLoader().loadTestsFromTestCase(c)
         for c in (ElMuroMandaPrimero, CrudoIdentificableSoloLocal, EligeSegunLaTarea, SaludYPanel,
                   ElCatalogoEsCoherente, EjecutarNoSeSaltaElMuro,
-                  DecidirEsRapidoYNoDejaANadie, LasConsultasSeMidenComoBusqueda)])
+                  DecidirEsRapidoYNoDejaANadie, LasConsultasSeMidenComoBusqueda,
+                  LaSondaDelLocalExigeInferencia)])
     res = unittest.TextTestRunner(verbosity=0).run(casos)
     if res.wasSuccessful():
         print("✅ ENRUTADOR EN VERDE (%d casos · el muro manda, la salud filtra, el panel diversifica)"

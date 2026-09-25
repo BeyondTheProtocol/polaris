@@ -219,6 +219,9 @@ runpy test_cerebro_enlace.py
 runpy test_reescribe_consulta.py
 runpy test_deid.py
 runpy test_deid_procedencia.py   # 24-sep · auditoría 3.3: lo del caso es N2 por procedencia aunque el detector no vea nada
+runpy test_deid_ner.py           # 25-sep · P4: capa NER del BSC; con NER pedido y caído, nada a medias
+runpy test_deid_diccionario.py   # 25-sep · P4: sus identificadores concretos, sin etiqueta y partidos
+runpy test_deid_eval.py          # 25-sep · P4: el banco mide bien y el suelo de recall sobre MEDDOCAN no baja
 runpy test_kb_pdf_avisos.py
 runpy test_kb_fts5.py
 runpy test_kb_hibrido.py

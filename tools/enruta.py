@@ -41,6 +41,7 @@ Uso:
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -285,6 +286,34 @@ FLAGS_POR_CAPACIDAD = {
 }
 
 
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+# La sonda del local tiene que INFERIR, no solo ver que ollama contesta (25-sep-26, feedback de
+# {{CONTACTO}}+KAI). Antes miraba `ollama list`: con el modelo corrupto, sin memoria o colgado, el
+# carril salía «vivo» y el enrutado mandaba ahí la de-identificación, que luego fallaba. Una
+# suma con respuesta única es la inferencia más barata que distingue «modelo carga y genera»
+# de «el servidor lista ficheros». Va por HTTP directo, sin prompt clínico: nada sensible viaja.
+_SONDA_LOCAL = ("Responde SOLO con el número, sin texto: ¿cuánto es 2+3?", re.compile(r"(?<!\d)5(?!\d)"))
+
+
+def _probar_local(timeout):
+    import local
+    instalados = local.modelos()
+    if not instalados:
+        return False, "ollama no responde o no tiene modelos"
+    if local.MODELO not in instalados:
+        return False, "falta el modelo del carril (%s); hay: %s" % (
+            local.MODELO, ", ".join(instalados[:3]))
+    prompt, esperado = _SONDA_LOCAL
+    t0 = time.time()
+    try:
+        salida = local._pedir(prompt, timeout=timeout)
+    except Exception as e:
+        return False, "%s no infiere: %r" % (local.MODELO, e)
+    if not esperado.search(salida or "") or len(salida) > 40:
+        return False, "%s responde mal a la sonda: %r" % (local.MODELO, (salida or "")[:40])
+    return True, "%s infiere (%.1f s)" % (local.MODELO, time.time() - t0)
+
+
 def probar(nombre, *, timeout=None):
     """¿Responde este proveedor? Prueba viva, sin suponer. (ok: bool, detalle: str)."""
     meta = PROVEEDORES.get(nombre) or {}
@@ -293,18 +322,7 @@ def probar(nombre, *, timeout=None):
     if nombre == "claude":
         return True, "es el runtime de esta sesión"
     if nombre == "local":
-        try:
-            r = subprocess.run(["ollama", "list"], capture_output=True, text=True, timeout=20)
-            if r.returncode != 0:
-                return False, "ollama no responde"
-            modelos = [l.split()[0] for l in r.stdout.strip().split("\n")[1:] if l.strip()]
-            if not modelos:
-                return False, "ollama sin modelos descargados"
-            return True, "ollama con %d modelo(s): %s" % (len(modelos), ", ".join(modelos[:3]))
-        except FileNotFoundError:
-            return False, "ollama no está instalado"
-        except Exception as e:
-            return False, "ollama: %r" % e
+        return _probar_local(timeout)
     if not tool:
         return False, "sin tool asociada"
     ruta = os.path.join(AQUI, tool)

@@ -61,7 +61,7 @@ _PROMPT_DEID = (
 )
 
 
-def _pedir(prompt, system=None, *, modelo=None, temperatura=0.0):
+def _pedir(prompt, system=None, *, modelo=None, temperatura=0.0, timeout=None):
     cuerpo = {
         "model": modelo or MODELO,
         "prompt": prompt,
@@ -75,7 +75,7 @@ def _pedir(prompt, system=None, *, modelo=None, temperatura=0.0):
         API.rstrip("/") + "/api/generate",
         data=json.dumps(cuerpo).encode("utf-8"),
         headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
+    with urllib.request.urlopen(req, timeout=timeout or TIMEOUT_S) as r:
         return (json.load(r).get("response") or "").strip()
 
 

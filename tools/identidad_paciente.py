@@ -64,12 +64,23 @@ def _norm(s):
     return "".join(c for c in s if not unicodedata.combining(c)).lower()
 
 
+# Casa base: los overlays son gitignored y en un worktree no existen, así que la ventanilla
+# rechazaba por identidad TODO lo que se abría desde una rama (deuda
+# identidad-paciente-overlay-no-viaja-al-worktree, 25-sep-26). Mismo arreglo que
+# `seguimiento._cargar_overlay`: primero el del checkout, si no, el de casa base. Con BTP_REPO
+# puesto a propósito (tests, otra instalación) se respeta y no se busca en otro sitio: un test que
+# quita el overlay tiene que ver «sin overlay», no el perfil real de la casa.
+CASA_BASE = None if os.environ.get("BTP_REPO") else os.path.expanduser("~/claudecode")
+
+
 def _overlay(nombre):
-    try:
-        with io.open(os.path.join(ROOT, "tools", nombre), encoding="utf-8") as fh:
-            return json.load(fh)
-    except (OSError, ValueError):
-        return {}
+    for raiz in dict.fromkeys(r for r in (ROOT, CASA_BASE) if r):
+        try:
+            with io.open(os.path.join(raiz, "tools", nombre), encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            continue
+    return {}
 
 
 def titular():

@@ -179,6 +179,11 @@ PROCESADORES = {
     # stdlib + tesseract/poppler locales, egress 0, y no toca el original (escribe un sidecar
     # `.ocr.txt` al lado), así que cabe por aquí con su línea en el log como todo lo demás.
     "ocr_informes": ("tools/ocr_informes.py", "/usr/bin/python3"),
+    # Banco de medida de la de-identificación (25-sep-26, P4 paso 6): prepara la muestra suya en
+    # zona clínica, guarda las anotaciones a mano y la mide. Solo imprime cifras agregadas; sus
+    # modos de escritura exigen BTP_VENTANILLA=1 y una carpeta clínica por `zonas_clinicas`.
+    # Stdlib; con NER llama a .venv-deid por subproceso, sin conexión (egress 0).
+    "deid_eval": ("tools/deid_eval.py", "/usr/bin/python3"),
 }
 
 
