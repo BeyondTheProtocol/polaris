@@ -4,6 +4,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PY=/usr/bin/python3; [ -x "$PY" ] || PY=python3
 fail=0
 skip=0
+# Los logs de los rojos, en una carpeta POR EJECUCIÓN (25-sep-26, deuda
+# test-all-log-rojo-tmp-compartido): con /tmp/rojo-<test>.log fijo, las sesiones en paralelo se
+# pisaban el log y el de una rama enseñaba el fallo de otra. En el CI hay un runner por ejecución
+# y el workflow público y healthcheck los buscan en /tmp: allí se queda. Test: test_all_rojo_dir.py.
+if [ -n "$BTP_ROJO_DIR" ]; then ROJO_DIR="$BTP_ROJO_DIR"; mkdir -p "$ROJO_DIR"
+elif [ -n "$CI" ]; then ROJO_DIR=/tmp
+else _t="${TMPDIR:-/tmp}"; ROJO_DIR=$(mktemp -d "${_t%/}/rojo.XXXXXX"); fi
+ROJO_DIR="${ROJO_DIR%/}"
 # 19-sep-2026 — BTP_PORTABLE=1 (lo usa el CI del repo público en Linux): salta las baterías
 # que solo pueden pasar en la casa base: Llavero de macOS, plists de launchd, el binario
 # `xurl`, el panel técnico de la anatomía. No son opcionales, es que allí no hay con qué
@@ -21,8 +29,8 @@ _salta() { [ -n "$BTP_PORTABLE" ] || return 1
            case " $(echo $SOLO_CASA_BASE) " in *" $1 "*) return 0;; esac; return 1; }
 run() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
         [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
-        [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "/tmp/rojo-$1.log" 2>/dev/null;
-                           echo "  🔴 ROJO: $1 (rc=$rc · log: /tmp/rojo-$1.log)"; }; }
+        [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
+                           echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
 # El nombre del test que se pone ROJO se DICE (27/7/26). Antes runpy solo incrementaba el contador:
 # la batería acababa en "❌ 1 batería(s) con fallos" sin decir cuál, y había que ir a mano fichero a
 # fichero. Con el log guardado, además, el fallo se puede mirar después (importa para los flakes).
@@ -30,8 +38,8 @@ runpy() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((ski
           [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
           # stderr va al log del rojo (22-sep-26): `unittest` escribe AHÍ el fallo, y sin esto el
           # paso «Qué falló exactamente» del CI público salía vacío con test_web_lint en rojo.
-          [ $rc -ne 0 ] && { fail=$((fail+1)); cat /tmp/t.$$ /tmp/t.$$.err > "/tmp/rojo-$1.log" 2>/dev/null;
-                             echo "  🔴 ROJO: $1 (rc=$rc · log: /tmp/rojo-$1.log)"; }; }
+          [ $rc -ne 0 ] && { fail=$((fail+1)); cat /tmp/t.$$ /tmp/t.$$.err > "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
+                             echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
 
 run   test_fuga.sh
 run   test_halt.sh
@@ -62,6 +70,7 @@ runpy test_casa_base_guard.py
 runpy test_gate_etiqueta.py
 runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} + KAI)
 runpy test_gate_citas.py
+runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU carpeta (deuda test-all-log-rojo-tmp-compartido)
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
@@ -281,24 +290,24 @@ run   test_credito_agotado.sh
 # romper a propósito lo que decían proteger.
 echo "── mutantes: tests/mutantes/lector_clinico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/lector_clinico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
-[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes.log 2>/dev/null;
-                     echo "  🔴 ROJO: campaña de mutantes (log: /tmp/rojo-mutantes.log)"; }
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes (log: $ROJO_DIR/rojo-mutantes.log)"; }
 echo "── mutantes: tests/mutantes/soporte_cita.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/soporte_cita.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
-[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-soporte.log 2>/dev/null;
-                     echo "  🔴 ROJO: campaña de mutantes soporte_cita (log: /tmp/rojo-mutantes-soporte.log)"; }
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-soporte.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes soporte_cita (log: $ROJO_DIR/rojo-mutantes-soporte.log)"; }
 echo "── mutantes: tests/mutantes/biomarcadores.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
-[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-biomarcadores.log 2>/dev/null;
-                     echo "  🔴 ROJO: campaña de mutantes biomarcadores (log: /tmp/rojo-mutantes-biomarcadores.log)"; }
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-biomarcadores.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes biomarcadores (log: $ROJO_DIR/rojo-mutantes-biomarcadores.log)"; }
 echo "── mutantes: tests/mutantes/biomarcadores_fecha.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores_fecha.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
-[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-biomarcadores-fecha.log 2>/dev/null;
-                     echo "  🔴 ROJO: campaña de mutantes biomarcadores_fecha (log: /tmp/rojo-mutantes-biomarcadores-fecha.log)"; }
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-biomarcadores-fecha.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes biomarcadores_fecha (log: $ROJO_DIR/rojo-mutantes-biomarcadores-fecha.log)"; }
 echo "── mutantes: tests/mutantes/caso_publico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
-[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ /tmp/rojo-mutantes-caso-publico.log 2>/dev/null;
-                     echo "  🔴 ROJO: campaña de mutantes caso_publico (log: /tmp/rojo-mutantes-caso-publico.log)"; }
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-caso-publico.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes caso_publico (log: $ROJO_DIR/rojo-mutantes-caso-publico.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
@@ -443,5 +452,7 @@ echo
 # Un SKIP no es ni verde ni rojo: es «necesita algo que aquí no está» (ver tests/_entorno.py).
 # Se dice aparte para que el número de rojos signifique lo que parece.
 [ "$skip" -gt 0 ] && echo "⏭️  $skip batería(s) saltada(s): falta el contenido, el estado vivo, los overlays locales o el lazo (HALT activo)"
-[ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos"
+[ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos · logs de ESTA ejecución: $ROJO_DIR"
+# Sin rojos, la carpeta propia sobra (nunca /tmp ni una que haya dado el llamador).
+[ "$fail" -eq 0 ] && [ -z "$CI" ] && [ -z "$BTP_ROJO_DIR" ] && rmdir "$ROJO_DIR" 2>/dev/null
 exit "$fail"
