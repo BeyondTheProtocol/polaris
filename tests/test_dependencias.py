@@ -72,9 +72,22 @@ class TestDependencias(unittest.TestCase):
         self.assertNotIn("tools/base.py", hondo)
 
     def test_huerfanos(self):
-        hs = self.g.huerfanos("tools")
+        hs, doc = self.g.huerfanos("tools")
         self.assertIn("tools/nadie.py", hs)
         self.assertNotIn("tools/base.py", hs)
+        self.assertEqual(doc, [])
+
+    def test_huerfano_documentado_fuera_no_es_muerto(self):
+        # 26-sep-26: backup.py no lo nombraba el repo pero sí la fuente de verdad (restore probado).
+        fuera = tempfile.mkdtemp(prefix="fuente-")
+        try:
+            with open(os.path.join(fuera, "nota.md"), "w") as fh:
+                fh.write("Backup: `nadie.py init/run/verify`\n")
+            hs, doc = self.g.huerfanos("tools", fuera=[fuera])
+            self.assertNotIn("tools/nadie.py", hs)
+            self.assertIn("tools/nadie.py", doc)
+        finally:
+            shutil.rmtree(fuera, ignore_errors=True)
 
     def test_buscar_por_nombre(self):
         self.assertEqual(self.g.buscar("base"), "tools/base.py")

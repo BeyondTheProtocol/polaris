@@ -17,7 +17,7 @@ Aristas (origen → destino), por tipo:
 Uso:
   python3 tools/dependencias.py quien <script> [--hondo]   # quién depende de él
   python3 tools/dependencias.py usa <script>               # de quién depende él
-  python3 tools/dependencias.py huerfanos [--dir tools]    # scripts que nadie nombra
+  python3 tools/dependencias.py huerfanos [--dir tools]    # scripts que nadie nombra (ni fuente ni memoria)
   python3 tools/dependencias.py centrales [-n 15]          # los más usados
   python3 tools/dependencias.py json                       # el grafo entero
 
@@ -174,12 +174,31 @@ class Grafo:
                 g[d].add(o)
         return g
 
-    def huerfanos(self, directorio="tools"):
+    def huerfanos(self, directorio="tools", fuera=None):
+        """Scripts de `directorio` que nada del repo nombra. Con `fuera` (carpetas de texto que git
+        no rastrea: la fuente de verdad, la memoria), separa los que SÍ se documentan ahí.
+        Devuelve (sin_mencion, solo_fuera). Por qué (26-sep-26): la primera versión dio 10 huérfanos
+        y 7 estaban documentados como herramientas manuales en la fuente o la memoria (backup.py,
+        lazo_telegram.sh…). Borrar por esa lista habría roto el backup a USB."""
         g = self.grado_entrada(solo_duros=False)
         pref = directorio.rstrip("/") + "/"
-        return [s for s in self.scripts
-                if s.startswith(pref) and "/" not in s[len(pref):]
-                and not os.path.basename(s).startswith("_") and not g.get(s)]
+        cands = [s for s in self.scripts
+                 if s.startswith(pref) and "/" not in s[len(pref):]
+                 and not os.path.basename(s).startswith("_") and not g.get(s)]
+        textos = []
+        for d in fuera or []:
+            for base, _dirs, fs in os.walk(d):
+                for f in fs:
+                    if f.endswith((".md", ".txt", ".json", ".jsonl")):
+                        try:
+                            with open(os.path.join(base, f), encoding="utf-8", errors="replace") as fh:
+                                textos.append(fh.read())
+                        except OSError:
+                            pass
+        todo = "\n".join(textos)
+        solo_fuera = [s for s in cands if os.path.basename(s) in todo
+                      or os.path.splitext(os.path.basename(s))[0] in todo]
+        return [s for s in cands if s not in solo_fuera], solo_fuera
 
 
 def _imprimir(res):
@@ -206,10 +225,18 @@ def main(argv):
         _imprimir(res)
     elif cmd == "huerfanos":
         d = resto[resto.index("--dir") + 1] if "--dir" in resto else "tools"
-        hs = g.huerfanos(d)
-        print("%d scripts en %s/ que nadie nombra (ni import, ni ruta, ni launchd, ni config, ni doc):" % (len(hs), d))
+        fuera = [os.path.join(RAIZ, "00_FUENTE-DE-VERDAD"),
+                 os.path.expanduser("~/.claude/projects/-Users-polaris-claudecode/memory")]
+        hs, doc = g.huerfanos(d, fuera=[f for f in fuera if os.path.isdir(f)])
+        print("%d scripts en %s/ sin ninguna mención (ni en el repo, ni en la fuente, ni en la memoria):"
+              % (len(hs), d))
         for h in hs:
             print("  " + h)
+        if doc:
+            print("%d más que el repo no nombra pero la fuente o la memoria sí (uso manual, NO borrar a ciegas):"
+                  % len(doc))
+            for h in doc:
+                print("  " + h)
     elif cmd == "centrales":
         n = int(resto[resto.index("-n") + 1]) if "-n" in resto else 15
         g_in = g.grado_entrada()
