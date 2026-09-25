@@ -242,7 +242,11 @@ fuga="$(tail -c +$((LOG_ANTES + 1)) "$LOG_REAL" 2>/dev/null | grep -F -f "$MARCA
 [ -z "$fuga" ] && ok || no "un test escribió en el dispatcher.out de verdad: $(echo "$fuga" | head -2)"
 rm -f "$MARCAS"
 
-[ "$(panel_sz)" = "$PANEL_ANTES" ] && ok || no "el PANEL-LAZO del árbol bajo prueba cambió ($PANEL_ANTES → $(panel_sz) bytes): un test escribe en el panel de verdad"
+# Tampoco aquí se compara el tamaño (26-sep-2026): en casa base el lazo vivo añade un bloque cada
+# ~70 s («aplazado … → reintentar», ORIGEN: lazo) y el test salía rojo sin culpa. Todo bloque que
+# escribe una batería lleva «ORIGEN: test» (panel._origen con BTP_TEST_BATTERY=1): eso es la fuga.
+fuga_panel="$(tail -c +$((PANEL_ANTES + 1)) "$PANEL_REAL" 2>/dev/null | grep -c "^- ORIGEN: test$")"
+[ "${fuga_panel:-0}" = "0" ] && ok || no "un test escribió $fuga_panel bloque(s) en el PANEL-LAZO de verdad"
 
 echo
 echo "RESULTADO dispatcher: $pass OK, $fail fallos"

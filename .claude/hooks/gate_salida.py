@@ -1211,17 +1211,36 @@ def borrador_sin_voz(t, tools=None):
     borrador ya voiceado («el resto se queda», «palabra por palabra») no cantan."""
     if tools is None or not _borradores(t):
         return None
+    # Un prompt para otra sesión de Claude o la cita de un tercero no son texto en su nombre
+    # (falsos positivos del replay, 25-sep-26). Solo se descartan si NINGÚN bloque es suyo.
+    if all(re.search(r"claude/|casa base|worktree|\brama\b|\bgit\b", b)
+           or re.match(r"\s*\*?\s*[«\"“]", b) for b in _borradores(t)):
+        return None
     etiqueta = re.search(r"^\W{0,6}(#+\s*)?(?!qu[ée] )[^\n]{0,30}\b" + _PIEZA
                          + r"\b[^\n]{0,50}(:|:\*\*|\*\*:?)\s*$", t, re.I | re.M)
-    if not etiqueta or re.search(r"espera tu OK|contrapeso|\[verificado", etiqueta.group(0), re.I):
+    if etiqueta and re.search(r"espera tu OK|contrapeso|\[verificado", etiqueta.group(0), re.I):
+        etiqueta = None
+    # Segunda vía, sin etiqueta (25-sep-26): el replay de 30 días encontró ~20 correos y DMs en su
+    # nombre sin «Borrador para X:» encima («Hola Mafalda, …», «Llevo meses construyendo…»). Se
+    # reconocen por la pieza nombrada en la respuesta y la primera persona dentro del bloque.
+    suyo = None
+    if not etiqueta and re.search(_PIEZA, _sin_fences(t), re.I):
+        suyo = next((b for b in _borradores(t)
+                     if len(b.strip()) >= 60
+                     and not re.search(r"claude/|casa base|worktree|\brama\b|\bgit\b", b)
+                     and not re.match(r"\s*\*?\s*[«\"“]", b)
+                     and re.search(r"\b(yo|mi|mis|me|estoy|llevo|tengo|gracias|I'm|I've|my|thanks)\b", b, re.I)),
+                    None)
+    if not etiqueta and not suyo:
         return None
     if re.search(r"(el resto (se queda|igual|es tuyo)|palabra por palabra|tal cual|traducci[óo]n "
-                 r"(directa|literal)|te lo dejo igual)", t, re.I):
+                 r"(directa|literal)|te lo dejo igual|muy personal|como (me )?pediste|recortad)", t, re.I):
         return None
     if any(re.search(r"voz-titular|voz_titular|redes-contenido|comunidad", x) for x in tools):
         return None
+    cita = etiqueta.group(0) if etiqueta else re.sub(r"\s+", " ", suyo)
     return ("«%s»: un texto en su nombre sin pasar por `voz-titular` en este turno. Por defecto, "
-            "antes de dárselo." % etiqueta.group(0).strip()[:80])
+            "antes de dárselo." % cita.strip()[:80])
 
 
 _DM = r"(\bDM\b|mensaje directo|instagram|\bIG\b|whatsapp|\bWA\b|telegram|linkedin)"
@@ -1305,11 +1324,22 @@ def correo_no_existe(t, tools=None):
         return None
     if not any(re.search(r"search_threads|get_thread|list_drafts", x) for x in tools):
         return None
-    if any(re.search(r"imap|_PRIVADO_CORREO|claude-in-chrome|Claude_Browser", x, re.I) for x in tools):
+    # `buzon.json` lo escribe el poller IMAP (`correo_imap.py`, cada 120 s): leerlo es mirar en vivo.
+    if any(re.search(r"imap|buzon\.json|_PRIVADO_CORREO|claude-in-chrome|Claude_Browser", x, re.I)
+           for x in tools):
         return None
-    m = re.search(r"(no (hay|existe|encuentro|aparece|veo|tengo|ha llegado|consta)|sin rastro de|"
-                  r"todav[íi]a no (ha )?(llegado|contestado|respondido))[^.\n]{0,40}\b(correo|mail|"
-                  r"email|respuesta|contestaci[óo]n)", _sin_bloques(t), re.I)
+    m = None
+    for f in re.split(r"(?<=[.\n])\s+", _sin_bloques(t)):
+        # Un plan condicional («si no ha contestado para el 1-oct…») no concluye nada.
+        if re.match(r"\W*(si|cuando|en cuanto|hasta que)\b", f, re.I) or re.search(r"\bsi (a[úu]n )?no\b", f, re.I):
+            continue
+        m = (re.search(r"(no (hay|existe|encuentro|aparece|veo|tengo|ha llegado|consta)|sin rastro de|"
+                       r"todav[íi]a no (ha )?(llegado|contestado|respondido))[^.\n]{0,40}\b(correo|mail|"
+                       r"email|respuesta|contestaci[óo]n)", f, re.I)
+             # La persona como sujeto (22-jun-26: «aún no ha escrito» era justo el fallo original).
+             or re.search(r"(a[úu]n|todav[íi]a) no (ha|han) (escrito|contestado|respondido)", f, re.I))
+        if m:
+            break
     if not m or re.search(r"retraso|con lag|tiempo real|navegador|en vivo|p[ée]gamel|IMAP", t, re.I):
         return None
     return ("«%s»: solo miraste por el MCP de Gmail, que va horas por detrás. Di «no lo veo por la "

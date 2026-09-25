@@ -797,7 +797,7 @@
    "aplicable": true,
    "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py::check_paso_por_voz_titular · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 10 disparos (80 con la 1.ª versión, que tomaba cualquier cita «>» por borrador). Parcial: no ve una pasada de voz hecha en un turno anterior. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py::check_paso_por_voz_titular · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 10 disparos (80 con la 1.ª versión, que tomaba cualquier cita «>» por borrador). Parcial: no ve una pasada de voz hecha en un turno anterior. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}. · 26-sep-26 (punto 08): segunda vía sin etiqueta (pieza nombrada + primera persona en el bloque) y fuera prompts a otra sesión y citas de terceros. Replay 30 d: 10 → 57 disparos, casi todos borradores reales en su nombre sin voz-titular; ~11 son vueltas del mismo DM.",
    "modo": "aviso"
   },
   {
@@ -1292,7 +1292,7 @@
    "aplicable": true,
    "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 4 disparos. Solo canta si el turno miró por el MCP de Gmail y no por IMAP ni navegador. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 4 disparos. Solo canta si el turno miró por el MCP de Gmail y no por IMAP ni navegador. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}. · 26-sep-26 (punto 08): caza también «aún no ha escrito» (el fallo original), acepta buzon.json como mirada en vivo y no canta en condicionales. Replay 30 d: 4 disparos.",
    "modo": "aviso"
   },
   {

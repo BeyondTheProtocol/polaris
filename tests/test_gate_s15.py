@@ -50,8 +50,18 @@ CASOS = {
     "borrador_sin_voz": {
         "pos": [("**Borrador para {{CONTACTO}} (no enviado):**\n\n> Hola {{CONTACTO}}, ¿te va bien el jueves?\n",
                  ["Bash"]),
-                ("**DM para {{CONTACTO}} (X):**\n\n> Hi {{CONTACTO}}! Quick update from my side.\n", [])],
+                ("**DM para {{CONTACTO}} (X):**\n\n> Hi {{CONTACTO}}! Quick update from my side.\n", []),
+                # 25-sep-26 (punto 08): sin etiqueta, pero es un correo suyo en primera persona.
+                ("Te dejo el correo, listo para mandar:\n\n> Hola Mafalda, gracias por preguntarme "
+                 "qué quiero sacar del bloque. Te cuento lo que tengo en mente.\n", ["Read"])],
         "neg": [
+            # 25-sep-26: un prompt para otra sesión y la cita de un tercero no son su voz.
+            ("**Mensaje para la otra sesión:**\n\n> Fusiona a casa base la rama claude/drive-x, "
+             "que tengo la suite en verde.\n", []),
+            ("**Lo que dice en su post:**\n\n> «Le escribo desde el móvil y decide qué "
+             "herramienta usar» (25-abr-2026)\n", []),
+            ("Mensaje para Natán, muy personal, como lo dijiste:\n\n> Hola Natán, apuntada la de "
+             "mañana a las 17:00, ahí estaré con lo que me pediste.\n", []),
             ("**DM para {{CONTACTO}} (X):**\n\n> Hi {{CONTACTO}}! Quick update from my side.\n",
              ["Agent", "voz-titular"]),
             # replay: un cierre que lista lo que espera su OK no es un texto en su nombre
@@ -98,12 +108,21 @@ CASOS = {
     },
     "correo_no_existe": {
         "pos": [("No hay ningún correo de {{CENTRO}} con los resultados todavía.",
+                 ["mcp__gmail__search_threads"]),
+                # 25-sep-26: la persona como sujeto, justo el fallo del 22-jun (el AWB).
+                ("Confirmado que Foundation aún no ha escrito, así que la frase es cierta.",
                  ["mcp__gmail__search_threads"])],
         "neg": [("No hay ningún correo de {{CENTRO}} con los resultados todavía.",
                  ["mcp__gmail__search_threads", "python3 tools/correo_imap.py buscar {{CENTRO}}"]),
                 ("No lo veo por la API, que va con retraso; lo confirmo en el navegador.",
                  ["mcp__gmail__search_threads"]),
-                ("No hay ningún correo de {{CENTRO}} con los resultados todavía.", ["Read"])],
+                ("No hay ningún correo de {{CENTRO}} con los resultados todavía.", ["Read"]),
+                # 25-sep-26: leer el buzón del poller IMAP es mirar en vivo.
+                ("No hay ningún correo de {{CENTRO}} con los resultados todavía.",
+                 ["mcp__gmail__search_threads", "tools/state/correo/buzon.json"]),
+                # Un plan condicional no concluye nada.
+                ("Si no ha contestado para el 1-oct, la vía cálida es escribir a otra persona.",
+                 ["mcp__gmail__search_threads"])],
     },
     "respuesta_en_ingles": {
         "pos": [("This is the summary of what I did today: I fixed the two regexes in the gate and "
