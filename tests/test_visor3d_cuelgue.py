@@ -236,9 +236,16 @@ print("4) el reloj de CPU se lee bien")
 check(G._a_segundos("0:01.50") == 1.5 and G._a_segundos("1:02:03") == 3723
       and G._a_segundos("2-00:00:01") == 172801, "formatos M:SS.ss, H:MM:SS y D-HH:MM:SS")
 
+print("5) el umbral de «quieto» escala con la ventana (deuda visor3d-cuelgue-inestable-con-carga)")
+# Con 2 s fijos en 3 s, un proceso al 100 % en una máquina a carga 51 (0,3 s de CPU en 3 s, medido)
+# se mataba como colgado. En producción (10 min) el umbral no cambia.
+check(G._umbral_cpu(600) == G.INACTIVO_CPU_S == 2.0, "ventana de 10 min: umbral 2 s, como siempre")
+check(G._umbral_cpu(VENTANA_S) <= 0.1, "ventana de 3 s: umbral %.2f s, por debajo de lo que un "
+      "proceso trabajando recibe con carga ~50 (0,3 s)" % G._umbral_cpu(VENTANA_S))
+
 if fallos:
     print("\n🔴 %d fallo(s):" % len(fallos))
     for f in fallos:
         print("   - " + f)
     sys.exit(1)
-print("\n✅ vigilante de cuelgues de visor3d: los 5 casos en verde")
+print("\n✅ vigilante de cuelgues de visor3d: los 6 casos en verde")

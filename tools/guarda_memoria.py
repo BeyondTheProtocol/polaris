@@ -34,7 +34,7 @@ Dos cosas que este script hace y la guarda anterior no:
    `visor3d suv` se quedó en interbloqueo dentro de nnU-Net: el principal esperando un lock y 7
    hijos `multiprocessing.spawn` en `sem_wait`, todo al 0 % de CPU más de 8 min, y habría seguido
    así para siempre. Se mide el tiempo de CPU ACUMULADO del árbol (no el %cpu instantáneo, que un
-   proceso sano a ratos también marca 0): si en `inactivo_s` no avanza más de `INACTIVO_CPU_S`, se
+   proceso sano a ratos también marca 0): si en `inactivo_s` no avanza más de `_umbral_cpu()` (2 s, o el 2 % de una ventana corta), se
    vuelca un `sample` de cada proceso (para cazar la causa, que aún no sabemos) y se mata el
    grupo con código 98. `corre_con_reintento` lo relanza UNA vez; si se repite, falla cerrado.
 
@@ -178,6 +178,15 @@ CODIGO_CUELGUE = 98
 # CPU que el árbol entero tiene que gastar en la ventana para contar como vivo. Un árbol colgado
 # gasta centésimas (los hilos de fondo de Python y torch); uno trabajando, segundos por segundo.
 INACTIVO_CPU_S = 2.0
+# ...y como mucho esta FRACCIÓN de la ventana (25-sep-26, deuda visor3d-cuelgue-inestable-con-carga).
+# 2 s fijos en una ventana corta pedían ~67 % de un núcleo: con la máquina a carga 51 sobre 10
+# núcleos, un proceso trabajando al 100 % recibía 0,3 s en 3 s (medido con `ps`) y se mataba como
+# colgado. Con la ventana de producción (10 min) el umbral sigue siendo 2 s.
+INACTIVO_CPU_FRAC = 0.02
+
+
+def _umbral_cpu(inactivo_s):
+    return min(INACTIVO_CPU_S, INACTIVO_CPU_FRAC * inactivo_s)
 
 
 def _a_segundos(t):
@@ -273,7 +282,7 @@ def corre(comando, tope_gb, intervalo=3.0, verbose=True, traza=None, tope_swap_g
                 for p, c in _cpu_por_pid(pids).items():
                     cpu_visto[p] = max(c, cpu_visto.get(p, 0.0))
                 cpu = sum(cpu_visto.values())
-                if cpu - cpu_ref > INACTIVO_CPU_S:
+                if cpu - cpu_ref > _umbral_cpu(inactivo_s):
                     cpu_ref, t_ref = cpu, time.time()
                 elif time.time() - t_ref >= inactivo_s and proc.poll() is None:
                     if verbose:

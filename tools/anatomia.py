@@ -301,6 +301,7 @@ FAMILIAS = [
                             "reglas_repetidas",
                             "bench_determinista",   # mide acierto del triaje, set dorado
                             "bench_jev",            # mide un modelo externo contra el mismo set, tras el muro
+                            "bench_modelos",        # modelo LOCAL por tarea contra el determinista (P5)
                             "mutantes")),           # comprueba que los tests de verdad protegen
 ]
 
