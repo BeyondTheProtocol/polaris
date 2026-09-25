@@ -216,6 +216,8 @@ con las cifras del repo delante y sin adornos: el carril local parado, demasiada
 gestión de su ciclo de vida, la dependencia de un solo runtime, el contexto que se pierde entre
 sesiones y las rutinas que se caen en silencio.
 
+English: [What is missing — five open problems](docs/what-is-missing.md).
+
 ### 👥 ¿Te interesan los agentes y cómo se reparten el trabajo?
 
 Los 34 agentes están publicados en `.claude/agents/`, uno por fichero, y
