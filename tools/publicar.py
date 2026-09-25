@@ -343,7 +343,7 @@ def _sin_tildes(t):
 
 def _rx_termino(t):
     """El patrón de un término de ficha. Largos (≥4): sin distinguir mayúsculas ni tildes
-    (la misma persona sale como «{{CONTACTO}}» y «{{CONTACTO}}»), también justo tras `\\b` o `_`,
+    (la misma persona sale como «Hernández» y «Hernandez»), también justo tras `\\b` o `_`,
     y pegados por delante de una Mayúscula, un `_` o un dígito (`ApellidoBot`, `apellido_ok`)
     pero NO de una minúscula: así «Madrid» no cae por contener un nombre de pila. Cortos
     (<4): colisionan con código (`zipfile.ZipFile`), así que solo casan con la grafía exacta

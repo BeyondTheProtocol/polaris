@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_digest.sh — el digest para el RAG de {{CONTACTO}} NUNCA fuga PII clínica cruda.
+# tests/test_digest.sh — el digest para el RAG de Alby NUNCA fuga PII clínica cruda.
 # (El léxico estratégico 'vacuna'/'neoantígeno' SÍ se permite: el bot es canal privado.)
 set -uo pipefail
 cd "$(dirname "$0")/.."

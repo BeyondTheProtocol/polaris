@@ -4,23 +4,23 @@
   },
 
   {
-    "id": "sello-relay-redteam-contacto",
+    "id": "sello-relay-redteam-baifo",
     "tipo": "sello",
-    "texto": "Según el red-team, {{CONTACTO}} es una caja negra con telemetría sin documentar.",
+    "texto": "Según el red-team, Baifo es una caja negra con telemetría sin documentar.",
     "espera": {"flags_min": 1},
     "_por_que": "EL incidente del 28-jun-26 en su formulación literal: un juicio de un red-team relayado como HECHO. CLAUDE.md lo prohíbe con nombre y apellidos («nunca relayes como HECHO un juicio de un doc o de un red-team sin verificarlo»). Durante un tiempo el linter lo PERDONABA porque «según X» contaba como sello."
   },
   {
     "id": "sello-relay-sin-prefijo",
     "tipo": "sello",
-    "texto": "{{CONTACTO}} es una caja negra con telemetría sin documentar.",
+    "texto": "Baifo es una caja negra con telemetría sin documentar.",
     "espera": {"flags_min": 1},
     "_por_que": "La misma afirmación sin el «según». Va en pareja con la de arriba: si una pasa y la otra no, el sello está premiando la forma en vez del fondo."
   },
   {
     "id": "sello-verificado-con-fuente",
     "tipo": "sello",
-    "texto": "Auditado el repo entero: cero telemetria [verificado: github.com/achetronic/contacto].",
+    "texto": "Auditado el repo entero: cero telemetria [verificado: github.com/achetronic/baifo].",
     "espera": {"flags": 0},
     "_por_que": "Falso positivo que importa: un claim VERIFICADO y citado no puede marcarse, o el linter se vuelve ruido y se aprende a ignorarlo."
   },

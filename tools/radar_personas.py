@@ -2,7 +2,7 @@
 """radar_personas.py — los GEMELOS DE CRITERIO se mantienen frescos (o cantan que no).
 
 Generaliza `radar_contacto.py` a los N consejeros que son espejo de una persona real
-({{CONTACTO}}, {{CONTACTO}}, {{CONTACTO}}, Sid, {{CONTACTO}}). NO es un daemon nuevo: es el ayudante determinista que
+({{CONTACTO}}, Alby, {{CONTACTO}}, Sid, {{CONTACTO}}). NO es un daemon nuevo: es el ayudante determinista que
 `auto-mejora` (o el propio consejero) invoca en su pase.
 
 POR QUÉ EXISTE (20-sep-2026). El radar de {{CONTACTO}} llevaba **86 días sin un solo pase**:

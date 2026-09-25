@@ -43,7 +43,7 @@ d = ob.recopilar_todo()
 SECCIONES = ["config", "sesiones", "gasto", "rutinas", "cajas", "agentes", "hilos", "salud", "halt", "actividad", "borradores", "urls", "generado"]
 for s in SECCIONES:
     check("recopilar_todo tiene '%s'" % s, s in d)
-check("urls.movil apunta a Tailscale", ob.TS_IP in d.get("urls", {}).get("movil", ""))
+check("urls.movil apunta a Tailscale (serve 9090 por nombre)", ob.TS_HOST in d.get("urls", {}).get("movil", "") and ":9090" in d.get("urls", {}).get("movil", ""))
 
 # Aislamiento: si una fuente revienta, su tarjeta trae _error y el resto sigue.
 _orig = ob.estado_salud

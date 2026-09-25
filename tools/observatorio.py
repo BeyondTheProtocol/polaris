@@ -27,7 +27,7 @@ Muro:
     interpreta ni avisa hacia fuera. Mismo guardia de token que el Tablero.
   · Lo único que sale es el `parte` diario al PROPIO Telegram de {{TITULAR}} (REPORT a sí misma; respeta HALT).
   · Privacidad por bind: escucha SOLO en 127.0.0.1 (jamás 0.0.0.0). Al móvil se llega por el relay
-    privado de Tailscale (tools/preview_remoto.py 8787 8788 → http://100.114.113.73:8788).
+    privado de Tailscale: `tailscale serve` 9090 → 127.0.0.1:8787 (http://polaris.taild7f51c.ts.net:9090).
   · Muestra meta/títulos; nunca datos clínicos/genómicos CRUDOS ni PII (encargos privados → enmascarados).
 
 Uso:
@@ -69,8 +69,14 @@ HOST = "127.0.0.1"
 # puerto (preview/test) sin pisar el servidor vivo; sigue siendo loopback (el muro de _host_es_privado
 # manda igual). No cambia el despliegue real.
 PORT = int(os.environ.get("BTP_OBS_PORT") or 8787)
-TS_IP = "100.114.113.73"   # Polaris en Tailscale (solo para mostrar la URL del móvil)
-MOVIL_PORT = 8788          # el relay (preview_remoto.py 8787 8788) escucha aquí en TS_IP
+TS_IP = "100.114.113.73"   # Polaris en Tailscale (se sigue aceptando como Origin propio)
+# Al móvil se llega por `tailscale serve --http=9090 http://127.0.0.1:8787` (tailnet only, sin
+# Funnel). Enruta por NOMBRE: por IP a :9090 da 404, así que el enlace lleva el nombre MagicDNS.
+# Sustituye al relay Python 8788 (S14): un proceso menos escuchando fuera de loopback.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026
+TS_HOST = "polaris.taild7f51c.ts.net"
+TS_HOST_CORTO = "polaris"
+MOVIL_PORT = 9090
 
 STATE = os.path.join(TOOLS, "state")
 PANEL = os.path.join(ROOT, "00_FUENTE-DE-VERDAD", "Gestion", "PANEL-LAZO.md")
@@ -114,7 +120,6 @@ _RUTINA_HUMANO = {
     "com.btp.enviar-hoy": "Tu HOY (te lo envía, 8:12)",
     "com.btp.polaris-estado": "Termómetro de Polaris (8:18)",
     "com.btp.observatorio": "El Observatorio (servidor)",
-    "com.btp.observatorio-remoto": "El Observatorio (acceso móvil)",
     "com.btp.observatorio-kiosk": "El Observatorio (pantalla completa)",
     "com.btp.observatorio-parte": "El Observatorio (parte diario, 8:18)",
     "com.btp.auto-mejora": "Auto-mejora diaria",
@@ -931,7 +936,7 @@ def recopilar_todo():
         "borradores": _safe(estado_borradores),
         "trazas": _safe(estado_trazas),
         "errores": _safe(estado_errores),
-        "urls": {"local": "http://%s:%d" % (HOST, PORT), "movil": "http://%s:%d" % (TS_IP, MOVIL_PORT)},
+        "urls": {"local": "http://%s:%d" % (HOST, PORT), "movil": "http://%s:%d" % (TS_HOST, MOVIL_PORT)},
     }
 
 
@@ -2191,7 +2196,7 @@ class Handler(BaseHTTPRequestHandler):
         if not ref:
             return True  # herramientas locales (curl con token) — sin navegador de por medio
         host = urlparse(ref).hostname or ""
-        return host in ("127.0.0.1", "::1", "localhost", TS_IP)
+        return host in ("127.0.0.1", "::1", "localhost", TS_IP, TS_HOST, TS_HOST_CORTO)
 
     def do_POST(self):  # noqa: N802 (API de http.server)
         path = self.path.split("?")[0]
@@ -2249,7 +2254,7 @@ def serve():
                                       markers=("observatorio.py",), log=lambda m: print(m, flush=True))
     except OSError as e:
         sys.exit("El Observatorio no pudo escuchar en %s:%d (%s). ¿Hay otra instancia ajena ahí?" % (HOST, PORT, e))
-    print("El Observatorio en http://%s:%d  (móvil vía Tailscale: http://%s:%d)" % (HOST, PORT, TS_IP, MOVIL_PORT), flush=True)
+    print("El Observatorio en http://%s:%d  (móvil vía Tailscale: http://%s:%d)" % (HOST, PORT, TS_HOST, MOVIL_PORT), flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -2282,7 +2287,7 @@ def construir_parte():
             lineas.append("Cayéndose (%d): lo primero, %s." % (h.get("n", 0), urgentes[0]["titulo"]))
         if h.get("pendientes_ok"):
             lineas.append("Esperan tu OK: %d." % h["pendientes_ok"])
-    lineas += ["", "Míralo entero: http://%s:%d" % (TS_IP, MOVIL_PORT)]
+    lineas += ["", "Míralo entero: http://%s:%d" % (TS_HOST, MOVIL_PORT)]
     return "\n".join(lineas)
 
 

@@ -105,6 +105,9 @@ Para parar: `launchctl unload -w ~/Library/LaunchAgents/com.btp.asistente.plist`
 > :3006 y reenviaba a :3005, donde no había nada. Se hizo `bootout` y se quitó de `~/Library/LaunchAgents`;
 > el plist sigue en `tools/launchd/` por si hiciera falta volver (`python3 tools/activar_daemon.py com.btp.preview-web`).
 > El mismo día se quitaron los `tailscale serve` huérfanos 9092 (→ :3030) y 7692 (→ :7682).
+> Y se retiró `com.btp.observatorio-remoto` (relay Python 100.114.113.73:8788 → :8787): el Observatorio
+> llega fuera de casa por `tailscale serve` en **http://polaris:9090** (o `polaris.taild7f51c.ts.net:9090`).
+> Volver al relay: `python3 tools/activar_daemon.py com.btp.observatorio-remoto` (el plist sigue en `tools/launchd/`).
 >
 > **No hace falta launchd para usarla puntualmente:** `staging.sh web <rama>` ya la levanta. El `on`
 > solo sirve para dejarla viva 24/7 (tras reinicios). URL fija para {{TITULAR}}: **http://100.114.113.73:3010**

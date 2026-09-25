@@ -1,11 +1,6 @@
 {
   "_doc": "Lista cerrada de lo que puede escuchar FUERA de loopback en la casa base. Lo que no esté aquí pone ROJO tests/test_puertos_loopback.py. Nace del punto S14 del feedback de {{CONTACTO}}+KAI (25-sep-2026). Campos: proceso = nombre que da `netstat -anv` (process:pid); puerto = número o \"dinamico\" (solo casa con puertos >= 32768); alcance = \"tailnet\" (IP 100.64/10 o fd7a:115c:a1e0::/48, solo la tailnet de {{TITULAR}}) o \"todas\" (cualquier interfaz, incluida la LAN de casa); argv_contiene = opcional, se exige en la línea de comando del PID; estado = \"excepcion\" (justificada, se queda) o \"revisar\" (pendiente de decisión de {{TITULAR}}, con deuda abierta). Quitar una entrada cuando el servicio se apague. Nunca meter aquí algo con Funnel (público): eso no es excepción, es fallo.",
   "escuchas": [
-    {"proceso": "Python", "puerto": 8788, "alcance": "tailnet", "argv_contiene": "preview_remoto.py 8787 8788",
-     "estado": "revisar",
-     "por_que": "Relay del Observatorio al móvil (com.btp.observatorio-remoto). Duplica a tailscale serve 9090 -> 127.0.0.1:8787. Propuesto migrar a 9090 y apagarlo; antes hay que ampliar _post_guard de observatorio.py al nombre MagicDNS.",
-     "deuda": "relay-observatorio-8788-duplica-serve"},
-
     {"proceso": "io.tailscale.ipn", "puerto": 5901, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 5901 -> 127.0.0.1:5900: pantalla remota (Jump) desde la tailnet."},
     {"proceso": "io.tailscale.ipn", "puerto": 9090, "alcance": "tailnet", "estado": "excepcion",

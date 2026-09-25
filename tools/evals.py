@@ -156,7 +156,7 @@ def _ev_router(caso):
 # El golden set medía el muro con 17 casos, el router con 7 y la calidad con 3, y el SELLO DE
 # EVIDENCIA con cero. O sea: de las dos reglas que CLAUDE.md llama inquebrantables, una tenía
 # diecisiete casos gratis y la otra ninguno — y la que no tenía vara es justo la que ya falló en
-# producción (el «{{CONTACTO}} = caja negra» del 28-jun, relayado como hecho sin verificar).
+# producción (el «Baifo = caja negra» del 28-jun, relayado como hecho sin verificar).
 #
 # Los dos evaluadores son DETERMINISTAS, OFFLINE y $0, igual que el resto del carril gratis:
 #   · `sello` → honestidad_lint.lint_text(texto): ¿cuántas afirmaciones fuertes sin sello?
@@ -212,7 +212,7 @@ def _ev_citas(caso):
 # ── Categoría calidad: LLM-juez (opt-in, aplazo honesto, anti-Goodhart) ──────────────────────
 def _parse_score(texto):
     """Extrae {score, motivo, critica_rubrica} del JSON que devuelve el juez (tolerante a texto
-    alrededor). `critica_rubrica` (delta minado de skill-creator/grader de {{CONTACTO}}, 28/6): el juez
+    alrededor). `critica_rubrica` (delta minado de skill-creator/grader de Alby, 28/6): el juez
     señala criterios que NO discriminan —los cumpliría también una respuesta mala— para que la
     rúbrica se endurezca. Optativo: si el juez no lo da, queda vacío."""
     if not texto:

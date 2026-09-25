@@ -16,8 +16,9 @@ SIEMPRE el muro/.HALT; el dead-man solo baja gasto y sube la insistencia del avi
 SERVICIOS Y CAMINOS VIVOS (añadido 26/6/26):
 Distingue "el proceso existe" de "responde de verdad". Tres niveles:
   1. Web local (127.0.0.1:8787): ¿el Observatorio devuelve 200?
-  2. Relay móvil (Tailscale 100.114.113.73:8788): ¿llega desde el móvil?
-     · Si el local va bien pero el relay no → NordVPN probablemente bloqueando Tailscale.
+  2. Camino móvil (tailscale serve 9090 → 8787, por nombre MagicDNS): ¿llega desde el móvil?
+     · Si el local va bien pero el móvil no → Tailscale caído o NordVPN bloqueándolo (no hay
+       daemon propio que reiniciar: el reenvío lo hace la app de Tailscale).
      · Si el local también está caído → daemon caído (se intenta kickstart UNA vez).
   3. Autofix acotado: kickstart de daemons KeepAlive caídos (una sola vez, reversible).
      Si sigue caído tras el kickstart → aviso en llano, sin bucle.
@@ -90,7 +91,9 @@ INACTIVO_MIN_SEG = int(os.environ.get("BTP_INACTIVO_MIN_MIN", "30")) * 60   # su
 
 # ── Servicios y caminos vivos ─────────────────────────────────────────────────────────
 OBS_LOCAL_URL   = "http://127.0.0.1:8787/"
-OBS_RELAY_URL   = "http://100.114.113.73:8788/"
+# Antes era el relay Python 100.114.113.73:8788 (com.btp.observatorio-remoto), retirado el
+# 25-sep-2026 (S14): `tailscale serve` 9090 hace lo mismo sin un proceso nuestro escuchando fuera.
+OBS_MOVIL_URL   = "http://polaris.taild7f51c.ts.net:9090/"
 HTTP_TIMEOUT_S  = 5    # generoso: el relay puede tardar si Tailscale negocia
 KICKSTART_WAIT  = 8    # segundos de espera tras kickstart antes de re-comprobar
 # Daemons con latido propio (bot-telegram): tras el kickstart el proceso nuevo no late hasta que
@@ -108,15 +111,14 @@ LATIDO_TRAS_KICKSTART_PASO_S = 1
 # hueco real del incidente del 2/7. Ya está cubierto, no lo repitas aquí con HTTP).
 KEEPALIVE_DAEMONS = {
     "observatorio":        "com.btp.observatorio",
-    "observatorio-remoto": "com.btp.observatorio-remoto",
     "borde-gateway":       "com.btp.borde-gateway",
 }
 
 # B1 (vigía de roster): daemons KeepAlive que NO se vigilan aquí porque ya tienen un check de
 # RESPUESTA dedicado (3b/3c) — mejor que "¿está cargado?", verifica que de verdad funcionen.
-_ROSTER_SKIP = {"com.btp.observatorio", "com.btp.observatorio-remoto", "com.btp.borde-gateway"}
+_ROSTER_SKIP = {"com.btp.observatorio", "com.btp.borde-gateway"}
 # Rutinas aparcadas a propósito: si faltan del roster, NO es un fallo (no alertar).
-_PARKED_HC = {"com.btp.instagram", "com.btp.preview-web"}
+_PARKED_HC = {"com.btp.instagram", "com.btp.preview-web", "com.btp.observatorio-remoto"}
 # (23/7: wa-tareas estuvo aquí mientras su gate de cosecha de WhatsApp estaba cerrado. {{TITULAR}} lo
 #  encendió (.wa_cosecha_on) → ya hace trabajo real a diario → vuelve a monitorizarse como el resto.)
 
@@ -1448,23 +1450,21 @@ def _check_gateway_vivo():
 
 
 def _check_servicios_vivos():
-    """Comprueba que el Observatorio y su relay responden de verdad, no solo que el
+    """Comprueba que el Observatorio y su camino móvil responden de verdad, no solo que el
     proceso exista. Si algo falla, intenta autofix (kickstart) UNA vez antes de avisar.
 
     Lógica de distinción VPN vs daemon caído:
-      - Si el local (8787) responde pero el relay (8788) no → el daemon del relay está
-        levantado pero no se alcanza por Tailscale (NordVPN probablemente bloqueando).
-        Aviso en llano; NO se hace kickstart (el daemon está vivo).
+      - Si el local (8787) responde pero el móvil (tailscale serve 9090) no → Tailscale caído o
+        NordVPN bloqueándolo. Aviso en llano; NO hay kickstart (no hay daemon nuestro en medio).
       - Si el local (8787) no responde → daemon del Observatorio caído. Se intenta
-        kickstart; si luego el relay tampoco → aviso separado de que ambos están caídos.
-      - Si solo falla el relay (8788) pero no el local → se intenta kickstart del relay.
+        kickstart; si luego el móvil tampoco → aviso separado.
 
     Devuelve (alertas_list, info_dict). Cadenas de alerta ESTABLES (sin números volátiles)
     para que el anti-flapping de _emitir_si_cambia funcione correctamente."""
     alertas, info = [], {}
 
     local_ok, local_det = _http_ok(OBS_LOCAL_URL)
-    relay_ok, relay_det = _http_ok(OBS_RELAY_URL)
+    relay_ok, relay_det = _http_ok(OBS_MOVIL_URL)
     info["obs_local"]  = {"ok": local_ok, "detalle": str(local_det)}
     info["obs_relay"]  = {"ok": relay_ok, "detalle": str(relay_det)}
 
@@ -1473,23 +1473,12 @@ def _check_servicios_vivos():
         return alertas, info
 
     if local_ok and not relay_ok:
-        # El servidor local responde, el relay no. Dos posibles causas:
-        #   a) el daemon del relay se cayó → kickstart
-        #   b) NordVPN bloquea Tailscale → no se puede arreglar con kickstart
-        kicked = _kickstart_daemon(KEEPALIVE_DAEMONS["observatorio-remoto"])
-        if kicked:
-            time.sleep(KICKSTART_WAIT)
-            relay_ok2, relay_det2 = _http_ok(OBS_RELAY_URL)
-            info["obs_relay_tras_kickstart"] = {"ok": relay_ok2, "detalle": str(relay_det2)}
-            if relay_ok2:
-                # Se arregló solo: registramos pero sin alertar a {{TITULAR}}
-                info["obs_relay_autofix"] = True
-                return alertas, info
-        # Sigue sin responder — puede ser VPN o daemon roto
+        # El servidor local responde y el camino por Tailscale no. Sin daemon nuestro en medio
+        # no hay nada que reiniciar: o Tailscale está caído, o NordVPN lo bloquea.
         alertas.append(
-            "La web de síntomas no se alcanza desde el móvil; "
-            "el servidor local sí responde, así que parece que NordVPN está bloqueando Tailscale. "
-            "Pausa NordVPN un momento y vuelve a intentarlo (o desactiva el relay si no lo necesitas)."
+            "La web de síntomas no se alcanza desde fuera de casa; "
+            "el servidor local sí responde, así que parece que Tailscale está caído o NordVPN lo bloquea. "
+            "Pausa NordVPN un momento y vuelve a intentarlo."
         )
         return alertas, info
 
@@ -1503,7 +1492,7 @@ def _check_servicios_vivos():
             if local_ok2:
                 info["obs_local_autofix"] = True
                 # Tras revivir el local, intentar también el relay
-                relay_ok2, _ = _http_ok(OBS_RELAY_URL)
+                relay_ok2, _ = _http_ok(OBS_MOVIL_URL)
                 info["obs_relay_tras_local_fix"] = {"ok": relay_ok2}
                 if not relay_ok2:
                     alertas.append(
@@ -2797,7 +2786,7 @@ def _check_rutinas_ned():
 
 def _check_gemelos_rancios():
     """WATCHDOG de los GEMELOS DE CRITERIO (20-sep-26): consejeros espejo de una persona real
-    ({{CONTACTO}}, {{CONTACTO}}, {{CONTACTO}}, Sid, {{CONTACTO}}) que dejaron de aprender sin que nadie lo notara.
+    ({{CONTACTO}}, Alby, {{CONTACTO}}, Sid, {{CONTACTO}}) que dejaron de aprender sin que nadie lo notara.
 
     POR QUÉ EXISTE: el radar de {{CONTACTO}} pasó **86 días sin un solo pase** (`Radar-{{CONTACTO}}.md`
     intacto desde el 26-jun) y la rutina seguía cerrando en verde, porque «sin novedad» y

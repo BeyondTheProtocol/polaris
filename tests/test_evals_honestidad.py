@@ -4,7 +4,7 @@
 Hallazgo medio nº13 de la auditoría del 25-jul-26: el golden set no tenía NI UN caso sobre sellos de
 evidencia. Enumerado entonces: muro 17 casos, router 7, calidad 3, honestidad 0. De las dos reglas
 que CLAUDE.md llama inquebrantables, una tenía diecisiete casos gratis y la otra ninguno — y la que
-no tenía vara es justo la que ya falló en producción (el «{{CONTACTO}} = caja negra» del 28-jun, relayado
+no tenía vara es justo la que ya falló en producción (el «Baifo = caja negra» del 28-jun, relayado
 como hecho sin verificar).
 
 Este test guarda dos cosas: que las categorías `sello` y `citas` sigan existiendo y en verde, y que
@@ -46,7 +46,7 @@ def main():
     # El incidente que originó el tool tiene que estar cubierto por su nombre, no por casualidad.
     ids = {c["id"] for c in casos}
     check("está el caso del relay «según el red-team» (el incidente del 28-jun)",
-          "sello-relay-redteam-contacto" in ids)
+          "sello-relay-redteam-baifo" in ids)
     check("está el DOI dentro de una bibliografía (el agujero de verifica_citas)",
           "citas-doi-en-bibliografia" in ids)
 

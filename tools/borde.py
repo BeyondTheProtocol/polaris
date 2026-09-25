@@ -80,7 +80,7 @@ HALT_FILES = (tuple(os.environ["BTP_HALT_FILES"].split(":"))
 # ── Registro de confianza (ESTÁTICO — rutas estáticas para PHI; deny-by-default) ─────────
 # Trusted = puede RECIBIR contenido sensible. Solo lo LOCAL y lo CLEARED. Cualquier endpoint
 # de un modelo en la nube (fugu/nvidia/glm/grok/perplexity/chatgpt/openrouter/gemini) es NO
-# confiable POR DEFECTO, aunque la marca lo llame "{{CONTACTO}}": el relay de {{CONTACTO}} es un proceso
+# confiable POR DEFECTO, aunque la marca lo llame "Alby": el relay de Alby es un proceso
 # humano cleared, no el endpoint del modelo. Fail-closed: lo que no esté aquí, no es trusted.
 TRUSTED_PREFIXES = ("local:", "cleared:")
 

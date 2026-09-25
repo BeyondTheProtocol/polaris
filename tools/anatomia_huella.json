@@ -96,7 +96,7 @@
     "correo": 8,
     "dinero": 3,
     "documentos": 3,
-    "el caso clínico": 24,
+    "el caso clínico": 25,
     "el día a día": 24,
     "el lazo": 9,
     "git y ramas": 8,
@@ -106,7 +106,7 @@
     "mejora del sistema": 7,
     "memoria y saber": 14,
     "modelos de IA": 14,
-    "muro y seguridad": 22,
+    "muro y seguridad": 23,
     "otras": 3,
     "redes y prensa": 13,
     "salud del sistema": 18
@@ -130,6 +130,7 @@
   ],
   "guardas": [
     "borrador_unico_guard",
+    "canario_muro",
     "casa_base_guard",
     "clinico_guard",
     "contrato_asiento",

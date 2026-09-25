@@ -27,7 +27,7 @@ Sistema personal de **{{TITULAR}} {{APELLIDO}}** (ingeniera + paciente de {{DIAG
 - Lo que produzcas, **déjalo en la fuente de verdad e indézalo** (`kb.py index`).
 - Subagentes y rutinas existentes en `.claude/agents/` y en las tareas programadas — respétalos, no los dupliques.
 
-## Disciplina de edición (lección de la skill `agent-workflow` de {{CONTACTO}}, 28/6)
+## Disciplina de edición (lección de la skill `agent-workflow` de Alby, 28/6)
 - **Lee antes de escribir.** No edites código que no has leído entero. Para cambios no triviales, plan corto primero (qué tocas, en qué orden, cómo sabrás que funcionó).
 - **Edición quirúrgica.** Usa find-and-replace exacto (match con indentación literal); reserva reescribir-fichero-entero para cuando de verdad reescribes todo. **Ante un mismatch de `edit`, re-lee el estado real del fichero antes de reintentar** — no insistas a ciegas.
 - **Cambios pequeños y verificables.** No 20 ficheros de golpe; verifica tras cada unidad lógica (build/tests/`test_all.sh`). Avisa antes de comandos con efectos.

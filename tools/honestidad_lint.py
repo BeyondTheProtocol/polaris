@@ -2,7 +2,7 @@
 """Linter de honestidad — caza afirmaciones FUERTES sin sello de evidencia. Determinista, SIN LLM.
 
 Origen ({{TITULAR}}, 28/6/26): el sistema le coló como HECHO un claim de red-team sin verificar
-("{{CONTACTO}} = caja negra con telemetría sin documentar") y resultó FALSO. Regla suya, repetida:
+("Baifo = caja negra con telemetría sin documentar") y resultó FALSO. Regla suya, repetida:
 **prefiero que digas "no lo sé / no lo puedo asegurar" antes que una falsa certeza.**
 Memoria: feedback-honestidad-limites-avisar-no-inventar.
 
@@ -227,7 +227,7 @@ def _check_repo(raiz, strict, desde_dias=None, top=20):
 # ─── self-test (corre en tests/test_honestidad_lint.py) ──────────────────────────
 _MALO = "El arnés tiene telemetría sin documentar y es una caja negra."
 _BUENO_SELLO = "El arnés tiene telemetría sin documentar [supuesto: sin auditar el repo]."
-_BUENO_VERIF = "Auditado el repo: cero telemetría [verificado: github.com/achetronic/contacto]."
+_BUENO_VERIF = "Auditado el repo: cero telemetría [verificado: github.com/achetronic/baifo]."
 _NEUTRO = "El arnés es local y corre en la terminal."
 
 

@@ -105,7 +105,7 @@ def main():
     if not q:
         print('Uso: python3 tools/gemini.py "tu pregunta (terminología genérica, sin PII)"'); return
     # 🔴 BORDE no-bypassable (fuente única del muro). Gemini = API pública NO confiable —
-    # "{{CONTACTO}}" es el relay HUMANO cleared, no este endpoint. Sustituye al assert_no_pii local.
+    # "Alby" es el relay HUMANO cleared, no este endpoint. Sustituye al assert_no_pii local.
     import borde
     if not borde.guard_cli(q, "gemini"):
         sys.exit(2)
