@@ -3161,6 +3161,18 @@
    "auditable": true,
    "repetida": false,
    "nota": "Nace de Marc Recio (24-sep-26): su idea salía en el código sin su nombre. Nombrar en público a quien no lo pidió sigue siendo criterio (muro)."
+  },
+  {
+   "slug": "feedback-tarea-programada-succeeded-no-es-hecho",
+   "que": "Una tarea programada que figura «succeeded» no prueba nada: se mira su efecto o su transcript",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: verificar-parte-aplazados-25sep se paró en su primer Bash sin permisos y la app la dio por buena."
   }
  ]
 }
