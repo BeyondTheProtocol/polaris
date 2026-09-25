@@ -41,6 +41,13 @@ if not os.path.exists(VENV):
     sys.exit(1)
 
 VENTANA_S = 3.0
+# El umbral de producción (INACTIVO_CPU_S = 2 s de CPU por ventana) está pensado para ventanas de
+# minutos. Con la ventana de 3 s del test exigía más del 67 % de un núcleo, y con la máquina
+# cargada un árbol que SÍ trabaja no llegaba y salía 98: el test medía el planificador, no el
+# vigilante. Medido el 25-sep con load 75-87 en 10 núcleos: el bucle del caso 3 recibía un 6 % de
+# CPU, 0,19 s por ventana. Lo que separa colgado de vivo es 0 frente a >0: el test usa 0,05 s
+# (5 veces la resolución de `ps -o time=`). Un árbol colgado gasta 0,00 y sigue muriendo igual.
+UMBRAL_CPU_S = 0.05
 fallos = []
 
 
@@ -104,7 +111,9 @@ if __name__ == "__main__":
 POR_VENTANILLA = r'''
 import os, sys
 sys.path.insert(0, os.path.join(os.environ["T_RAIZ"], "tools"))
+import guarda_memoria
 import lector_clinico as L
+guarda_memoria.INACTIVO_CPU_S = float(os.environ["T_UMBRAL"])
 TMP = os.environ["T_TMP"]
 L.LOG = os.path.join(TMP, "acceso.log")
 L.CUELGUES_DIR = os.path.join(TMP, "cuelgues")
@@ -118,6 +127,7 @@ POR_GUARDA = r'''
 import os, sys
 sys.path.insert(0, os.path.join(os.environ["T_RAIZ"], "tools"))
 import guarda_memoria as G
+G.INACTIVO_CPU_S = float(os.environ["T_UMBRAL"])
 codigo, _, intentos = G.corre_con_reintento(
     [sys.executable, "-c", os.environ["T_CMD"]], None, reintentos=0, intervalo=0.3,
     inactivo_s=float(os.environ["T_VENTANA"]), verbose=False)
@@ -152,7 +162,7 @@ def lanza(conductor, tope_s, **extra):
     visor = os.path.join(tmp, "visor_falso.py")
     open(visor, "w").write(VISOR_FALSO)
     env = dict(os.environ, T_RAIZ=RAIZ, T_TMP=tmp, T_VISOR=visor, T_VENV=VENV,
-               T_VENTANA=str(VENTANA_S), **{k: str(v) for k, v in extra.items()})
+               T_VENTANA=str(VENTANA_S), T_UMBRAL=str(UMBRAL_CPU_S), **{k: str(v) for k, v in extra.items()})
     t0 = time.time()
     # a FICHERO, no a pipe: un hijo huérfano que herede el pipe dejaría esperando su EOF, y el
     # test mediría eso en vez del vigilante

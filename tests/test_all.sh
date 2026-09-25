@@ -405,6 +405,7 @@ runpy test_coste_modelos.py         # 13-sep · todo modelo claude-* gastado tie
 runpy test_gasto_tarifa.py          # 24-sep · un modelo sin tarifa se DICE; una sola tabla y un solo matcher
 runpy test_saldo_prepago.py         # el estimador del prepago deja de afirmar lo que no sabe
 runpy test_bench_jev.py           # 21-sep · a Jev solo sale lo que pasa el borde + fechas/@/URLs
+runpy test_bench_modelos.py       # 25-sep · P5: partición, umbral en calibración, freno MLX, 0 textos a disco
 runpy test_eval_triage_residuo.py # 21-sep · el set dorado no sale con fechas, URLs, @handles ni números largos
 runpy test_radar_orden_jev.py     # 21-sep · Jev solo ordena la cola del radar: nunca archiva ni toca lo cruzado
 runpy test_radar_encaje_n1.py     # 22-sep · encaje N1: sin trust o con perfil caducado no sale nada; solo ordena
