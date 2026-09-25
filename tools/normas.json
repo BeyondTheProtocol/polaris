@@ -3173,6 +3173,54 @@
    "auditable": false,
    "repetida": false,
    "nota": "25-sep-26: verificar-parte-aplazados-25sep se paró en su primer Bash sin permisos y la app la dio por buena."
+  },
+  {
+   "slug": "feedback-poc-con-nucleo-diferencial",
+   "que": "Una POC trae ya el núcleo diferencial (algoritmo/motor) en versión decente; si no, se dice en la primera línea",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: POC de {{CONTACTO}} entregada con un motor termostato; {{TITULAR}}: la POC debería tener ya un algoritmo en condiciones."
+  },
+  {
+   "slug": "feedback-nombre-verificar-antes-de-adoptar",
+   "que": "Un nombre de producto se verifica con whois/RDAP y bases de marcas antes de adoptarlo; dominio y marca el mismo día",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: «{{CONTACTO}}» se dio por libre en mayo con IA; contacto.app era de otra empresa de fitness desde 4 días antes."
+  },
+  {
+   "slug": "feedback-contacto-diseno-innovador-no-cliche",
+   "que": "El diseño de producto explora direcciones de verdad y evita el cliché sanitario (teal, tarjetas blancas, pastel wellness)",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: {{TITULAR}}, sobre la primera identidad de la POC: «algo mejor que el típico verde, queremos algo innovador»."
+  },
+  {
+   "slug": "feedback-nombre-bonito-inventado-generado-sin-ia",
+   "que": "Nombres de producto inventados y bonitos como {{CONTACTO}}, generados por combinatoria propia y filtrados por .com libre, no pedidos a un LLM",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: rechazó nombres reales técnicos («no me gusta nada, tiene que ser tan bonito como contacto»)."
   }
  ]
 }
