@@ -547,6 +547,79 @@ _devolver_casa_a_master() {
 }
 trap '_devolver_casa_a_master' EXIT
 
+# --- CANARIO DEL MURO (P9, 25-sep-26) ------------------------------------------------------
+# Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+# La doc oficial (https://code.claude.com/docs/en/headless) anuncia que `--bare` será el modo por
+# defecto de `-p`, y `--bare` no carga hooks: el muro_guard PreToolUse desaparecería SIN ERROR.
+# El hook SessionStart .claude/hooks/canario_muro.sh (en cada settings del lazo) deja un testigo
+# con un nonce; si no aparece, este script falla CERRADO en vez de dejar correr la rutina sin muro.
+#   1. PREFLIGHT, antes de gastar nada: una sesión canario con una clave inválida (coste 0,
+#      verificado 25-sep con 2.1.236: total_cost_usd 0, duration_api_ms 0). Se repite solo cuando
+#      cambia la clave (versión del CLI + hash del settings + hash del hook); el OK se cachea.
+#      Sin testigo → código rojo + exit 1: nada corre.
+#   2. TESTIGO EN CADA RUN: el run real también debe dejarlo. Si falta y el modelo llegó a
+#      trabajar (coste > 0 o tokens de salida > 0) → corrió sin muro: código rojo. Si falta y no corrió nada,
+#      se invalida el OK cacheado y este job falla cerrado (el siguiente repite el preflight).
+# Activo SIEMPRE en producción. Con BTP_CLAUDE_BIN (binario falso de los tests) va apagado salvo
+# BTP_CANARIO=1, para no romper los tests ajenos; los del canario lo encienden a propósito.
+CANARIO_ON=1
+[ -n "${BTP_CLAUDE_BIN:-}" ] && CANARIO_ON="${BTP_CANARIO:-0}"
+CANARIO_BIN="${BTP_CLAUDE_BIN:-$CMD}"
+CANARIO_DIR="$CST/canario"
+CANARIO_HOOK="$REPO/.claude/hooks/canario_muro.sh"
+CODIGO_ROJO="${BTP_CODIGO_ROJO:-$REPO/tools/codigo_rojo.py}"
+_canario_falla() {  # $1 = motivo · $2 = detalle · $3 = "rojo" si dispara código rojo
+  echo "run_agent[$AGENT_NAME]: 🔴 CANARIO DEL MURO: $1" >&2
+  if [ "${3:-}" = "rojo" ]; then
+    "$PY" "$CODIGO_ROJO" trigger "canario del muro: $1" "$2" >/dev/null 2>&1 || true
+  fi
+  heartbeat "canario_muro_falla"
+  "$PY" -c 'import json,sys;print(json.dumps({"result":"canario del muro: "+sys.argv[1]+" (fallo CERRADO: no corrió sin muro)","total_cost_usd":0.0,"is_error":True},ensure_ascii=False))' "$1"
+  exit 1
+}
+_canario_clave() {  # versión del CLI + hash de settings y hook. Vacía = no se puede fijar.
+  local v
+  v="$("$CANARIO_BIN" --version 2>/dev/null | head -1)"
+  [ -n "$v" ] || return 0
+  printf '%s|%s|%s' "$v" "$(shasum -a 256 "$SETTINGS" 2>/dev/null | cut -c1-16)" \
+    "$(shasum -a 256 "$CANARIO_HOOK" 2>/dev/null | cut -c1-16)" | shasum -a 256 | cut -c1-24
+}
+_canario_testigo_ok() {  # $1 = fichero · $2 = nonce esperado
+  [ -f "$1" ] && [ "$(head -1 "$1" 2>/dev/null)" = "$2" ]
+}
+if [ "$CANARIO_ON" = 1 ]; then
+  mkdir -p "$CANARIO_DIR" 2>/dev/null || true
+  [ -x "$CANARIO_HOOK" ] || _canario_falla "falta $CANARIO_HOOK o no es ejecutable" "Sin el hook no hay testigo." rojo
+  CANARIO_CLAVE="$(_canario_clave)"
+  [ -n "$CANARIO_CLAVE" ] || _canario_falla "no pude leer la versión de $CANARIO_BIN" "Sin versión no se puede fijar el canario." rojo
+  CANARIO_STAMP="$CANARIO_DIR/ok-$CANARIO_CLAVE"
+  if [ ! -f "$CANARIO_STAMP" ]; then
+    _T="$CANARIO_DIR/pre.$$.testigo"; _N="pre-$$-$RANDOM$RANDOM"; rm -f "$_T"
+    # exec → el PID es el del CLI y el kill de abajo lo corta. Clave inválida: el hook corre al
+    # arrancar la sesión, la llamada al modelo falla (sin coste) y no esperamos a sus reintentos.
+    ( exec env -u CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY="sk-ant-canario-sin-credito" \
+        BTP_CANARIO_TESTIGO="$_T" BTP_CANARIO_NONCE="$_N" \
+        "$CANARIO_BIN" -p "canario del muro" --settings "$SETTINGS" --permission-mode acceptEdits \
+        --output-format json --max-turns 1 --model haiku </dev/null >/dev/null 2>&1 ) &
+    _PID=$!
+    _ESPERA=$(( ${BTP_CANARIO_ESPERA:-60} * 5 ))   # en pasos de 0,2 s
+    while [ "$_ESPERA" -gt 0 ]; do
+      _canario_testigo_ok "$_T" "$_N" && break
+      kill -0 "$_PID" 2>/dev/null || { sleep 0.2; break; }
+      sleep 0.2; _ESPERA=$((_ESPERA - 1))
+    done
+    kill "$_PID" 2>/dev/null || true; wait "$_PID" 2>/dev/null || true
+    if _canario_testigo_ok "$_T" "$_N"; then
+      rm -f "$_T" "$CANARIO_DIR"/ok-* 2>/dev/null || true
+      printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$("$CANARIO_BIN" --version 2>/dev/null | head -1)" >"$CANARIO_STAMP"
+    else
+      rm -f "$_T" 2>/dev/null || true
+      _canario_falla "la sesión canario no cargó los hooks de $(basename "$SETTINGS") ($("$CANARIO_BIN" --version 2>/dev/null | head -1))" \
+        "Claude Code arrancó sin ejecutar el hook SessionStart del muro. Lo más probable: un cambio de versión (p. ej. --bare por defecto en -p) hace que no cargue los hooks de --settings, y con ellos el muro_guard. El lazo queda parado hasta revisarlo. Diagnóstico: python3 tests/test_canario_muro.py y la versión en tools/state/canario/." rojo
+    fi
+  fi
+fi
+
 # --- Bucle de degradación: prueba la cadena hasta que uno responda o se agote --------------
 # Observabilidad (pieza 8): marca el instante de inicio para calcular duración.
 _OBS_TS_INI="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -555,9 +628,34 @@ OUT=""; rc=0; DEGRADADO=0; RECHAZO_EN=""
 N=${#CADENA[@]}
 for i in "${!CADENA[@]}"; do
   M="${CADENA[$i]}"; MODELO="$M"
+  if [ "$CANARIO_ON" = 1 ]; then   # testigo de ESTE intento (ver CANARIO DEL MURO arriba)
+    export BTP_CANARIO_TESTIGO="$CANARIO_DIR/run.$$.$i.testigo" BTP_CANARIO_NONCE="run-$$-$i-$RANDOM$RANDOM"
+    rm -f "$BTP_CANARIO_TESTIGO"
+  fi
   set +e
   OUT="$("${BTP_CLAUDE_BIN:-$CMD}" "${ARGS[@]}" --model "$M")"; rc=$?   # BTP_CLAUDE_BIN = gancho de test; $CMD = binario de la caja
   set -e
+  if [ "$CANARIO_ON" = 1 ]; then
+    if _canario_testigo_ok "$BTP_CANARIO_TESTIGO" "$BTP_CANARIO_NONCE"; then
+      rm -f "$BTP_CANARIO_TESTIGO"
+    else
+      rm -f "$BTP_CANARIO_TESTIGO" "$CANARIO_STAMP" 2>/dev/null || true
+      # ¿Llegó a trabajar el modelo? coste > 0 o tokens de salida > 0. num_turns NO vale: con la
+      # clave rechazada el CLI devuelve num_turns 1 y coste 0 (visto en vivo, 2.1.236).
+      _TRABAJO="$(printf '%s' "$OUT" | "$PY" -c 'import json,sys
+try: d=json.loads(sys.stdin.read())
+except Exception: print(0); sys.exit()
+u=d.get("usage") or {}
+print(1 if (d.get("total_cost_usd") or 0) > 0 or (u.get("output_tokens") or 0) > 0 else 0)' 2>/dev/null || echo 1)"
+      if [ "$_TRABAJO" = 1 ]; then
+        printf '%s' "$OUT" | "$PY" "$REPO/tools/cost_guard.py" add --stdin \
+          --job "${AGENT_NAME}-$(date +%Y%m%dT%H%M%S)" --via "$VIA" >/dev/null 2>&1 || true
+        _canario_falla "el run de $AGENT_NAME ($M) trabajó SIN dejar testigo: los hooks del muro no se cargaron" \
+          "El preflight pasó, pero este run no ejecutó el hook SessionStart y aun así el modelo trabajó: pudo usar herramientas sin muro_guard. Revisa qué hizo en el log del job antes de levantar el código rojo." rojo
+      fi
+      _canario_falla "el run de $AGENT_NAME ($M) no dejó testigo y no llegó a trabajar; repito el preflight en el siguiente" ""
+    fi
+  fi
   if is_credit_out "$OUT"; then break; fi          # saldo vacío → al manejador de crédito
   # 🔴 CRÍTICO + límite (25-sep-26, deuda carril-clinico-degrada-y-sirve-sin-marcar): NO degrada.
   # El comentario de CRITICO lo prometía («nunca se sirve con un cerebro flojo») y este bucle no lo

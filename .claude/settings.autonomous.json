@@ -6,6 +6,18 @@
     "allow": ["Bash(python3 tools/correo.py aviso:*)"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "P9 (25-sep-26): CANARIO del muro. Deja el testigo que run_agent.sh exige; si no aparece, los hooks de este fichero no se cargaron y el lazo falla CERRADO (código rojo). No inyecta contexto.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/canario_muro.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "_comment": "H2 (Fase 0): matcher '*' = TODAS las tools pasan por el muro, incluidas las de MCP (mcp__servidor__tool). muro_guard.py enruta: Bash→checks, Write/Edit→check_write, lecturas locales + MCP de investigación (biomcp/cbioportal)→permitido, y TODO lo demás (MCP de envío, Task, WebFetch/WebSearch)→DENY. Antes solo cubría Bash/Write → los MCP de envío salían sin muro.",

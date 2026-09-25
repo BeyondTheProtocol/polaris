@@ -155,7 +155,9 @@ CAMINO = [
     ("el subagente", "tools/run_agent.sh",
      "Arranca el arnés agéntico con el comité que toca, su fichero de permisos y "
      "un tope de turnos (25 de rutina, 60 si es crítico). Nunca se salta los "
-     "permisos, y un subagente no puede anidar más de dos niveles."),
+     "permisos, y un subagente no puede anidar más de dos niveles. Antes de "
+     "arrancar comprueba con un canario que el arnés cargó los hooks del muro; "
+     "si no los cargó, no arranca y dispara el código rojo."),
     ("los guardarraíles", ".claude/hooks/",
      "Antes de CADA herramienta corre un hook que puede denegarla: en el lazo, una "
      "allowlist fail-closed; en interactivo, el guarda de lo clínico. Y al cerrar "

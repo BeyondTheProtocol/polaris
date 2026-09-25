@@ -219,6 +219,7 @@ runpy test_evidencia_no_cuelga.py
 runpy test_oauth_refresh.py
 runpy test_freno_criticidad.py
 runpy test_run_agent_f2.py
+runpy test_canario_muro.py
 runpy test_xurl.py
 runpy test_x_mcp_puente.py   # el MCP de X relanza su puente en vez de quedarse ciego (14-sep-26)
 runpy test_x_daemons.py

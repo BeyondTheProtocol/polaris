@@ -13,6 +13,18 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "_comment": "P9 (25-sep-26): CANARIO del muro. Deja el testigo que run_agent.sh exige; si no aparece, los hooks de este fichero no se cargaron y el lazo falla CERRADO (código rojo). No inyecta contexto.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/canario_muro.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "_comment": "IDENTICO al del molde del radar: matcher '*' = TODAS las tools pasan por el muro (Bash->checks, Write/Edit->check_write, SOLO lecturas locales SAFE_TOOLS->permitido, y TODO lo demas -MCP incl. biomcp/cbioportal, Task, WebFetch/WebSearch, ToolSearch- DENY, SAFE_MCP_TOOLS vacio). muro_guard.py es la barrera real (exit 2 anula cualquier allow).",
