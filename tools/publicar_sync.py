@@ -37,10 +37,12 @@ REPO = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
 ESPEJO = os.environ.get("BTP_ESPEJO_DIR") or os.path.join(REPO, "_cajita", "publico")
 REMOTO = "https://github.com/BeyondTheProtocol/polaris.git"
 RAMA = "master"
-# Una publicación entera (derivar + compileall + push) ronda el minuto y medio. 180 s deja
-# margen sin que una corrida encallada bloquee la siguiente para siempre: pasado el timeout,
-# `_lock` reclama el lock huérfano.
-LOCK_TIMEOUT_S = 180.0
+# Una publicación entera (derivar + compileall + push) ronda el minuto y medio, y el candado
+# puede cubrir DOS (la segunda pasada). Hasta el 25-sep-2026 esto valía 180 s y `_lock` reclamaba
+# por antigüedad: bajo carga 70 la corrida siguiente borró el candado de una viva y las dos se
+# pisaron el árbol. Ahora `_lock` solo reclama si el dueño ha muerto, así que esperar mucho no
+# cuesta nada y evita lo otro: rendirse y dejar sin publicar el merge que disparó esta corrida.
+LOCK_TIMEOUT_S = 900.0
 
 
 def _halt():

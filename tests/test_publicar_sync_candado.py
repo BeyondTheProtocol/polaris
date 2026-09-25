@@ -10,12 +10,11 @@ público se quedó sin recibir el arreglo que estaba esperando.
 REPRODUCIDO antes de arreglar: dos `publicar_sync.py --dry` simultáneos, uno pasa y el otro
 muere en `shutil.rmtree` con FileNotFoundError.
 
-QUÉ SE COMPRUEBA Y QUÉ NO. `_lock` da exclusión mientras el lock sea más joven que el propio
-timeout; pasado ese plazo lo reclama por huérfano, para que una corrida encallada no bloquee
-el sistema para siempre. Así que aquí NO se espera un TimeoutError —no llegaría nunca—, se
-comprueba lo que de verdad importa: que la segunda corrida ESPERA a la primera en vez de
-entrar a la vez. Serializar es todo lo que hacía falta: el árbol sale de casa base, así que
-publicar dos veces seguidas da el mismo resultado; publicar dos veces A LA VEZ, no.
+QUÉ SE COMPRUEBA (reescrito el 25-sep-2026). Antes `_lock` reclamaba un candado más viejo que
+el timeout de quien esperaba, y este test lo daba por bueno: sujetaba el candado 30 s y esperaba
+que la segunda corrida entrase al primer segundo. Eso es justo el solape que se quería evitar, y
+pasó en vivo ese día (dos publicaciones a la vez, `rmtree` sobre un árbol no vacío). Ahora se
+comprueba que la segunda corrida ESPERA a que la primera SUELTE, y que entonces publica.
 """
 import os
 import sys
@@ -50,14 +49,35 @@ def main():
           'with _lock.lock("publicar-sync"' in open(
               os.path.join(ROOT, "tools", "publicar_sync.py"), encoding="utf-8").read())
 
+    import threading
+    SUJETA = 1.5
+    publicar_sync.LOCK_TIMEOUT_S = 10.0
+    listo = threading.Event()
+
+    def primera():
+        with _lock.lock("publicar-sync", timeout=30.0):
+            listo.set()
+            time.sleep(SUJETA)
+
+    h = threading.Thread(target=primera)
+    h.start()
+    listo.wait(5)
+    check("el candado está tomado", _lock.held("publicar-sync"))
+    t0 = time.time()
+    rc = publicar_sync.main(["--dry"])
+    tardó = time.time() - t0
+    h.join()
+    check("la segunda corrida ESPERA a que la primera suelte, no entra a la vez", tardó >= SUJETA - 0.2)
+    check("y cuando entra, hace su trabajo (no se pierde la publicación)", llamadas == [True])
+    check("sin reventar: devuelve el rc de `sincronizar`", rc == 0)
+
+    # Dueño VIVO más allá del plazo de quien espera: no se le quita el candado (el fallo del 25-sep).
+    llamadas.clear()
+    publicar_sync.LOCK_TIMEOUT_S = 0.5
     with _lock.lock("publicar-sync", timeout=30.0):
-        check("el candado está tomado", _lock.held("publicar-sync"))
-        t0 = time.time()
-        rc = publicar_sync.main(["--dry"])
-        tardó = time.time() - t0
-        check("la segunda corrida ESPERA a la primera, no entra a la vez", tardó >= ESPERA)
-        check("y cuando entra, hace su trabajo (no se pierde la publicación)", llamadas == [True])
-        check("sin reventar: devuelve el rc de `sincronizar`", rc == 0)
+        rc2 = publicar_sync.main(["--dry"])
+        check("con el dueño vivo, agotado el plazo NO entra a la vez", llamadas == [] and rc2 == 0)
+    publicar_sync.LOCK_TIMEOUT_S = ESPERA
 
     check("al salir del with, el candado queda libre para la siguiente",
           not _lock.held("publicar-sync") or True)
