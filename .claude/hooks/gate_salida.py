@@ -229,10 +229,28 @@ def falsa_certeza(t, tools=None):
     return None
 
 
+# Guiones largos que son ESTRUCTURA, no muletilla (P6 F1-bis, 25-sep-26): `verificacion` etiquetó
+# 120 disparos de `tells_ia` y 10 de sus 12 falsos positivos eran estos tres. Idea de {{CONTACTO}}
+# {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+_GUION_ESTRUCTURA = (
+    r"(?m)^\s*\|.*$"                                            # fila de tabla entera
+    r"|(?m:^\s*(?:[-·•*]|\d+[.)])?\s*\*\*[^*\n]+\*\*:?\s*)—"   # «**Título** — explicación»
+    r"|(?:https?://\S+|\b[\w-]+(?:\.[\w-]+)+/\S*)\s*—"          # «url — plataforma»
+)
+
+
+def _sin_guiones_estructura(t):
+    return re.sub(_GUION_ESTRUCTURA, " ", t)
+
+
 def tells_ia(t, tools=None):
     """feedback-no-em-dash-tell-ia — que no suene a IA."""
-    limpio = _sin_bloques(t)
+    limpio = _sin_guiones_estructura(_sin_bloques(t))
     n = limpio.count("—")
+    # Densidad sobre la PROSA, sin tablas (replay 25-sep-26, 2465 turnos: 179 → 123). Sobre la
+    # longitud original se perdían 41 respuestas con ≥3 guiones de prosa; así se pierden 29, que
+    # solo llegaban a 3 contando guiones de estructura, y entran 21 muletillas que las tablas largas
+    # diluían (muestra de 5: las 5, guiones en mitad de frase).
     por_mil = (n * 1000.0 / max(len(limpio), 1))
     if n >= 3 and por_mil >= 2.0:
         # Un ejemplo REAL citado (13-sep-26), no solo el conteo: sin esto el `extracto` del log
@@ -341,7 +359,7 @@ def pendientes_sin_verificar(t, tools=None):
     """
     if tools is None:
         return None
-    if not re.search(r"(lo que (te )?queda|lo tuyo ahora|sigue pendiente|"
+    if not re.search(r"(lo que (te )?queda(?! por decidir)|lo tuyo ahora|sigue pendiente|"
                      r"te queda por)", t, re.I):
         return None
     if any(re.search(r"seguimiento|Read|Grep|Glob|git |ls |cat |python3", x, re.I) for x in tools):
@@ -883,7 +901,10 @@ def gestion_pide_ok(t, tools=None):
     fuera = (r"\bnada\b|ya no|sin pedir|sin preguntar|#\d+|\bPR\b|pull|deploy|preview|vista previa|"
              r"netlify|web|producci[óo]n|publica|muro|hook|ci_barrido|guard|c[óo]digo rojo|"
              r"fusion[ée]\b|fusionad[oa]|se hizo|no he comprobado|cada una con tu OK|"
-             r"con tu OK y verificad|^[-*\s]*\**hecho\b|commit `?[0-9a-f]{7}`? con tu OK")
+             r"con tu OK y verificad|^[-*\s]*\**hecho\b|commit `?[0-9a-f]{7}`? con tu OK|"
+             # P6 F1-bis (25-sep-26, etiquetas de `verificacion`): negación, fusión ya hecha y
+             # worktree como LUGAR de trabajo, no como objeto a podar.
+             r"no te (pido|voy a pedir) (el )?OK|con tu OK\W+verificad|en (un|su|el) worktree\b")
     lineas = [l.strip() for l in _sin_fences(t).splitlines()]
     for n, l in enumerate(lineas):
         if not re.search(pide, l, re.I):
@@ -1210,7 +1231,33 @@ def _extracto(motivo):
     return frag
 
 
-def _apunta(hallazgos, modo, reintento=False):
+# Checks cuyo `motivo` es un texto fijo: sin la frase de la respuesta no se pueden etiquetar, y los
+# transcripts se purgan (P6 F1-bis, 25-sep-26: 149 filas quedaron indecidibles por eso).
+_ANCLA_CONTEXTO = {
+    "no_se_sin_mirar": r"no sé\b|no tengo ese dato|no me consta|no lo encuentro",
+    "pendientes_sin_verificar": r"lo que (te )?queda|lo tuyo ahora|sigue pendiente|te queda por",
+}
+
+
+def _contexto(check, texto):
+    """~200 caracteres de la respuesta alrededor de lo que disparó el check, de-identificados.
+    None si el check no lo necesita o no hay texto. Fail-open, como `_extracto`."""
+    patron = _ANCLA_CONTEXTO.get(check)
+    if not patron or not texto:
+        return None
+    m = re.search(patron, texto, re.I)
+    if not m:
+        return None
+    frag = texto[max(0, m.start() - 100):m.end() + 100].replace("\n", " ")
+    try:
+        import borde
+        frag, _n = borde.de_identificar(frag)
+    except Exception:
+        pass
+    return frag
+
+
+def _apunta(hallazgos, modo, reintento=False, texto=None):
     try:
         os.makedirs(os.path.dirname(LOG), exist_ok=True)
         # `bloqueo_real` corrige el hallazgo colateral del 13-sep-26: `modo` en la fila es el
@@ -1231,6 +1278,7 @@ def _apunta(hallazgos, modo, reintento=False):
                     "bloqueo_real": check in bloqueados,
                     "motivo": motivo[:200],
                     "extracto": _extracto(motivo),
+                    **({"contexto": _contexto(check, texto)} if _contexto(check, texto) else {}),
                     **({"reintento": True} if reintento else {}),
                 }, ensure_ascii=False) + "\n")
     except Exception:
@@ -1290,7 +1338,7 @@ def main():
         try:
             h = revisar(texto, _tools_del_turno(data.get("transcript_path")))
             if h:
-                _apunta(h[:MAX_HALLAZGOS], _reglas_activas()[1], reintento=True)
+                _apunta(h[:MAX_HALLAZGOS], _reglas_activas()[1], reintento=True, texto=texto)
         except Exception:
             pass                                  # fail-open: apuntar nunca frena
         return 0
@@ -1300,7 +1348,7 @@ def main():
         return 0
     activas, modo = _reglas_activas()
     hallazgos = _prioriza(hallazgos, modo)[:MAX_HALLAZGOS]
-    _apunta(hallazgos, modo)
+    _apunta(hallazgos, modo, texto=texto)
     # `sombra` (escalera P2, 25-sep-26): el check se apunta para medirlo, pero no se enseña. Para
     # los ruidosos, que en aviso solo hacían ruido. Nunca aplica a SIEMPRE_BLOQUEA.
     sombra = {c for c, _s, m in activas if m == "sombra" and c not in SIEMPRE_BLOQUEA}

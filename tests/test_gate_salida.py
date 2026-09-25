@@ -569,6 +569,46 @@ class SemillasChecksRuidosos(unittest.TestCase):
         t = "Qué espera tu OK: fusionar la rama a casa base con cerrar_sesion.py y podar el worktree."
         self.assertIsNotNone(g.gestion_pide_ok(t, self.SIN_MIRAR))
 
+    # ── F1-bis (25-sep-26): falsos positivos etiquetados por `verificacion` ──
+    def test_pendientes_lo_que_queda_por_decidir_no_salta(self):
+        t = "Lo que queda por decidir, y es tuyo: cómo se aceptan los PR de fuera en el repo."
+        self.assertIsNone(g.pendientes_sin_verificar(t, self.SIN_MIRAR))
+
+    def test_tells_guion_de_encabezado_tabla_y_url_no_salta(self):
+        t = ("**TL;DR** — todo listo para revisar.\n**Qué espera tu OK** — nada por ahora.\n"
+             "1. **Paso uno** — medir el replay.\n| a | — | b |\n| — | — | x |\n"
+             "- helptitular.com/vistazo-x — X\n- helptitular.com/vistazo-in — LinkedIn\n")
+        self.assertIsNone(g.tells_ia(t))
+
+    def test_tells_muletilla_en_prosa_sigue_saltando(self):
+        t = ("El plan es simple — lo hacemos hoy. Luego — y esto importa — lo medimos. "
+             "Al final — como siempre — lo archivamos, y listo.")
+        self.assertIsNotNone(g.tells_ia(t))
+
+    def test_tells_muletilla_junto_a_encabezados_sigue_saltando(self):
+        t = ("**TL;DR** — hecho.\nEl arreglo — que era pequeño — ya está. La suite — por fin — "
+             "pasa, y el replay — sin sorpresas — lo confirma.")
+        self.assertIsNotNone(g.tells_ia(t))
+
+    def test_gestion_negacion_no_te_pido_ok_no_salta(self):
+        t = "No te pido OK para fusionar a casa base: es el arreglo de una regresión que ya aprobaste."
+        self.assertIsNone(g.gestion_pide_ok(t, self.SIN_MIRAR))
+
+    def test_gestion_fusion_ya_hecha_y_verificada_no_salta(self):
+        t = "Fusión a casa base con tu OK. Verificado en casa base: el test del gate pasa en verde."
+        self.assertIsNone(g.gestion_pide_ok(t, self.SIN_MIRAR))
+
+    def test_gestion_worktree_como_lugar_no_salta(self):
+        t = "Qué espera tu OK: pasar prompt-audit en modo solo informe, trabajando en un worktree aparte."
+        self.assertIsNone(g.gestion_pide_ok(t, self.SIN_MIRAR))
+
+    def test_log_guarda_contexto_de_la_respuesta_para_no_se(self):
+        t = "Revisé la carpeta del caso. No sé si el hospital ya mandó el informe del 18 de agosto."
+        ctx = g._contexto("no_se_sin_mirar", t)
+        self.assertIsNotNone(ctx)
+        self.assertIn("No sé si el hospital", ctx)
+        self.assertIsNone(g._contexto("tells_ia", t))
+
 
 if __name__ == "__main__":
     suite = unittest.TestSuite()

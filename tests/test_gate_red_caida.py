@@ -97,7 +97,7 @@ class RecorteNoTiraLoQueBloquea(unittest.TestCase):
         cita = ("citas_fabricadas", "s", "Cita(s) que NO existen en su registro público: PMID:1")
         real_rev, real_ap = g.revisar, g._apunta
         g.revisar = lambda t, tools=None: estilo + [cita]
-        g._apunta = lambda h, m: None
+        g._apunta = lambda h, m, **_kw: None
         old_argv, old_stdin = sys.argv, sys.stdin
         sys.argv, sys.stdin = ["gate"], io.StringIO(json.dumps({"last_assistant_message": "x" * 200}))
         err = io.StringIO()
