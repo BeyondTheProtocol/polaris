@@ -846,12 +846,20 @@ def presupuesto_tests():
     _orig_cok, _orig_resync = cost_guard.credito_ok, cost_guard.resync_baseline_auto
     _resyncs = []
     cost_guard.resync_baseline_auto = lambda: _resyncs.append(1)
-    # ledger cree que está bajo, PERO la API tiene crédito → resync y CERO alarma (recarga sin anotar)
-    cost_guard.saldo_prepago = lambda: {"monto": 20, "gastado": 18, "restante": 2, "frac": 0.92, "fecha_recarga": "2026-07-17"}
+    _orig_obs = cost_guard.observar_credito
+    cost_guard.observar_credito = lambda ok: None          # no tocar el recargas.jsonl real
+    # 26-sep-26: gastado MÁS de lo supuesto y la API sigue viva → el importe era mayor: se sube, sin alarma
+    cost_guard.saldo_prepago = lambda: {"monto": 20, "gastado": 21, "restante": -1, "frac": 1.05, "fecha_recarga": "2026-07-17"}
     cost_guard.credito_ok = lambda *a, **k: True
     al_sp = [a[0] for a in hc._check_presupuesto()[0]]
     ok(not any(a.startswith("saldo_prepago") for a in al_sp) and _resyncs,
-       "ledger bajo + API CON crédito → resync, sin alarma (autónomo)")
+       "gastado > importe + API CON crédito → se sube el importe, sin alarma")
+    # …pero entre el 75 % y el 100 % con la API viva SÍ se avisa: es el aviso ANTES del corte
+    _resyncs.clear()
+    cost_guard.saldo_prepago = lambda: {"monto": 20, "gastado": 17, "restante": 3, "frac": 0.85, "fecha_recarga": "2026-07-17", "horas_restantes": 6.0}
+    al = dict(hc._check_presupuesto()[0])
+    ok("saldo_prepago_aviso" in al and not _resyncs and "~6 h" in al["saldo_prepago_aviso"],
+       "85 % gastado + API viva → aviso previo con horas restantes, sin reiniciar la cuenta")
     # la API rechaza por falta de crédito (señal REAL) → aviso URGENTE
     cost_guard.credito_ok = lambda *a, **k: False
     ok(any(a[0] == "saldo_prepago_urgente" for a in hc._check_presupuesto()[0]),
@@ -862,14 +870,15 @@ def presupuesto_tests():
     ok("saldo_prepago_aviso" in al_sp and "saldo_prepago_urgente" not in al_sp,
        "ledger bajo + sonda indeterminada → aviso suave (sin cifras caducas)")
     # ledger NO bajo (<75%) → NI se sonda (barato), silencio
-    cost_guard.credito_ok = lambda *a, **k: (_ for _ in ()).throw(AssertionError("no debe sondar si frac<0.75"))
+    cost_guard.credito_ok = lambda *a, **k: True   # leer la señal es un fichero: se lee siempre
     cost_guard.saldo_prepago = lambda: {"monto": 20, "gastado": 8, "restante": 12, "frac": 0.40, "fecha_recarga": "2026-07-17"}
     ok(not any(a[0].startswith("saldo_prepago") for a in hc._check_presupuesto()[0]),
-       "saldo <75% → silencio (ni sonda a la API)")
+       "saldo <75% → silencio")
     cost_guard.saldo_prepago = lambda: None
     ok(not any(a[0].startswith("saldo_prepago") for a in hc._check_presupuesto()[0]),
        "sin recarga registrada → silencio (sin baseline no inventamos)")
     cost_guard.credito_ok, cost_guard.resync_baseline_auto = _orig_cok, _orig_resync
+    cost_guard.observar_credito = _orig_obs
 
     cost_guard._limits, cost_guard.today_spent, cost_guard.month_spent = orig
     cost_guard.saldo_prepago = _orig_saldo

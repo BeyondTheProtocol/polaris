@@ -706,6 +706,9 @@ if is_credit_out "$OUT" || is_limit "$OUT"; then
   # lo no-clínico, {{TITULAR}} debe saber que el saldo de PAGO está a 0 para recargar el carril de
   # calidad/clínico (que NO se releva). El flag corta el spam; salida.py respeta el muro.
   if is_credit_out "$OUT"; then
+    # Señal REAL para cost_guard.credito_ok (26-sep-26): antes solo la escribía ia.ask y el lazo
+    # seguía «con crédito» mientras la API ya rechazaba. Con ella, healthcheck aprende la recarga.
+    "$PY" "$REPO/tools/cost_guard.py" credito agotado >/dev/null 2>&1 || true
     mkdir -p "$CST/dispatcher" 2>/dev/null || true
     CFLAG="$CST/dispatcher/aviso-credito-$(date +%F).flag"
     if [ ! -e "$CFLAG" ] && [ -f "$CST/notif/config.json" ]; then
@@ -823,6 +826,10 @@ elif [ "$rc" -eq 0 ] && ! printf '%s' "$OUT" | grep -q '"is_error":[[:space:]]*t
   EXITO_REAL=1
 else
   EXITO_REAL=0
+fi
+# Un trabajo que salió bien por la API medida prueba que HAY prepago (26-sep-26): se deja la señal.
+if [ "$EXITO_REAL" = 1 ] && [ "$VIA" = "api" ]; then
+  "$PY" "$REPO/tools/cost_guard.py" credito ok >/dev/null 2>&1 || true
 fi
 if [ "$EXITO_REAL" = 1 ]; then
   if [ "$DEGRADADO" = 1 ]; then heartbeat "ok_degradado"; else heartbeat "ok"; fi

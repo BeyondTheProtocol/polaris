@@ -320,7 +320,8 @@ def spent_since_detallado(fecha_iso):
     viene sin etiquetar. En vez de adivinar, se cuenta aparte: quien decide (`saldo_prepago`) sabe
     entonces qué parte de su cifra es firme y qué parte no, y puede decir «no lo sé» en vez de
     afirmar. Los días sin desglose de eventos caen enteros a `sin_etiquetar`, que es la verdad."""
-    out = {"total": 0.0, "api": 0.0, "suscripcion": 0.0, "sin_etiquetar": 0.0}
+    out = {"total": 0.0, "api": 0.0, "suscripcion": 0.0, "sin_etiquetar": 0.0,
+           "otros_proveedores": 0.0}
     if not os.path.isdir(COST):
         return out
     for fn in sorted(os.listdir(COST)):
@@ -352,6 +353,11 @@ def spent_since_detallado(fecha_iso):
                 usd = float(usd)
                 visto += usd
                 via = e.get("via")
+                if via == "api" and str(e.get("job", "")).startswith("api-"):
+                    # api-grok, api-perplexity, api-chatgpt…: dinero de OTRO proveedor (26-sep-26).
+                    # Cuenta en el total, pero no sale del prepago de Anthropic.
+                    out["otros_proveedores"] += usd
+                    continue
                 out["suscripcion" if via == "suscripcion" else
                     "api" if via == "api" else "sin_etiquetar"] += usd
             # El agregado del día puede ser mayor que la suma de eventos (eventos podados, o
@@ -379,15 +385,43 @@ def saldo_prepago():
         return None
     det = spent_since_detallado(ur.get("fecha", datetime.now().strftime("%Y-%m-%d")))
     gastado = det["total"]
-    return {"monto": round(monto, 2), "gastado": round(gastado, 2),
-            "restante": round(monto - gastado, 2), "frac": gastado / monto,
-            "frac_firme": det["api"] / monto,
-            "sin_etiquetar": det["sin_etiquetar"],
-            "fiable": det["sin_etiquetar"] <= 0.25 * gastado if gastado else True,
-            "fecha_recarga": ur.get("fecha")}
+    out = {"monto": round(monto, 2), "gastado": round(gastado, 2),
+           "restante": round(monto - gastado, 2), "frac": gastado / monto,
+           "frac_firme": det["api"] / monto,
+           "sin_etiquetar": det["sin_etiquetar"],
+           "fiable": det["sin_etiquetar"] <= 0.25 * gastado if gastado else True,
+           "fecha_recarga": ur.get("fecha")}
+    # Previsión (26-sep-26): a este ritmo de API de Anthropic, cuántas horas quedan. Solo con una
+    # baseline de hora conocida y al menos 1 h de historia; si no, no se inventa.
+    try:
+        horas = (time.time() - float(ur.get("ts", 0))) / 3600.0
+        if ur.get("ts") and horas >= 1 and det["api"] > 0:
+            ritmo = det["api"] / horas
+            out["ritmo_usd_h"] = round(ritmo, 3)
+            out["horas_restantes"] = round(max(monto - det["api"], 0) / ritmo, 1)
+    except Exception:
+        pass
+    return out
 
 
 _CREDITO_TTL_S = 6 * 3600   # 6 h: la señal la refresca cualquier llamada a Claude del lazo (frecuente)
+
+
+def marcar_credito(ok):
+    """Escribe la señal de crédito (mismo fichero y formato que `ia._marcar_credito`). La llama
+    run_agent.sh (26-sep-26): el lazo gasta el prepago por ahí y hasta hoy no la escribía, así que
+    a las 00:21 del 26-sep la señal seguía diciendo «hay crédito» con la API ya rechazando. Es
+    estado local, no una llamada fuera. Fail-soft."""
+    try:
+        d = os.path.join(STATE, "ia")
+        os.makedirs(d, exist_ok=True)
+        tmp = os.path.join(d, ".credito.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"ok": bool(ok), "ts": time.time()}, f)
+        os.replace(tmp, os.path.join(d, "credito.json"))
+        return True
+    except Exception:
+        return False
 
 
 def credito_ok(ttl=_CREDITO_TTL_S):
@@ -408,22 +442,87 @@ def credito_ok(ttl=_CREDITO_TTL_S):
 
 
 def resync_baseline_auto():
-    """La API CONFIRMA crédito pero el ledger lo daba por agotado → hubo una recarga que {{TITULAR}} no
-    anotó. Reajusta la baseline a HOY (append de un marcador `auto`) para que el estimador deje de
-    gritar en falso, sin que ella tenga que decirme el importe. Amount = la última conocida (estimación
-    honesta, marcada `auto`); si {{TITULAR}} anota el importe real después, ese gana (append-only). Devuelve
-    el marcador o None. Fail-soft."""
+    """La API CONFIRMA crédito pero el estimador lo daba por gastado → el importe que suponíamos se
+    quedó corto. Se SUBE el importe (el doble de lo gastado) SIN mover la baseline.
+
+    Por qué así (26-sep-26): antes se ponía la baseline a HOY en cada pasada. Como el estimador
+    cuenta por DÍA, el gasto de hoy seguía dentro y la condición volvía a cumplirse: 189 marcadores
+    `auto` en recargas.jsonl y el estimador reiniciado cada 30 min, así que nunca podía avisar ANTES
+    de quedarse a cero (se agotó 5 veces en septiembre sin aviso previo). Subir el importe mantiene
+    la cuenta y solo se repite si el gasto vuelve a pasar del umbral. Devuelve el marcador o None."""
     try:
         ur = ultima_recarga()
-        monto = float((ur or {}).get("monto_usd", 20.0)) or 20.0
-        rec = {"ts": time.time(), "fecha": datetime.now().strftime("%Y-%m-%d"),
-               "monto_usd": monto, "auto": True}
-        os.makedirs(COST, exist_ok=True)
-        with open(_recargas_path(), "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        if not ur:
+            return None
+        sp = saldo_prepago()
+        gastado = float((sp or {}).get("frac_firme", 0)) * float(ur.get("monto_usd", 0) or 0)
+        monto = round(max(float(ur.get("monto_usd", 0) or 0), 2 * gastado), 2)
+        if monto <= float(ur.get("monto_usd", 0) or 0):
+            return None
+        rec = dict(ur, monto_usd=monto, auto="ajuste", ajustado_ts=time.time())
+        _append_recarga(rec)
         return rec
     except Exception:
         return None
+
+
+def _append_recarga(rec):
+    os.makedirs(COST, exist_ok=True)
+    with open(_recargas_path(), "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def _ultimo_marcador():
+    """Última línea de recargas.jsonl, sea recarga o marcador de agotado."""
+    ult = None
+    try:
+        with open(_recargas_path(), encoding="utf-8") as f:
+            for ln in f:
+                try:
+                    r = json.loads(ln)
+                    if isinstance(r, dict):
+                        ult = r
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return ult
+
+
+def observar_credito(ok, ahora=None):
+    """Aprende el importe real del prepago sin que {{TITULAR}} lo anote (26-sep-26).
+
+    Se llama en cada pasada de salud con la señal real (`credito_ok`). Dos transiciones:
+      · hay crédito → SIN crédito: se anota `{"tipo": "agotado", "gastado": X}`. X es lo que salió
+        de la API de Anthropic desde la última recarga, o sea lo que de verdad se cargó.
+      · SIN crédito → hay crédito: {{TITULAR}} recargó. Nueva baseline con hora exacta y, como importe,
+        lo aprendido en el corte anterior (si fue creíble, > 1 $); si no, el último conocido.
+    Supone que recarga cantidades parecidas; si no, el siguiente corte lo corrige solo. None si no
+    hay transición. Fail-soft."""
+    if ok is None:
+        return None
+    ahora = ahora or time.time()
+    try:
+        ult = _ultimo_marcador()
+        agotado = bool(ult and ult.get("tipo") == "agotado")
+        if ok is False and not agotado:
+            sp = saldo_prepago() or {}
+            gastado = round(float(sp.get("frac_firme", 0)) * float(sp.get("monto", 0)), 2)
+            rec = {"tipo": "agotado", "ts": ahora, "gastado": gastado}
+            _append_recarga(rec)
+            return rec
+        if ok is True and agotado:
+            previa = ultima_recarga() or {}
+            monto = float(ult.get("gastado", 0) or 0)
+            if monto <= 1:
+                monto = float(previa.get("monto_usd", 20.0) or 20.0)
+            rec = {"ts": ahora, "fecha": datetime.fromtimestamp(ahora).strftime("%Y-%m-%d"),
+                   "monto_usd": round(monto, 2), "auto": "recarga_detectada"}
+            _append_recarga(rec)
+            return rec
+    except Exception:
+        pass
+    return None
 
 
 def _tope_efectivo():
@@ -929,6 +1028,9 @@ def main(argv):
             return 2
         r = desglose(dia)
         print(json.dumps(r, ensure_ascii=False, indent=2) if "--json" in a else _texto_desglose(r))
+        return 0
+    if cmd == "credito" and a and a[0] in ("ok", "agotado"):
+        marcar_credito(a[0] == "ok")
         return 0
     if cmd == "saldo":
         sp = saldo_prepago()

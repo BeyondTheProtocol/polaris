@@ -103,12 +103,13 @@ def main():
     import healthcheck as hc
 
     def alertas_con(sp, credito):
-        orig_sp, orig_ck = cg.saldo_prepago, cg.credito_ok
+        orig_sp, orig_ck, orig_obs = cg.saldo_prepago, cg.credito_ok, cg.observar_credito
         cg.saldo_prepago, cg.credito_ok = (lambda: sp), (lambda: credito)
+        cg.observar_credito = lambda ok: None
         try:
             al, _info = hc._check_presupuesto()
         finally:
-            cg.saldo_prepago, cg.credito_ok = orig_sp, orig_ck
+            cg.saldo_prepago, cg.credito_ok, cg.observar_credito = orig_sp, orig_ck, orig_obs
         return {c: t for c, t in al}
 
     no_fiable = {"monto": 20.0, "gastado": 49.72, "restante": -29.72, "frac": 2.48,

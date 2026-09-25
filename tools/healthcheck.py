@@ -3159,14 +3159,22 @@ def _check_presupuesto():
         sp = None
     if sp:
         info["saldo_prepago"] = sp
-        # AUTONOMÍA (fix 23/7): el ledger es solo un ESTIMADOR que {{TITULAR}} tendría que rellenar a mano.
-        # No alarmamos por él: cuando cree que está bajo, PREGUNTAMOS a la API de verdad (sonda barata,
-        # cacheada 15 min). Así el sistema sabe el saldo SOLO, sin que se lo digan.
-        baja = sp["frac"] >= PREPAGO_FRAC_AVISO
-        cok = cost_guard.credito_ok() if baja else True
+        # 26-sep-26: la alarma mira el gasto de la API de ANTHROPIC (frac_firme), no el bruto con la
+        # suscripción y otros proveedores. La señal real se lee SIEMPRE (es un fichero, no una
+        # llamada) y alimenta `observar_credito`, que aprende cuánto recargó {{TITULAR}} entre dos cortes.
+        # Antes: «API con crédito» = «el estimador está mal» → baseline a hoy en cada pasada (189
+        # veces) y el aviso previo nunca llegaba. Ahora solo se sube el importe si el gasto ya lo
+        # PASÓ con la API aún viva; entre el 75 % y el 100 % se avisa, que es para lo que existe.
+        frac = sp.get("frac_firme", sp["frac"]) if sp.get("fiable", True) else sp["frac"]
+        baja = frac >= PREPAGO_FRAC_AVISO
+        cok = cost_guard.credito_ok()
         info["credito_probe"] = cok
-        if baja and cok is True:
-            # La API TIENE crédito → el ledger está caduco (recarga sin anotar) → resync y CERO alarma.
+        try:
+            cost_guard.observar_credito(cok)
+        except Exception:
+            pass
+        if cok is True and frac >= 1.0:
+            # Gastado más de lo supuesto y la API sigue viva → el importe era mayor. Se sube, sin alarma.
             try:
                 cost_guard.resync_baseline_auto()
             except Exception:
@@ -3175,19 +3183,23 @@ def _check_presupuesto():
             # SEÑAL REAL: la API rechaza por falta de crédito (400 'Credit balance too low'). Esta sí.
             alertas.append(("saldo_prepago_urgente",
                             "🔴 La API de Anthropic responde SIN CRÉDITO: el prepago se agotó y el núcleo "
-                            "se para hasta que recargues (console.anthropic.com → Billing). Lo detecté yo "
+                            "se para hasta que recargues (https://platform.claude.com/settings/billing). Lo detecté yo "
                             "solo, no por una cuenta a mano."))
         elif baja and sp.get("fiable", True):
+            # Con la API viva (cok True) o muda (None): el estimador es fiable y dice que queda poco.
             # cok is None → la sonda real no confirma. Se avisa SOLO si el estimador es fiable, o
             # sea si la mayor parte del gasto está etiquetada como API medida. Antes se avisaba
             # siempre, y como el prepago solo lo consume la API pero el estimador sumaba también
             # la cuota de la suscripción, la cifra se volvía imposible (restante −29,72 $ el
             # 25-jul) y el mismo aviso salía en cada pasada hasta escalar la deuda a rojo.
+            horas = sp.get("horas_restantes")
             alertas.append(("saldo_prepago_aviso",
-                            "Saldo de la API estimado bajo (%.0f%% de la última recarga) y no pude "
-                            "confirmarlo contra la API en esta pasada; si el lazo se frena, revisa "
-                            "el saldo en console.anthropic.com." % (100 * sp["frac"])))
-        elif baja:
+                            "Queda poco prepago de la API de Anthropic: gastado el %.0f%% de la última "
+                            "recarga%s. Cuando se acabe, el lazo se para. Recarga en "
+                            "https://platform.claude.com/settings/billing"
+                            % (100 * frac, (", a este ritmo se acaba en ~%.0f h" % horas)
+                               if isinstance(horas, (int, float)) else "")))
+        elif baja and cok is None:
             # No es que el saldo esté bajo: es que NO SE PUEDE SABER, y decir «bajo» sería afirmar
             # lo que no se ha verificado. Clave propia para que no se confunda con la alarma real.
             info["saldo_sin_señal"] = True
