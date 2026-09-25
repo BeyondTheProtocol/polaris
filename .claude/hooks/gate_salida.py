@@ -58,7 +58,21 @@ MAX_HALLAZGOS = 3        # no abrumar: los 3 más graves
 LOG = os.path.join(_casa.state_dir(), "gate_salida.jsonl")
 URGENTE = ("🔴", "CÓDIGO ROJO", "CODIGO ROJO", ".HALT")
 MAX_IDS_CITA = 6         # tope de citas a verificar por respuesta (coste y latencia)
-TIMEOUT_CITAS = 20       # segundos para todo el lote; si no llega, PENDIENTE (aviso), nunca «verificado»
+# Presupuesto de RED compartido por los tres checks que llaman fuera (citas, preclínico, cifras).
+# 25-sep-26 (deuda `gate_salida_timeout_desalineado`): antes cada llamada tenía 20 s propios y
+# `settings.json` le da al hook 8 s. Si el registro tardaba, el harness mataba el hook entero y se
+# perdían en silencio TODOS los checks del turno, también el aviso de «cita sin verificar». Ahora
+# las llamadas comparten un reloj que acaba antes que el del harness; lo que no llega sale como
+# PENDIENTE (aviso), nunca como «verificado». `tests/test_gate_presupuesto.py` vigila el margen.
+PRESUPUESTO_RED = 5.5    # segundos para TODAS las llamadas de red del turno (hook: 8 s)
+_T0 = time.monotonic()    # se reinicia en cada `revisar()` (replay y tests revisan miles)
+
+
+def _queda():
+    """Segundos de red que le quedan a este turno (0 si ya se gastó el presupuesto)."""
+    return max(0.0, PRESUPUESTO_RED - (time.monotonic() - _T0))
+
+
 # Checks que bloquean AUNQUE el gate global esté en `aviso`. Solo entra aquí lo que, una vez
 # leído, ya no se puede deshacer: una cita fabricada en contexto clínico se recuerda aunque
 # después se desmienta. El resto de checks respetan el modo global.
@@ -503,10 +517,10 @@ def citas_fabricadas(t, tools=None):
         return _cita_sin_verificar(ids, "no encuentro `tools/verifica_citas.py`")
     try:
         r = subprocess.run([sys.executable, verificador, "--json"] + ids,
-                           capture_output=True, text=True, timeout=TIMEOUT_CITAS)
+                           capture_output=True, text=True, timeout=_queda() or 0.01)
         datos = json.loads(r.stdout or "null")
     except subprocess.TimeoutExpired:
-        return _cita_sin_verificar(ids, "el registro no contestó en %d s" % TIMEOUT_CITAS)
+        return _cita_sin_verificar(ids, "el registro no contestó a tiempo (presupuesto de %.1f s)" % PRESUPUESTO_RED)
     except Exception as e:
         return _cita_sin_verificar(ids, "falló la verificación (%s)" % type(e).__name__)
     if not isinstance(datos, list) or not datos:
@@ -646,7 +660,7 @@ def preclinico_aplanado(t, tools=None):
                 "frase o dilo como no comprobado." % ", ".join(pmids))
     try:
         r = subprocess.run([sys.executable, clasificador, "--json"] + pmids,
-                           capture_output=True, text=True, timeout=TIMEOUT_CITAS)
+                           capture_output=True, text=True, timeout=_queda() or 0.01)
         datos = json.loads(r.stdout or "[]")
     except Exception:
         datos = None
@@ -717,7 +731,7 @@ def cita_no_respalda(t, tools=None):
         return _cifra_sin_cotejar(citas, "no encuentro `tools/soporte_cita.py`")
     try:
         r = subprocess.run([sys.executable, herramienta, "--lote"], input=json.dumps(pares),
-                           capture_output=True, text=True, timeout=TIMEOUT_CITAS)
+                           capture_output=True, text=True, timeout=_queda() or 0.01)
         datos = json.loads(r.stdout or "null")
     except Exception as e:                         # red o proceso caído: aviso, no acusación
         return _cifra_sin_cotejar(citas, "falló el cotejo (%s)" % type(e).__name__)
@@ -1192,6 +1206,8 @@ def _reglas_activas():
 
 def revisar(texto, tools=None):
     """[(check, slug, motivo)] de lo que incumple. Nunca lanza."""
+    global _T0
+    _T0 = time.monotonic()                        # el presupuesto de red es por respuesta
     if not texto:
         return []
     if any(u in texto for u in URGENTE):

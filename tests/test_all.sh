@@ -67,6 +67,7 @@ runpy test_lentes.py
 runpy test_gate_salida.py
 runpy test_replay_gate.py
 runpy test_gate_punto08.py
+runpy test_gate_presupuesto.py
 runpy test_nvidia_tope.py
 runpy test_readme_modelos.py
 runpy test_stdin_canalizado.py
