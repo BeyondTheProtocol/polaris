@@ -58,6 +58,34 @@ def main():
     finally:
         b.borde.es_trusted, b.preguntar = orig_t, orig_p
     check("no hay modo crudo", not hasattr(b, "_casos_crudos") and "--crudo" not in open(b.__file__).read())
+    # 25-sep: todo envío a Jev deja un `enviado` en el ledger, por cualquier ruta (antes bench y
+    # bench_n1 salían sin rastro). Red y ledger falsos: no sale nada ni se toca el ledger vivo.
+    class _Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"answers": {"es_tarea": {"noul": 0.7}}}'
+    sellos = []
+    orig_u, orig_s = b.urllib.request.urlopen, b.borde._sellar
+    b.urllib.request.urlopen = lambda *a, **k: _Resp()
+    b.borde._sellar = lambda ev: sellos.append(ev)
+    try:
+        for instr in (None, b.INSTR_RADAR, b.INSTR_N1):
+            b.preguntar("texto de prueba", "clave-falsa", instr=instr)
+        rutas = [s.get("ruta") for s in sellos]
+        check("cada envío a Jev sella un «enviado»",
+              len(sellos) == 3 and all(s["evento"] == "enviado" and s["destino"] == b.DESTINO_N1
+                                       for s in sellos))
+        check("el sello distingue la ruta", rutas == ["triage", "radar-orden", "n1"])
+        check("el sello no lleva el texto", all("texto de prueba" not in str(s) for s in sellos))
+        sellos.clear()
+        b.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(OSError("red"))
+        try:
+            b.preguntar("texto", "clave-falsa")
+        except OSError:
+            pass
+        check("si Jev no responde, no se sella un envío", not sellos)
+    finally:
+        b.urllib.request.urlopen, b.borde._sellar = orig_u, orig_s
     print("test_bench_jev: %d OK, %d fallos" % (_pass, _fail))
     return 1 if _fail else 0
 

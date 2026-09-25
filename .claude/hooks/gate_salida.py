@@ -19,6 +19,8 @@ CÓMO SE COMPORTA (por diseño, para no volverse un estorbo):
   · **Determinista y sin LLM** (coste 0, <1s). Caza CLASES de patrón, no toda falsedad.
   · **FAIL-OPEN**: cualquier excepción, timeout o duda → deja pasar. Un guardián de estilo no puede
     romper una conversación. (Lo contrario que el muro, que es fail-closed: ahí sí se bloquea.)
+    EXCEPCIÓN (25-sep-26): los checks que consultan RED (citas, tier, cifra) no callan si la red
+    falla. Devuelven un hallazgo PENDIENTE: se avisa («sin verificar»), se apunta y no bloquea.
   · **Nunca frena una urgencia**: si la respuesta lleva 🔴 / CÓDIGO ROJO / HALT, pasa sin mirar.
   · **Sin bucles**: si `stop_hook_active` viene puesto (ya bloqueó una vez este turno), pasa.
   · **Bypass**: `BTP_GATE_OFF=1`.
@@ -56,11 +58,16 @@ MAX_HALLAZGOS = 3        # no abrumar: los 3 más graves
 LOG = os.path.join(_casa.state_dir(), "gate_salida.jsonl")
 URGENTE = ("🔴", "CÓDIGO ROJO", "CODIGO ROJO", ".HALT")
 MAX_IDS_CITA = 6         # tope de citas a verificar por respuesta (coste y latencia)
-TIMEOUT_CITAS = 20       # segundos para todo el lote; si no llega, fail-open
+TIMEOUT_CITAS = 20       # segundos para todo el lote; si no llega, PENDIENTE (aviso), nunca «verificado»
 # Checks que bloquean AUNQUE el gate global esté en `aviso`. Solo entra aquí lo que, una vez
 # leído, ya no se puede deshacer: una cita fabricada en contexto clínico se recuerda aunque
 # después se desmienta. El resto de checks respetan el modo global.
 SIEMPRE_BLOQUEA = {"citas_fabricadas"}
+# Un hallazgo que empieza así es una verificación que NO se pudo hacer, no una violación: se avisa
+# y nunca bloquea (ver `_bloquean`). Existe para que un fallo de red no se convierta en un
+# «verificado» por defecto (auditoría Gorgojo 1.4;
+# desde el 25-sep-26 lo usan los tres checks que consultan red).
+PENDIENTE = "⏳ PENDIENTE de comprobar:"
 
 # ── utilidades ────────────────────────────────────────────────────────────────────────────────
 def _sin_fences(t):
@@ -367,27 +374,58 @@ def citas_fabricadas(t, tools=None):
     """Una cita que NO existe no puede llegar a {{TITULAR}}. Gate determinista, sin LLM.
 
     Se apoya en tools/verifica_citas.py (Crossref / NCBI / ClinicalTrials / arXiv). Solo corre
-    si la respuesta trae algún id: sin ids no hay coste ni red. FAIL-OPEN en todo lo demás —
-    red caída o API muda devuelven `no_resoluble` y NO se acusa, porque la cita puede existir.
+    si la respuesta trae algún id: sin ids no hay coste ni red.
+
+    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+    Fallo de verificación ≠ vía libre (25-sep-26, su punto de rotura 07). Antes, red
+    caída, timeout, verificador ausente o `no_resoluble` devolvían None: la cita salía como si se
+    hubiera comprobado y no quedaba ni rastro en el log. Reproducido con la red cortada: un PMID
+    inventado pasaba con cero hallazgos. Ahora eso devuelve un hallazgo PENDIENTE: se le enseña a
+    {{TITULAR}} como «cita SIN VERIFICAR», se apunta en el log y NO bloquea (la cita puede existir; la
+    culpa es de la red, no de la respuesta). Solo `no_existe` confirmado bloquea.
     """
     ids = _ids_cita(t)
     if not ids:
         return None
     verificador = os.path.join(REPO, "tools", "verifica_citas.py")
     if not os.path.exists(verificador):
-        return None
+        return _cita_sin_verificar(ids, "no encuentro `tools/verifica_citas.py`")
     try:
         r = subprocess.run([sys.executable, verificador, "--json"] + ids,
                            capture_output=True, text=True, timeout=TIMEOUT_CITAS)
-        datos = json.loads(r.stdout or "[]")
-    except Exception:
-        return None                                # fail-open: nunca frenar por la red
-    malas = [d["id"] for d in datos if d.get("estado") == "no_existe"]
-    if not malas:
-        return None
-    return ("Cita(s) que NO existen en su registro público: %s. Verificado con "
-            "`tools/verifica_citas.py` (Crossref/NCBI/ClinicalTrials/arXiv). Quita la "
-            "referencia o sustitúyela por una real ANTES de entregar." % ", ".join(malas))
+        datos = json.loads(r.stdout or "null")
+    except subprocess.TimeoutExpired:
+        return _cita_sin_verificar(ids, "el registro no contestó en %d s" % TIMEOUT_CITAS)
+    except Exception as e:
+        return _cita_sin_verificar(ids, "falló la verificación (%s)" % type(e).__name__)
+    if not isinstance(datos, list) or not datos:
+        return _cita_sin_verificar(ids, "el verificador no devolvió resultados legibles")
+    datos = [d for d in datos if isinstance(d, dict)]
+    malas = [d.get("id") for d in datos if d.get("estado") == "no_existe"]
+    # Todo lo que no sea `existe` ni `no_existe` (no_resoluble, no_parseable, estado raro) y los ids
+    # que el verificador no devolvió cuentan como NO comprobados, nunca como buenos.
+    dudosas = [d.get("entrada") or d.get("id") for d in datos
+               if d.get("estado") not in ("existe", "no_existe")]
+    if len(datos) < len(ids):
+        vistos = {str(d.get("entrada")) for d in datos}
+        dudosas += [x for x in ids if x not in vistos]
+    if malas:
+        extra = (" Además, sin verificar (red o registro mudo): %s." % ", ".join(dudosas)
+                 if dudosas else "")
+        return ("Cita(s) que NO existen en su registro público: %s. Verificado con "
+                "`tools/verifica_citas.py` (Crossref/NCBI/ClinicalTrials/arXiv). Quita la "
+                "referencia o sustitúyela por una real ANTES de entregar.%s"
+                % (", ".join(malas), extra))
+    if dudosas:
+        return _cita_sin_verificar(dudosas, "el registro no respondió o no la resolvió")
+    return None
+
+
+def _cita_sin_verificar(ids, porque):
+    """Hallazgo PENDIENTE de `citas_fabricadas`: avisa, se apunta, no bloquea."""
+    return (PENDIENTE + " CITA SIN VERIFICAR: %s (%s). NO está comprobado que exista: trátala "
+            "como «sin verificar» hasta cotejarla con `tools/verifica_citas.py` o abrirla."
+            % (", ".join(ids), porque))
 
 
 # Léxico del check `preclinico_aplanado`. Fuera de la función para poder testearlo suelto.
@@ -408,10 +446,6 @@ _YA_ETIQUETADO = (
     "no se ha probado en personas", "todavía no en humanos", "todavia no en humanos",
 )
 
-# Un hallazgo que empieza así es una verificación que NO se pudo hacer, no una violación: se avisa
-# y nunca bloquea (ver `_bloquean`). Existe para que un fallo de red no se convierta en un
-# «verificado» por defecto (auditoría Gorgojo 1.4).
-PENDIENTE = "⏳ PENDIENTE de comprobar:"
 # Fin de frase que NO es fin de frase: «Smith et al. mostraron…», «p. ej. en ratones».
 _ABREVIATURA = re.compile(r"(?:\bet al|\bp\. ej|\bvs|\betc|\bfig|\baprox|\bdra?|\bsra?|\b\w)\.$", re.I)
 
@@ -567,16 +601,29 @@ def cita_no_respalda(t, tools=None):
     if not pares:
         return None
     herramienta = os.path.join(REPO, "tools", "soporte_cita.py")
+    citas = list(dict.fromkeys(p["cita"] for p in pares))
     if not os.path.exists(herramienta):
-        return None
+        return _cifra_sin_cotejar(citas, "no encuentro `tools/soporte_cita.py`")
     try:
         r = subprocess.run([sys.executable, herramienta, "--lote"], input=json.dumps(pares),
                            capture_output=True, text=True, timeout=TIMEOUT_CITAS)
-        datos = json.loads(r.stdout or "[]")
-    except Exception:
-        return None                                # red o proceso caído: aviso, no acusación
-    malas = [d for d in datos if isinstance(d, dict) and d.get("estado") == "NO_RESPALDA"]
+        datos = json.loads(r.stdout or "null")
+    except Exception as e:                         # red o proceso caído: aviso, no acusación
+        return _cifra_sin_cotejar(citas, "falló el cotejo (%s)" % type(e).__name__)
+    if not isinstance(datos, list):
+        return _cifra_sin_cotejar(citas, "el cotejo no devolvió resultados legibles")
+    datos = [d for d in datos if isinstance(d, dict)]
+    malas = [d for d in datos if d.get("estado") == "NO_RESPALDA"]
     if not malas:
+        # 25-sep-26: PENDIENTE por RED ya no calla (callar era dar la cifra por cotejada). El de
+        # HALT sí: es una parada deliberada de {{TITULAR}}, no un fallo, y avisar en cada respuesta con
+        # HALT puesto sería el ruido que este check quiso evitar al nacer.
+        red = [d.get("id") for d in datos if d.get("estado") == "PENDIENTE"
+               and "HALT" not in str(d.get("motivo") or "")]
+        if len(datos) < len(pares):
+            red += citas[len(datos):]
+        if red:
+            return _cifra_sin_cotejar(list(dict.fromkeys(red)), "el registro no respondió")
         return None
     detalle = "; ".join("%s no contiene %s (bajo «%s»)" % (
         d.get("id"), ", ".join(d.get("faltan_numeros") or []), (d.get("afirmacion") or "")[:80])
@@ -584,6 +631,13 @@ def cita_no_respalda(t, tools=None):
     return ("La cita existe pero su abstract NO trae la cifra que le atribuyes: %s. Verificado con "
             "`tools/soporte_cita.py` (abstract de PubMed/CT.gov, sin LLM). Corrige la cifra, cita "
             "la fuente que sí la dice, o marca que sale del texto completo." % detalle)
+
+
+def _cifra_sin_cotejar(citas, porque):
+    """Hallazgo PENDIENTE de `cita_no_respalda`: avisa, se apunta, no bloquea."""
+    return (PENDIENTE + " CIFRA SIN COTEJAR contra %s (%s). No sé si el abstract dice la cifra "
+            "que le atribuyes: dila como «sin verificar» o cotéjala con `tools/soporte_cita.py`."
+            % (", ".join(citas), porque))
 
 
 # Solo se coteja una frase que atribuye un RESULTADO al estudio. El replay del 24-sep (2338 turnos,
@@ -918,6 +972,25 @@ def _bloquean(hallazgos, modo_global):
             and ((propio.get(c) or modo_global) == "bloqueo" or c in SIEMPRE_BLOQUEA)]
 
 
+def _prioriza(hallazgos, modo_global):
+    """Lo que bloquea primero, luego lo PENDIENTE, luego el resto; estable dentro de cada grupo.
+    25-sep-26: el recorte a MAX_HALLAZGOS se hacía en el orden del registro, donde
+    `citas_fabricadas` va el 15.º. Con tres avisos de estilo delante, una cita INVENTADA se caía
+    del recorte y la respuesta salía sin bloquear (y una «sin verificar», sin aviso).
+    Los de modo `sombra` van al final: no se enseñan, y no pueden quitarle sitio a lo que sí."""
+    bloq = set(_bloquean(hallazgos, modo_global))
+    activas, _ = _reglas_activas()
+    sombra = {c for c, _s, m in activas if m == "sombra" and c not in SIEMPRE_BLOQUEA}
+
+    def peso(h):
+        if h[0] in bloq:
+            return 0
+        if h[0] in sombra:
+            return 3
+        return 1 if str(h[2] or "").startswith(PENDIENTE) else 2
+    return sorted(hallazgos, key=peso)
+
+
 def _es_mensaje_de_titular(d):
     """¿Esta línea del transcript es un mensaje suyo? Los tool_result también llevan role=user, y
     tomarlos por mensaje suyo borraba del turno los Agent lanzados antes (11-sep-26)."""
@@ -1051,7 +1124,7 @@ def main():
     if not hallazgos:
         return 0
     activas, modo = _reglas_activas()
-    hallazgos = hallazgos[:MAX_HALLAZGOS]
+    hallazgos = _prioriza(hallazgos, modo)[:MAX_HALLAZGOS]
     _apunta(hallazgos, modo)
     # `sombra` (escalera P2, 25-sep-26): el check se apunta para medirlo, pero no se enseña. Para
     # los ruidosos, que en aviso solo hacían ruido. Nunca aplica a SIEMPRE_BLOQUEA.

@@ -101,6 +101,10 @@ Para parar: `launchctl unload -w ~/Library/LaunchAgents/com.btp.asistente.plist`
 > feature antes de mandarla a producción. Privada: nada sale a internet. **No despliega** (el
 > "mandar a producción" lleva al PR; mergeas tú/{{CONTACTO}}). Sustituye al viejo `com.btp.preview-web`
 > (relay del dev server), que queda **obsoleto** (no lo cargues a la vez: usan la misma idea de relay).
+> **Retirado del todo el 25-sep-2026** (S14 de la revisión de {{CONTACTO}}+KAI): escuchaba en la IP de Tailscale
+> :3006 y reenviaba a :3005, donde no había nada. Se hizo `bootout` y se quitó de `~/Library/LaunchAgents`;
+> el plist sigue en `tools/launchd/` por si hiciera falta volver (`python3 tools/activar_daemon.py com.btp.preview-web`).
+> El mismo día se quitaron los `tailscale serve` huérfanos 9092 (→ :3030) y 7692 (→ :7682).
 >
 > **No hace falta launchd para usarla puntualmente:** `staging.sh web <rama>` ya la levanta. El `on`
 > solo sirve para dejarla viva 24/7 (tras reinicios). URL fija para {{TITULAR}}: **http://100.114.113.73:3010**

@@ -11,7 +11,8 @@ llegaba a ella sin filtro.
 Este test fija las cuatro propiedades del check, sin tocar la red (subprocess mockeado):
   1. Una cita que NO existe se caza.
   2. Una cita que existe pasa.
-  3. Red caída / API muda (`no_resoluble`) NO acusa — la cita puede existir. FAIL-OPEN.
+  3. Red caída / API muda (`no_resoluble`) NO acusa ni bloquea — la cita puede existir — pero
+     tampoco calla: sale PENDIENTE, «sin verificar» (25-sep-26; antes era fail-open silencioso).
   4. Bloquea aunque el gate global esté en modo `aviso` (`SIEMPRE_BLOQUEA`).
 """
 import json
@@ -73,9 +74,12 @@ class GateCitas(unittest.TestCase):
         g.subprocess.run = _mock("existe")
         self.assertIsNone(g.citas_fabricadas(CON_PMID))
 
-    def test_red_caida_no_acusa(self):
+    def test_red_caida_no_acusa_pero_avisa(self):
         g.subprocess.run = _mock("no_resoluble")
-        self.assertIsNone(g.citas_fabricadas(CON_PMID))
+        m = g.citas_fabricadas(CON_PMID)
+        self.assertTrue(m and m.startswith(g.PENDIENTE), m)
+        self.assertIn("SIN VERIFICAR", m)
+        self.assertEqual(g._bloquean([("citas_fabricadas", "s", m)], "aviso"), [])
 
     def test_sin_ids_no_toca_la_red(self):
         def boom(*a, **k):
@@ -83,11 +87,13 @@ class GateCitas(unittest.TestCase):
         g.subprocess.run = boom
         self.assertIsNone(g.citas_fabricadas(LIMPIO))
 
-    def test_excepcion_es_fail_open(self):
+    def test_excepcion_avisa_sin_bloquear(self):
         def boom(*a, **k):
             raise OSError("red caída")
         g.subprocess.run = boom
-        self.assertIsNone(g.citas_fabricadas(CON_PMID))
+        m = g.citas_fabricadas(CON_PMID)
+        self.assertTrue(m and m.startswith(g.PENDIENTE), m)
+        self.assertEqual(g._bloquean([("citas_fabricadas", "s", m)], "aviso"), [])
 
     def test_extraccion_de_ids(self):
         ids = g._ids_cita("PMID: 39538331 y 10.1186/s13073-024-01388-3 y NCT07112053 y arXiv: 2402.10588")
@@ -177,8 +183,17 @@ class CitaNoRespalda(unittest.TestCase):
         g.subprocess.run = _mock_soporte(ABSTRACT_14)
         self.assertIsNone(g.cita_no_respalda(ATRIBUYE_14))
 
-    def test_registro_mudo_calla(self):
+    def test_registro_mudo_avisa_sin_bloquear(self):
+        """25-sep-26: antes callaba, que era dar la cifra por cotejada."""
         g.subprocess.run = _mock_soporte(None)
+        m = g.cita_no_respalda(ATRIBUYE_41)
+        self.assertTrue(m and m.startswith(g.PENDIENTE), m)
+        self.assertEqual(g._bloquean([("cita_no_respalda", "s", m)], "bloqueo"), [])
+
+    def test_halt_calla(self):
+        """HALT es una parada deliberada de {{TITULAR}}, no un fallo de red: no se avisa en cada turno."""
+        g.subprocess.run = lambda cmd, **kw: _Resp(json.dumps([
+            {"estado": "PENDIENTE", "id": "12345678", "motivo": "HALT activo: no se consulta"}]))
         self.assertIsNone(g.cita_no_respalda(ATRIBUYE_41))
 
     def test_sin_cita_no_consulta(self):

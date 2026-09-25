@@ -26,6 +26,7 @@ Uso:
   python3 tools/bench_jev.py --seco          # cuenta qué saldría, sin llamar a Jev
   python3 tools/bench_jev.py --n1            # ¿juzga el encaje? Exige trust-cloud de {{TITULAR}}
 """
+import hashlib
 import json
 import os
 import re
@@ -97,7 +98,18 @@ def preguntar(texto, clave, timeout=30, instr=None):
     t0 = time.time()
     with urllib.request.urlopen(req, timeout=timeout) as fh:
         d = json.loads(fh.read())
+    _sellar_envio(texto, instr)
     return float(d["answers"]["es_tarea"]["noul"]), (time.time() - t0) * 1000
+
+
+def _sellar_envio(texto, instr):
+    """Sella en el ledger del borde un evento `enviado` por cada texto que Jev ya recibió.
+    Aquí pasan TODAS las rutas (triaje, --n1, orden y encaje del radar), así ninguna sale sin
+    rastro: antes `bench` y `bench_n1` enviaban sin sellar. Solo metadatos: ruta y hash corto.
+    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    ruta = {INSTR_N1: "n1", INSTR_RADAR: "radar-orden"}.get(instr, "triage")
+    borde._sellar({"evento": "enviado", "destino": DESTINO_N1, "ruta": ruta,
+                   "sello": hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]})
 
 
 def _filas(limite=None):

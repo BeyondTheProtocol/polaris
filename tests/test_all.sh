@@ -61,6 +61,7 @@ runpy test_casa_base_guard.py
 runpy test_gate_etiqueta.py
 runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} {{CONTACTO}} + KAI)
 runpy test_gate_citas.py
+runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
 runpy test_tier_evidencia.py
@@ -377,6 +378,7 @@ runpy test_caja.py
 runpy test_cosecha_panel.py
 runpy test_contrato_asiento.py
 runpy test_portguard.py
+runpy test_puertos_loopback.py
 runpy test_rebuild_agents.py
 
 # ── Hallazgos de impacto MEDIO de la auditoría del 25-jul-26 ─────────────────────
