@@ -417,6 +417,12 @@ def analiticas(bio):
     for gk, g in (bio.get("grupos") or {}).items():
         analitos = []
         for a in g.get("analitos", []):
+            # Lo DERIVADO (p. ej. BUN/creatinina = urea/2,14 ÷ creatinina, con una banda 10-20 que no
+            # sale de ningún informe) no se publica: la página promete que cada cifra viene de un
+            # informe, y salía con ref_de «informe», ▲ y ×límite (revisión del PR 223, 25-sep).
+            if "(derivado)" in (a.get("nombre") or "") or any(
+                    str(p.get("fuente", "")).startswith("derivado") for p in a.get("puntos", [])):
+                continue
             ref = a.get("ref") or {}
             puntos = []
             for p in a.get("puntos", []):
@@ -447,16 +453,16 @@ def analiticas(bio):
         "n_analiticas": bio.get("n_analiticas"),
         "generado": bio.get("generado"),
         "sello": "extraido",
-        # Honesto con el origen: las tres analíticas de ago-sep 2026 vienen de una transcripción
-        # de la nota clínica (cotejada contra el PDF), no del OCR del informe (verificacion, 24-sep).
+        # Honesto con el origen: desde el 25-sep las tres analíticas de ago-sep 2026 se extraen del
+        # PDF original (antes, de una transcripción que omitía filas y rangos).
         "fuente": {"es": "Informes de laboratorio, leídos por el lector de analíticas y fechados "
-                         "por el día de la extracción. Las tres de agosto y septiembre de 2026 vienen "
-                         "de una transcripción cotejada con el informe. Solo se grafica lo leído con "
-                         "confianza alta o media.",
+                         "por el día de la extracción. Las tres de agosto y septiembre de 2026 se "
+                         "extraen del PDF original del laboratorio. Solo muestras de sangre y solo lo "
+                         "leído con confianza alta o media; nada calculado por nosotros.",
                    "en": "Lab reports, read by the lab parser and dated by the day the sample was "
-                         "drawn. The three from August and September 2026 come from a transcription "
-                         "checked against the report. Only values read with high or medium "
-                         "confidence are plotted."},
+                         "drawn. The three from August and September 2026 are extracted from the "
+                         "lab's original PDF. Blood samples only, only values read with high or "
+                         "medium confidence, nothing calculated by us."},
         "grupos": grupos,
     }
 

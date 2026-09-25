@@ -140,6 +140,7 @@ runpy test_fuente_clinica.py
 runpy test_biomarcadores_vhio.py
 runpy test_biomarcadores_ggt_alias.py
 runpy test_biomarcadores_fecha_extraccion.py
+runpy test_biomarcadores_muestras.py
 runpy test_frescura_dosier.py
 runpy test_dosier_invariantes.py
 runpy test_cotejo_invariante.py

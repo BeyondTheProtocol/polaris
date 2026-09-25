@@ -158,6 +158,11 @@ BIO = {
              {"fecha": "2026-08-19", "valor": 60.0, "fuera": False, "confianza": "alta", "fuente": "e.md",
               "ref_low": None, "ref_high": None},
          ]}]},
+        "renal_hepatico": {"nombre": "Renal y hepático", "analitos": [
+            {"key": "bun_cr", "nombre": "Ratio BUN/Creatinina (derivado)", "unidad": "",
+             "ref": {"low": 10.0, "high": 20.0},
+             "puntos": [{"fecha": "2026-09-08", "valor": 26.6, "fuera": True, "confianza": "alta",
+                         "fuente": "derivado urea/2.14 ÷ creatinina", "ref_low": 10.0, "ref_high": 20.0}]}]},
         "hematologia": {"nombre": "Hematología", "analitos": [
             {"key": "hemoglobina", "nombre": "Hemoglobina", "unidad": "g/dL",
              "ref": {"low": 11.7, "high": 16.1},
@@ -256,6 +261,12 @@ class Construye(unittest.TestCase):
         self.assertIsNone(ca["puntos"][0]["fuera"])
         hb = self.pub["analiticas"]["grupos"]["hematologia"]["analitos"][0]["puntos"][0]
         self.assertEqual(hb["fuera"], "bajo")
+
+    def test_lo_derivado_no_se_publica(self):
+        # BUN/Cr lo calcula biomarcadores.py con una banda 10-20 que no trae ningún informe: salía
+        # con ref_de «informe» y ▲. Una cifra calculada por nosotros no va al panel público.
+        claves = [a["key"] for g in self.pub["analiticas"]["grupos"].values() for a in g["analitos"]]
+        self.assertNotIn("bun_cr", claves)
 
 
 class FallaCerrado(unittest.TestCase):

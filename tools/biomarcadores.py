@@ -200,12 +200,22 @@ _RE_SIN_UNIDAD = re.compile(
 )
 
 
+# Muestras que NO son sangre: el mismo analito (LDH, glucosa, albúmina, CEA…) medido en otro líquido
+# no es la serie de sangre. Detectado el 25-sep-2026: el 14-mar-2024 entraban LDH 840, glucosa <4,
+# albúmina 1,8 y CEA 1,3 de LÍQUIDO PLEURAL como si fueran analítica de sangre en el panel /datos.
+_RE_NO_SANGRE = re.compile(
+    r"\b(l[ií]quido|pleural|asc[ií]tic[oa]|peritoneal|pericárdic[oa]|pericardic[oa]|sinovial|"
+    r"cefalorraqu[ií]deo|lcr|orina|urinari[oa]|heces|lavado|broncoaspirado|drenaje)\b", re.I)
+
+
 def parse_line(line):
     """Devuelve (entrada_analito, dict_punto) o None. dict_punto: valor, unidad,
     ref_low, ref_high, fuera, confianza."""
     compact = re.sub(r"\s+", " ", line).strip()
     if not compact or compact.startswith("-") or compact.startswith("."):
         return None
+    if _RE_NO_SANGRE.search(compact):
+        return None  # otra muestra (pleural, orina, LCR…): no es la serie de sangre
     low = compact.lower()
     matched_alias = None
     for al in _ALIASES_SORTED:
