@@ -249,5 +249,100 @@ check("esperar a una HORA (`date +%H%M`) cuenta como tope",
 check("el caso que motivó el deny sigue cazado: esperar a un pid sin reloj",
       bc.bucle_sin_tope("while kill -0 76684 2>/dev/null; do sleep 60; done; tail -45 /tmp/b.log"))
 
+# Batería adversarial (25-sep-2026): los payloads que la verificación ejecutó contra el detector
+# al pasar el hook a `deny`. True = bucle de espera SIN tope (debe cazarse); False = legítimo.
+_B = "until [ -f /tmp/x ]; do sleep 5; done"
+_ADVERSARIAL = [
+    ("H1 cat|bash", "cat <<EOF | bash\n%s\nEOF" % _B, True),
+    ("H2 bash -c $(cat)", "bash -c \"$(cat <<'EOF'\n%s\nEOF\n)\"" % _B, True),
+    ("H3 sh -s", "sh -s <<EOF\n%s\nEOF" % _B, True),
+    ("H5 sudo bash", "sudo bash <<EOF\n%s\nEOF" % _B, True),
+    ("H6 nohup bash &", "nohup bash <<'EOF' &\n%s\nEOF" % _B, True),
+    ("H7 VAR=1 bash", "FOO=1 bash <<EOF\n%s\nEOF" % _B, True),
+    ("H8 ksh", "ksh <<EOF\n%s\nEOF" % _B, True),
+    ("H9 dash", "dash <<EOF\n%s\nEOF" % _B, True),
+    ("H11 $((1<<3))", "x=$((1<<3)); echo $x\n%s" % _B, True),
+    ("H12 here-string", "grep -q foo <<< abc\n%s" % _B, True),
+    ("H13 <<-EOF", "bash <<-EOF\n\t%s\n\tEOF" % _B, True),
+    ("H16 bucle tras heredoc", "cat <<EOF\nhola\nEOF\n%s" % _B, True),
+    ("H18 <<< \"hola\"", "read -r v <<< \"hola\"\n%s" % _B, True),
+    ("H19 env bash", "/usr/bin/env bash <<EOF\n%s\nEOF" % _B, True),
+    ("H20 docker exec bash", "docker exec -i c1 bash <<EOF\n%s\nEOF" % _B, True),
+    ("H21 ssh host bash", "ssh host bash <<EOF\n%s\nEOF" % _B, True),
+    ("H27 cat|zsh", "cat <<'EOF' | zsh\n%s\nEOF" % _B, True),
+    ("H28 cat|ssh", "cat <<'EOF' | ssh host\n%s\nEOF" % _B, True),
+    ("H29 tee && bash", "tee /tmp/w.sh <<'EOF' >/dev/null && bash /tmp/w.sh\n%s\nEOF" % _B, True),
+    ("L1 multilínea", "until [ -f /tmp/x ]\ndo\n  sleep 5\ndone", True),
+    ("L3 while :", "while :; do sleep 5; done", True),
+    ("L4 /bin/sleep", "while true; do /bin/sleep 5; done", True),
+    ("L6 continuación \\", "while true; do \\\n  sleep 5; done", True),
+    ("L15 forma típica", "until [ -f /tmp/x ]; do\n  sleep 5\ndone", True),
+    ("L16 14-sep en 3 líneas", "while ! grep -q EXIT /tmp/log; do\n  sleep 5\ndone\necho listo", True),
+    ("T1 # timeout", _B + " # timeout ", True),
+    ("T2 echo date +%s", "echo \"date +%s\"; " + _B, True),
+    ("T3 date +%H en log", "echo \"$(date +%H:%M) esperando\"; " + _B, True),
+    ("T4 --connect-timeout", "until curl -s --connect-timeout 5 localhost:8080; do sleep 5; done", True),
+    ("T6 $SECONDS fuera", _B + "; echo $SECONDS", True),
+    ("T7 date +%s en log", "log=/tmp/run_$(date +%s).log; " + _B, True),
+    ("F1 contador", "n=0; until [ -f /tmp/x ] || [ $n -ge 60 ]; do n=$((n+1)); sleep 5; done", False),
+    ("F2 tries++", "while (( tries++ < 30 )); do sleep 2; done", False),
+    ("F3 date '+%s'", "fin=$(( $(date '+%s') + 600 )); until [ -f /tmp/x ]; do [ $(date '+%s') -lt $fin ] "
+                      "|| break; sleep 5; done", False),
+    ("F4 date -u +%s", "fin=$(( $(date -u +%s) + 600 )); until [ -f /tmp/x ]; do [ $(date -u +%s) -lt $fin ] "
+                       "|| break; sleep 5; done", False),
+    ("F5 SECONDS <", "SECONDS=0; while (( SECONDS < 60 )); do sleep 1; done", False),
+    ("F6 while read", "while read -r l; do echo $l; sleep 0.2; done < /tmp/lista", False),
+    ("F7 python con cadena", "python3 - <<'EOF'\ns = 'until grep -q X f; do sleep 5; done'\nprint(s)\nEOF", False),
+    ("F8 cat a notas", "cat <<'EOF' > /tmp/notas.md\nejemplo: %s\nEOF" % _B, False),
+    ("F9 bash con contador", "bash <<'EOF'\nn=0; until [ -f /tmp/x ] || [ $n -ge 60 ]; do n=$((n+1)); sleep 5; "
+                             "done\nEOF", False),
+    ("F10 date +%H%M", "while [ \"$(date +%H%M)\" -lt 1357 ]; do sleep 60; done", False),
+    ("F11 plantilla", "fin=$(( $(date +%s) + 600 )); until [ -f /tmp/x ]; do [ $(date +%s) -lt $fin ] "
+                      "|| break; sleep 5; done", False),
+    ("F13 i<10", "i=0; while [ $i -lt 10 ]; do i=$((i+1)); sleep 1; done", False),
+    ("F14 ++n", "until [ -f /tmp/x ] || [ $(( ++n )) -gt 20 ]; do sleep 3; done", False),
+    # Heredoc SIN cierre: ante la duda se LEE (segunda vuelta). Tragárselo hasta el final dejaba
+    # pasar `git commit -m "usa <<EOF"` ↵ bucle real. Falso positivo raro a cambio de un hueco fácil.
+    ("F15 cierre indentado (se lee)", "cat <<EOF\n%s\n  EOF\nuntil x; do sleep 1; done" % _B, True),
+    ("F16 heredoc sin cierre (se lee)", "cat <<EOF > /tmp/n.md\nhola\n%s" % _B, True),
+    ("F17 $SECONDS en cond", "until [ -f /tmp/x ] || [ $SECONDS -gt 600 ]; do sleep 5; done", False),
+    ("F18 health con contador", "n=0; while [ $n -lt 60 ] && ! curl -sf localhost:8080/h; do n=$((n+1)); "
+                                "sleep 5; done", False),
+    ("git commit -F - con texto", "git commit -q -F - <<'EOF'\nfix: antes un `%s` sin tope\nEOF" % _B, False),
+    ("timeout delante", "timeout 600 bash -c '%s'" % _B, False),
+    # Del replay de 31.298 comandos reales: comparar un ESTADO EXTERNO con un número no es tope.
+    ("estado externo -gt N", "until [ \"$(python3 -c 'print(1)')\" -gt 5000 ]; do sleep 5; done", True),
+    ("pgrep|wc -eq 0", "until [ \"$(pgrep -f 'kb.py index' | wc -l)\" -eq 0 ]; do sleep 5; done", True),
+    ("contador que se reinicia", "z=0; until [ $z -ge 2 ]; do n=$(lsof -i :8765 | wc -l); if [ \"$n\" = 0 ]; "
+                                 "then z=$((z+1)); else z=0; fi; sleep 2; done", True),
+    ("date +%H solo en el echo final", "while pgrep -f run_agent.sh >/dev/null; do sleep 30; done; "
+                                       "echo \"terminó $(date +%H:%M:%S)\"", True),
+    ("git commit -m con el texto", "git add x && git commit -q -m \"feat: avisar de %s\"" % _B, False),
+    # Segunda vuelta adversarial (25-sep-2026), lo realista.
+    ("D1 'done' en un echo del cuerpo", "until [ -f /tmp/x ]; do echo \"not done yet\"; sleep 5; done", True),
+    ("F15b 'until' en una cadena + for acotado", "echo 'esperando until que arranque'; for i in 1 2 3; "
+                                                 "do curl -s x && break; sleep 2; done", False),
+    ("F16b 'until' en un fichero + for", "cp /tmp/until.txt /tmp/y; for i in 1 2 3; do sleep 1; done", False),
+    ("A12 tail -f | while read", "tail -f /tmp/log | while read -r l; do echo $l; sleep 1; done", True),
+    ("A13 while read < <(tail -f)", "while read -r l; do sleep 1; done < <(tail -f /tmp/log)", True),
+    ("A2 heredoc sin comillas con $( )", "cat <<EOF > /tmp/n.txt\n$(%s)\nEOF" % _B, True),
+    ("A10 '<<EOF' dentro de un -m", "git commit -m \"usa <<EOF para heredocs\"\n%s" % _B, True),
+    ("bash -c 'while …'", "bash -c 'while true; do sleep 5; done'", True),
+    ("R1 contador contra $MAX", "n=0; until [ -f /tmp/x ] || [ $n -ge $MAX ]; do n=$((n+1)); sleep 5; done",
+     False),
+    ("R2 (( n < MAX ))", "n=0; while (( n < MAX )); do n=$((n+1)); sleep 1; done", False),
+    ("R3 let i=i+1", "i=0; while [ $i -lt 10 ]; do let i=i+1; sleep 1; done", False),
+    ("R4 ((i=i+1))", "i=0; while [ $i -lt 10 ]; do ((i=i+1)); sleep 1; done", False),
+    ("R5 test $i -lt 10", "i=0; while test $i -lt 10; do i=$((i+1)); sleep 1; done", False),
+    ("R6 reloj en variable", "fin=$(( $(date +%s) + 600 )); until [ -f /tmp/x ]; do now=$(date +%s); "
+                             "[ $now -lt $fin ] || break; sleep 5; done", False),
+    ("R7 date +'%s'", "fin=$(( $(date +'%s') + 600 )); until [ -f /tmp/x ]; do [ $(date +'%s') -lt $fin ] "
+                      "|| break; sleep 5; done", False),
+    ("R8 n+0 no es contador", "n=0; until [ -f /tmp/x ] || [ $n -ge 60 ]; do n=$((n+0)); sleep 5; done", True),
+    ("R9 # timeout en comentario", "# timeout 5 min de margen\n%s" % _B, True),
+]
+for _nombre, _payload, _esperado in _ADVERSARIAL:
+    check("adversarial %s → %s" % (_nombre, _esperado), bc.bucle_sin_tope(_payload) is _esperado)
+
 print("test_bucles_colgados: %d OK, %d fallos" % (_pass, _fail))
 sys.exit(1 if _fail else 0)

@@ -45,6 +45,7 @@ Uso:
   python3 tools/bucles_colgados.py --dry-run     # solo lista, no toca nada
 """
 import json
+import bisect
 import os
 import re
 import signal
@@ -146,50 +147,204 @@ def _es_shell(cmd):
     return base in _SHELLS
 
 
-# Lo que cuenta como TOPE. Medido sobre 13.069 comandos Bash reales de 7 días: 100 traían bucle
-# de espera y solo 5 llevaban alguna de estas marcas. OJO: en este Mac NO existe `timeout` ni
-# `gtimeout` (command not found), así que el idioma bueno de aquí es el del reloj:
-#   fin=$(( $(date +%s) + 600 )); until COND; do [ $(date +%s) -lt $fin ] || break; sleep 5; done
-# `date +%H` (25-sep-2026): `while [ "$(date +%H%M)" -lt 1357 ]; do sleep 60; done` espera a una
-# HORA, y la hora llega sola; el replay lo daba por bucle sin tope.
-_MARCAS_DE_TOPE = ("timeout ", "gtimeout ", "date +%s", "date +%H", "$SECONDS", "SECONDS -",
-                   "for _ in", "for i in")
+# ── Detector de bucles de espera sin tope (reescrito el 25-sep-2026, dos vueltas adversariales) ─
+# El hook `regla_en_accion` pasó ese día de avisar a DENEGAR. Dos verificaciones adversariales
+# (130 payloads ejecutados) y una comparación sobre 31.302 comandos Bash reales dieron la forma:
+#   · el bucle se localiza por PASOS (palabra clave en posición de comando → `do` → el primer
+#     `done` que tenga un `sleep` delante), cruzando líneas: un agente casi siempre escribe
+#     `do` ↵ `  sleep 5` ↵ `done`, y la regex de una línea de antes no lo vio nunca;
+#   · el tope se juzga DENTRO del bucle, en sus tests: reloj (date +%s/+%H, SECONDS, o una
+#     variable sacada de `date +%s`), autoincremento, o un contador que avanza de verdad y no se
+#     reinicia; o un `timeout N bash -c` que lo envuelve. Comparar un estado externo con un
+#     número (`until [ "$(… last_uid)" -gt 5000 ]`) no es tope;
+#   · el cuerpo de un heredoc solo se ignora si el receptor es inerte, la etiqueta va entre
+#     comillas o el cuerpo no tiene `$(`/backticks, hay línea de cierre, y nada lo ejecuta
+#     después en la cabecera (tubería, shell).
+# FUERA DE ALCANCE, a propósito: este freno es para un agente que se olvida del tope, no para
+# alguien que quiera colarse. No se persigue: ofuscación (`done` en variable, `s\leep`, base64),
+# esperas sin la palabra `sleep` (perl select, read -t, bucle activo), contadores FINGIDOS
+# (`n+0`, `|| true`, `-eq` inalcanzable, reinicio a 1, subshell), un script escrito a fichero y
+# ejecutado después, `os.system` desde python, `.shell` de sqlite3, alias `!` de git.
+
+# Shells que EJECUTAN lo que se les pasa por un heredoc o una tubería.
+_SHELLS_RECEPTOR = ("zsh", "bash", "sh", "ksh", "dash", "fish")
+# Receptores INERTES de un heredoc: lo que reciben es texto o código de otro lenguaje, no shell.
+_INERTES = ("cat", "tee", "git", "gh", "jq", "node", "ruby", "perl", "wc", "pbcopy")
+# Prefijos que no son el programa: `sudo bash`, `env X=1 bash`, `nohup`, `time`, `exec`…
+_PREFIJOS = ("sudo", "env", "nohup", "time", "exec", "caffeinate", "nice", "command", "builtin")
+
+_LIM_DO, _LIM_DONE = 2000, 20000
+_RE_HEREDOC_INI = re.compile(r"(?:^|(?<=[\s;&|(]))<<(?!<)(-?)[ \t]*(['\"]?)([A-Za-z_][\w.-]*)\2")
+_RE_PALABRA_BUCLE = re.compile(r"\b(until|while)\b")
+_RE_DO = re.compile(r"\bdo\b")
+_RE_DONE = re.compile(r"\bdone\b")
+_RE_SLEEP = re.compile(r"\bsleep\b")
+_RE_WHILE_READ = re.compile(r"^while\s+(?:IFS=\S*\s+)?read\b")
+_RE_ENTRADA_INFINITA = re.compile(r"\btail\s+(?:-\w*\s+)*-[a-zA-Z]*[fF]|<\s*<\(|\byes\s*\|")
+# `timeout N … bash -c '…'` delante del bucle, en la MISMA línea y no en un comentario.
+_RE_TIMEOUT = re.compile(r"(?<![\w-])g?timeout\s+\d")
+_RE_TIMEOUT_ENVUELVE = re.compile(r"(?<![\w-])g?timeout\s+\d+\S*\s+(?:\S+\s+){0,3}(?:ba|z|k|da)?sh\b")
+_MARGEN_TIMEOUT = 160
+# Expresiones de test del bucle: `[ … ]`, `[[ … ]]`, `(( … ))`, `test …`.
+_RE_TEST = re.compile(r"\[\[?[^\]\n]*\]\]?|\(\([^)\n]*\)\)|\btest\s[^;&|\n]*")
+_RE_RELOJ = re.compile(r"date\s+(?:-u\s+)?['\"]?\+['\"]?%[sH]|\b(?:EPOCH)?SECONDS\b")
+_RE_VAR_RELOJ = re.compile(r"\b(\w+)=\$\((?:\(\s*\$\()?\s*date\s+[^)]*%s")
+_RE_AUTOINC = re.compile(r"\w\+\+|\+\+\s*\w")                    # (( tries++ < 30 )), $(( ++n ))
+_OP = r"-(?:ge|gt|le|lt|eq)"
+_LIM = r"(?:\d+|\$\{?\w+\}?|\"\$\{?\w+\}?\")"
+_RE_COMPARA_VAR = re.compile(
+    r"\$\{?(\w+)\}?\"?\s+%s\s+%s" % (_OP, _LIM)                  # [ $n -lt 60 ] / [ $n -ge $MAX ]
+    + r"|%s\s+%s\s+\"?\$\{?(\w+)\}?" % (r"\d+", _OP)              # [ 10 -gt $i ]
+    + r"|\(\(\s*\$?(\w+)\s*[<>]=?\s*\$?\w+")                     # (( n < MAX ))
+# Mensajes de commit / PR con la palabra «until … sleep … done» dentro no son un bucle.
+_RE_MENSAJE = re.compile(r"(?:\s-m|--message|--body|--title)\s+(\"(?:[^\"\\]|\\.)*\"|'[^']*')")
 
 
-# Cuerpo de un heredoc (25-sep-2026). El replay de 4.000 comandos reales para pasar el hook a
-# `deny` sacó un falso positivo: un `python3 - <<'EOF'` cuyo código llevaba, dentro de una cadena,
-# el texto «until grep …; do sleep 5; done». Lo que va a python/node/cat no es shell y no se lee
-# como shell; lo que va a bash/sh/zsh (`bash <<EOF … EOF`) sí, porque eso sí se ejecuta.
-_RE_HEREDOC = re.compile(
-    r"^(?P<cab>[^\n]*?<<-?[ \t]*(?P<q>['\"]?)(?P<tag>\w+)(?P=q)[^\n]*)\n"
-    r"(?P<cuerpo>.*?)(?:\n[ \t]*(?P=tag)[ \t]*(?=\n|$)|\Z)", re.S | re.M)
+def _es_receptor_shell(palabras):
+    return any(os.path.basename(p) in _SHELLS_RECEPTOR for p in palabras)
+
+
+def _programa(palabras):
+    for p in palabras:
+        base = os.path.basename(p)
+        if base in _PREFIJOS or p.startswith("-") or re.match(r"^\w+=", p):
+            continue
+        return base
+    return ""
 
 
 def _sin_heredocs(cmd):
-    def _sub(m):
-        antes = m.group("cab").split("<<", 1)[0]
-        ultimo = re.split(r"&&|\|\||;|\|", antes)[-1].split()
-        prog = os.path.basename(ultimo[0]) if ultimo else ""
-        return m.group(0) if prog in _SHELLS else m.group("cab") + "\n"
-    try:
-        return _RE_HEREDOC.sub(_sub, cmd)
-    except Exception:
-        return cmd
+    """El comando sin el cuerpo de los heredocs INERTES (python, cat a un fichero, git commit -F
+    -…). Ante la duda, el cuerpo SE QUEDA: receptor desconocido, shell o tubería en la cabecera,
+    etiqueta sin comillas con `$(`/backticks en el cuerpo (bash los expande), o sin cierre."""
+    lineas = cmd.split("\n")
+    posiciones = {}
+    for k, l in enumerate(lineas):
+        posiciones.setdefault(l, []).append(k)
+        if l.lstrip("\t") != l:
+            posiciones.setdefault(l.lstrip("\t"), []).append(k)
+    out, i = [], 0
+    while i < len(lineas):
+        linea = lineas[i]
+        m = _RE_HEREDOC_INI.search(linea)
+        out.append(linea)
+        i += 1
+        if not m:
+            continue
+        guion, comilla, etiqueta = m.group(1), m.group(2), m.group(3)
+        antes, despues = linea[:m.start()], linea[m.end():]
+        segmento = re.split(r"&&|\|\||;|\|", antes)[-1].split()
+        prog = _programa(segmento)
+        inerte = ((prog in _INERTES or prog.startswith("python")) and "|" not in despues
+                  and not _es_receptor_shell(antes.split() + despues.split()))
+        if not inerte:
+            continue
+        cierre = bisect.bisect_left(posiciones.get(etiqueta, []), i)
+        cands = posiciones.get(etiqueta, [])
+        j = None
+        for c in cands[cierre:]:
+            if guion or lineas[c] == etiqueta:
+                j = c
+                break
+        if j is None:
+            continue                                   # sin cierre: ante la duda, se lee
+        cuerpo = "\n".join(lineas[i:j])
+        if not comilla and ("$(" in cuerpo or "`" in cuerpo):
+            continue                                   # bash expande el cuerpo: se ejecuta
+        i = j
+    return "\n".join(out)
+
+
+def _en_posicion_de_comando(txt, ini):
+    """`until`/`while` como COMANDO, no dentro de una cadena o de un nombre de fichero."""
+    previo = txt[max(0, ini - 40):ini].rstrip(" \t")   # ventana fija: sin ella, cuadrático
+    if (not previo and ini < 40) or (previo and previo[-1] in ";&|(\n{!'\""):
+        return True                                    # también `bash -c 'while …'`
+    # `-c` sin comillas: así sale en `ps` el shell de un bucle vivo (`zsh -c while true; do …`).
+    return bool(re.search(r"(?:^|[\s;])(?:do|then|else|time|exec|nohup|-c)$", previo))
+
+
+def _bucles(cmd):
+    """[(ini, fin, texto_del_bucle, texto, relojes)] de cada `until|while … do … done` que duerme dentro,
+    sobre el comando sin heredocs inertes ni mensajes de commit."""
+    txt = _sin_heredocs(_RE_MENSAJE.sub(" -m ''", cmd or ""))
+    infinita = bool(_RE_ENTRADA_INFINITA.search(txt))
+    # Posiciones precalculadas + búsqueda binaria: con 200 KB hostiles la versión que recorría el
+    # texto por cada palabra clave tardaba 32 s, y el hook tiene 8 s (medido el 25-sep-2026).
+    dos = [m.end() for m in _RE_DO.finditer(txt)]
+    sleeps = [m.start() for m in _RE_SLEEP.finditer(txt)]
+    dones = [(m.start(), m.end()) for m in _RE_DONE.finditer(txt)]
+    ini_dones = [a for a, _b in dones]
+    relojes = frozenset(_RE_VAR_RELOJ.findall(txt))    # una vez por comando, no por bucle
+    res = []
+    for m in _RE_PALABRA_BUCLE.finditer(txt):
+        if not _en_posicion_de_comando(txt, m.start()):
+            continue
+        k = bisect.bisect_left(dos, m.end() + 2)
+        if k == len(dos) or dos[k] - m.end() > _LIM_DO:
+            continue
+        d_fin = dos[k]
+        s = bisect.bisect_left(sleeps, d_fin)          # el primer `sleep` tras el `do`…
+        if s == len(sleeps) or sleeps[s] - d_fin > _LIM_DONE:
+            continue
+        f = bisect.bisect_left(ini_dones, sleeps[s])   # …y el primer `done` tras ese `sleep`
+        if f == len(dones) or dones[f][0] - d_fin > _LIM_DONE:
+            continue
+        cuerpo = txt[m.start():dones[f][1]]
+        if not (_RE_WHILE_READ.match(cuerpo) and not infinita):
+            res.append((m.start(), dones[f][1], cuerpo, txt, relojes))
+    return res
+
+
+def _incrementa(var, cuerpo):
+    """¿`var` avanza dentro del bucle y nunca vuelve a empezar? (`z=0` dentro = no es contador)."""
+    v = re.escape(var)
+    n = r"[1-9]\d*"
+    formas = (r"\b{v}=\$\(\(\s*\$?{v}\s*\+\s*{n}\s*\)\)", r"\b{v}=\$\(\(\s*{n}\s*\+\s*\$?{v}\s*\)\)",
+              r"\b{v}\+\+", r"\+\+\s*{v}\b", r"\b{v}\s*\+=\s*{n}", r"\blet\s+[\"']?{v}\+\+",
+              r"\blet\s+[\"']?{v}\s*=\s*\$?{v}\s*\+\s*{n}", r"\(\(\s*{v}\s*=\s*\$?{v}\s*\+\s*{n}",
+              r"\b{v}=\$\[\s*\$?{v}\s*\+\s*{n}\s*\]", r"\b{v}=\$\(expr\s+\$?{v}\s*\+\s*{n}\s*\)")
+    sube = any(re.search(f.format(v=v, n=n), cuerpo) for f in formas)
+    reinicia = re.search(r"(?<![\w$])%s=0\b" % v, cuerpo)
+    return sube and not reinicia
+
+
+def _con_tope(bucle):
+    """¿Este bucle se corta solo? Reloj o autoincremento en un test, un contador que avanza y no
+    se reinicia, o un `timeout N … sh -c` que lo envuelve en su misma línea."""
+    ini, _fin, cuerpo, txt, relojes = bucle
+    if _RE_TIMEOUT.search(cuerpo):
+        return True
+    linea = txt[max(0, ini - _MARGEN_TIMEOUT):ini].split("\n")[-1].split("#")[0]
+    if _RE_TIMEOUT_ENVUELVE.search(linea):
+        return True
+    d = _RE_DO.search(cuerpo)
+    dentro = cuerpo[d.end():] if d else cuerpo
+    for t in _RE_TEST.findall(cuerpo):
+        if _RE_RELOJ.search(t) or _RE_AUTOINC.search(t):
+            return True
+        if any(re.search(r"\$\{?%s\b" % re.escape(r), t) for r in relojes):
+            return True
+        for m in _RE_COMPARA_VAR.finditer(t):
+            var = m.group(1) or m.group(2) or m.group(3)
+            if var and _incrementa(var, dentro):
+                return True
+    return False
 
 
 def es_bucle_espera(cmd):
     """¿El comando trae un bucle de espera de shell (`until|while … do … sleep … done`)?"""
-    return bool(_RE_BUCLE_ESPERA.search(_sin_heredocs(cmd or "")))
+    return bool(_bucles(cmd))
 
 
 def tiene_tope(cmd):
-    """¿Ese bucle lleva algo que lo corte solo (reloj, contador, timeout)?"""
-    return any(m in (cmd or "") for m in _MARCAS_DE_TOPE)
+    """¿TODOS sus bucles de espera llevan algo que los corte solos (reloj, contador, timeout)?"""
+    return all(_con_tope(b) for b in _bucles(cmd))
 
 
 def bucle_sin_tope(cmd):
     """La pregunta completa, para que el hook y el matador usen UNA sola definición."""
-    return es_bucle_espera(cmd) and not tiene_tope(cmd)
+    return any(not _con_tope(b) for b in _bucles(cmd))
 
 
 _es_bucle_espera = es_bucle_espera   # nombre viejo, por si algo lo usaba
