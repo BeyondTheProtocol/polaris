@@ -3,6 +3,18 @@
     "baseRef": "head"
   },
   "hooks": {
+    "SubagentStart": [
+      {
+        "_comment": "Contexto a los subagentes (P8 pieza B, 25-sep-26; idea de {{CONTACTO}} + KAI). Un subagente no recibe MEMORY.md ni el recall por mensaje (doc oficial). Inyecta las normas criticas de MEMORY.md + recall de memoria_radar con el ENCARGO como consulta (verificado en vivo: el encargo ya esta en el transcript al saltar SubagentStart). Tope 9.500 caracteres (la doc corta a 10.000). A/B por hash del agent_id: la mitad va sin nada; se mide con subagente_contexto.py --ab cruzando con la traza de gate_subagente. Si a 14 dias no baja un 30 %, se retira. FAIL-OPEN, no puede bloquear. Bypass BTP_SUBCTX_OFF=1; BTP_SUBCTX_AB=0 inyecta a todos.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/subagente_contexto.py",
+            "timeout": 6
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [

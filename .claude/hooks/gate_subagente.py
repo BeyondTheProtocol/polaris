@@ -99,12 +99,14 @@ def aviso(agente, hall):
     return out if len(out) <= MAX_AVISO else out[:MAX_AVISO - 1] + "…"
 
 
-def _trazar(agente, n, hall, todos):
-    """Sin contenido: hora, agente, longitud, checks avisados y todos los que vio el gate."""
+def _trazar(agente, n, hall, todos, agent_id=""):
+    """Sin contenido: hora, agente, agent_id (cruce con el A/B de subagente_contexto), longitud,
+    checks avisados y todos los que vio el gate."""
     try:
         os.makedirs(os.path.dirname(TRAZA), exist_ok=True)
         with open(TRAZA, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": round(time.time(), 1), "agente": agente, "chars": n,
+            fh.write(json.dumps({"ts": round(time.time(), 1), "agente": agente, "agent_id": agent_id,
+                                 "chars": n,
                                  "checks": sorted({h[0] for h in hall}),
                                  "todos": sorted({h[0] for h in todos})}, ensure_ascii=False) + "\n")
     except Exception:
@@ -124,7 +126,8 @@ def procesar(datos, gate=None):
     entrada = datos.get("tool_input") if isinstance(datos.get("tool_input"), dict) else {}
     agente = (resp.get("agentType") if isinstance(resp, dict) else None) or entrada.get("subagent_type") or "general-purpose"
     todos, hall = hallazgos(texto, gate)
-    _trazar(agente, len(texto), hall, todos)
+    _trazar(agente, len(texto), hall, todos,
+            (resp.get("agentId") if isinstance(resp, dict) else "") or "")
     if not hall:
         return None
     return {"hookSpecificOutput": {"hookEventName": "PostToolUse",

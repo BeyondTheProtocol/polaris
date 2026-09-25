@@ -152,6 +152,7 @@
     "salida_guard",
     "session_start",
     "singleton_guard",
+    "subagente_contexto",
     "token_rotacion_guard",
     "traza_subagente",
     "worktree_guard",

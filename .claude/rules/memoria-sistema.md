@@ -16,7 +16,7 @@ Cuatro capas. Cada norma vive en **una** de ellas, no en varias.
 |---|---|---|---|
 | **1. Constitución** | `CLAUDE.md` | siempre, y **sobrevive a `/compact`** | lo que aplica a CUALQUIER tarea: estrella polar, muro, plan-primero, formato de entrega |
 | **2. Reglas por contexto** | `.claude/rules/*.md` con `paths:` | solo al tocar ficheros que casan | reglas de un subsistema concreto |
-| **3. Recall en el momento** | hooks + `memoria_radar.py` | al escribir el prompt y antes de una acción de riesgo | las memorias `feedback-*` |
+| **3. Recall en el momento** | hooks + `memoria_radar.py` | al escribir el prompt, antes de una acción de riesgo y al arrancar cada subagente (`subagente_contexto.py`, A/B) | las memorias `feedback-*` |
 | **4. Bucle cerrado** | `tests/test_recall_memoria.py`, auto-mejora | en `test_all.sh` y en la rutina | mide si el recall trae lo que debía |
 
 ## Los límites son reales, no estéticos

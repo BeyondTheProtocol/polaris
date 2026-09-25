@@ -172,7 +172,9 @@ CAMINO = [
      "una cita que no existe y una afirmación fuerte sin sello, porque las dos, una "
      "vez leídas, ya no se pueden deshacer. El informe de cada subagente pasa por "
      "ese mismo gate antes de que se resuma: citas, cifras y lo preclínico llegan "
-     "marcados si no cuadran."),
+     "marcados si no cuadran. Y cada subagente arranca con las normas críticas de "
+     "{{TITULAR}} y las memorias que tocan a su encargo, porque de serie no ve su memoria "
+     "(en prueba A/B: la mitad arranca sin nada, para medir si sirve)."),
     ("las herramientas", "tools/ · MCP",
      "Lo que el subagente puede tocar: las tools propias del repo y los conectores "
      "MCP. Lo que no está en la lista, no existe para él."),
