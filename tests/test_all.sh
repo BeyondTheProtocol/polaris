@@ -157,6 +157,7 @@ runpy test_biomarcadores_ggt_alias.py
 runpy test_biomarcadores_fecha_extraccion.py
 runpy test_biomarcadores_muestras.py
 runpy test_rag_lab_origen.py  # analíticas activas extraídas del PDF, no transcritas a mano (25-sep)
+runpy test_web_citas_futuras.py  # web: ninguna cita futura con día junto a un lugar (acoso, 25-sep)
 runpy test_frescura_dosier.py
 runpy test_dosier_invariantes.py
 runpy test_cotejo_invariante.py
