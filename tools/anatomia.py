@@ -170,7 +170,9 @@ CAMINO = [
      "el turno, otro hook revisa la respuesta contra las normas escritas: la mayoría "
      "solo avisan, pero dos frenan la respuesta aunque el gate esté en modo aviso — "
      "una cita que no existe y una afirmación fuerte sin sello, porque las dos, una "
-     "vez leídas, ya no se pueden deshacer."),
+     "vez leídas, ya no se pueden deshacer. El informe de cada subagente pasa por "
+     "ese mismo gate antes de que se resuma: citas, cifras y lo preclínico llegan "
+     "marcados si no cuadran."),
     ("las herramientas", "tools/ · MCP",
      "Lo que el subagente puede tocar: las tools propias del repo y los conectores "
      "MCP. Lo que no está en la lista, no existe para él."),
@@ -299,6 +301,7 @@ FAMILIAS = [
                          "migrar_secretos")),   # claves del Llavero, no en claro
     ("mejora del sistema", ("auto_mejora", "coach", "kpi_", "deuda", "normas",
                             "reglas_repetidas",
+                            "repeticiones_semana",  # cifra semanal de correcciones repetidas (P8, 25-sep-26)
                             "bench_determinista",   # mide acierto del triaje, set dorado
                             "bench_jev",            # mide un modelo externo contra el mismo set, tras el muro
                             "bench_modelos",        # modelo LOCAL por tarea contra el determinista (P5)

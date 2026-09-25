@@ -98,6 +98,11 @@ PREFIJOS_RUIDO = (
     "posttooluse hook ",
     "userpromptsubmit hook ",
     "sessionstart hook ",
+    # Mensajes de OTRA sesión de Claude (SendMessage entre sesiones). Llegan como turno de
+    # usuario con entrypoint claude-desktop, pero no son {{TITULAR}}: medido el 25-sep-26, 4 de
+    # las 16 «correcciones ya en memoria» de 45 días eran esto.
+    "another claude session sent a message",
+    "<cross-session-message",
 )
 
 # Marcadores de mensajes de control (no son contenido humano).

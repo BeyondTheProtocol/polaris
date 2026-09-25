@@ -41,6 +41,7 @@ Regla de oro: **nada se duplica**. Si una norma está en una regla, en la consti
 | Regenerar el índice tras escribir una memoria | `python3 tools/indice_memoria.py` |
 | Ver si algo se ha pasado de los límites | `python3 tools/salud_memoria.py` |
 | Ver qué normas ha tenido que repetir {{TITULAR}} | `python3 tools/reglas_repetidas.py` |
+| Cifra semanal de correcciones repetidas (y cuántas tras un subagente) | `python3 tools/repeticiones_semana.py` |
 | Medir si el recall sigue trayendo lo que debe | `python3 tests/test_recall_memoria.py` |
 | Recalcular los vectores (si se activa el brazo semántico) | `.venv-embed/bin/python tools/memoria_radar.py vectores` |
 

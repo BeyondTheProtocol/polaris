@@ -195,6 +195,17 @@
         ]
       },
       {
+        "_comment": "Gate sobre los informes de subagente (P8 pieza A, 25-sep-26; idea de {{CONTACTO}} + KAI). Pasa el informe de un Agent sincrono por gate_salida.revisar() y avisa SOLO de integridad de evidencia (citas, cifras, preclinico, clinico asumido, China, geografia) como additionalContext. Replay 14 d: 48 % de informes con hallazgo vs 16 % del hilo principal. Modo AVISO: nunca bloquea ni reescribe. Traza sin contenido en tools/state/gate_subagente.jsonl. Timeout 25 s: el peor caso medido es 20 s (red de las citas). FAIL-OPEN, bypass BTP_GATE_SUB_OFF=1.",
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/gate_subagente.py",
+            "timeout": 25
+          }
+        ]
+      },
+      {
         "matcher": "*",
         "hooks": [
           {

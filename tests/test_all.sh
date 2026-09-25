@@ -108,6 +108,8 @@ runpy test_bot_triage.py
 runpy test_triage_route_enrutado.py
 runpy test_buzon_ideas.py
 runpy test_cosecha_correcciones.py
+runpy test_repeticiones_semana.py
+runpy test_gate_subagente.py
 runpy test_cosecha_hilos.py
 runpy test_cosecha_entregables.py
 runpy test_archivar_nota.py
