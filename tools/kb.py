@@ -22,21 +22,24 @@ COMPAT: `retrieve()` acepta un `db_path`; si termina en `.json` usa el lector BM
 scoring K1=1.5). Lo usan llamadas programáticas con index_path propio (contexto_caso) y los tests.
 
 HÍBRIDO (BM25 + vectorial, capa opcional): además del FTS5 de siempre, `index` calcula
-embeddings locales (tools/kb_embed.py, ONNX egress-0) y los guarda en `.kb_index.vectors.npy`
-(float32, mmap, fila i ↔ rowid i+1 de la tabla FTS5 — mismo orden de inserción). `retrieve()`
+embeddings locales (tools/kb_embed.py, ONNX egress-0) y los guarda en `.kb_index.<gen>.vectors.npy`
+(float32, mmap, fila i ↔ rowid i+1 de la tabla FTS5 — mismo orden de inserción), con un hash por
+fragmento al lado y un manifiesto DENTRO del .db que dice qué generación es la suya (ver
+_escribir_generacion). `retrieve()`
 fusiona el ranking BM25 con el ranking por coseno vía RRF (reciprocal rank fusion) ANTES del
 gate de sensibilidad, que se aplica exactamente igual que hoy (recomputa _sensitivity sobre el
 CONTENIDO, nunca se relaja). Si el modelo/vectores no están disponibles (kb_embed.disponible()
-False, o el .npy no existe) → FALLBACK DURO a FTS5 puro (comportamiento de hoy, cero red).
+False, el .npy no existe o no es de la generación del .db) → FALLBACK DURO a FTS5 puro
+(comportamiento de hoy, cero red).
 """
-import sys, os, re, json, math, unicodedata, glob, sqlite3, logging, hashlib
+import sys, os, re, json, math, unicodedata, glob, sqlite3, logging, hashlib, time, secrets
 from collections import defaultdict
 
 ROOT = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")  # casa base SIEMPRE: la fuente de verdad y el índice viven ahí (gitignored), nunca en un worktree
 FV  = os.path.join(ROOT, "00_FUENTE-DE-VERDAD")
 DB  = os.path.join(FV, ".kb_index.db")     # índice FTS5 primario
 IDX = os.path.join(FV, ".kb_index.json")   # formato legado (solo lo leen callers con index_path=.json / tests)
-VEC = os.path.join(FV, ".kb_index.vectors.npy")  # embeddings de la capa híbrida (opcional; junto al FTS5)
+VEC = os.path.join(FV, ".kb_index.vectors.npy")  # LEGADO: .npy sin generación; ya no se lee, build() lo poda
 K1, B, CHUNK = 1.5, 0.75, 1200             # K1/B: solo para el lector JSON de compat (FTS5 usa k1=1.2 fijo)
 RRF_K = 60                                 # constante estándar de reciprocal rank fusion (1/(k+rank))
 
@@ -175,15 +178,14 @@ _SCHEMA = (
     ")"
 )
 
-def _build_vectors(rows, vec_path):
-    """Calcula embeddings para `rows` (mismo orden → mismo rowid que la tabla FTS5, 1-indexed)
-    y los guarda en vec_path (.npy float32, N×384). Fail-soft TOTAL: si la capa vectorial no
-    está disponible (modelo/deps ausentes) o CUALQUIER cosa falla, no escribe nada y deja el
-    índice en FTS5-puro (retrieve() lo detecta por la ausencia del fichero, ver disponible()
-    de kb_embed) — nunca rompe `index`, que es la vía de siempre."""
+def _calcular_vectores(rows):
+    """Embeddings de `rows` (mismo orden → mismo rowid que la tabla FTS5, 1-indexed): float32
+    N×384, o None. Fail-soft TOTAL: si la capa vectorial no está disponible (modelo/deps
+    ausentes) o CUALQUIER cosa falla, devuelve None y la generación sale solo-FTS5 — nunca
+    rompe `index`, que es la vía de siempre. No escribe nada: eso es _escribir_generacion."""
     if not kb_embed.disponible():
         print("ℹ️  Capa vectorial no disponible (onnxruntime/modelo ausentes) — índice solo-FTS5 (fallback normal).")
-        return
+        return None
     import numpy as np
     textos = [body for (_rel, _heading, _sens, body) in rows]
     BATCH = 64
@@ -194,16 +196,103 @@ def _build_vectors(rows, vec_path):
             if batch is None:
                 raise RuntimeError("embed_texts devolvió None a mitad de indexado")
             vecs.append(batch)
-        mat = np.concatenate(vecs, axis=0).astype("float32") if vecs else np.zeros((0, kb_embed.DIM), "float32")
-        tmp = vec_path + ".tmp.npy"
-        np.save(tmp, mat)
-        os.replace(tmp, vec_path)   # swap atómico, igual que el .db
-        print(f"✅ Vectores calculados: {mat.shape[0]} pasajes × {mat.shape[1]}-dim → "
-              f"{os.path.basename(vec_path)} ({os.path.getsize(vec_path)//1024} KB)")
+        return np.concatenate(vecs, axis=0).astype("float32") if vecs else np.zeros((0, kb_embed.DIM), "float32")
     except Exception as e:
         print(f"⚠️  Capa vectorial: fallo calculando embeddings ({e}) — índice queda solo-FTS5.")
-        if os.path.exists(vec_path):
-            os.remove(vec_path)   # no dejar un .npy viejo/desincronizado con la DB nueva
+        return None
+
+
+# ─── generación: .db + vectores + manifiesto como UNA unidad ───────────────────────────────
+# Hasta el issue #17 (auditoría externa 22-sep-2026, punto 4.5), build() hacía el swap del .db,
+# soltaba el lock y DESPUÉS calculaba los vectores, que sobre el corpus real son minutos. En ese
+# hueco el lector casaba la fila i del .npy VIEJO con el rowid i+1 del .db NUEVO: devolvía
+# pasajes que no tenían nada que ver con la consulta, con el coseno de otro texto. El muro no se
+# relajaba (el gate se recomputa sobre el contenido), pero la recuperación mentía sin avisar.
+# Ahora cada build es una GENERACIÓN con id propio. Sus vectores y sus hashes van a ficheros con
+# ese id en el nombre, que nadie reescribe; el manifiesto va DENTRO del .db. El único puntero es
+# el `os.replace(tmp, DB)`: publica .db y manifiesto de golpe, y el manifiesto dice qué vectores
+# son los suyos. El lector usa una sola conexión y solo acepta vectores de su generación que
+# además casen fragmento a fragmento; si algo no casa, busca solo por texto.
+_MANIFIESTO = "CREATE TABLE kb_manifiesto(clave TEXT PRIMARY KEY, valor TEXT NOT NULL)"
+_RE_GENERACION = re.compile(r"\A\d{8}T\d{6}-[0-9a-f]{8}\Z")
+
+
+def _nueva_generacion():
+    return "%s-%s" % (time.strftime("%Y%m%dT%H%M%S"), secrets.token_hex(4))
+
+
+def _huella(body, vec):
+    """Hash por fragmento: 16 bytes de sha256 del texto Y de su vector. Con los dos dentro, la
+    huella ata la fila del .db, la fila del .npy y la fila de hashes: cambiar cualquiera de los
+    tres (un .npy de otra generación copiado encima, por ejemplo) deja de casar. 2,4 MB a 150k."""
+    return hashlib.sha256(body.encode("utf-8") + b"\0" + vec.tobytes()).digest()[:16]
+
+
+def _rutas_generacion(db_path, gen):
+    """(vectores, hashes) de la generación `gen`, junto al .db. Se derivan del id, no se leen del
+    manifiesto: un manifiesto no puede mandar al lector a un fichero de otra generación."""
+    base, _ext = os.path.splitext(db_path)
+    return base + ".%s.vectors.npy" % gen, base + ".%s.sha.npy" % gen
+
+
+def _escribir_generacion(con, db_path, gen, bodies, mat):
+    """Deja la generación `gen` lista para publicar: vectores y hashes en sus ficheros (si hay
+    `mat`) y el manifiesto en `con`, que todavía es el .db temporal. NO publica nada: eso lo hace
+    el os.replace del .db, y solo después de que esto haya terminado."""
+    man = {"generacion": gen, "fragmentos": str(len(bodies)), "vectores": "no"}
+    if mat is not None:
+        import numpy as np
+        vec_path, sha_path = _rutas_generacion(db_path, gen)
+        mat = np.ascontiguousarray(mat, dtype="float32")   # los bytes que se hashean = los que se guardan
+        # uint8 (N×16) y no `S16`: numpy recorta los \x00 finales de un bytes_, y 1 de cada 256
+        # hashes acaba en cero — esos fragmentos no casarían nunca.
+        hashes = np.frombuffer(b"".join(_huella(b, v) for b, v in zip(bodies, mat)),
+                               dtype="uint8").reshape(-1, 16)
+        for ruta, arr in ((vec_path, mat), (sha_path, hashes)):
+            tmp = ruta + ".tmp.npy"
+            np.save(tmp, arr)
+            os.replace(tmp, ruta)
+        man.update(vectores="si", dim=str(mat.shape[1]))
+        print(f"✅ Vectores calculados: {mat.shape[0]} pasajes × {mat.shape[1]}-dim → "
+              f"{os.path.basename(vec_path)} ({os.path.getsize(vec_path)//1024} KB)")
+    con.execute(_MANIFIESTO)
+    con.executemany("INSERT INTO kb_manifiesto(clave, valor) VALUES (?,?)", sorted(man.items()))
+    con.commit()
+
+
+def _generacion_de(db_path):
+    """Id de la generación publicada en db_path, o None (no hay .db, o es anterior al manifiesto)."""
+    if not os.path.exists(db_path):
+        return None
+    try:
+        con = sqlite3.connect("file:%s?mode=ro" % db_path, uri=True)
+        try:
+            row = con.execute("SELECT valor FROM kb_manifiesto WHERE clave='generacion'").fetchone()
+        finally:
+            con.close()
+        return row[0] if row else None
+    except sqlite3.Error:
+        return None
+
+
+def _podar_generaciones(db_path, conservar):
+    """Borra los vectores de generaciones a las que ya no apunta nadie, y el .npy legado. Se
+    conservan la recién publicada y la anterior: un lector que abrió el .db viejo justo antes del
+    swap todavía puede ir a por los suyos. Si aun así llega tarde, no los encuentra y busca por
+    texto — nunca con los de otra generación."""
+    base, _ext = os.path.splitext(db_path)
+    prefijo = os.path.basename(base) + "."
+    for ruta in glob.glob(glob.escape(base) + ".*.vectors.npy") + glob.glob(glob.escape(base) + ".*.sha.npy"):
+        gen = os.path.basename(ruta)[len(prefijo):].rsplit(".", 2)[0]
+        if gen not in conservar:
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+    try:
+        os.remove(base + ".vectors.npy")
+    except OSError:
+        pass
 
 
 # El historial ordenado (`_PRIVADO_CLINICO/_historial/`) es la copia BUENA de cada informe:
@@ -294,6 +383,7 @@ def build():
     tmp = "%s.tmp.%d" % (DB, os.getpid())
     if os.path.exists(tmp):
         os.remove(tmp)
+    gen = _nueva_generacion()
     con = sqlite3.connect(tmp)
     con.execute(_SCHEMA)
     _pdf_avisos.clear()   # cuenta fresca de avisos de PDF en cada build() (idempotente)
@@ -321,15 +411,19 @@ def build():
     except sqlite3.Error as e:
         print("kb: índice escrito, sin compactar (%s: %s)" % (type(e).__name__, e),
               file=sys.stderr)
+    # Los vectores se calculan ANTES del swap y con el lock tomado: la generación se publica
+    # entera o no se publica. Mientras tanto se sigue sirviendo la anterior, también entera.
+    _escribir_generacion(con, DB, gen, [r[3] for r in rows], _calcular_vectores(rows))
     con.close()
-    os.replace(tmp, DB)   # swap atómico: no corrompe si alguien consulta a la vez
+    anterior = _generacion_de(DB)
+    os.replace(tmp, DB)   # EL puntero: .db + manifiesto de golpe; el manifiesto nombra sus vectores
+    _podar_generaciones(DB, {gen, anterior})
     lock.close()          # sueltas el lock DESPUÉS del swap: hasta aquí el índice no es el nuevo
     print(f"✅ Indexados {n} pasajes de {len(files)} ficheros → .kb_index.db ({os.path.getsize(DB)//1024} KB)")
     if _pdf_avisos:
         nombres = ", ".join(os.path.basename(p) for p in sorted(_pdf_avisos))
         print(f"⚠️  {len(_pdf_avisos)} PDFs con partes ilegibles (no-fatal, pypdf saltó esos objetos/páginas "
               f"rotos y siguió con el resto del texto): {nombres}")
-    _build_vectors(rows, VEC)   # capa híbrida opcional — mismo orden de `rows` = mismo rowid FTS5
 
 # FTS5 tiene sintaxis de query propia; el texto crudo del usuario puede romperla. Plegamos con
 # el MISMO toks() y construimos un OR de términos citados (semántica "cualquier término suma").
@@ -347,17 +441,14 @@ def _scope_sql(scope):
         return " AND sensitivity = 'public'"
     return " AND sensitivity != 'private'"
 
-def _fts5_candidates(q, k, scope, db_path):
+def _fts5_candidates(q, k, scope, con):
     """Candidatos BM25 YA filtrados por el gate de sensibilidad (recomputado sobre contenido),
     hasta `k` filas — [(rowid, path, title, body, score)], mayor score = mejor. Base compartida
     de _retrieve_fts5 (uso público, sin rowid) y del brazo BM25 de la fusión híbrida (con rowid,
     para poder casar con el ranking vectorial por identidad de fila, no por texto)."""
-    if not os.path.exists(db_path):
-        return []
     expr = _match_expr(q)
     if not expr:
         return []
-    con = sqlite3.connect(db_path)
     limit = max(k * 20, 100)
     cur = con.execute(
         "SELECT rowid, path, title, body, bm25(chunks) FROM chunks "
@@ -371,38 +462,61 @@ def _fts5_candidates(q, k, scope, db_path):
         out.append((rowid, path, title, body, -score))   # bm25() es negativo; -score = mayor mejor
         if len(out) >= k:
             break
-    con.close()
     return out
 
 def _retrieve_fts5(q, k, scope, db_path):
-    return [(path, title, body, score) for (_rowid, path, title, body, score)
-            in _fts5_candidates(q, k, scope, db_path)]
+    if not os.path.exists(db_path):
+        return []
+    con = sqlite3.connect(db_path)
+    try:
+        return [(path, title, body, score) for (_rowid, path, title, body, score)
+                in _fts5_candidates(q, k, scope, con)]
+    finally:
+        con.close()
 
 # ─── capa vectorial (opcional) + fusión RRF ────────────────────────────────────────────────
-def _vector_path_for(db_path):
-    """El .npy vive JUNTO al .db (mismo directorio, nombre derivado) — igual convención que
-    IDX/VEC en producción. Para un db_path custom (tests / contexto_caso con index_path propio)
-    buscamos "<db_path sin extensión>.vectors.npy"; si no existe, el brazo vectorial no aporta
-    nada y la fusión cae sola a BM25-solo (ver retrieve())."""
-    if db_path == DB:
-        return VEC
-    base, _ext = os.path.splitext(db_path)
-    return base + ".vectors.npy"
+def _vectores_de(con, db_path):
+    """(mat, hashes) de la generación que tiene abierta `con`, o None → solo texto.
 
-def _vector_candidates(q, k, scope, db_path):
+    None si el .db no tiene manifiesto (es anterior a las generaciones: no hay forma de saber qué
+    .npy es el suyo), si su generación salió sin vectores, si el id no tiene la forma esperada
+    (fail-closed: no se construye una ruta con un valor raro), si faltan los ficheros o si su
+    tamaño no es el que el manifiesto declara."""
+    try:
+        man = dict(con.execute("SELECT clave, valor FROM kb_manifiesto"))
+    except sqlite3.Error:
+        return None
+    gen = man.get("generacion", "")
+    if man.get("vectores") != "si" or not _RE_GENERACION.match(gen):
+        return None
+    import numpy as np
+    vec_path, sha_path = _rutas_generacion(db_path, gen)
+    if not (os.path.exists(vec_path) and os.path.exists(sha_path)):
+        return None
+    mat = np.load(vec_path, mmap_mode="r")
+    hashes = np.load(sha_path, mmap_mode="r")
+    n = int(man.get("fragmentos", -1))
+    if mat.shape[0] != n or hashes.shape != (n, 16):
+        return None
+    return mat, hashes
+
+def _vector_candidates(q, k, scope, con, db_path):
     """Candidatos por coseno YA filtrados por el gate — [(rowid, path, title, body, score)],
-    mayor score = mejor. [] si la capa vectorial no está disponible, el .npy no existe, o
-    db_path no es el índice FTS5 primario (el .npy solo tiene sentido junto a su .db hermano).
+    mayor score = mejor. [] si la capa vectorial no está disponible o si los vectores no son de
+    la generación que tiene abierta `con` (ver _vectores_de). Cada candidato se comprueba además
+    contra la huella de SU fragmento (texto + vector, ver _huella): si uno no casa, la capa
+    entera queda en entredicho y se devuelve [] — mejor solo texto que un pasaje con el coseno
+    de otro.
     Fail-soft: cualquier excepción (npy corrupto, mismatch de tamaño…) → [] y retrieve() sigue
     con BM25 solo — nunca rompe una consulta."""
-    if not kb_embed.disponible() or not os.path.exists(db_path):
-        return []
-    vec_path = _vector_path_for(db_path)
-    if not os.path.exists(vec_path):
+    if not kb_embed.disponible():
         return []
     try:
         import numpy as np
-        mat = np.load(vec_path, mmap_mode="r")
+        capa = _vectores_de(con, db_path)
+        if capa is None:
+            return []
+        mat, hashes = capa
         qv = kb_embed.embed_query(q)
         if qv is None or mat.shape[0] == 0 or mat.shape[1] != qv.shape[0]:
             return []
@@ -412,20 +526,20 @@ def _vector_candidates(q, k, scope, db_path):
         # se ordenan solo esos `limit` — evita un sort completo de todo el corpus por consulta.
         top_idx = np.argpartition(-sims, limit - 1)[:limit]
         top_idx = top_idx[np.argsort(-sims[top_idx])]
-        con = sqlite3.connect(db_path)
         out = []
         for i in top_idx:
             rowid = int(i) + 1   # fila i (0-indexed, orden de build()) ↔ rowid i+1 (FTS5)
             row = con.execute("SELECT path, title, body FROM chunks WHERE rowid=?", (rowid,)).fetchone()
             if row is None:
-                continue
+                return []
             path, title, body = row
+            if hashes[i].tobytes() != _huella(body, mat[i]):
+                return []
             if not _allowed(_sensitivity(path, body), scope):   # MURO: idéntico al brazo BM25
                 continue
             out.append((rowid, path, title, body, float(sims[i])))
             if len(out) >= k:
                 break
-        con.close()
         return out
     except Exception:
         return []
@@ -450,9 +564,18 @@ def _retrieve_hybrid(q, k, scope, db_path):
     """BM25 (siempre) + vectorial (si disponible) fusionados por RRF. Si la capa vectorial no
     aporta candidatos (modelo ausente, .npy ausente, o falla) esto colapsa exactamente a
     _retrieve_fts5 reordenado por RRF-de-una-sola-rama, que preserva el MISMO orden relativo
-    que el BM25 puro (rrf monótono en el rango) — no hay pérdida de comportamiento hoy."""
-    bm25 = _fts5_candidates(q, max(k * 4, 40), scope, db_path)
-    vec = _vector_candidates(q, max(k * 4, 40), scope, db_path)
+    que el BM25 puro (rrf monótono en el rango) — no hay pérdida de comportamiento hoy.
+
+    UNA conexión para los dos brazos: si otro build publica a mitad de consulta, esta sigue
+    leyendo el fichero que abrió (os.replace no lo toca) y los vectores de ESA generación."""
+    if not os.path.exists(db_path):
+        return []
+    con = sqlite3.connect(db_path)
+    try:
+        bm25 = _fts5_candidates(q, max(k * 4, 40), scope, con)
+        vec = _vector_candidates(q, max(k * 4, 40), scope, con, db_path)
+    finally:
+        con.close()
     if not vec:
         return [(path, title, body, score) for (_rowid, path, title, body, score) in bm25[:k]]
     return _rrf_fuse(bm25, vec, k)
