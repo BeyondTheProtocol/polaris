@@ -203,6 +203,9 @@ FAMILIAS = [
                           # a nada (auditoría Gorgojo 1.1, 24-sep-26)
                           "fuente_clinica",
                           "gate_etiqueta",     # etiqueta hallazgos del gate de salida (aviso→bloqueo)
+                          # escalera sombra→aviso→bloqueo con cota Clopper-Pearson: mide y
+                          # PROPONE, firma {{TITULAR}} (25-sep-26, idea de {{CONTACTO}} {{CONTACTO}} + KAI)
+                          "gate_escalera",
                           "replay_gate",       # mide un check nuevo contra respuestas reales (22-sep-26)
                           # a Grok/Perplexity sale el TEMA de la búsqueda, no su frase (22-sep-26)
                           "reescribe_consulta", "eval_reescritura")),

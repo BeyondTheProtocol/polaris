@@ -113,7 +113,22 @@ class NoPuedoFalsoRealista(unittest.TestCase):
         "No puedo leer el correo ahora: el conector de Gmail está caído y da error de red.",
         "Hay un cambio en ese borrador que tienes que mirar tú, porque es tu voz y tu criterio.",
         "El vigía confundió «no puedo leer el fichero» con «el daemon está caído», y no era así.",
+        # Canarios de FP (revisión P2, 25-sep-26): límites REALES dichos con su prueba, o rodeo
+        # que hago yo. Bloquearlos empuja a borrar el límite = mentir por omisión.
+        "No puedo adjuntar el vídeo al correo: Gmail limita a 25 MB; lo subo a Drive y te dejo el enlace.",
+        "Tendrás que descargar tú el PDF: la página exige inicio de sesión con tu cuenta.",
+        "No puedo leer el PDF escaneado como texto, así que lo paso por OCR.",
+        "No puedo enviar el correo: el servidor SMTP lo rechaza con error 550.",
     ]
+    # El límite o el rodeo NO excusan pasarle la tarea a ella.
+    POSITIVOS_CON_EXCUSA = [
+        "Tendrás que subirlo tú a Drive, pesa 30 MB.",
+        "No puedo adjuntar el informe, así que tendrás que mandarlo tú.",
+    ]
+
+    def test_limite_no_excusa_delegar(self):
+        for f in self.POSITIVOS_CON_EXCUSA:
+            self.assertIsNotNone(g.no_puedo_falso(f), "no cazó: %s" % f)
 
     def test_caza_las_frases_reales(self):
         for f in self.POSITIVOS:
@@ -163,6 +178,41 @@ class ContratoDelHook(unittest.TestCase):
         mal = MUTACIONES[0][1]
         rc, _o, _e = self._correr({"last_assistant_message": mal, "stop_hook_active": True})
         self.assertEqual(rc, 0, "si ya frenó una vez este turno, no vuelve a frenar")
+
+    def test_sombra_apunta_y_calla(self):
+        """Escalera P2: un check en `sombra` se mide (log) pero no se enseña ni bloquea."""
+        orig = g._reglas_activas
+        try:
+            g._reglas_activas = lambda: ([(c, "", "sombra") for c in g.CHECKS], "aviso")
+            h = g.revisar(MUTACIONES[0][1])
+            self.assertTrue(h)
+            self.assertEqual(g._bloquean(h, "aviso"),
+                             [c for c, _s, _m in h if c in g.SIEMPRE_BLOQUEA])
+            # main(): apunta en el log y no enseña nada
+            import io
+            from unittest import mock
+            log = os.path.join(self._tmp_state, "gate_salida.jsonl")
+            with mock.patch.object(g, "LOG", log), \
+                    mock.patch("sys.stdin", io.StringIO(json.dumps(
+                        {"last_assistant_message": MUTACIONES[0][1]}))), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                rc = g.main()
+            self.assertEqual(rc, 0)
+            self.assertEqual(out.getvalue().strip(), "", "en sombra no se enseña")
+            self.assertTrue(os.path.exists(log) and open(log).read().strip(), "en sombra SÍ se apunta")
+        finally:
+            g._reglas_activas = orig
+
+    def test_reescritura_se_apunta_sin_bloquear(self):
+        """Revisión P2 (25-sep-26): la reescritura tras un bloqueo salía sin apuntar."""
+        mal = MUTACIONES[0][1]
+        rc, out, _e = self._correr({"last_assistant_message": mal, "stop_hook_active": True})
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.strip(), "", "en la reescritura no avisa: solo apunta")
+        with open(os.path.join(self._tmp_state, "gate_salida.jsonl"), encoding="utf-8") as f:
+            filas = [json.loads(l) for l in f if l.strip()]
+        self.assertTrue(filas, "la reescritura tiene que quedar en el log")
+        self.assertTrue(all(r.get("reintento") and not r["bloqueo_real"] for r in filas))
 
     def test_modo_aviso_no_bloquea_pero_avisa_a_titular(self):
         rc, out, _e = self._correr({"last_assistant_message": MUTACIONES[0][1]})

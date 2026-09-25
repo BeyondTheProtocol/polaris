@@ -154,9 +154,21 @@ _OBJETO_CON_TOOL = re.compile(
 # Lo que SÍ es de un humano: credenciales, login, pagos, firma, gates de OK, su criterio.
 _DELEGA_LEGITIMO = re.compile(
     r"\bOK\b|\bgate\b|firma|confirm|contrase[ñn]a|password|passkey|passcode|credencial|captcha|"
-    r"\b2FA\b|c[óo]digo|cl@ve|certificado digital|sudo|llavero|login|inicia(r)? sesi[óo]n|"
+    r"\b2FA\b|c[óo]digo|cl@ve|certificado digital|sudo|llavero|login|inici(a|ar|o)( de)? sesi[óo]n|"
     r"entrar con|pag(ar|o)\b|tarjeta|prohibid|irreversible|tu decisi[óo]n|tu criterio|tu voz|"
     r"tu m[ée]dic|tu onc[óo]log|auto mode|permiso|\b40[13]\b|ca[íi]d[oa]|no responde", re.I)
+
+
+# Un límite REAL dicho con su prueba (cifra, código de error, rechazo) no es incapacidad fingida:
+# bloquearlo empuja a borrar el límite, que es mentir por omisión (25-sep-26, revisión P2 del
+# comité verificacion). Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI,
+# revisión del 25-sep-2026.
+_LIMITE_REAL = re.compile(
+    r"\b(limita|l[íi]mite)\b[^.]{0,30}\d|\b\d+\s*[MG]B\b|\berror\s+\d{3}\b|\brechaz", re.I)
+# «No puedo X, así que lo paso por OCR»: el rodeo lo hago yo, no se lo paso a ella.
+_RODEO_PROPIO = re.compile(
+    r"\b(as[íi] que|pero|y)\s+(lo|la|los|las)\s+(subo|paso|convierto|proceso|hago|mando|leo|"
+    r"descargo|abro|comprimo|parto)\b", re.I)
 
 
 def no_puedo_falso(t, tools=None):
@@ -177,9 +189,13 @@ def no_puedo_falso(t, tools=None):
             continue
         if not _OBJETO_CON_TOOL.search(f) or _DELEGA_LEGITIMO.search(f):
             continue
+        pasa_a_ella = re.search(r"\bt[úu]\b|te toca|tendr[áa]s que|tienes que|para que (lo|la)", f, re.I)
+        if not pasa_a_ella and (_LIMITE_REAL.search(f) or _RODEO_PROPIO.search(f[m.end():])):
+            continue
         return ("«%s…»: dices que no puedes, o le pasas a {{TITULAR}}, algo para lo que hay herramienta "
                 "(Gmail, Drive, ficheros, navegador). Hazlo. Si de verdad es un gate de su OK o una "
-                "credencial suya, dilo así, no como incapacidad." % f.strip()[:120])
+                "credencial suya, dilo así, no como incapacidad. Si es un límite REAL de la "
+                "herramienta, cítalo con su cifra o su error: no lo borres." % f.strip()[:120])
     return None
 
 
@@ -974,14 +990,16 @@ def _extracto(motivo):
     return frag
 
 
-def _apunta(hallazgos, modo):
+def _apunta(hallazgos, modo, reintento=False):
     try:
         os.makedirs(os.path.dirname(LOG), exist_ok=True)
         # `bloqueo_real` corrige el hallazgo colateral del 13-sep-26: `modo` en la fila es el
         # GLOBAL en el momento de escribir, no si ESTE hallazgo bloqueó de verdad (un check con
         # `modo` propio, como `falsa_certeza`, puede bloquear con el global en "aviso"). Se
         # calcula igual que `_bloquean()`.
-        bloqueados = set(_bloquean(hallazgos, modo))
+        # En la reescritura (`reintento`) no se bloquea nunca: se apunta para que el log no cuente
+        # de menos (revisión P2, 25-sep-26: la reescritura salía sin auditar ni apuntar).
+        bloqueados = set() if reintento else set(_bloquean(hallazgos, modo))
         sesion_hash = (hashlib.sha256(SESION.encode("utf-8")).hexdigest()[:16]
                       if SESION else None)
         with open(LOG, "a", encoding="utf-8") as f:
@@ -993,6 +1011,7 @@ def _apunta(hallazgos, modo):
                     "bloqueo_real": check in bloqueados,
                     "motivo": motivo[:200],
                     "extracto": _extracto(motivo),
+                    **({"reintento": True} if reintento else {}),
                 }, ensure_ascii=False) + "\n")
     except Exception:
         pass
@@ -1014,18 +1033,32 @@ def main():
         data = json.loads(sys.stdin.read() or "{}")
     except Exception:
         return 0                                  # fail-open
-    if data.get("stop_hook_active"):
-        return 0                                  # ya frenó una vez este turno: no hacemos bucle
     texto = data.get("last_assistant_message") or ""
     global SESION
     SESION = str(data.get("session_id") or data.get("transcript_path") or "") or None
+    if data.get("stop_hook_active"):
+        # Ya frenó una vez este turno: no hacemos bucle, pero la reescritura SÍ se apunta
+        # (`reintento: true`), o el log vivo cuenta de menos y las cotas de la escalera mienten.
+        try:
+            h = revisar(texto, _tools_del_turno(data.get("transcript_path")))
+            if h:
+                _apunta(h[:MAX_HALLAZGOS], _reglas_activas()[1], reintento=True)
+        except Exception:
+            pass                                  # fail-open: apuntar nunca frena
+        return 0
     tools = _tools_del_turno(data.get("transcript_path"))
     hallazgos = revisar(texto, tools)
     if not hallazgos:
         return 0
-    _, modo = _reglas_activas()
+    activas, modo = _reglas_activas()
     hallazgos = hallazgos[:MAX_HALLAZGOS]
     _apunta(hallazgos, modo)
+    # `sombra` (escalera P2, 25-sep-26): el check se apunta para medirlo, pero no se enseña. Para
+    # los ruidosos, que en aviso solo hacían ruido. Nunca aplica a SIEMPRE_BLOQUEA.
+    sombra = {c for c, _s, m in activas if m == "sombra" and c not in SIEMPRE_BLOQUEA}
+    hallazgos = [h for h in hallazgos if h[0] not in sombra]
+    if not hallazgos:
+        return 0
     cuerpo = "\n".join("· [%s] %s" % (c, m) for c, _s, m in hallazgos)
     if _bloquean(hallazgos, modo):
         sys.stderr.write("GATE DE SALIDA — corrige esto ANTES de entregar la respuesta:\n"

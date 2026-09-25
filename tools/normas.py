@@ -81,7 +81,7 @@ def reglas_salida(d=None):
         if m:
             mo = (n.get("modo") or "").strip().lower()
             out.append({"slug": n["slug"], "check": m.group(1), "que": n.get("que", ""),
-                        "modo": mo if mo in ("aviso", "bloqueo") else None})
+                        "modo": mo if mo in ("sombra", "aviso", "bloqueo") else None})
     return out
 
 

@@ -59,6 +59,7 @@ runpy test_stdin_canalizado.py
 runpy test_bash_return_explicito.py
 runpy test_casa_base_guard.py
 runpy test_gate_etiqueta.py
+runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} {{CONTACTO}} + KAI)
 runpy test_gate_citas.py
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py

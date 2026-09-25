@@ -53,8 +53,17 @@
    "aplicable": true,
    "auditable": true,
    "repetida": true,
-   "nota": "22-sep-26: ampliado de solo-correo (0 disparos en 2.032 turnos reales) a cualquier objeto con herramienta. Replay (tools/replay_gate.py, 14 dias): 11 disparos, 9 aciertos, 2 dudosos (82 %). Sigue en aviso: el umbral acordado para bloqueo es 90 %. Promovido a BLOQUEO el 22-sep-26 por decision de {{TITULAR}} (82 %, bajo el umbral): un falso positivo cuesta una reescritura; no bloquear le cuesta volver a corregirlo.",
-   "modo": "bloqueo"
+   "nota": "22-sep-26: ampliado de solo-correo (0 disparos en 2.032 turnos reales) a cualquier objeto con herramienta. Replay (tools/replay_gate.py, 14 dias): 11 disparos, 9 aciertos, 2 dudosos (82 %). El umbral acordado para bloqueo era 90 %. Promovido a BLOQUEO el 22-sep-26 por decision de {{TITULAR}} (82 %, bajo el umbral): un falso positivo cuesta una reescritura; no bloquear le cuesta volver a corregirlo. · 25-sep-26 (escalera P2, idea de {{CONTACTO}} {{CONTACTO}} + KAI): el comité verificacion demostró FP sobre límites reales dichos con su prueba («inicio de sesión», «limita a 25 MB», «error 550», rodeo propio); bloquearlos empuja a borrar el límite = mentir por omisión. Arreglado en _DELEGA_LEGITIMO/_LIMITE_REAL/_RODEO_PROPIO con canarios en tests/test_gate_salida.py. Se queda en bloqueo con esa condición; tools/gate_escalera.py propone bajar si 3 FP seguidos o cota > 30 % con ≥20 etiquetados.",
+   "modo": "bloqueo",
+   "escalera": {
+    "clase": "suprime_info",
+    "escalon": "bloqueo",
+    "subida": {
+     "fecha": "2026-09-22",
+     "firma": "{{TITULAR}}",
+     "base": "replay 9/11 (82 %), etiquetas NO en el almacén; cota FP 47 %"
+    }
+   }
   },
   {
    "slug": "feedback-honestidad-limites-avisar-no-inventar",
@@ -67,7 +76,16 @@
    "auditable": true,
    "repetida": true,
    "modo": "bloqueo",
-   "nota": "· 31-jul-26: pasa a bloqueo. 2 hallazgos en 6 dias de 69: poco volumen y mucho riesgo. Cumplida la semana de medicion del 25-jul. · 20-sep-26: {{TITULAR}} la eleva a MANTRA NUMERO UNO («lo peor que puede hacer el sistema es mentir»), escrita a fuego en CLAUDE.md por encima del sello. Ver feedback-nunca-mentir. Se amplia la clase: tambien miente una TOOL que devuelve exito sin validar lo que trajo (cn_fetch/CDE, cubierto por tests/test_cn_fetch.py)."
+   "nota": "· 31-jul-26: pasa a bloqueo. 2 hallazgos en 6 dias de 69: poco volumen y mucho riesgo. Cumplida la semana de medicion del 25-jul. · 20-sep-26: {{TITULAR}} la eleva a MANTRA NUMERO UNO («lo peor que puede hacer el sistema es mentir»), escrita a fuego en CLAUDE.md por encima del sello. Ver feedback-nunca-mentir. Se amplia la clase: tambien miente una TOOL que devuelve exito sin validar lo que trajo (cn_fetch/CDE, cubierto por tests/test_cn_fetch.py).",
+   "escalera": {
+    "clase": "suprime_info",
+    "escalon": "bloqueo",
+    "subida": {
+     "fecha": "2026-07-31",
+     "firma": "sin firma registrada",
+     "base": "2 hallazgos en 6 días; 0 etiquetados a 25-sep"
+    }
+   }
   },
   {
    "slug": "feedback-no-em-dash-tell-ia",
@@ -78,7 +96,11 @@
    "heredada": false,
    "aplicable": true,
    "auditable": true,
-   "repetida": true
+   "repetida": true,
+   "escalera": {
+    "clase": "estilo",
+    "escalon": "aviso"
+   }
   },
   {
    "slug": "feedback-formato-tabla-pasos-itinerarios",
@@ -89,7 +111,11 @@
    "heredada": false,
    "aplicable": true,
    "auditable": true,
-   "repetida": true
+   "repetida": true,
+   "escalera": {
+    "clase": "estilo",
+    "escalon": "aviso"
+   }
   },
   {
    "slug": "feedback-no-repetir-disclaimers-muro",
@@ -336,7 +362,16 @@
    "auditable": true,
    "repetida": false,
    "nota": "Unico check que bloquea aunque el gate este en aviso: una cita inventada, una vez leida, ya no se puede deshacer. Se apoya en tools/verifica_citas.py (sin LLM). Hueco demostrado el 31-jul-26: un PMID falso con un dato clinico paso con exit 0.",
-   "modo": "bloqueo"
+   "modo": "bloqueo",
+   "escalera": {
+    "clase": "suprime_info",
+    "escalon": "bloqueo",
+    "subida": {
+     "fecha": "2026-07-31",
+     "firma": "sin firma registrada",
+     "base": "SIEMPRE_BLOQUEA: una cita inventada leída no se deshace; determinista (verifica_citas.py)"
+    }
+   }
   },
   {
    "slug": "feedback-preclinico-no-se-aplana",
@@ -349,7 +384,16 @@
    "auditable": true,
    "repetida": false,
    "nota": "Regla 17 del protocolo, mecanizada el 17-sep-26. Vivia solo en el prompt: se cumplia cuando el modelo se acordaba. El tier lo resuelve tools/tier_evidencia.py contra PubMed (PublicationType + MeSH, sin LLM); el gate teje tres booleanos (cita preclinica / afirma eficacia / ya etiquetado) y solo acusa con los dos primeros y sin el tercero. Desde el 24-sep (auditoria Gorgojo 1.4) va POR UNIDAD: la etiqueta cubre solo su frase; y red caida o tier desconocido dan un hallazgo PENDIENTE que avisa y nunca bloquea (antes: fail-open silencioso).",
-   "modo": "bloqueo"
+   "modo": "bloqueo",
+   "escalera": {
+    "clase": "suprime_info",
+    "escalon": "bloqueo",
+    "subida": {
+     "fecha": "2026-09-17",
+     "firma": "sin firma registrada",
+     "base": "nace en bloqueo, 0 etiquetados a 25-sep"
+    }
+   }
   },
   {
    "slug": "feedback-cita-debe-respaldar-la-cifra",
