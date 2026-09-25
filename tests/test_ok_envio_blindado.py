@@ -402,6 +402,53 @@ class ElPermisoVaLigadoALoAprobado(_Base):
                          "deny")
 
 
+# ═══ 4b · un merge va atado al CONTENIDO que ella vio (P3 · F2, 25-sep-26) ═══════════════════
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+SHA = "3f2a9c1e" + "0" * 32
+
+
+class ElMergeVaAtadoAlContenido(_Base):
+
+    def _dije(self, texto):
+        """Lo que yo le escribí justo antes de su orden (lo que ella tenía delante)."""
+        self._linea({"type": "assistant", "isSidechain": False,
+                     "message": {"role": "assistant", "content": [{"type": "text", "text": texto}]}})
+
+    def _merge(self, cmd):
+        return self._salida("Bash", {"command": cmd})
+
+    def test_con_el_commit_que_vio_se_fusiona(self):
+        self._dije("El PR #224 está listo, cabeza 3f2a9c1e. ¿Lo fusiono?")
+        self._ordenar("fusiónalo")
+        self.assertNotEqual(self._merge("gh pr merge 224 --squash --match-head-commit " + SHA), "deny")
+
+    def test_sin_match_head_commit_no(self):
+        self._dije("El PR #224 está listo, cabeza 3f2a9c1e. ¿Lo fusiono?")
+        self._ordenar("fusiónalo")
+        self.assertEqual(self._merge("gh pr merge 224 --squash"), "deny")
+
+    def test_un_commit_que_no_vio_no(self):
+        """Alguien empujó al PR después de que ella lo viera: la cabeza ya es otra."""
+        self._dije("El PR #224 está listo, cabeza 3f2a9c1e. ¿Lo fusiono?")
+        self._ordenar("fusiónalo")
+        self.assertEqual(self._merge("gh pr merge 224 --match-head-commit " + "9" * 40), "deny")
+
+    def test_sha_abreviado_no_vale_en_el_merge(self):
+        self._dije("El PR #224 está listo, cabeza 3f2a9c1e. ¿Lo fusiono?")
+        self._ordenar("fusiónalo")
+        self.assertEqual(self._merge("gh pr merge 224 --match-head-commit 3f2a9c1e"), "deny")
+
+    def test_el_sha_en_su_propio_mensaje_tambien_vale(self):
+        self._dije("Tienes dos PRs abiertos.")
+        self._ordenar("fusiona el #224, commit 3f2a9c1e")
+        self.assertNotEqual(self._merge("gh pr merge 224 --match-head-commit=" + SHA), "deny")
+
+    def test_el_pr_equivocado_sigue_sin_valer(self):
+        self._dije("El PR #224 está listo, cabeza 3f2a9c1e.")
+        self._ordenar("fusiónalo")
+        self.assertEqual(self._merge("gh pr merge 225 --match-head-commit " + SHA), "deny")
+
+
 # ═══ 5 · web_novedad consume el mismo permiso ═══════════════════════════════════════════════
 class WebNovedadNoSeRompe(_Base):
 

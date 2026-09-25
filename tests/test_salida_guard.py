@@ -458,7 +458,10 @@ class GuardDeSalida(unittest.TestCase):
         self.assertIn("{{CONTACTO}}", contenido)
 
     # ── fusionar un PR (25-sep-26): «fusiona» abre solo `gh pr merge` del PR del que se hablaba ──
-    MERGE_WEB = "cd /Users/polaris/projects/.mgc-staging/x && gh pr merge %s --merge"
+    # P3 · F2 (25-sep-26): el merge lleva el SHA de la cabeza que ella vio (`--match-head-commit`).
+    SHA = "3f2a9c1e" + "0" * 32
+    MERGE_WEB = ("cd /Users/polaris/projects/.mgc-staging/x && gh pr merge %s --merge "
+                 "--match-head-commit " + SHA)
 
     def _yo(self, texto):
         """Lo que le escribí antes de su mensaje: lo que tenía delante al contestar."""
@@ -472,12 +475,12 @@ class GuardDeSalida(unittest.TestCase):
         for texto in ("fusiona", "Fusiónalo", "mergea", "dale a fusionar", "vale, fusiona",
                       "ya puedes fusionar", "haz el merge"):
             with self.subTest(texto=texto):
-                self._yo("Siguiente: ¿fusiono el #224 en GitHub?")
+                self._yo("Siguiente: ¿fusiono el #224 en GitHub? (cabeza 3f2a9c1e)")
                 self._ok_envio(texto)
                 self.assertIsNone(self._bash(self.MERGE_WEB % 224), texto)
 
     def test_fusiona_el_numero_manda(self):
-        self._yo("Hay dos PR abiertos: #224 y #225.")
+        self._yo("Hay dos PR abiertos: #224 y #225. (cabeza 3f2a9c1e)")
         self._ok_envio("fusiona el 224")
         self.assertEqual(self._bash(self.MERGE_WEB % 225), "deny", "dijo el 224, no el 225")
         self.assertIsNone(self._bash(self.MERGE_WEB % 224))
@@ -487,14 +490,14 @@ class GuardDeSalida(unittest.TestCase):
         self._ok_envio("fusiona")
         self.assertEqual(self._bash(self.MERGE_WEB % 224), "deny")
         # un merge sin número no se puede comprobar
-        self._yo("¿fusiono el #224?")
+        self._yo("¿fusiono el #224? (cabeza 3f2a9c1e)")
         self._ok_envio("fusiona")
         self.assertEqual(self._bash("cd /Users/polaris/projects/.mgc-staging/x && gh pr merge --merge"),
                          "deny")
 
     def test_fusionar_no_abre_el_envio(self):
         """Un permiso de fusionar no vale para mandar un correo ni para publicar por otra vía."""
-        self._yo("¿fusiono el #224?")
+        self._yo("¿fusiono el #224? (cabeza 3f2a9c1e)")
         self._ok_envio("fusiona")
         self.assertEqual(self._decision(self._hook(
             {"tool_name": self.SEND, "tool_input": {"to": "alguien@hospital.example"}})), "deny")
@@ -509,16 +512,16 @@ class GuardDeSalida(unittest.TestCase):
                       "hay que fusionar el 224", "fusionar mañana", "sin fusionar", "¿lo fusiono yo?",
                       "fusiona a casa base", "no hagas el merge"):
             with self.subTest(texto=texto):
-                self._yo("¿fusiono el #224?")
+                self._yo("¿fusiono el #224? (cabeza 3f2a9c1e)")
                 self._ok_envio(texto)
                 self.assertEqual(self._bash(self.MERGE_WEB % 224), "deny", texto)
 
     def test_publicalo_sigue_fusionando_y_programar_no(self):
         """Lo que funcionaba no se rompe: el #220 salió con «publícalo»."""
-        self._yo("¿publico el #220?")
+        self._yo("¿publico el #220? (cabeza 3f2a9c1e)")
         self._ok_envio("publícalo")
         self.assertIsNone(self._bash(self.MERGE_WEB % 220))
-        self._yo("¿fusiono el #220?")
+        self._yo("¿fusiono el #220? (cabeza 3f2a9c1e)")
         self._ok_envio("prográmalo")
         self.assertEqual(self._bash(self.MERGE_WEB % 220), "deny")
 

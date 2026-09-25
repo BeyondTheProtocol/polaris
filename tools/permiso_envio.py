@@ -476,7 +476,8 @@ def contexto(d):
     return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(texto)},
                       "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
                       "cambios": [e for _, e in cambios], "alcance": alcance(texto),
-                      "prs_suyos": _prs(texto), "prs_vistos": _prs("\n".join(visto))}
+                      "prs_suyos": _prs(texto), "prs_vistos": _prs("\n".join(visto)),
+                      "shas_vistos": _shas(texto + "\n" + "\n".join(visto))}
 
 
 # Números de PR en un texto: «#224», «PR 224», «el 224», «.../pull/224».
@@ -487,6 +488,25 @@ _MERGE = re.compile(r"\bgh\s+pr\s+merge\b(?P<resto>[^;&|\n]*)")
 
 def _prs(texto):
     return {int(n) for n in _PR_EN_TEXTO.findall(texto or "")}
+
+
+# Commits en un texto: 7 a 40 hex, como git los abrevia. En minúsculas para comparar.
+_SHA_EN_TEXTO = re.compile(r"(?<![0-9A-Za-z])[0-9a-fA-F]{7,40}(?![0-9A-Za-z])")
+# `--match-head-commit X` o `--match-head-commit=X` dentro del `gh pr merge`.
+_MATCH_HEAD = re.compile(r"--match-head-commit(?:\s+|=)['\"]?([0-9a-fA-F]+)")
+
+
+def _shas(texto):
+    return {x.lower() for x in _SHA_EN_TEXTO.findall(texto or "")}
+
+
+def sha_de_merge(comando):
+    """El SHA de `--match-head-commit` de un `gh pr merge`, en minúsculas, o None."""
+    m = _MERGE.search(comando or "")
+    if not m:
+        return None
+    h = _MATCH_HEAD.search(m.group("resto"))
+    return h.group(1).lower() if h else None
 
 
 def pr_de_merge(comando):
@@ -503,19 +523,41 @@ def pr_de_merge(comando):
     return True, None
 
 
-def comprobar_fusion(ctx, numero):
+def comprobar_fusion(ctx, numero, sha=None):
     """"" si el merge de `numero` es el PR del que ella hablaba; si no, el motivo. Candado: si su
     mensaje nombra PRs, tiene que ser uno de esos; si no nombra ninguno, el que yo le había puesto
-    delante (mi último mensaje antes del suyo), igual que `en_vista` en los borradores."""
+    delante (mi último mensaje antes del suyo), igual que `en_vista` en los borradores. Y además
+    tiene que ser el CONTENIDO que vio (`_comprobar_contenido`)."""
     if numero is None:
         return "el merge no dice qué PR: no puedo comprobar que sea el que ella aprobó"
     suyos = ctx.get("prs_suyos") or set()
     if suyos:
-        return "" if numero in suyos else "ella dijo el PR %s, no el %s" % (
-            ", ".join(str(n) for n in sorted(suyos)), numero)
-    if numero in (ctx.get("prs_vistos") or set()):
-        return ""
-    return "el PR %s no estaba en lo que ella tenía delante al decirlo" % numero
+        if numero not in suyos:
+            return "ella dijo el PR %s, no el %s" % (", ".join(str(n) for n in sorted(suyos)), numero)
+    elif numero not in (ctx.get("prs_vistos") or set()):
+        return "el PR %s no estaba en lo que ella tenía delante al decirlo" % numero
+    return _comprobar_contenido(ctx, numero, sha)
+
+
+def _comprobar_contenido(ctx, numero, sha):
+    """P3 · F2 (25-sep-26): la firma va atada al CONTENIDO, no solo al número del PR.
+
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+    Antes, un «fusiona» sobre el #N dejaba fusionar el #N aunque alguien le hubiera empujado
+    commits DESPUÉS de que ella lo viera. Ahora el merge tiene que llevar `--match-head-commit`
+    con el SHA completo de la cabeza, y ese SHA (7+ caracteres bastan) tiene que estar en lo que
+    ella tenía delante o en su mensaje. GitHub hace el resto en el servidor: si la cabeza ya no es
+    esa, rechaza el merge. Así «lo firmo yo» sigue significando «firmo ESTO que he visto»."""
+    como = ("enséñale el SHA de la cabeza (`gh pr view %s --json headRefOid`) y usa "
+            "`gh pr merge %s --match-head-commit <SHA>`" % (numero, numero))
+    if not sha:
+        return "falta `--match-head-commit`: la firma va atada al contenido que ella vio; " + como
+    if len(sha) != 40:
+        return "`--match-head-commit` necesita el SHA completo (40 caracteres), no %d" % len(sha)
+    vistos = ctx.get("shas_vistos") or set()
+    if not any(len(v) >= 7 and sha.startswith(v) for v in vistos):
+        return "el commit %s no estaba en lo que ella tenía delante al decirlo; %s" % (sha[:12], como)
+    return ""
 
 
 def comprobar_envio(ctx, entrada, tool=""):
@@ -535,7 +577,7 @@ def comprobar_envio(ctx, entrada, tool=""):
         return ("su orden no cubre programar una tarea" if que == "programar"
                 else "su orden no cubre fusionar un PR")
     if que == "fusionar":
-        return comprobar_fusion(ctx, numero)
+        return comprobar_fusion(ctx, numero, sha_de_merge(entrada.get("command")))
     destinos = destinatarios(entrada)
     if ctx.get("emails") and destinos - ctx["emails"]:
         return "va a %s y ella nombró %s" % (", ".join(sorted(destinos - ctx["emails"])),
