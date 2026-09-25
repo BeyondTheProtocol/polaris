@@ -138,6 +138,17 @@
         ]
       },
       {
+        "_comment": "Un preview escucha solo en este Mac (26-sep-26). Al escribir o editar un .claude/launch.json, cada configuración que arranca un servidor (port + comando) tiene que atarse a 127.0.0.1/localhost; si no, DENY con el arreglo. Nació de *:3217 abierto a la red por un preview de Nitro sin HOST (test_puertos_loopback en rojo, deuda preview_node_expuesto_lan). FAIL-OPEN; escotilla BTP_LOOPBACK_OK=1. No ve launch.json escritos por Bash: ahí sigue el test de puertos.",
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/launch_loopback_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "_comment": "Contrato de asiento de la caja (13-sep-26). Añade al prompt de cada asiento de ANÁLISIS (lista en tools/caja.py) el contrato JSON que cosecha_panel.py necesita para juntar un dossier; sin él, los subagentes del chat no lo recibían (medido: 0 decisiones en el último panel real). Devuelve updatedInput con la entrada ENTERA y solo el prompt cambiado; NO pone permissionDecision (no toca permisos). Matcher propio, no el * del muro; ningún otro hook reescribe la entrada. FAIL-OPEN, no repite, bypass BTP_CONTRATO_OFF=1.",
         "matcher": "Agent|Task",
         "hooks": [
