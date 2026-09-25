@@ -61,6 +61,7 @@ runpy test_healthcheck_drift_plists.py
 runpy test_prueba_entregable.py
 runpy test_dispatcher_env_turnos.py
 runpy test_enruta.py
+runpy test_enruta_salud_compartida.py   # 25-sep · una sola caché de salud para todos los árboles; sonda de grok sin búsqueda
 runpy test_enruta_comite.py
 runpy test_decide_peticion.py
 runpy test_lentes.py

@@ -283,7 +283,9 @@ FAMILIAS = [
 
                      # el espejo público: derivar el árbol publicable y mantenerlo al día
                      # (19-sep-26) — es fontanería de repos, no «otras»
-                     "publicar", "pr_portar")),
+                     "publicar", "pr_portar",
+                     # grafo de quién depende de quién en el repo (25-sep-26)
+                     "dependencias")),
     ("el lazo", ("cola", "queue", "dispatcher", "run_agent", "panel", "decide_peticion",
                  # comprueba que un encargo del lazo dejó huella en disco (20-sep-26)
                  "prueba_entregable",

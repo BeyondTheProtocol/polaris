@@ -49,7 +49,26 @@ import time
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 
-CACHE_SALUD = os.path.join(AQUI, "state", "enruta_salud.json")
+
+
+def _dir_estado():
+    """Dónde vive la caché de salud: el estado de CASA BASE, compartido por todos los árboles.
+
+    Hasta el 25-sep-2026 colgaba de `AQUI` (el `tools/` de cada árbol): cada worktree sondeaba
+    por su cuenta a los proveedores de pago al caducar SU caché. Con ~20 worktrees vivos salían
+    15-18 rondas por hora, casi todo el dinero real de API de ese día (medido en el registro
+    completo de cost_guard). `BTP_STATE_DIR` aísla; un proceso que es un test, a un tmp."""
+    try:
+        from _casa import state_dir, es_proceso_de_test
+        if not os.environ.get("BTP_STATE_DIR") and es_proceso_de_test():
+            import tempfile
+            return os.path.join(tempfile.gettempdir(), "btp-test-enruta-%d" % os.getuid())
+        return state_dir()
+    except Exception:
+        return os.path.join(AQUI, "state")
+
+
+CACHE_SALUD = os.path.join(_dir_estado(), "enruta_salud.json")
 CACHE_TTL_S = 3600          # una hora: suficiente para no repetir la prueba en cada decisión
 
 # ── Catálogo ────────────────────────────────────────────────────────────────────────────────
@@ -276,6 +295,7 @@ def _cache_escribir(estado):
 # descartaba un proveedor que estaba perfectamente vivo. Medido el 2-sep-2026.
 TIMEOUT_S = {"nvidia": 150, "perplexity": 90}
 TIMEOUT_DEFECTO = 60
+SONDA_FLAGS = {"grok": ["--nolive"]}     # la sonda de salud no necesita búsqueda en vivo
 
 # Algunas capacidades no se piden con lenguaje natural: se piden con el flag de la tool, que
 # lleva el prompt ya afinado. Sin esto, `enruta --ejecutar "de-identifica esto"` mandaba la
@@ -329,7 +349,10 @@ def probar(nombre, *, timeout=None):
     if not os.path.exists(ruta):
         return False, "falta %s" % tool
     try:
-        r = subprocess.run([sys.executable, ruta, "Responde solo: OK"],
+        # grok busca en vivo (web + X) por defecto: para contestar «OK» se pagaban ~2.000 tokens
+        # de resultados de búsqueda (25-sep-2026). Sigue siendo una llamada de pago REAL, que es
+        # lo que detecta un saldo a cero; solo sin búsqueda.
+        r = subprocess.run([sys.executable, ruta] + SONDA_FLAGS.get(nombre, []) + ["Responde solo: OK"],
                            capture_output=True, text=True, timeout=timeout,
                            env=dict(os.environ, BTP_ORIGEN="ping"))   # el contador lo separa
         salida = (r.stdout or "").strip()
@@ -365,7 +388,7 @@ def salud(*, refrescar=False, solo=None):
     return estado
 
 
-LOCK_REFRESCO = os.path.join(AQUI, "state", "enruta_salud.refrescando")
+LOCK_REFRESCO = os.path.join(_dir_estado(), "enruta_salud.refrescando")   # compartido, como la caché
 LOCK_REFRESCO_S = 600       # un refresco en vuelo cada 10 min como mucho: nada de tormentas
 
 
@@ -373,6 +396,12 @@ def _refrescar_de_fondo():
     """Lanza `enruta.py --salud` desacoplado y vuelve al instante. Fail-open."""
     if os.environ.get("BTP_ENRUTA_SIN_REFRESCO") == "1":
         return
+    try:
+        from _casa import es_proceso_de_test
+        if es_proceso_de_test() and not os.environ.get("BTP_STATE_DIR"):
+            return                  # un test no lanza sondas de PAGO reales de fondo
+    except Exception:
+        pass
     try:
         if os.path.exists(LOCK_REFRESCO) and time.time() - os.path.getmtime(LOCK_REFRESCO) < LOCK_REFRESCO_S:
             return
