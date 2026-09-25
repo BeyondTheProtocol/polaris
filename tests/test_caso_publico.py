@@ -280,6 +280,17 @@ class FallaCerrado(unittest.TestCase):
         self.assertFalse(os.path.exists(_publico()), "no debe quedar un caso.json a medias")
         self.assertFalse(os.path.exists(cp.PRIVADO))
 
+    def test_cita_futura_con_dia_no_se_publica(self):
+        # 25-sep-2026: «pruebas la semana del 28-sep» y «primera dosis el 1-oct» junto al hospital
+        # decían dónde estará ella (acosador activo). Una fecha de día futura hace fallar el build.
+        f = copy.deepcopy(FUENTE)
+        d = f["ficha"]["diagnostico"]["valor"]
+        if isinstance(d, dict):
+            d["es"] = d["es"] + ". Primera dosis el 3 de marzo de 2099 en el hospital"
+        else:
+            f["ficha"]["diagnostico"]["valor"] = d + ". Primera dosis el 3 de marzo de 2099 en el hospital"
+        self._falla(f, "fecha futura con día")
+
     def test_dato_sin_fuente(self):
         f = copy.deepcopy(FUENTE)
         del f["ficha"]["diagnostico"]["fuente"]

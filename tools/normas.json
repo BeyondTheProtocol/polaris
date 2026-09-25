@@ -3313,14 +3313,26 @@
   {
    "slug": "feedback-no-publicar-citas-futuras-con-lugar",
    "que": "En la web pública nunca día exacto + lugar de una cita FUTURA de {{TITULAR}}; como mucho el mes, y la fecha cuando ya ha pasado",
-   "clase": "contexto",
-   "mecanismo": "ninguno por ahora: verificacion antes de publicar. Candidata a lint-doc (test que busque fechas futuras junto a hospital o ciudad en caso.json y textos); deuda abierta",
+   "clase": "lint-doc",
+   "mecanismo": "tools/caso_publico.py::citas_futuras + tests/test_caso_publico.py (test_cita_futura_con_dia_no_se_publica)",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
    "auditable": true,
    "repetida": false,
-   "nota": "Nace el 25-sep-26 en la revisión del PR 223: /datos iba a publicar «pruebas la semana del 28-sep» y «1-oct» junto a {{CENTRO}}. Hay acoso activo. La registra otra sesión porque la que escribió la memoria ya cerró."
+   "nota": "Nace el 25-sep-26 en la revisión del PR 223: /datos iba a publicar «pruebas la semana del 28-sep» y «1-oct» junto a {{CENTRO}}. Hay acoso activo. Cubre el panel /datos: el build de caso.json falla con una fecha de día futura. Posts, correos y el resto de la web siguen dependiendo del criterio."
+  },
+  {
+   "slug": "feedback-ia-video-no-para-cifras",
+   "que": "Planos con cifras o texto clínico no se animan con IA generativa (Flow/Omni): se montan en local, fieles al píxel",
+   "clase": "contexto",
+   "mecanismo": "ninguno: criterio del montaje (revisión fotograma a fotograma contra la captura)",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace del 25-sep-26: 3 de 6 clips de Flow inventaron texto («104%»), pintaron líneas sobre un gráfico o recortaron «+8,8 %» a «8 %», con un prompt que lo prohibía. Montador local de referencia: 05 · Web/piloto-video-el-caso-en-datos (fuente de verdad)."
   }
  ]
 }

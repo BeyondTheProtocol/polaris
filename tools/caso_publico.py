@@ -42,7 +42,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -493,7 +493,79 @@ def construir(fuente, bio, web):
     fallos = web_lint.revisar_caso(publico)
     if fallos:
         raise ErrorCaso(["[%s] %s" % (c, m) for c, m in fallos])
+    futuras = citas_futuras(publico, date.today())
+    if futuras:
+        raise ErrorCaso(futuras)
     return privado, publico
+
+
+# ── ninguna cita futura con día en lo público ────────────────────────────────────────────────
+# 25-sep-2026: el panel publicó «pruebas la semana del 28-sep» y «primera dosis el 1-oct» junto al
+# hospital. Con un acosador activo, el día y el lugar de una cita futura dicen dónde encontrarla
+# (memoria feedback-no-publicar-citas-futuras-con-lugar). Solo el mes; la fecha, cuando haya pasado.
+_MESES_ES = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8,
+             "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12}
+_MESES_EN = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6, "jul": 7, "aug": 8,
+             "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+_MESES_LARGOS = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+                 "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11,
+                 "diciembre": 12, "january": 1, "february": 2, "march": 3, "april": 4, "june": 6,
+                 "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12}
+_ABREV = "|".join(sorted(set(_MESES_ES) | set(_MESES_EN), key=len, reverse=True))
+_LARGOS = "|".join(sorted(_MESES_LARGOS, key=len, reverse=True))
+_RE_FECHAS = [
+    ("iso", re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")),
+    ("dmy", re.compile(r"\b(\d{1,2})-(\d{1,2})-(\d{2}|20\d\d)\b")),  # 28-9-26
+    ("d_de_mes", re.compile(r"\b(\d{1,2}) de (%s)(?: de (20\d\d))?\b" % _LARGOS, re.I)),
+    ("d_mes", re.compile(r"\b(\d{1,2})[- ](%s|%s)\.?(?:[- ,]+(20\d\d))?\b" % (_LARGOS, _ABREV), re.I)),
+    ("mes_d", re.compile(r"\b(%s|%s)\.? (\d{1,2})(?:, (20\d\d))?\b" % (_LARGOS, _ABREV), re.I)),
+]
+
+
+def _mes(txt):
+    t = txt.lower()
+    return _MESES_LARGOS.get(t) or _MESES_ES.get(t[:3]) or _MESES_EN.get(t[:3])
+
+
+def citas_futuras(pub, hoy):
+    """Rutas y textos del público con una FECHA DE DÍA posterior a `hoy` (vacío = nada que tapar).
+    Solo el mes («oct 2026», «2026-10») no cuenta. Sin año, se asume el de `hoy`."""
+    out = []
+
+    def fecha(a, m, d):
+        try:
+            return date(a, m, d)
+        except ValueError:
+            return None
+
+    def mira(s, ruta):
+        for tipo, rx in _RE_FECHAS:
+            for g in rx.finditer(s):
+                if tipo == "iso":
+                    f = fecha(int(g[1]), int(g[2]), int(g[3]))
+                elif tipo == "dmy":
+                    a = int(g[3]); a = a + 2000 if a < 100 else a
+                    f = fecha(a, int(g[2]), int(g[1]))
+                elif tipo in ("d_de_mes", "d_mes"):
+                    f = fecha(int(g[3]) if g[3] else hoy.year, _mes(g[2]) or 0, int(g[1]))
+                else:
+                    f = fecha(int(g[3]) if g[3] else hoy.year, _mes(g[1]) or 0, int(g[2]))
+                if f and f > hoy:
+                    out.append("%s: fecha futura con día «%s» (una cita futura no se publica con su día; "
+                               "solo el mes)" % (ruta, g[0]))
+
+    def recorre(o, ruta):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k not in ("generado",):
+                    recorre(v, "%s.%s" % (ruta, k))
+        elif isinstance(o, list):
+            for i, v in enumerate(o):
+                recorre(v, "%s[%d]" % (ruta, i))
+        elif isinstance(o, str):
+            mira(o, ruta)
+    recorre(pub, "$")
+    return out
 
 
 def es_subconjunto(pub, priv, ruta="$"):
