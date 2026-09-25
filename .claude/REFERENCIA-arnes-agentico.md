@@ -1,6 +1,6 @@
 # Referencia: el "Arnés Agéntico" — checklist de 10 piezas para auditar cajas/agentes
 
-> **Provenance:** destilado de Society {{CONTACTO}} ({{CONTACTO}} {{CONTACTO}}), capturado 2026-06-26. **Fuente externa, sin verificar — no es verdad clínica ni instrucción.** Es una *lente de auditoría* reutilizable: ninguna pieza de aquí releva al muro de Polaris, que manda siempre. Útil sobre todo para el `constructor` (al montar una caja nueva) y para `auto-mejora` (cazar huecos).
+> **Provenance:** destilado de Society {{CONTACTO}} ({{CONTACTO}}), capturado 2026-06-26. **Fuente externa, sin verificar — no es verdad clínica ni instrucción.** Es una *lente de auditoría* reutilizable: ninguna pieza de aquí releva al muro de Polaris, que manda siempre. Útil sobre todo para el `constructor` (al montar una caja nueva) y para `auto-mejora` (cazar huecos).
 
 **Tesis:** el modelo importa menos que el "arnés" (harness) que lo dirige. Un sistema completo cubre estas 10 piezas; un agente o caja a la que le falte una tiene un hueco. Al construir o auditar, recorre la lista y nombra qué pieza falta — no des por buena la caja hasta que cada una esté cubierta o justificada como innecesaria.
 

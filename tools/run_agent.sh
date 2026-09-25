@@ -548,7 +548,7 @@ _devolver_casa_a_master() {
 trap '_devolver_casa_a_master' EXIT
 
 # --- CANARIO DEL MURO (P9, 25-sep-26) ------------------------------------------------------
-# Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 # La doc oficial (https://code.claude.com/docs/en/headless) anuncia que `--bare` será el modo por
 # defecto de `-p`, y `--bare` no carga hooks: el muro_guard PreToolUse desaparecería SIN ERROR.
 # El hook SessionStart .claude/hooks/canario_muro.sh (en cada settings del lazo) deja un testigo

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """test_gate_escalera.py — la escalera del gate (P2, 25-sep-26) no puede mentir sobre la cota
-ni proponer subir un check sin datos. Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su
+ni proponer subir un check sin datos. Idea de {{CONTACTO}} (https://contacto), con su
 agente KAI, revisión del 25-sep-2026.
 
 Aísla el estado en un `BTP_STATE_DIR` temporal antes de importar (nunca toca el log vivo).

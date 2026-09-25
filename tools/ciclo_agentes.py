@@ -295,7 +295,7 @@ def cerrar(dias=7, ahora=None):
 
 
 
-# ── dónde se atascó (destilado de {{CONTACTO}} {{CONTACTO}}, 20-sep-26) ────────────────────────────────
+# ── dónde se atascó (destilado de {{CONTACTO}}, 20-sep-26) ────────────────────────────────
 # Su punto: antes de darle OTRA herramienta a un agente que falla, mira DÓNDE se atasca. No es
 # lo mismo no entender el encargo, que no poder ejecutarlo, que perder el hilo a mitad — son tres
 # arreglos distintos, y el reflejo de añadir un MCP más no cura ninguno. Aquí ya guardábamos el

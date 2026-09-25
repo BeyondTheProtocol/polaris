@@ -59,7 +59,7 @@ runpy test_stdin_canalizado.py
 runpy test_bash_return_explicito.py
 runpy test_casa_base_guard.py
 runpy test_gate_etiqueta.py
-runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} {{CONTACTO}} + KAI)
+runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numérico (idea de {{CONTACTO}} + KAI)
 runpy test_gate_citas.py
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
@@ -351,6 +351,8 @@ runpy test_estado_rutina.py               # 24-sep · issue #4 (PR #22 de fuera,
 runpy test_rutinas_latido.py              # 25-sep · cadencia real + periodo declarado + cola del comité ({{CONTACTO}}+KAI)
 runpy test_audit_agentes_daemon.py
 runpy test_publicar_fuga.py
+runpy test_publicar_personas.py  # ficha de persona `alto`: ni su apellido ni su ficha salen al espejo
+runpy test_espejo_reiniciar_historial.py  # reiniciar el historial del espejo: ensayo por defecto, sin la palabra no empuja
 runpy test_publicar_overlay_casa_base.py
 runpy test_publicar_sync.py
 runpy test_publicar_sync_candado.py  # dos publicaciones a la vez NO se pisan el árbol

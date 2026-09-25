@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """tools/digest.py — compila el DIGEST sanitizado del proyecto para sincronizar el RAG de
-Alby (@RealTitular) POR CHAT, sin fuga.
+{{CONTACTO}} (@RealTitular) POR CHAT, sin fuga.
 
 Principio (el muro): por el chat del bot va SOLO estado/estrategia (coordinación). El bot
-es un canal PRIVADO de confianza (Alby, hecho para {{TITULAR}}) → los términos estratégicos
+es un canal PRIVADO de confianza ({{CONTACTO}}, hecho para {{TITULAR}}) → los términos estratégicos
 ('vacuna', 'neoantígenos', nombres de ensayo, el médico de la biopsia) SÍ pueden ir (ella
-ya aprobó un digest con ellos el 21/6, y Alby ya alimenta al bot con el caso). Lo que NUNCA
-puede salir por el chat (nube de Telegram + caja de Alby SIN vetar): **PII clínica CRUDA** —
+ya aprobó un digest con ellos el 21/6, y {{CONTACTO}} ya alimenta al bot con el caso). Lo que NUNCA
+puede salir por el chat (nube de Telegram + caja de {{CONTACTO}} SIN vetar): **PII clínica CRUDA** —
 genes/biomarcadores nombrados, variantes genómicas (HGVS/VCF/HLA), teléfonos, y el contenido
 de `_PRIVADO_*`. Por eso este módulo:
 

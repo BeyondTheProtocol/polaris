@@ -106,7 +106,7 @@ def _sellar_envio(texto, instr):
     """Sella en el ledger del borde un evento `enviado` por cada texto que Jev ya recibió.
     Aquí pasan TODAS las rutas (triaje, --n1, orden y encaje del radar), así ninguna sale sin
     rastro: antes `bench` y `bench_n1` enviaban sin sellar. Solo metadatos: ruta y hash corto.
-    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026."""
     ruta = {INSTR_N1: "n1", INSTR_RADAR: "radar-orden"}.get(instr, "triage")
     borde._sellar({"evento": "enviado", "destino": DESTINO_N1, "ruta": ruta,
                    "sello": hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]})

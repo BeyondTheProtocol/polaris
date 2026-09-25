@@ -8,7 +8,7 @@ Tres fallos de la misma clase, «el vigía mira un número que no es el real»:
      «ok» no avisaba nunca. Aquí se comprueba que el periodo declarado cuadra con su plist.
   3. `radar_ned_diario._ya_hay_job_del_comite` buscaba en `running/`, que la cola no tiene.
 
-Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 """
 import json
 import os

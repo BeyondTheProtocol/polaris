@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_radar_personas.py — que un gemelo de criterio no pueda dejar de aprender EN SILENCIO.
 
-POR QUÉ EXISTE (20-sep-2026). El radar de {{CONTACTO}} {{CONTACTO}} (`consejero-arquitectura`) estuvo
+POR QUÉ EXISTE (20-sep-2026). El radar de {{CONTACTO}} (`consejero-arquitectura`) estuvo
 **86 días sin un solo pase**: `Radar-{{CONTACTO}}.md` no se tocó desde el cableado del 26-jun. La causa
 real estaba escrita en el log ({{CONTACTO}} no tiene X; sus canales piden WebFetch, que el perfil
 autónomo del muro no permite), pero el sistema **nunca lo cantó**, porque una pasada sin nada que
@@ -116,7 +116,7 @@ class DeltaYCarriles(unittest.TestCase):
         self.assertEqual(f["resultado"], "bloqueado")
 
     def test_no_respuesta_de_grok_es_bloqueado_no_novedad(self):
-        """20-sep-26, en vivo con @{{CONTACTO}}Masip: grok contestó «no se especificó ningún perfil»
+        """20-sep-26, en vivo con @{{CONTACTO}}: grok contestó «no se especificó ningún perfil»
         con rc=0, y el radar lo contó como NOVEDAD porque el texto era nuevo. Una no-respuesta
         que cambia de huella cada pase es una tool mintiendo éxito."""
         class _R:
@@ -137,8 +137,8 @@ class DeltaYCarriles(unittest.TestCase):
         def _run(cmd, **kw):
             visto["prompt"] = cmd[-1]
             return _R()
-        radar_personas._pase_grok({"handle": "{{CONTACTO}}Masip", "prompt": "lo ultimo"}, {}, run=_run)
-        self.assertIn("@{{CONTACTO}}Masip", visto["prompt"])
+        radar_personas._pase_grok({"handle": "{{CONTACTO}}", "prompt": "lo ultimo"}, {}, run=_run)
+        self.assertIn("@{{CONTACTO}}", visto["prompt"])
 
     def test_el_estado_NUNCA_persiste_el_contenido_externo(self):
         """Regla de {{TITULAR}} (20-sep-26): «que TÚ aprendas, no tienes por qué guardar nada, solo el

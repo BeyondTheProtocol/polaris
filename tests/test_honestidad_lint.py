@@ -28,13 +28,13 @@ print("TEST honestidad_lint")
 ok(H._selftest() == 0, "selftest interno en verde")
 
 # (2) caza el claim real del 28/6
-caso = "Baifo es una caja negra single-author con telemetría sin documentar."
+caso = "{{CONTACTO}} es una caja negra single-author con telemetría sin documentar."
 ok(len(H.lint_text(caso)) >= 1, "marca el claim falso real (caja negra/telemetría sin sello)")
 
 # (3) NO lo marca con sello declarado
 ok(len(H.lint_text(caso + " [supuesto: red-team sin verificar]")) == 0,
    "no marca el mismo claim con [supuesto]")
-ok(len(H.lint_text("Auditado: cero telemetría [verificado: github.com/achetronic/baifo].")) == 0,
+ok(len(H.lint_text("Auditado: cero telemetría [verificado: github.com/achetronic/contacto].")) == 0,
    "no marca un claim con [verificado] + fuente")
 
 # (4) líneas neutras y tituladas no se marcan

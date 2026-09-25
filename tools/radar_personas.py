@@ -2,7 +2,7 @@
 """radar_personas.py — los GEMELOS DE CRITERIO se mantienen frescos (o cantan que no).
 
 Generaliza `radar_contacto.py` a los N consejeros que son espejo de una persona real
-({{CONTACTO}}, Alby, {{CONTACTO}}, Sid, {{CONTACTO}}). NO es un daemon nuevo: es el ayudante determinista que
+({{CONTACTO}}, {{CONTACTO}}, {{CONTACTO}}, Sid, {{CONTACTO}}). NO es un daemon nuevo: es el ayudante determinista que
 `auto-mejora` (o el propio consejero) invoca en su pase.
 
 POR QUÉ EXISTE (20-sep-2026). El radar de {{CONTACTO}} llevaba **86 días sin un solo pase**:
@@ -178,7 +178,7 @@ def _pase_local(fuente, estado_fuente):
 # Grok contesta con rc=0 y texto plausible aunque NO haya mirado nada: «no se especificó ningún
 # perfil», «no se encontraron posts». Sin esto, esa no-respuesta cambia de huella cada vez y el
 # radar la cuenta como NOVEDAD — una tool que miente éxito, justo lo que este módulo existe para
-# impedir. Verificado en vivo el 20-sep-26 con @{{CONTACTO}}Masip.
+# impedir. Verificado en vivo el 20-sep-26 con @{{CONTACTO}}.
 NO_RESPUESTA = (
     "no se especific", "no se indic", "no se proporcion", "no es posible acceder",
     "no se encontraron posts", "no se han encontrado", "no tengo acceso",
@@ -233,7 +233,7 @@ def _pase_yt(fuente, estado_fuente, run=subprocess.run):
     Es API pura por urllib: **vive en modo autónomo**, sin WebFetch ni navegador. Devuelve
     títulos + fechas + enlaces de los vídeos NUEVOS; el vídeo no se toca. Lo que el agente haga
     con ellos (abrir uno y aprender de él) es suyo — aquí solo se detecta el delta.
-    Verificado en vivo el 20-sep-26 con @contacto.contacto (220 vídeos, publica casi a diario).
+    Verificado en vivo el 20-sep-26 con @contacto (220 vídeos, publica casi a diario).
     """
     canal = fuente.get("handle") or fuente.get("canal_id") or ""
     if not canal:

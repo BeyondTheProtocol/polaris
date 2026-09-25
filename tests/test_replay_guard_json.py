@@ -73,5 +73,26 @@ veredictos = sorted(RG.juzga(json_hook, env, f["cmd"], f["tool"], f.get("cwd", "
                     for f in filas)
 ok(veredictos == ["ALLOW", "DENY"], "replay de punta a punta: un DENY y un ALLOW", repr(veredictos))
 
+# El replay no escribe en el estado VIVO (25-sep-26). Antes `salida_guard` volcaba cada veredicto
+# del replay al `salida_guard.jsonl` real y leía el `ok_envio.json` real (podía gastar el permiso de
+# un solo uso de {{TITULAR}}). Primero se mira el entorno: si no está aislado, NO se lanza el hook de
+# verdad, para que el propio test no ensucie el log que protege.
+import _casa                    # noqa: E402
+logdir = tempfile.mkdtemp(prefix="replay-state-")
+env_r = RG._entorno(logdir)
+aislado = env_r.get("BTP_STATE_DIR", "").startswith(logdir + os.sep)
+ok(aislado, "el replay corre con BTP_STATE_DIR dentro de su carpeta temporal",
+   repr(env_r.get("BTP_STATE_DIR")))
+if aislado:
+    vivo = os.path.join(_casa.state_dir(), "salida_guard.jsonl")
+    antes = os.path.getsize(vivo) if os.path.exists(vivo) else -1
+    real = os.path.join(RAIZ, ".claude", "hooks", "salida_guard.py")
+    v = RG.juzga(real, env_r, "gh pr merge 1 --repo prueba/replay", "Bash", "/tmp", "default")[0]
+    ok(v == "DENY", "el salida_guard real deniega el merge en el replay", v)
+    despues = os.path.getsize(vivo) if os.path.exists(vivo) else -1
+    ok(antes == despues, "el log vivo de salida_guard no crece con el replay", "%s → %s" % (antes, despues))
+    ok(os.path.exists(os.path.join(env_r["BTP_STATE_DIR"], "salida_guard.jsonl")),
+       "el veredicto queda en el log aislado")
+
 print("\ntest_replay_guard_json: %d fallos" % fallos)
 sys.exit(1 if fallos else 0)

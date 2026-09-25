@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""tools/mcp_server.py — Servidor MCP propio de Polaris (Fase 2 de la migración Baifo=cara).
+"""tools/mcp_server.py — Servidor MCP propio de Polaris (Fase 2 de la migración {{CONTACTO}}=cara).
 
-Expone SOLO las herramientas NO-CLÍNICAS de Polaris a Baifo (u otro cliente MCP) vía transporte
+Expone SOLO las herramientas NO-CLÍNICAS de Polaris a {{CONTACTO}} (u otro cliente MCP) vía transporte
 stdio estándar. El cliente JAMÁS ve nada clínico/sensible: la allowlist es CERRADA y fail-closed.
 
 Guardarraíles (el muro manda SIEMPRE):
@@ -16,16 +16,16 @@ Guardarraíles (el muro manda SIEMPRE):
 Transporte: stdio (estándar MCP). El proceso corre como hijo del cliente.
 SDK: mcp (≥1.28) — vía .venv-consensus (la que ya tiene el SDK instalado).
 
-NO enciende nada. NO crea plist. NO modifica config de Baifo.
+NO enciende nada. NO crea plist. NO modifica config de {{CONTACTO}}.
 
-Para conectar Baifo (línea que {{TITULAR}} aprobaría en su config — NO aplicar aquí):
+Para conectar {{CONTACTO}} (línea que {{TITULAR}} aprobaría en su config — NO aplicar aquí):
     mcps:
       - name: polaris
         command: /Users/titular/claudecode/.venv-consensus/bin/python3
         args: [/Users/titular/claudecode/tools/mcp_server.py]
         env: {}
 
-Cómo probar sin Baifo (stdio):
+Cómo probar sin {{CONTACTO}} (stdio):
     echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | \\
         /Users/titular/claudecode/.venv-consensus/bin/python3 tools/mcp_server.py
 

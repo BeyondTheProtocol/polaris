@@ -219,7 +219,7 @@ def main():
                body="# Donaciones\nApoya mi tratamiento, la vacuna personalizada.\n")
     check("A13 'vacuna' ya NO es léxico prohibido", "A13" not in codes("a13v", "FAIL"))
     write_caja(fvia, "a13b", fm={"visibilidad": "publica", "rag_scope": "public"},
-               body="# Contacto\nLlama al 619718173 para donar.\n")
+               body="# Contacto\nLlama al 600000000 para donar.\n")
     check("A13 PII (teléfono) en pública", "A13" in codes("a13b", "FAIL"))
 
     # ── Regresiones del pase adversarial (bypasses cazados) ──────────────────

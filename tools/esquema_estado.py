@@ -14,7 +14,7 @@ queda en el fichero, se cuenta en los totales y desaparece de los avisos. Un pen
 es peor que un pendiente: parece que está vigilado.
 
 Idea original: «fuerza un esquema entre el agente y la base de datos, no te fíes de la frase»
-(destilado de {{CONTACTO}} {{CONTACTO}}, 20-sep-26). Aquí la aplicación es al revés de lo esperado — la
+(destilado de {{CONTACTO}}, 20-sep-26). Aquí la aplicación es al revés de lo esperado — la
 validación ya estaba; lo que faltaba era **comprobar que nadie la rodea**.
 
 Uso:

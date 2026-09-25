@@ -52,7 +52,7 @@ intento**, sin discusión. Lo que se añade es el otro caso, el que se resolvía
   un modelo más caro no lo arregla — lo arregla un encargo mejor. Si es *retomar*, tampoco:
   eso es contexto. Solo el atasco de *ejecución* mejora subiendo de modelo.
 
-Origen: destilado de los 201 vídeos de {{CONTACTO}} {{CONTACTO}} (20-sep-26), cruzado con nuestros propios
+Origen: destilado de los 201 vídeos de {{CONTACTO}} (20-sep-26), cruzado con nuestros propios
 números. **No anula el carve-out:** si algo pedía máxima potencia y no se puede, se BLOQUEA y se
 avisa — nunca se degrada en silencio.
 

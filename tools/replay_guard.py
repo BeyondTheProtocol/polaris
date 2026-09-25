@@ -100,6 +100,12 @@ def _entorno(logdir):
     e = dict(os.environ)
     e["CLAUDE_PROJECT_DIR"] = logdir
     e["BTP_REPO"] = CASA_BASE
+    # Estado aislado (25-sep-26). Sin esto `salida_guard` escribía cada veredicto del replay en el
+    # `salida_guard.jsonl` REAL (977 «denegados» falsos en 3,5 días frente a 17 reales: el log dejó
+    # de valer como medida) y leía el `ok_envio.json` real, así que un replay podía GASTAR el
+    # permiso de un solo uso que {{TITULAR}} acababa de abrir. Medido al planear P3 (firmas por niveles).
+    e["BTP_STATE_DIR"] = os.path.join(logdir, "state")
+    os.makedirs(e["BTP_STATE_DIR"], exist_ok=True)
     e.pop("MURO_ALLOW_CLINICAL", None)     # el bypass falsearía todo el replay
     return e
 

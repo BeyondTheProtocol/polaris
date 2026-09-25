@@ -1,6 +1,6 @@
 #!/bin/bash
 # SessionStart hook del lazo (settings.autonomous / quarantine / los BTP_SETTINGS): CANARIO DEL MURO.
-# Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 #
 # Deja un testigo con el nonce que run_agent.sh le pasa por entorno. Si el testigo NO aparece,
 # Claude Code no cargó los hooks del --settings (p. ej. `--bare` por defecto en `-p`, anunciado en

@@ -57,7 +57,7 @@ releases. El muro manda: nada hacia fuera, sin push.
 - Recall activo de memoria en el chat (SessionStart brújula NED + memorias relevantes por prompt)
 - Vigía de roster: caza el daemon KeepAlive caído sin avisar (autofix kickstart, escala si no revive)
 - Auto-recover de jobs caídos por schema-desconocido, con freno anti-bucle
-- Agente alby (consejero de arneses locales) + dossier + skills de Alby destiladas (humanizer a voz, calidad de código Python, AGENTS.md)
+- Agente contacto (consejero de arneses locales) + dossier + skills de {{CONTACTO}} destiladas (humanizer a voz, calidad de código Python, AGENTS.md)
 - _merge_ `06ffde5f`
 
 ## v2026.06.27-4 — Regla inquebrantable: proteger el goal incluso de {{TITULAR}} (muro)

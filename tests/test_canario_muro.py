@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_canario_muro.py — si Claude Code deja de cargar los hooks del muro, el lazo falla CERRADO.
 
-POR QUÉ EXISTE (P9, 25-sep-2026). Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI,
+POR QUÉ EXISTE (P9, 25-sep-2026). Idea de {{CONTACTO}} (https://contacto), con su agente KAI,
 revisión del 25-sep-2026. La doc oficial de Claude Code (https://code.claude.com/docs/en/headless)
 dice que `--bare` «will become the default for -p in a future release», y `--bare` no carga hooks:
 el muro_guard PreToolUse desaparecería sin error y la rutina correría sin muro, en silencio.

@@ -231,7 +231,7 @@ class DondeSeAtasca(unittest.TestCase):
         os.environ.pop("BTP_STATE_DIR", None)
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    """Destilado de {{CONTACTO}} {{CONTACTO}} (20-sep-26): antes de dar OTRA herramienta a un agente que
+    """Destilado de {{CONTACTO}} (20-sep-26): antes de dar OTRA herramienta a un agente que
     falla, mira DÓNDE se atasca — entender el encargo, ejecutarlo, o retomar el hilo. Son tres
     arreglos distintos y añadir un MCP más no cura ninguno. El motivo ya se guardaba; esto lo
     agrupa para poder responder la pregunta con datos."""

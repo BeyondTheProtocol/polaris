@@ -170,7 +170,8 @@ EXCLUIR_PAT = (
 
 # ── La despersonalización. Orden importa: lo más largo primero. ──────────────────────────
 def _titular(clave):
-    """Datos del titular desde el overlay (`nombre`, `apellidos`, `nacimiento`, `contactos`).
+    """Datos del titular desde el overlay (`nombre`, `apellidos`, `nacimiento`, `contactos`,
+    `telefonos`).
 
     No pueden vivir en este fichero: `publicar.py` se publica a sí mismo, así que llevarlos
     aquí lo convierte en la ficha que pretende borrar — el mismo fallo que tenían los
@@ -252,6 +253,121 @@ def _nombres_de_terceros():
     return tuple(sorted(nombres, key=len, reverse=True))
 
 
+# ── Fichas de persona: cada una declara su anonimato, y el espejo lo cumple solo ─────────
+# 25-sep-2026, FUGA REAL: una ficha de `tools/config/personas/` que pide no nombrar a esa
+# persona salió al espejo con el nombre de pila tapado y el APELLIDO en claro (en `persona`,
+# en el handle y en la URL de su perfil). La deny-list solo tapaba lo que alguien había
+# copiado a mano en `nombres.local.json`, y el apellido nunca se copió. El arreglo es de
+# CLASE: la ficha es la fuente de verdad de esa persona, así que la ficha aporta sus nombres.
+#   · `anonimato: "alto"`   → nombre completo, cada palabra de `persona`, handles y URL de
+#                              perfil van a `{{CONTACTO}}` y entran en el barrido final.
+#   · `anonimato: "publico"`→ figura pública; su ficha puede salir tal cual.
+#   · sin campo o con otro valor → NO se publica nada (rc=3). Una ficha nueva sin nivel es
+#     justo cómo se cuela la siguiente fuga.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+PERSONAS_DIR = os.path.join("tools", "config", "personas")
+NIVELES_ANONIMATO = ("alto", "publico")
+_CLAVES_IDENTIDAD = ("handle", "url", "email", "telefono")
+_TILDES = {"a": "aáàäâ", "e": "eéèëê", "i": "iíìïî", "o": "oóòöô", "u": "uúùüû", "n": "nñ", "c": "cç"}
+
+
+def _fichas_personas():
+    """[(ruta relativa, dict o None si no se puede leer)] de las fichas versionadas o no."""
+    base = os.path.join(ROOT, PERSONAS_DIR)
+    try:
+        nombres = sorted(f for f in os.listdir(base) if f.endswith(".json"))
+    except OSError:
+        return []
+    out = []
+    for f in nombres:
+        try:
+            with io.open(os.path.join(base, f), encoding="utf-8") as fh:
+                d = json.load(fh)
+        except (OSError, ValueError):
+            d = None
+        out.append((os.path.join(PERSONAS_DIR, f), d if isinstance(d, dict) else None))
+    return out
+
+
+def _personas_sin_cubrir():
+    """Las fichas que el espejo no sabe tratar: ilegibles, sin `anonimato` válido, o `alto`
+    sin `persona`. Cualquiera de ellas bloquea la publicación entera."""
+    malas = []
+    for rel, d in _fichas_personas():
+        if d is None:
+            malas.append("%s → no es un JSON legible" % rel)
+        elif d.get("anonimato") not in NIVELES_ANONIMATO:
+            malas.append("%s → falta `anonimato` (%s)" % (rel, " | ".join(NIVELES_ANONIMATO)))
+        elif d["anonimato"] == "alto" and not str(d.get("persona") or "").strip():
+            malas.append("%s → `anonimato: alto` sin `persona`" % rel)
+    return malas
+
+
+def _valores_identidad(x):
+    """Handles, URLs, correos y teléfonos, estén al nivel que estén de la ficha."""
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k in _CLAVES_IDENTIDAD and isinstance(v, str) and v.strip():
+                yield v.strip()
+            else:
+                yield from _valores_identidad(v)
+    elif isinstance(x, list):
+        for v in x:
+            yield from _valores_identidad(v)
+
+
+def _terminos_de_personas():
+    """Lo que las fichas `alto` mandan tapar, del más largo al más corto."""
+    terminos = set()
+    for _rel, d in _fichas_personas():
+        if not d or d.get("anonimato") != "alto":
+            continue
+        persona = " ".join(str(d.get("persona") or "").split())
+        if persona:
+            terminos.add(persona)
+            terminos |= {t for t in persona.split() if len(t) >= 2}
+        for v in _valores_identidad(d):
+            if "://" in v:
+                # de la URL de perfil se veta el último tramo (el handle), no el dominio
+                v = v.rstrip("/").rsplit("/", 1)[-1]
+            v = v.lstrip("@")
+            if len(v) >= 3:
+                terminos.add(v)
+    return tuple(sorted(terminos, key=lambda t: (-len(t), t)))
+
+
+def _sin_tildes(t):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
+def _rx_termino(t):
+    """El patrón de un término de ficha. Largos (≥4): sin distinguir mayúsculas ni tildes
+    (la misma persona sale como «{{CONTACTO}}» y «{{CONTACTO}}»), también justo tras `\\b` o `_`,
+    y pegados por delante de una Mayúscula, un `_` o un dígito (`ApellidoBot`, `apellido_ok`)
+    pero NO de una minúscula: así «Madrid» no cae por contener un nombre de pila. Cortos
+    (<4): colisionan con código (`zipfile.ZipFile`), así que solo casan con la grafía exacta
+    de la ficha y como palabra suelta."""
+    if len(t) < 4:
+        return re.compile(r"(?<![A-Za-z0-9])%s(?![A-Za-z0-9])" % re.escape(t))
+    cuerpo = "".join(
+        "[%s]" % _TILDES[c.lower()] if c.lower() in _TILDES else (r"\s+" if c.isspace() else re.escape(c))
+        for c in _sin_tildes(t))
+    return re.compile(r"(?:(?<=\\b)|(?<![A-Za-z0-9áéíóúñÁÉÍÓÚÑ]))%s(?-i:(?![a-záéíóúñ]))" % cuerpo, re.I)
+
+
+def _contacto_pegado(m):
+    """Como `_contacto`, pero sin llaves si el término va pegado a un identificador: dentro
+    de `ApellidoBot` o `apellido_ok`, `{{CONTACTO}}` deja de ser código válido."""
+    t = m.group(0)
+    s, j = m.string, m.end()
+    if t.isupper():
+        return "CONTACTO"
+    if t.islower():
+        return "contacto"
+    return "Contacto" if (j < len(s) and (s[j].isalnum() or s[j] == "_")) else "{{CONTACTO}}"
+
+
 def _contacto(m):
     """Los nombres viven también DENTRO de identificadores (`contacto_ok`,
     `INVARIANTES_..._CONTACTO`): ahí `{{CONTACTO}}` no es Python válido. Se conserva la forma
@@ -305,6 +421,10 @@ SUSTITUCIONES = (
     (re.compile(r"%s%s,?\s*" % (_TRAS, re.escape(a)), re.I), "") for a in _titular("apellidos")
 ) + tuple(
     (re.compile(p_, re.I), "{{FECHA_NAC}}") for p_ in _titular("nacimiento")
+) + tuple(
+    # Las fichas de persona con `anonimato: alto` (ver `_terminos_de_personas`). Van ANTES
+    # que la deny-list: el nombre completo tiene que caer entero, no a trozos.
+    (_rx_termino(t), _contacto_pegado) for t in _terminos_de_personas()
 ) + tuple(
     # Los nombres de terceros (contactos, colaboradores, médicos), del overlay.
     # Por defecto van SIN distinguir mayúsculas: un nombre corto metido dentro de un detector
@@ -388,6 +508,15 @@ def _vetados_del_titular():
             pass
     for c in _titular("contactos"):
         out.append(re.compile(r"%s%s\b" % (_TRAS, re.escape(c)), re.I))
+    # Sus teléfonos (25-sep-2026: su móvil salió en un fixture de test, publicado desde el
+    # primer commit del espejo). Solo se vetan: si aparece uno, se cambia por uno de pega a
+    # mano. Se toleran espacios, puntos y guiones entre cifras, y el +34 delante.
+    for t in _titular("telefonos"):
+        cifras = re.sub(r"\D", "", str(t))[-9:]
+        if len(cifras) == 9:
+            out.append(re.compile(r"(?<!\d)%s(?!\d)" % r"[\s.\-]?".join(cifras)))
+    # Y lo que mandan tapar las fichas de persona: si sobrevive uno, no se publica.
+    out.extend(_rx_termino(t) for t in _terminos_de_personas())
     return tuple(out)
 
 
@@ -442,7 +571,25 @@ def _entra(rel):
     partes = rel.split(os.sep)
     if any(_excluido(p) for p in partes):
         return False
+    if rel in _fichas_alto():
+        # La ficha `alto` ES el dossier de alguien que pidió no salir (sus canales, sus rutas
+        # de digest, lo que se mina de él): tapar el nombre no la hace publicable.
+        return False
     return partes[0] in INCLUIR
+
+
+def _fichas_alto():
+    return frozenset(rel for rel, d in _fichas_personas() if d and d.get("anonimato") == "alto")
+
+
+def _colisiones(entran):
+    """Rutas de origen distintas que acaban en el MISMO fichero público. 25-sep-2026: varias
+    fichas de persona se renombraban todas a `contacto.json` y la última pisaba a las demás
+    en silencio. Publicar algo distinto de lo que se barrió no es publicar: se aborta."""
+    destinos = {}
+    for rel in entran:
+        destinos.setdefault(despersonalizar(rel, con_perfil=False), []).append(rel)
+    return sorted((d, len(o)) for d, o in destinos.items() if len(o) > 1)
 
 
 def _coser_runner(texto):
@@ -516,7 +663,17 @@ def _overlay_ok():
         faltan.append("tools/perfil.local.json → sustituciones")
     if not _nombres_de_terceros():
         faltan.append("tools/nombres.local.json → nombres")
+    faltan.extend(_personas_sin_cubrir())
     return faltan
+
+
+def _vaciar(destino):
+    """Borra el árbol derivado y conserva `.git`: el árbol se deriva; el repo que lo aloja, no."""
+    for hijo in os.listdir(destino):
+        if hijo == ".git":
+            continue
+        ruta = os.path.join(destino, hijo)
+        shutil.rmtree(ruta) if os.path.isdir(ruta) and not os.path.islink(ruta) else os.remove(ruta)
 
 
 def publicar(destino, forzar=False):
@@ -534,14 +691,18 @@ def publicar(destino, forzar=False):
         # Borrar el destino entero se llevaba por delante su `.git`: el repo publicado
         # perdía historial y remote en cada regeneración, y había que rehacerlo y empujar
         # con --force. El árbol se deriva; el repo que lo aloja, no.
-        for hijo in os.listdir(destino):
-            if hijo == ".git":
-                continue
-            ruta = os.path.join(destino, hijo)
-            shutil.rmtree(ruta) if os.path.isdir(ruta) else os.remove(ruta)
+        _vaciar(destino)
     os.makedirs(destino, exist_ok=True)
 
     entran = [r for r in versionados() if _entra(r)]
+    choques = _colisiones(entran)
+    if choques:
+        # Los orígenes no se imprimen: el nombre de fichero original es justo lo que se tapa.
+        print("🔴 NO se publica: %d ruta(s) pública(s) con varios orígenes" % len(choques),
+              file=sys.stderr)
+        for destino_rel, n in choques:
+            print("   %s ← %d ficheros" % (destino_rel, n), file=sys.stderr)
+        return 1
     for rel in entran:
         _copiar_uno(rel, destino)
     n = len(entran)
@@ -562,7 +723,9 @@ def publicar(destino, forzar=False):
             print("   %s → %s" % (rel, ", ".join(hits)), file=sys.stderr)
         if len(sucios) > 25:
             print("   … y %d más" % (len(sucios) - 25), file=sys.stderr)
-        shutil.rmtree(destino)   # fail-closed: nada a medias
+        # fail-closed: nada a medias. Pero el `.git` del destino se queda: es el clon del
+        # espejo, con su historial y su remoto (25-sep-2026: un veto borraba el repo entero).
+        _vaciar(destino)
         return 1
 
     print("\n✅ %d ficheros en %s · barrido limpio (%d patrones vetados)"

@@ -6,7 +6,7 @@ Bash) y el paso 7 de `.claude/agents/auto-mejora.md`: romperlo dejaría a la rut
 ayudante y, peor, en silencio.
 
 Qué cambió (20-sep-2026): el radar de una sola persona se generalizó a los N gemelos de
-criterio ({{CONTACTO}}, Alby, {{CONTACTO}}, Sid, {{CONTACTO}}) con estado persistido y, sobre todo, con la
+criterio ({{CONTACTO}}, {{CONTACTO}}, {{CONTACTO}}, Sid, {{CONTACTO}}) con estado persistido y, sobre todo, con la
 distinción que faltaba entre «sin novedad» y «carril bloqueado» — el agujero por el que este
 radar se pasó 86 días sin un solo pase sin que nadie se enterara. Ver `radar_personas.py`.
 

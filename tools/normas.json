@@ -53,7 +53,7 @@
    "aplicable": true,
    "auditable": true,
    "repetida": true,
-   "nota": "22-sep-26: ampliado de solo-correo (0 disparos en 2.032 turnos reales) a cualquier objeto con herramienta. Replay (tools/replay_gate.py, 14 dias): 11 disparos, 9 aciertos, 2 dudosos (82 %). El umbral acordado para bloqueo era 90 %. Promovido a BLOQUEO el 22-sep-26 por decision de {{TITULAR}} (82 %, bajo el umbral): un falso positivo cuesta una reescritura; no bloquear le cuesta volver a corregirlo. · 25-sep-26 (escalera P2, idea de {{CONTACTO}} {{CONTACTO}} + KAI): el comité verificacion demostró FP sobre límites reales dichos con su prueba («inicio de sesión», «limita a 25 MB», «error 550», rodeo propio); bloquearlos empuja a borrar el límite = mentir por omisión. Arreglado en _DELEGA_LEGITIMO/_LIMITE_REAL/_RODEO_PROPIO con canarios en tests/test_gate_salida.py. Se queda en bloqueo con esa condición; tools/gate_escalera.py propone bajar si 3 FP seguidos o cota > 30 % con ≥20 etiquetados.",
+   "nota": "22-sep-26: ampliado de solo-correo (0 disparos en 2.032 turnos reales) a cualquier objeto con herramienta. Replay (tools/replay_gate.py, 14 dias): 11 disparos, 9 aciertos, 2 dudosos (82 %). El umbral acordado para bloqueo era 90 %. Promovido a BLOQUEO el 22-sep-26 por decision de {{TITULAR}} (82 %, bajo el umbral): un falso positivo cuesta una reescritura; no bloquear le cuesta volver a corregirlo. · 25-sep-26 (escalera P2, idea de {{CONTACTO}} + KAI): el comité verificacion demostró FP sobre límites reales dichos con su prueba («inicio de sesión», «limita a 25 MB», «error 550», rodeo propio); bloquearlos empuja a borrar el límite = mentir por omisión. Arreglado en _DELEGA_LEGITIMO/_LIMITE_REAL/_RODEO_PROPIO con canarios en tests/test_gate_salida.py. Se queda en bloqueo con esa condición; tools/gate_escalera.py propone bajar si 3 FP seguidos o cota > 30 % con ≥20 etiquetados.",
    "modo": "bloqueo",
    "escalera": {
     "clase": "suprime_info",
@@ -3289,6 +3289,30 @@
    "auditable": true,
    "repetida": false,
    "nota": "Nace del 25-sep-26: «En cribado de TROPION-Breast06» con «lo dice {{TITULAR}}» cuando ya había firmado y había correo de la coordinadora del estudio."
+  },
+  {
+   "slug": "feedback-pr-aprobado-fusion-sin-preguntar",
+   "que": "Si {{TITULAR}} aprueba un PR, mergeo y fusiono lo que cuelgue de él sin volver a preguntar; si entran commits nuevos, se revisan y, limpios, se mergea igual",
+   "clase": "contexto",
+   "mecanismo": "ninguno: la memoria, por recall, al cerrar un PR web; el guard --match-head-commit sigue impidiendo mergear un head no revisado",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace el 25-sep-26 (PR 223/224/225): tras aprobar, se le volvió a preguntar «¿lo mergeo?» varias veces. Es criterio (qué cuenta como aprobado y qué commits posteriores lo invalidan), no un texto que un hook pueda bloquear."
+  },
+  {
+   "slug": "feedback-no-publicar-citas-futuras-con-lugar",
+   "que": "En la web pública nunca día exacto + lugar de una cita FUTURA de {{TITULAR}}; como mucho el mes, y la fecha cuando ya ha pasado",
+   "clase": "contexto",
+   "mecanismo": "ninguno por ahora: verificacion antes de publicar. Candidata a lint-doc (test que busque fechas futuras junto a hospital o ciudad en caso.json y textos); deuda abierta",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace el 25-sep-26 en la revisión del PR 223: /datos iba a publicar «pruebas la semana del 28-sep» y «1-oct» junto a {{CENTRO}}. Hay acoso activo. La registra otra sesión porque la que escribió la memoria ya cerró."
   }
  ]
 }

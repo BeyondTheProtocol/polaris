@@ -167,7 +167,7 @@ ESTADOS_HB_SANOS = {"ok", "gate_sin_novedad", "ok_sin_novedad", "centralita", "r
 # plist, más holgura para lo que tarda la pasada. Con eso `estado_rutina.clasificar` caza la rutina
 # que deja de correr sin fallar (su último latido sigue en «ok» y el watchdog de abajo no la veía).
 # tests/test_healthcheck.py comprueba que periodo_h no es menor que el hueco real de su plist.
-# Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 RUTINAS_NED = (
     {"agente": "auto-mejora",   "label": "la auto-mejora del sistema (lun/mié/vie/dom)",
      "plist": "com.btp.auto-mejora", "periodo_h": 48, "margen_h": 6},
@@ -570,7 +570,7 @@ def _cadencia_calendario(sci):
     disparos reales de una semana tipo (una clave ausente es comodín, como en launchd) y se toma el
     hueco circular más grande. Con `Day`/`Month` se queda en 30 días: los meses no son iguales y
     ahí el conservador es el umbral largo.
-    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026."""
     entradas = sci if isinstance(sci, list) else [sci]
     entradas = [e for e in entradas if isinstance(e, dict)]
     if not entradas:
@@ -2726,7 +2726,7 @@ def _frescura_rutina(d, edad_h):
     horas: el éxito y la ejecución son el mismo instante. Con periodo P = periodo_h + margen_h:
     hasta P «al-dia», pasado P «atrasada», desde 2P «rota». Sin periodo declarado, o con el .HALT
     puesto (las rutinas no corren a propósito, como en `daemon_inactivo`), devuelve None: no alarma.
-    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026."""
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026."""
     if not d.get("periodo_h"):
         return None
     try:
@@ -2797,7 +2797,7 @@ def _check_rutinas_ned():
 
 def _check_gemelos_rancios():
     """WATCHDOG de los GEMELOS DE CRITERIO (20-sep-26): consejeros espejo de una persona real
-    ({{CONTACTO}}, Alby, {{CONTACTO}}, Sid, {{CONTACTO}}) que dejaron de aprender sin que nadie lo notara.
+    ({{CONTACTO}}, {{CONTACTO}}, {{CONTACTO}}, Sid, {{CONTACTO}}) que dejaron de aprender sin que nadie lo notara.
 
     POR QUÉ EXISTE: el radar de {{CONTACTO}} pasó **86 días sin un solo pase** (`Radar-{{CONTACTO}}.md`
     intacto desde el 26-jun) y la rutina seguía cerrando en verde, porque «sin novedad» y

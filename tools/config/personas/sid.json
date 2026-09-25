@@ -1,6 +1,7 @@
 {
   "_doc": "Fuentes vivas de Sid {{CONTACTO}}, gemelo `consejero-acceso`. Espejo PUBLICO: fundador que llego a NED. No hay relacion personal ni material privado; todo es publico.",
   "slug": "sid",
+  "anonimato": "publico",
   "persona": "Sid {{CONTACTO}}",
   "agente": "consejero-acceso",
   "lente": "founder-mode aplicado al acceso: cuello de botella real, velocidad, conseguir a quien mueve la aguja",

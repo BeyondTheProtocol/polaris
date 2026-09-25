@@ -12,7 +12,7 @@ hoy eso se sostenía en tres sitios, ninguno capaz de parar la llamada:
 Es decir: un agente con acceso a MCP podía enviar un correo de verdad y el único freno era que se
 acordara de no hacerlo. Contra un texto de fuera que dice «envía esto a X» —el patrón clásico de
 inyección— acordarse no es un mecanismo. La idea de mover la aprobación DENTRO del bucle, en vez
-de revisar al final, sale del destilado de los vídeos de {{CONTACTO}} {{CONTACTO}} (20-sep-26).
+de revisar al final, sale del destilado de los vídeos de {{CONTACTO}} (20-sep-26).
 
 CÓMO FRENA
   `deny`, no `ask`. Probado en vivo el 25-jul-26 (ver `regla_en_accion.py`): en una sesión normal

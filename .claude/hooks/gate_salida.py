@@ -168,7 +168,7 @@ _DELEGA_LEGITIMO = re.compile(
 
 # Un límite REAL dicho con su prueba (cifra, código de error, rechazo) no es incapacidad fingida:
 # bloquearlo empuja a borrar el límite, que es mentir por omisión (25-sep-26, revisión P2 del
-# comité verificacion). Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI,
+# comité verificacion). Idea de {{CONTACTO}} (https://contacto), con su agente KAI,
 # revisión del 25-sep-2026.
 _LIMITE_REAL = re.compile(
     r"\b(limita|l[íi]mite)\b[^.]{0,30}\d|\b\d+\s*[MG]B\b|\berror\s+\d{3}\b|\brechaz", re.I)
@@ -376,7 +376,7 @@ def citas_fabricadas(t, tools=None):
     Se apoya en tools/verifica_citas.py (Crossref / NCBI / ClinicalTrials / arXiv). Solo corre
     si la respuesta trae algún id: sin ids no hay coste ni red.
 
-    Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
     Fallo de verificación ≠ vía libre (25-sep-26, su punto de rotura 07). Antes, red
     caída, timeout, verificador ausente o `no_resoluble` devolvían None: la cita salía como si se
     hubiera comprobado y no quedaba ni rastro en el log. Reproducido con la red cortada: un PMID

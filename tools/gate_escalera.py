@@ -2,7 +2,7 @@
 """tools/gate_escalera.py — la ESCALERA del gate de salida: por check, cuántos casos hay
 etiquetados, cuántos falsos positivos, qué cota superior de FP garantiza eso, y qué escalón PROPONE.
 
-Idea de {{CONTACTO}} {{CONTACTO}} (https://contacto.com), con su agente KAI, revisión del 25-sep-2026.
+Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 Plan: `00_FUENTE-DE-VERDAD/04 · IA/Notas/p2-escalera-del-gate-verificación-y-plan-2026-09-25.md`.
 
 POR QUÉ. El criterio viejo (`gate_etiqueta.py`) subía checks a bloqueo con 1, 7 o 20 casos: con
