@@ -63,6 +63,10 @@ WA_DIR = os.path.join(seguimiento.REPO, "00_FUENTE-DE-VERDAD", "_PRIVADO_WHATSAP
 STATE = getattr(seguimiento, "STATE", os.path.join(seguimiento.REPO, "tools", "state"))
 WATERMARK = os.path.join(STATE, "wa_cosecha.json")
 BANDEJA = os.path.join(STATE, "tareas", "wa_candidatos.json")  # inbox que juzga Vega
+# Lo que no cabe en la bandeja NO se tira: va aquí, entero (25-sep-26). Antes se recortaba a los
+# 300 más recientes y, como el watermark ya había avanzado, lo recortado no volvía nunca: con
+# 150-824 candidatos al día se perdía casi a diario sin que nadie lo juzgara.
+DESBORDADOS = os.path.join(STATE, "tareas", "wa_desbordados.jsonl")
 
 # Kill-switch HALT (mismo contrato que run_agent.sh / btp_dispatcher.sh). Override en tests.
 HALT_FILES = os.environ.get("BTP_HALT_FILES", "").split(":") if os.environ.get("BTP_HALT_FILES") \
@@ -154,6 +158,7 @@ def cosechar(ventana_dias=VENTANA_DIAS):
     seg = seguimiento.load_seguimiento()
     existentes = {h.get("id") for h in seg.get("hilos", [])}
     ya_bandeja = {c.get("slug") for c in _load_json(BANDEJA, {}).get("candidatos", [])}
+    ya_bandeja |= _slugs_desbordados()
     desde_ventana = datetime.datetime.now() - datetime.timedelta(days=ventana_dias)
     wm = _load_json(WATERMARK, {})
     nuevo_wm = dict(wm)
@@ -193,22 +198,75 @@ def cosechar(ventana_dias=VENTANA_DIAS):
     return candidatos, nuevo_wm
 
 
+def _slugs_desbordados():
+    out = set()
+    try:
+        with open(DESBORDADOS, encoding="utf-8") as fh:
+            for ln in fh:
+                try:
+                    out.add(json.loads(ln).get("slug"))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return out
+
+
+def _ts_fuente(c):
+    m = re.search(r"@ (\d{2}/\d{2}/\d{2} \d{2}:\d{2})", c.get("fuente") or "")
+    return _parse_ts(m.group(1)) if m else None
+
+
+def _prioridad(candidatos):
+    """Orden de la bandeja: (0) lo que escribe ella, (1) chats uno a uno, (2) grupos; dentro de
+    cada nivel, lo más reciente primero. Un chat es «grupo» si en lo que hay de él hablan dos o
+    más personas además de ella: aproximación, pero no lee nada más que lo ya cosechado."""
+    otros = {}
+    for c in candidatos:
+        if c.get("who") != "yo":
+            otros.setdefault(c.get("chat"), set()).add(c.get("who"))
+
+    def clave(c):
+        if c.get("who") == "yo":
+            nivel = 0
+        else:
+            nivel = 1 if len(otros.get(c.get("chat"), ())) <= 1 else 2
+        ts = _ts_fuente(c) or datetime.datetime.min
+        return (nivel, -ts.timestamp() if ts != datetime.datetime.min else 0)
+    return sorted(candidatos, key=clave)
+
+
 def estacionar(candidatos, nuevo_wm):
     """Añade los candidatos a la bandeja que juzga Vega (dedup por slug). Avanza el watermark.
-    NO crea tarjetas — eso lo hace Vega tras juzgar. Devuelve cuántos se estacionaron."""
+    NO crea tarjetas — eso lo hace Vega tras juzgar. Devuelve cuántos se estacionaron.
+
+    La bandeja MUESTRA como mucho `MAX_BANDEJA`, por prioridad (`_prioridad`); el resto se
+    GUARDA en `DESBORDADOS`. Se filtra lo que se muestra, nunca lo que se guarda. El watermark
+    solo avanza si las dos escrituras han ido bien: si no, mañana se vuelve a cosechar."""
     banj = _load_json(BANDEJA, {"candidatos": []})
     if not isinstance(banj.get("candidatos"), list):
         banj = {"candidatos": []}
-    existentes = {c.get("slug") for c in banj["candidatos"]}
+    existentes = {c.get("slug") for c in banj["candidatos"]} | _slugs_desbordados()
+    todos = list(banj["candidatos"])
     n = 0
     for c in candidatos:
         if c["slug"] in existentes:
             continue
-        banj["candidatos"].append(c)
+        todos.append(c)
         existentes.add(c["slug"])
         n += 1
-    # backstop anti-crecimiento: nos quedamos con los más recientes
-    banj["candidatos"] = banj["candidatos"][-MAX_BANDEJA:]
+    ordenados = _prioridad(todos)
+    dentro, fuera = ordenados[:MAX_BANDEJA], ordenados[MAX_BANDEJA:]
+    if fuera:
+        os.makedirs(os.path.dirname(DESBORDADOS), exist_ok=True)
+        with open(DESBORDADOS, "a", encoding="utf-8") as fh:
+            for c in fuera:
+                fh.write(json.dumps(c, ensure_ascii=False) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+    banj["candidatos"] = dentro
+    banj["desbordados_hoy"] = len(fuera)
+    banj["desbordados_total"] = int(banj.get("desbordados_total") or 0) + len(fuera)
     banj["actualizado"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     _save_json(BANDEJA, banj)
     _save_json(WATERMARK, nuevo_wm)

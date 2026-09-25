@@ -32,7 +32,7 @@ Uso (MLX vive en su venv, no en el `.venv` de casa base):
   ~/.venvs/mlx-bench/bin/python tools/bench_modelos.py --modelo mlx:mlx-community/Qwen3.5-9B-4bit
   python3 tools/bench_modelos.py --modelo det                      # solo la línea base
   python3 tools/bench_modelos.py --modelo ollama:qwen3:8b --tareas triaje,dudosas
-  … --esperar 60  (espera hasta 60 min a que haya memoria)   … --limite 10   (prueba corta)   … --forzar   (saltarse el freno de memoria, bajo tu riesgo)
+  … --esperar 60  (espera hasta 60 min a que haya memoria)   … --limite 10   (prueba corta)   … --fallos   (lista en consola cada fallo, para revisarlo)   … --forzar   (saltarse el freno de memoria, bajo tu riesgo)
 """
 import json
 import math
@@ -46,6 +46,7 @@ from collections import Counter, defaultdict
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
+import modelo_mlx  # noqa: E402
 REPO_TOOLS = os.path.dirname(AQUI)
 ROOT = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
 SALIDA = os.path.join(ROOT, "tools", "state", "eval")
@@ -54,6 +55,7 @@ OBJETIVO = 0.97          # acierto mínimo al decidir para fijar el umbral en ca
 CONFIADO = 0.90          # un fallo por encima de esto es un «fallo confiado»
 MAX_CHARS = 2000         # la cabecera clasifica (ver historial.clasificar); el resto es latencia
 LETRAS = "ABCDEFGHIJKLMNOPQRST"
+VER_FALLOS = False
 
 
 # ─────────────────────────── casos cerrados ───────────────────────────
@@ -183,78 +185,9 @@ class Determinista:
         return et, (1.0 if et is not None else 0.0), ms   # sin probabilidad: 1 o abstención
 
 
-class MLX:
-    def __init__(self, repo):
-        self.nombre = "mlx:" + repo
-        self.repo = repo
-        self._cargado = False
-
-    def tamano_gb(self):
-        """Tamaño en disco de los pesos del snapshot local. Para 4 bits es buen proxy de lo que
-        ocupa en memoria unificada. None si no está descargado → el freno bloquea (fail-closed)."""
-        base = os.path.expanduser("~/.cache/huggingface/hub/models--" + self.repo.replace("/", "--"))
-        tot = 0
-        for raiz, _d, fs in os.walk(os.path.join(base, "blobs")):
-            tot += sum(os.path.getsize(os.path.join(raiz, f)) for f in fs)
-        return tot / 1e9 if tot else None
-
-    def cargar(self):
-        import mlx.core as mx
-        from mlx_lm import load
-        self.mx = mx
-        # 25-sep-26: sin esto, a los 90 min el proceso ocupaba 11 GB y el swap 13,4 GB con unos
-        # pesos de 6 GB. MLX guarda en caché un búfer por cada longitud de prompt distinta y no
-        # los suelta. Techo duro (pesos + 2 GB) y caché vaciada tras cada caso.
-        tam = self.tamano_gb() or 6.0
-        mx.set_memory_limit(int((tam + 2.0) * 1e9))
-        mx.set_cache_limit(int(0.5e9))
-        t0 = time.time()
-        self.model, self.tok = load(self.repo)
-        self.carga_s = time.time() - t0
-        self._ids = {}
-        self._cargado = True
-
-    def _ids_letra(self, letra):
-        if letra not in self._ids:
-            ids = set()
-            for v in (letra, " " + letra):
-                enc = self.tok.encode(v, add_special_tokens=False)
-                if len(enc) == 1:
-                    ids.add(enc[0])
-            self._ids[letra] = sorted(ids)
-        return self._ids[letra]
-
+class MLX(modelo_mlx.MLX):
     def decidir(self, tarea, texto, opciones):
-        mx = self.mx
-        msgs = [{"role": "user", "content": _prompt(*_INSTR_OPC[tarea], texto)}]
-        try:
-            p = self.tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False,
-                                             enable_thinking=False)
-        except TypeError:
-            p = self.tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
-        ids = self.tok.encode(p, add_special_tokens=False)
-        t0 = time.perf_counter()
-        logits = self.model(mx.array(ids)[None])[0, -1].astype(mx.float32)
-        lp = logits - mx.logsumexp(logits)
-        mx.eval(lp)
-        ms = (time.perf_counter() - t0) * 1000
-        del logits
-        mx.clear_cache()
-        probs = {}
-        for letra in opciones:
-            ii = self._ids_letra(letra)
-            probs[letra] = sum(math.exp(lp[i].item()) for i in ii) if ii else 0.0
-        s = sum(probs.values())
-        if s <= 0:
-            return None, 0.0, ms
-        mejor = max(probs, key=probs.get)
-        return opciones[mejor][0], probs[mejor] / s, ms
-
-    def memoria_ahora_gb(self):
-        return (self.mx.get_active_memory() + self.mx.get_cache_memory()) / 1e9
-
-    def memoria_pico_gb(self):
-        return self.mx.get_peak_memory() / 1e9
+        return self.puntuar(_prompt(*_INSTR_OPC[tarea], texto), opciones)
 
 
 class Ollama:
@@ -307,6 +240,37 @@ def _umbral(res):
     return mejor
 
 
+UMBRAL_NO = 0.95   # tirar un correo es el fallo caro: el modelo necesita más seguridad para «no»
+
+
+def _cascada(casos, res, idx, umbral_tarea, umbral_no=None):
+    """El uso realista: decide el determinista; el modelo solo entra donde él se abstiene, y con
+    umbral ASIMÉTRICO. Motivo (25-sep-26): el único fallo confiado de Qwen3.5-9B por encima de
+    0,84 fue tirar como «no» un correo de un centro oncológico (91 %)."""
+    umbral_no = umbral_no or max(umbral_tarea, UMBRAL_NO)
+    det = Determinista()
+    dec = ok = fc = fm = 0
+    for i in idx:
+        v = det.decidir("triaje", casos[i]["texto"], None)[0]
+        if v is None:
+            r = res[i]
+            lim = umbral_no if r["pred"] == "no" else umbral_tarea
+            if r["pred"] is None or r["conf"] < lim:
+                continue
+            v, conf = r["pred"], r["conf"]
+            del_modelo = True
+        else:
+            conf, del_modelo = 1.0, False
+        dec += 1
+        bien = _ok(v, casos[i]["gold"])
+        ok += bien
+        fc += (not bien and conf >= CONFIADO)
+        fm += (not bien and del_modelo)
+    n = len(idx) or 1
+    return {"n": len(idx), "cobertura": round(dec / n, 3),
+            "acierto_al_decidir": round(ok / dec, 3) if dec else None, "fallos_confiados": fc, "fallos_del_modelo": fm}
+
+
 def _resumen(res, umbral=None):
     n = len(res) or 1
     if umbral is None:
@@ -330,72 +294,7 @@ def _ece(res, bins=10):
                for g in cubos.values())
 
 
-def _freno(cand, forzar, esperar=0):
-    """Con `esperar` (minutos) reintenta cada 2 min hasta que haya sitio. CON TOPE, siempre: un
-    `until` sin límite fue el fallo del 13-sep-26 (14 h colgado esperando una marca)."""
-    import score_local as sl
-    if not isinstance(cand, MLX):
-        return
-    tam, libre = cand.tamano_gb(), sl._memoria_libre_gb()
-    limite = time.time() + esperar * 60
-    while (tam is not None and libre is not None and libre - tam < sl.HOLGURA_GB
-           and time.time() < limite):
-        print(f"   … {libre:.1f} GB libres, hacen falta {tam + sl.HOLGURA_GB:.1f}; "
-              f"reintento en 120 s", flush=True)
-        time.sleep(120)
-        libre = sl._memoria_libre_gb()
-    if tam is None or libre is None:
-        msg = f"no puedo medir la memoria (libre={libre}, modelo={tam})"
-        if not forzar:
-            raise SystemExit(f"⛔ {msg}. ¿Pesos descargados? Con --forzar sigue bajo tu riesgo.")
-        print(f"  ⚠️  {msg}; sigo por --forzar")
-        return
-    margen = libre - tam
-    print(f"  memoria: {libre:.1f} GB libres · pesos {tam:.1f} GB · margen {margen:.1f} GB "
-          f"(mínimo {sl.HOLGURA_GB})")
-    if margen < sl.HOLGURA_GB and not forzar:
-        raise SystemExit(f"⛔ NO se carga: dejaría {margen:.1f} GB al sistema. El 20-sep-26 un "
-                         f"bench sin freno tumbó el mini.")
-
-
-def _swap_gb():
-    try:
-        out = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True, text=True,
-                             timeout=5).stdout
-        return float(re.search(r"used\s*=\s*([\d.]+)M", out).group(1)) / 1024.0
-    except Exception:
-        return None
-
-
-_SWAP_INICIO = []
-
-
-def _vigia(cand, minimo_gb=1.5, swap_max_gb=1.5, proceso_max_gb=None):
-    """El freno de arranque no ve lo que pasa DURANTE una hora de bench. Se para si:
-      · el sistema baja de `minimo_gb` libres, o
-      · el swap crece más de `swap_max_gb` desde el arranque, o
-      · MLX (activa + caché) pasa de pesos + 2,5 GB.
-    El 25-sep-26 solo miraba lo primero, y el porcentaje libre se sostenía a base de swap: el
-    proceso llegó a 11 GB y el swap a 13,4 GB sin que saltara. Medir no vale un reinicio."""
-    import score_local as sl
-    if not isinstance(cand, MLX):
-        return
-    swap = _swap_gb()
-    if swap is not None and not _SWAP_INICIO:
-        _SWAP_INICIO.append(swap)
-    motivo = None
-    libre = sl._memoria_libre_gb()
-    if libre is not None and libre < minimo_gb:
-        motivo = f"quedan {libre:.1f} GB libres (mínimo {minimo_gb})"
-    elif swap is not None and swap - _SWAP_INICIO[0] > swap_max_gb:
-        motivo = f"el swap ha crecido {swap - _SWAP_INICIO[0]:.1f} GB desde el arranque"
-    else:
-        tope = proceso_max_gb or ((cand.tamano_gb() or 6.0) + 2.5)
-        usado = cand.memoria_ahora_gb()
-        if usado > tope:
-            motivo = f"MLX ocupa {usado:.1f} GB (tope {tope:.1f})"
-    if motivo:
-        raise SystemExit(f"⛔ abortado a mitad: {motivo}. Lo ya medido está impreso arriba.")
+_freno, _vigia = modelo_mlx.freno, modelo_mlx.vigia
 
 
 CASOS = {"triaje": casos_triaje, "dudosas": casos_dudosas, "tipo": casos_tipo,
@@ -443,6 +342,23 @@ def correr(cand, tareas, limite=None, forzar=False, esperar=0):
                                        if not res[i]["ok"] and res[i]["pred"] is not None).most_common(5)}
         filas[tarea] = fila
         _imprimir(tarea, fila)
+        if tarea == "triaje" and u and not isinstance(cand, Determinista):
+            fila["cascada"] = _cascada(casos, res, test, u)
+            fila["cascada_todos"] = _cascada(casos, res, range(len(casos)), u)
+            print("   cascada test (det primero; modelo solo en «dudosa»; «no» exige ≥ %.2f): %s"
+                  % (UMBRAL_NO, fila["cascada"]))
+            print("   cascada, los %d casos: %s" % (len(casos), fila["cascada_todos"]))
+        if VER_FALLOS:
+            # Solo consola, en local: es para que un humano (o la sesión) mire QUÉ falla.
+            print("   fallos (todos los casos, más confiados primero; «det» = lo que dijo el determinista):")
+            det = Determinista()
+            for i in sorted(range(len(res)), key=lambda i: -res[i]["conf"]):
+                r = res[i]
+                if r["ok"] or r["pred"] is None:
+                    continue
+                d = det.decidir(tarea, casos[i]["texto"], opciones)[0]
+                t = " ".join(casos[i]["texto"].split())[:160]
+                print(f"    {r['conf']:.0%} dijo {r['pred']} · era {casos[i]['gold']} · det {d} · {t}")
     out = {"candidato": cand.nombre, "fecha": time.strftime("%Y-%m-%d %H:%M"), "tareas": filas}
     if isinstance(cand, MLX):
         out["memoria_pico_gb"] = cand.memoria_pico_gb()
@@ -503,4 +419,5 @@ if __name__ == "__main__":
     lim = _opt("--limite")
     esp = int(_opt("--esperar", "0"))
     forzar = "--forzar" in a
+    VER_FALLOS = "--fallos" in a
     correr(candidato(spec), tareas, limite=int(lim) if lim else None, forzar=forzar, esperar=esp)

@@ -13,6 +13,7 @@ import tempfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import bench_modelos as b  # noqa: E402
+import modelo_mlx as mm  # noqa: E402
 
 _pass = _fail = 0
 
@@ -53,6 +54,25 @@ def main():
         bloquea = True
     check("freno MLX fail-closed sin pesos", bloquea)
 
+    # Cascada: el modelo solo entra donde el determinista se abstiene, y «no» exige ≥ 0,95.
+    # 25-sep-26: el único fallo confiado de Qwen3.5-9B fue tirar un correo oncológico al 91 %.
+    import triage_tareas as tt
+    orig_cl = tt.clasificar
+    tt.clasificar = lambda t, origen="chat": {"veredicto": {"d1": "tarea"}.get(t, "dudosa")}
+    try:
+        cs = [{"texto": "d1", "gold": "tarea"}, {"texto": "m1", "gold": "tarea"},
+              {"texto": "m2", "gold": "tarea"}, {"texto": "m3", "gold": "no"}]
+        rs = [{"pred": "no", "conf": 0.99, "ok": False},      # det manda: el modelo no pisa
+              {"pred": "no", "conf": 0.91, "ok": False},      # «no» al 91 %: se abstiene
+              {"pred": "tarea", "conf": 0.90, "ok": True},    # «tarea» al 90 %: decide
+              {"pred": "tarea", "conf": 0.50, "ok": False}]   # bajo umbral: se abstiene
+        c = b._cascada(cs, rs, range(4), 0.84)
+        check("cascada: el determinista manda donde decide", c["acierto_al_decidir"] == 1.0)
+        check("cascada: «no» al 91 % se abstiene (umbral asimétrico)", c["cobertura"] == 0.5)
+        check("cascada: 0 fallos del modelo", c["fallos_del_modelo"] == 0)
+    finally:
+        tt.clasificar = orig_cl
+
     # 25-sep-26: el vigía solo miraba % libre y el proceso llegó a 11 GB con 13,4 GB de swap.
     class MLXFalso(b.MLX):
         def __init__(self, ahora):
@@ -64,15 +84,15 @@ def main():
 
         def memoria_ahora_gb(self):
             return self._ahora
-    orig_swap, orig_libre = b._swap_gb, b.__dict__.get("_libre")
+    orig_swap = mm._swap_gb
     import score_local as sl
     orig_ml = sl._memoria_libre_gb
     sl._memoria_libre_gb = lambda: 8.0      # el % libre «parece» sano, como aquel día
 
     def aborta(cand, swaps):
         seq = list(swaps)
-        b._swap_gb = lambda: seq.pop(0) if len(seq) > 1 else seq[0]
-        del b._SWAP_INICIO[:]
+        mm._swap_gb = lambda: seq.pop(0) if len(seq) > 1 else seq[0]
+        del mm._SWAP_INICIO[:]
         try:
             for _ in swaps:
                 b._vigia(cand)
@@ -84,8 +104,8 @@ def main():
         check("vigía para si MLX pasa de pesos + 2,5 GB", aborta(MLXFalso(11.0), [5.0, 5.0]))
         check("vigía deja seguir si todo está en su sitio", not aborta(MLXFalso(6.5), [5.0, 5.3, 5.4]))
     finally:
-        b._swap_gb, sl._memoria_libre_gb = orig_swap, orig_ml
-        del b._SWAP_INICIO[:]
+        mm._swap_gb, sl._memoria_libre_gb = orig_swap, orig_ml
+        del mm._SWAP_INICIO[:]
 
     # A disco solo agregados: un candidato falso con texto marcado no deja rastro en el JSON.
     class Falso:

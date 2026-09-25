@@ -307,6 +307,8 @@ FAMILIAS = [
                             "bench_determinista",   # mide acierto del triaje, set dorado
                             "bench_jev",            # mide un modelo externo contra el mismo set, tras el muro
                             "bench_modelos",        # modelo LOCAL por tarea contra el determinista (P5)
+                            "modelo_mlx",           # modelo local en MLX con sus frenos de memoria
+                            "presorteo",            # ordena la bandeja de WhatsApp para Vega; no decide
                             "mutantes")),           # comprueba que los tests de verdad protegen
 ]
 
