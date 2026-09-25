@@ -40,7 +40,8 @@ El bucle NO opera solo. Antes de dar por bueno un cambio, consulta a los experto
   - 🎨 `diseno` — cualquier salida con forma / nombre / pantalla visible (digest, widget, formato de HOY).
   - 🔀 `git` — cualquier decisión de mecánica de git del repo.
 - **Regla FAIL-CLOSED:** si un experto consultado **discrepa** de un cambio que ibas a APLICAR solo, NO lo apliques: bájalo a PROPUESTA en `00_FUENTE-DE-VERDAD/Gestion/HOY.md` con su objeción. Discrepancia abierta nunca se presenta como consenso (espejo del panel de decisión de alto riesgo).
-- **Entorno degradado (portátil sin los subagentes cargados):** si un experto no se puede invocar como subagente, aplica TÚ su lente inline (su checklist/rúbrica) y **dilo explícitamente** en el resumen; no te saltes la consulta en silencio.
+- **En el lazo, EN LÍNEA solo hay dos (25-sep-26):** con el perfil del lazo, el muro solo deja invocar como subagente a `verificacion` y `consejero-arquitectura` (`muro_guard.py`, `TASK_ALLOW_PRIV`). Al resto de la mesa (`comite-medico`, `git`, `consejero-precision`…) **se le consulta POR LA COLA**: `python3 tools/cola.py enqueue "<la pregunta>" --agente <x> --tipo exec --prueba '{"tipo":"deuda","clave":"<clave>"}'`, y su veredicto llega en el ciclo siguiente. Lo que depende de ese veredicto se queda en PROPUESTA hasta entonces. **Nunca muevas `master` tú**: el 6-sep este bucle lo hizo con `git branch -f` para una línea de docs; desde el 11-sep lo impide `tools/githooks/reference-transaction`, y fusionar a casa base es de {{TITULAR}}.
+- **Entorno degradado (portátil sin los subagentes cargados):** si un experto no se puede invocar como subagente ni por la cola, aplica TÚ su lente inline (su checklist/rúbrica) y **dilo explícitamente** en el resumen; no te saltes la consulta en silencio.
 - **Registro:** nombra en el resumen diario qué expertos intervinieron y su veredicto (igual que con `verificacion`).
 
 == A · Aprender de {{TITULAR}} (lo más importante) ==

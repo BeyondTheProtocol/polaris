@@ -189,6 +189,18 @@ fi
 # degrada con AVISO RUIDOSO (fiabilidad reducida), nunca en silencio.
 # Fable = tier de MÁXIMA potencia (por encima de Opus, verificado en vivo 2/jul/26 — `claude
 # --model fable` responde en esta cuenta); si Fable falla/limita, degrada a Opus y luego Sonnet.
+# Un job CLÍNICO sin modelo usa el que declara la ficha de su agente (25-sep-26, deuda
+# clinico-sin-modelo-va-a-sonnet). Antes caía en el sonnet por defecto y se le pasaba al CLI con
+# --model, pisando el `model: fable` de la ficha: en el historial de la cola hay tres jobs
+# clínicos que corrieron así, sin marca ni aviso. Si la ficha no dice nada, fable.
+case "${BTP_AGENT:-}" in
+  comite-medico|oncologo-virtual|verificacion|herramientas-medicas)
+    if [ -z "${BTP_MODEL:-}" ]; then
+      BTP_MODEL="$(sed -n '1,15s/^model:[[:space:]]*//p' "$REPO/.claude/agents/${BTP_AGENT}.md" 2>/dev/null | head -1)"
+      BTP_MODEL="${BTP_MODEL:-fable}"
+      echo "run_agent: job clínico sin modelo → el de la ficha de $BTP_AGENT ($BTP_MODEL), no sonnet por defecto." >&2
+    fi ;;
+esac
 MODELO_PEDIDO="${BTP_MODEL:-sonnet}"
 case "$MODELO_PEDIDO" in
   fable*)  CADENA=(fable opus sonnet) ;;
@@ -423,15 +435,35 @@ aviso_clinico() {  # $1 = modelo destino
 # generalizado a `ia._debe_avisar`, expuesto aquí vía CLI) en vez de reinventar un flag nuevo —
 # ventana de 1h (no 1/día: si el bloqueo se resuelve y reaparece por otra causa en la MISMA hora,
 # igual avisa porque el hash del motivo cambia; si es el MISMO motivo persistente, no re-machaca).
-aviso_critico_bloqueado() {  # $1 = motivo (saldo/límite)
+aviso_critico_bloqueado() {  # $1 = motivo (saldo/límite/rechazo)
   [ -f "$CST/notif/config.json" ] || return 0
   "$PY" "$REPO/tools/ia.py" --debe-avisar "run_agent_critico:$AGENT_NAME" 1 "$1" >/dev/null 2>&1 || return 0
+  # Qué la desbloquea depende del motivo (25-sep-26): antes decía siempre «recarga el saldo»,
+  # también ante un límite pasajero, y eso la mandaba a la consola a pagar sin motivo.
+  case "$1" in
+    *saldo*) QUE_HACER="Para desbloquearla ya: recarga el saldo de Anthropic." ;;
+    *) QUE_HACER="No tienes que hacer nada: se reintenta sola." ;;
+  esac
   "$PY" "$SALIDA_PY" report-urgente \
-    "🔴 He PARADO una tarea importante (clínica/crítica) en vez de atenderla con un cerebro de respaldo, porque el cerebro principal de esa tarea (hoy, Claude) no está disponible ($1). La dejo pendiente y la retomo en cuanto vuelva. Para desbloquearla ya: recarga el saldo de Anthropic. No se pierde nada." \
+    "🔴 He PARADO una tarea importante (clínica/crítica) en vez de atenderla con un cerebro de menos potencia ($1). La dejo pendiente y la retomo en cuanto se pueda. $QUE_HACER No se pierde nada." \
+    >/dev/null 2>&1 || true
+}
+# ⚠️ Aviso URGENTE cuando una tarea crítica SÍ se responde con un modelo inferior porque el pedido
+# la rechazó (25-sep-26). Mismo anti-spam de 1 h por motivo que el bloqueo.
+aviso_critico_degradado() {  # $1 = modelo que rechazó · $2 = modelo que respondió
+  [ -f "$CST/notif/config.json" ] || return 0
+  "$PY" "$REPO/tools/ia.py" --debe-avisar "run_agent_degradado:$AGENT_NAME" 1 "$1>$2" >/dev/null 2>&1 || return 0
+  "$PY" "$SALIDA_PY" report-urgente \
+    "⚠️ Una tarea clínica de $AGENT_NAME la ha respondido $2 porque $1 la rechazó. Te llega marcada: es un modelo de menos potencia, contrástalo antes de usarlo." \
     >/dev/null 2>&1 || true
 }
 is_limit() {  # $1 = OUT — límite de capacidad/rate REINTENTABLE (NO el saldo agotado).
   printf '%s' "$1" | grep -qE '"api_error_status":[[:space:]]*(429|529)' && return 0
+  # El texto solo cuenta si la respuesta ES un error (25-sep-26, verificacion). Antes el grep
+  # miraba el JSON entero, `.result` incluido: una respuesta clínica BUENA que citaba «rate limit»
+  # o «usage limit» se tomaba por un límite. Con lo crítico esperando en vez de degradar, eso la
+  # bloqueaba para siempre, pagando un run completo en cada reintento. Un éxito no es un límite.
+  printf '%s' "$1" | grep -qE '"is_error":[[:space:]]*true' || return 1
   printf '%s' "$1" | grep -qiE 'overloaded|rate[ _-]?limit|too many requests|usage limit|quota exceeded' && return 0
   return 1
 }
@@ -519,7 +551,7 @@ trap '_devolver_casa_a_master' EXIT
 # Observabilidad (pieza 8): marca el instante de inicio para calcular duración.
 _OBS_TS_INI="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 heartbeat "arranca"
-OUT=""; rc=0; DEGRADADO=0
+OUT=""; rc=0; DEGRADADO=0; RECHAZO_EN=""
 N=${#CADENA[@]}
 for i in "${!CADENA[@]}"; do
   M="${CADENA[$i]}"; MODELO="$M"
@@ -527,6 +559,16 @@ for i in "${!CADENA[@]}"; do
   OUT="$("${BTP_CLAUDE_BIN:-$CMD}" "${ARGS[@]}" --model "$M")"; rc=$?   # BTP_CLAUDE_BIN = gancho de test; $CMD = binario de la caja
   set -e
   if is_credit_out "$OUT"; then break; fi          # saldo vacío → al manejador de crédito
+  # 🔴 CRÍTICO + límite (25-sep-26, deuda carril-clinico-degrada-y-sirve-sin-marcar): NO degrada.
+  # El comentario de CRITICO lo prometía («nunca se sirve con un cerebro flojo») y este bucle no lo
+  # miraba: una tarea clínica que pedía Fable se respondía con Opus o Sonnet y le llegaba a {{TITULAR}}
+  # como una respuesta normal. Un límite es pasajero, así que la tarea ESPERA: sale del bucle con
+  # el OUT del límite y el manejador de abajo la bloquea (exit 75, se reencola, aviso fuerte).
+  # Decisión de {{TITULAR}} (25-sep): límite → esperar; rechazo → responder el siguiente, MARCADO.
+  if is_limit "$OUT" && [ -n "$CRITICO" ]; then
+    echo "run_agent: 🔴 límite en $M y tarea CRÍTICA → no degrado: espera a que vuelva $M." >&2
+    break
+  fi
   if is_limit "$OUT" && [ $((i + 1)) -lt "$N" ]; then
     SIG="${CADENA[$((i + 1))]}"
     echo "run_agent: límite de capacidad en $M → degrado a $SIG." >&2
@@ -539,7 +581,11 @@ for i in "${!CADENA[@]}"; do
   if (is_refusal "$OUT" || is_respuesta_vacia "$OUT") && [ $((i + 1)) -lt "$N" ]; then
     SIG="${CADENA[$((i + 1))]}"
     echo "run_agent: FALLBACK: refusal en $M → $SIG (respuesta hueca/rechazada)." >&2
-    if [ "$DEGRADADO" = 0 ]; then aviso_clinico "$SIG"; fi
+    # Un rechazo NO se arregla esperando (es el clasificador, no la capacidad): si lo crítico
+    # esperara, la tarea no se haría nunca. Responde el siguiente, pero su respuesta sale MARCADA
+    # y con aviso urgente (ver «Marca de degradado» abajo). Se apunta quién rechazó primero.
+    [ -z "$RECHAZO_EN" ] && RECHAZO_EN="$M"
+    if [ "$DEGRADADO" = 0 ] && [ -z "$CRITICO" ]; then aviso_clinico "$SIG"; fi
     DEGRADADO=1
     continue
   fi
@@ -630,6 +676,34 @@ if [ "$rc" -eq 0 ] && (is_refusal "$OUT" || is_respuesta_vacia "$OUT"); then
     heartbeat "aplazado_refusal"
   fi
   exit 75
+fi
+
+# ⚠️ Marca de degradado (25-sep-26). Una tarea CRÍTICA que respondió un modelo porque el pedido la
+# RECHAZÓ no puede llegar como una respuesta normal: hasta hoy era indistinguible de una a plena
+# potencia. Lleva la marca delante del `.result`, que es lo único que el dispatcher le entrega a
+# {{TITULAR}}. Si no se puede marcar, NO se entrega (fail-closed): se bloquea como cualquier crítico.
+# Solo se marca lo que se ENTREGA: una respuesta con `is_error:true` no llega a {{TITULAR}} (el
+# dispatcher la manda a fallidos), así que marcarla y avisar «te llega marcada» sería un aviso
+# falso, y bloquearla por no tener `.result` la dejaba reencolándose sin fin (verificacion,
+# 25-sep-26). Esas siguen el camino de fallo normal de abajo.
+if [ -n "$CRITICO" ] && [ -n "$RECHAZO_EN" ] && [ "$MODELO" != "$RECHAZO_EN" ] \
+   && printf '%s' "$OUT" | grep -qE '"is_error":[[:space:]]*false'; then
+  MARCA="⚠️ Respondida por $MODELO porque $RECHAZO_EN la rechazó o la devolvió vacía. Es un modelo de menos potencia que el que pedía esta tarea: contrástalo antes de usarlo."
+  MARCADO="$(printf '%s' "$OUT" | jq -c --arg m "$MARCA" \
+    'if (.result | type) == "string" then .result = ($m + "\n\n" + .result) else error("sin result") end' \
+    2>/dev/null)" || MARCADO=""
+  if [ -z "$MARCADO" ]; then
+    # El JSON va a stdout igual que en los demás bloqueos: el dispatcher lee de ahí el coste
+    # real; sin él cobraba el pesimista (3 USD) en cada reintento.
+    printf '%s' "$OUT"
+    echo "run_agent: 🔴 no pude marcar la respuesta degradada de $AGENT_NAME → BLOQUEO (sin marca no se entrega)." >&2
+    aviso_critico_bloqueado "no pude marcar como degradada la respuesta de $MODELO"
+    heartbeat "critico_bloqueado"
+    exit 75
+  fi
+  OUT="$MARCADO"
+  echo "run_agent: ⚠️ respuesta de $MODELO entregada MARCADA ($RECHAZO_EN la rechazó)." >&2
+  aviso_critico_degradado "$RECHAZO_EN" "$MODELO"
 fi
 
 # Camino normal (Claude respondió): stdout EXACTO = JSON del agente (intacto para el dispatcher).

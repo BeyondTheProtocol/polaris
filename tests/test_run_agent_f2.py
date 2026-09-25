@@ -391,36 +391,48 @@ def cadena_fable_tests():
     Fake claude: 429 (límite) en fable Y opus, éxito en sonnet → afirma que el bucle prueba los TRES
     modelos EN ORDEN antes de responder, leyendo el --model de cada intento (fichero append, no
     overwrite, para poder reconstruir la secuencia completa)."""
-    tmp = tempfile.mkdtemp(prefix="ra_fable_")
-    seq_file = os.path.join(tmp, "modelos_probados.txt")
-    _bin_fable = os.path.join(tmp, "claude_fable_degrada.sh")
-    # Lee el --model de "$@" (el flag va seguido de su valor) y lo apunta; 429 salvo en sonnet.
-    open(_bin_fable, "w").write(
-        '#!/bin/bash\n'
-        'm=""\n'
-        'while [ $# -gt 0 ]; do\n'
-        '  if [ "$1" = "--model" ]; then m="$2"; fi\n'
-        '  shift\n'
-        'done\n'
-        'echo "$m" >> "' + seq_file + '"\n'
-        'if [ "$m" = "sonnet" ]; then\n'
-        '  echo \'{"subtype":"success","is_error":false,"total_cost_usd":0.01,"result":"ok"}\'\n'
-        'else\n'
-        '  echo \'{"api_error_status": 429, "is_error": true}\'\n'
-        'fi\n'
-    )
-    os.chmod(_bin_fable, 0o755)
+    def _cadena_con_limites(agente):
+        tmp = tempfile.mkdtemp(prefix="ra_fable_")
+        seq_file = os.path.join(tmp, "modelos_probados.txt")
+        _bin_fable = os.path.join(tmp, "claude_fable_degrada.sh")
+        # Lee el --model de "$@" (el flag va seguido de su valor) y lo apunta; 429 salvo en sonnet.
+        open(_bin_fable, "w").write(
+            '#!/bin/bash\n'
+            'm=""\n'
+            'while [ $# -gt 0 ]; do\n'
+            '  if [ "$1" = "--model" ]; then m="$2"; fi\n'
+            '  shift\n'
+            'done\n'
+            'echo "$m" >> "' + seq_file + '"\n'
+            'if [ "$m" = "sonnet" ]; then\n'
+            '  echo \'{"subtype":"success","is_error":false,"total_cost_usd":0.01,"result":"ok"}\'\n'
+            'else\n'
+            '  echo \'{"api_error_status": 429, "is_error": true}\'\n'
+            'fi\n'
+        )
+        os.chmod(_bin_fable, 0o755)
+        env = _clean_env(BTP_CLAUDE_BIN=_bin_fable, BTP_API_KEY_OVERRIDE="x",
+                   BTP_COST_GUARDED="1", BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG,
+                   BTP_AGENT=agente, BTP_MODEL="fable", BTP_REPO=ROOT,
+                   BTP_HALT_FILES=os.path.join(tmp, "nh_a") + ":" + os.path.join(tmp, "nh_b"))
+        p = subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "revisa el caso"],
+                           capture_output=True, text=True, env=env)
+        return p, (open(seq_file).read().split() if os.path.exists(seq_file) else [])
 
-    env = _clean_env(BTP_CLAUDE_BIN=_bin_fable, BTP_API_KEY_OVERRIDE="x",
-               BTP_COST_GUARDED="1", BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG,
-               BTP_AGENT="comite-medico", BTP_MODEL="fable", BTP_REPO=ROOT,
-               BTP_HALT_FILES=os.path.join(tmp, "nh_a") + ":" + os.path.join(tmp, "nh_b"))
-    p = subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "revisa el caso"],
-                       capture_output=True, text=True, env=env)
-    secuencia = open(seq_file).read().split() if os.path.exists(seq_file) else []
+    # RUTINA (no clínica): la cadena degrada y responde, como siempre.
+    p, secuencia = _cadena_con_limites("orquestador")
     ok(secuencia == ["fable", "opus", "sonnet"],
-       "BTP_MODEL=fable → CADENA fable→opus→sonnet en orden (visto: %r)" % secuencia)
-    ok(p.returncode == 0, "cadena fable degrada y ACABA respondiendo (rc=0), no se queda sin cerebro")
+       "rutina: BTP_MODEL=fable → CADENA fable→opus→sonnet en orden (visto: %r)" % secuencia)
+    ok(p.returncode == 0, "rutina: la cadena degrada y ACABA respondiendo (rc=0)")
+    # CRÍTICA (clínica) — 25-sep-26, deuda carril-clinico-degrada-y-sirve-sin-marcar: antes este
+    # mismo caso con comite-medico degradaba a sonnet y entregaba (rc=0) como si nada. Un límite
+    # es pasajero: la tarea ESPERA a Fable (rc 75, se reencola) y no se prueba ningún otro modelo.
+    p, secuencia = _cadena_con_limites("comite-medico")
+    ok(secuencia == ["fable"],
+       "crítica: con límite en fable NO degrada, solo se prueba fable (visto: %r)" % secuencia)
+    ok(p.returncode == 75, "crítica: con límite → exit 75 (espera y se reencola), no rc=0")
+    ok('"result":"ok"' not in p.stdout,
+       "crítica: no se entrega ninguna respuesta de un modelo de menos potencia")
 
     # BTP_MODEL=fable sin degradación (fable responde a la primera) → solo se prueba fable.
     tmp2 = tempfile.mkdtemp(prefix="ra_fable_ok_")
@@ -518,6 +530,8 @@ def refusal_degrada_tests():
     msgfile = os.path.join(tmp, "msgs.txt")
     open(fake_salida, "w").write(
         "import sys\nopen(%r,'a').write(' '.join(sys.argv[1:])+'\\n')\n" % msgfile)
+    os.makedirs(os.path.join(tmp, "notif"), exist_ok=True)      # avisos opt-in: aquí, sí
+    json.dump({"token": "x", "chat_id": "1"}, open(os.path.join(tmp, "notif", "config.json"), "w"))
     env = _clean_env(BTP_CLAUDE_BIN=_bin, BTP_API_KEY_OVERRIDE="x",
                BTP_COST_GUARDED="1", BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG,
                BTP_AGENT="comite-medico", BTP_MODEL="fable", BTP_REPO=ROOT,
@@ -530,6 +544,19 @@ def refusal_degrada_tests():
        "refusal en fable → degrada a opus (visto: %r)" % secuencia)
     ok(p.returncode == 0 and "respuesta real de opus" in p.stdout,
        "tras degradar, la respuesta ENTREGADA es la real de Opus, no el hueco del refusal")
+    # 25-sep-26 (decisión de {{TITULAR}}: rechazo → responde el siguiente, MARCADO). Antes la de Opus
+    # llegaba como una respuesta normal de Fable; ahora el `.result` lleva la marca delante.
+    try:
+        entregado = json.loads(p.stdout)["result"]
+    except Exception:
+        entregado = ""
+    ok(entregado.startswith("⚠️ Respondida por opus porque fable la rechazó"),
+       "crítica degradada por rechazo: el .result lleva la MARCA delante (visto: %r)" % entregado[:80])
+    ok(entregado.rstrip().endswith("respuesta real de opus"),
+       "…y detrás, la respuesta de Opus intacta")
+    msgs = open(msgfile).read() if os.path.exists(msgfile) else ""
+    ok("report-urgente" in msgs and "fable la rechazó" in msgs,
+       "…y un aviso URGENTE que dice quién rechazó y quién respondió (visto: %r)" % msgs[:120])
     ok("FALLBACK: refusal en fable" in p.stderr,
        "deja traza reconocible 'FALLBACK: refusal en <modelo> → <siguiente>' en stderr")
 
@@ -573,6 +600,73 @@ def refusal_degrada_tests():
        "heartbeat refleja el bloqueo/aplazo por refusal, NUNCA 'ok' (visto: %r)" % hb2)
 
 
+def critico_bordes_tests():
+    """Los tres casos que encontró `verificacion` el 25-sep-26 en el arreglo del carril clínico:
+    (A) Fable rechaza y Opus FALLA sin texto → no puede quedar en exit 75 con la salida vacía
+        (reencolado sin fin y 3 USD pesimistas por vuelta): sigue el camino de fallo normal;
+    (A') Fable rechaza y Opus falla CON texto → no se marca ni se avisa «te llega marcada»: no se
+        entrega, va a fallidos;
+    (B) una respuesta BUENA que cita «rate limit» no es un límite: se entrega, no se bloquea."""
+    refusal = '{"subtype":"success","is_error":false,"stop_reason":"refusal","result":""}'
+
+    def correr(por_modelo):
+        tmp = tempfile.mkdtemp(prefix="ra_bordes_")
+        b = os.path.join(tmp, "claude.sh")
+        casos = "".join("  %s) echo '%s' ;;\n" % (m, j) for m, j in por_modelo.items())
+        open(b, "w").write('#!/bin/bash\nm=""\nwhile [ $# -gt 0 ]; do [ "$1" = "--model" ] && m="$2"; '
+                           'shift; done\ncase "$m" in\n' + casos + 'esac\n')
+        os.chmod(b, 0o755)
+        msg = os.path.join(tmp, "msgs.txt")
+        fake = os.path.join(tmp, "salida_fake.py")
+        open(fake, "w").write("import sys\nopen(%r,'a').write(' '.join(sys.argv[1:])+'\\n')\n" % msg)
+        os.makedirs(os.path.join(tmp, "notif"), exist_ok=True)
+        json.dump({"token": "x", "chat_id": "1"}, open(os.path.join(tmp, "notif", "config.json"), "w"))
+        env = _clean_env(BTP_CLAUDE_BIN=b, BTP_API_KEY_OVERRIDE="x", BTP_COST_GUARDED="1",
+                         BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG, BTP_AGENT="comite-medico",
+                         BTP_MODEL="fable", BTP_REPO=ROOT, BTP_SALIDA=fake,
+                         BTP_HALT_FILES=os.path.join(tmp, "nh_a") + ":" + os.path.join(tmp, "nh_b"))
+        p = subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "revisa el caso"],
+                           capture_output=True, text=True, env=env)
+        return p, (open(msg).read() if os.path.exists(msg) else "")
+
+    p, msgs = correr({"fable": refusal, "opus": '{"is_error":true,"subtype":"error_during_execution"}'})
+    ok(p.returncode != 75 and p.stdout.strip() != "",
+       "(A) rechazo → fallo sin texto: no queda en exit 75 con la salida vacía (rc=%d)" % p.returncode)
+    p, msgs = correr({"fable": refusal,
+                      "opus": '{"is_error":true,"subtype":"error_max_turns","result":"parcial"}'})
+    ok("Respondida por" not in p.stdout and "report-urgente" not in msgs,
+       "(A') rechazo → fallo con texto: ni marca ni aviso de algo que no se entrega")
+    p, msgs = correr({"fable": '{"is_error":false,"subtype":"success","result":"La API tiene un rate limit de 50 rpm."}'})
+    ok(p.returncode == 0 and "rate limit de 50 rpm" in p.stdout,
+       "(B) una respuesta buena que cita «rate limit» se entrega, no es un límite (rc=%d)" % p.returncode)
+
+
+def clinico_sin_modelo_tests():
+    """Deuda clinico-sin-modelo-va-a-sonnet (25-sep-26). Un job clínico sin modelo caía en el
+    sonnet por defecto, pisando el `model: fable` de la ficha del agente; tres jobs de la cola
+    corrieron así. Ahora usa el de la ficha. Un agente de rutina sin modelo sigue en sonnet."""
+    def primer_modelo(agente):
+        tmp = tempfile.mkdtemp(prefix="ra_sin_modelo_")
+        seq = os.path.join(tmp, "modelos.txt")
+        b = os.path.join(tmp, "claude.sh")
+        open(b, "w").write('#!/bin/bash\nm=""\nwhile [ $# -gt 0 ]; do [ "$1" = "--model" ] && m="$2"; '
+                           'shift; done\necho "$m" >> "' + seq + '"\n'
+                           "echo '{\"subtype\":\"success\",\"is_error\":false,\"result\":\"ok\"}'\n")
+        os.chmod(b, 0o755)
+        env = _clean_env(BTP_CLAUDE_BIN=b, BTP_API_KEY_OVERRIDE="x", BTP_COST_GUARDED="1",
+                         BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG, BTP_AGENT=agente, BTP_REPO=ROOT,
+                         BTP_HALT_FILES=os.path.join(tmp, "nh_a") + ":" + os.path.join(tmp, "nh_b"))
+        env.pop("BTP_MODEL", None)
+        subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "x"],
+                       capture_output=True, text=True, env=env)
+        return (open(seq).read().split() or [""])[0] if os.path.exists(seq) else ""
+    for agente in ("comite-medico", "oncologo-virtual", "verificacion", "herramientas-medicas"):
+        m = primer_modelo(agente)
+        ok(m == "fable", "clínico sin modelo (%s) → el de su ficha, fable (visto: %r)" % (agente, m))
+    m = primer_modelo("orquestador")
+    ok(m == "sonnet", "rutina sin modelo sigue en sonnet (visto: %r)" % m)
+
+
 def main():
     # 1) Rutina AGÉNTICA (sin BTP_FREE_OK) + Claude agotado → APLAZA con exit 75, NO finge con un 3B
     out, err, hb, rc = run_agent("revisa la cola y avanza lo rutinario", "orquestador")
@@ -612,6 +706,8 @@ def main():
     cadena_fable_tests()
     orquestador_fallback_tests()
     refusal_degrada_tests()
+    critico_bordes_tests()
+    clinico_sin_modelo_tests()
     print("RESULTADO run_agent F2: %d OK, %d fallos" % (_pass, _fail))
     print("✅ F2 EN VERDE" if _fail == 0 else "❌ revisar fallos")
     return _fail

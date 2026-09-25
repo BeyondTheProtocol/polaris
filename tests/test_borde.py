@@ -564,11 +564,11 @@ def _fake_claude(script_path, behavior):
     os.chmod(script_path, 0o755)
 
 
-def _run_agent(behavior, modelo_pedido):
+def _run_agent(behavior, modelo_pedido, agente="comite-medico"):
     fake = os.path.join(_TMP, "fake_claude.sh")
     _fake_claude(fake, behavior)
     env = dict(os.environ, BTP_CLAUDE_BIN=fake, BTP_API_KEY_OVERRIDE="x",
-               BTP_MODEL=modelo_pedido, BTP_COST_GUARDED="1", BTP_AGENT="comite-medico")
+               BTP_MODEL=modelo_pedido, BTP_COST_GUARDED="1", BTP_AGENT=agente)
     p = subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "haz X"],
                        capture_output=True, text=True, env=env)
     hb = os.path.join(ROOT, "tools", "state", "heartbeat", "comite-medico.json")
@@ -584,15 +584,20 @@ def _test_run_agent():
     """
     _halt = [os.path.expanduser("~/.btp.HALT"), os.path.join(ROOT, ".HALT")]
     if any(os.path.exists(h) for h in _halt):
-        print("  SKIP: 4 casos de run_agent saltados — hay un HALT activo y el lazo está parado")
+        print("  SKIP: 5 casos de run_agent saltados — hay un HALT activo y el lazo está parado")
         return
 
     lim = '{\"api_error_status\": 429, \"is_error\": true, \"error\": \"overloaded\"}'
     okj = '{\"result\": \"hola\", \"is_error\": false, \"total_cost_usd\": 0.0}'
-    # opus y sonnet topados, haiku responde → debe salir el JSON de haiku
-    out, err, rc = _run_agent({"opus": lim, "sonnet": lim, "haiku": okj}, "opus")
-    ok('"result": "hola"' in out, "run_agent degrada opus→sonnet→haiku y entrega haiku")
+    # RUTINA: opus y sonnet topados, haiku responde → sale el JSON de haiku (degrada y sirve).
+    out, err, rc = _run_agent({"opus": lim, "sonnet": lim, "haiku": okj}, "opus", "orquestador")
+    ok('"result": "hola"' in out, "rutina: run_agent degrada opus→sonnet→haiku y entrega haiku")
     ok("degrado a sonnet" in err and "degrado a haiku" in err, "run_agent logea la degradación")
+    # CLÍNICO con el mismo límite (25-sep-26, deuda carril-clinico-degrada-y-sirve-sin-marcar):
+    # antes este caso, con comite-medico, entregaba haiku como si nada. Ahora espera a opus.
+    out1, err1, rc1 = _run_agent({"opus": lim, "sonnet": lim, "haiku": okj}, "opus")
+    ok(rc1 == 75 and '"result": "hola"' not in out1 and "no degrado" in err1,
+       "clínico: con límite NO degrada ni entrega un modelo inferior, espera (rc 75)")
     # toda la cadena topada + agente CLÍNICO (comite-medico) → 🔴 BLOQUEO crítico (no muere callado,
     # y NO degrada a un cerebro flojo): rc 75 y el stderr lo dice (freno de criticidad).
     out2, err2, rc2 = _run_agent({"opus": lim, "sonnet": lim, "haiku": lim}, "opus")

@@ -44,6 +44,33 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
                     "00_FUENTE-DE-VERDAD", "_PRIVADO_CORREO")
 SEEN = os.path.join(correo.CORREO_DIR, "archive_seen.json")   # delta por cuenta (uidvalidity+last_uid)
 MAX_PER_RUN = 800            # tope por corrida: backfill GRADUAL (el resto en la siguiente pasada)
+from _casa import casa_base  # noqa: E402 — el índice y el venv viven en casa base, nunca en un worktree
+REPO = casa_base()
+# El intérprete con pypdf: sin él, `kb.py index` se niega (perdería los PDFs). Es el de casa base,
+# igual que en archivar_nota._build y el daemon com.btp.kb-reindex.
+VENV_PY = os.path.join(REPO, ".venv", "bin", "python3")
+
+
+def reindexar(archivados, dry, lanzar=None):
+    """Reindexa el RAG si esta pasada archivó algo (deuda kb-index-venv-bloqueada-en-autonomo).
+
+    POR QUÉ (25-sep-26). Tras archivar, los cuerpos de correo nuevos no se podían consultar hasta
+    el siguiente reindexado del daemon, que es cada 3 h: justo la ventana de HOY. El lazo no
+    puede lanzar el intérprete del venv por ruta (el muro lo veta), pero sí este script, que lo
+    lanza él como ya hace `archivar_nota._build`. Si el daemon está reindexando, `kb.py` tiene
+    candado y no duplica. Nada archivado o `--dry` → no hace nada. Devuelve el rc, o None."""
+    if dry or archivados <= 0:
+        return None
+    if not os.path.exists(VENV_PY):
+        print("  (sin reindexar: no encuentro %s; lo hará el daemon)" % VENV_PY, file=sys.stderr)
+        return None
+    import subprocess
+    lanzar = lanzar or subprocess.run
+    r = lanzar([VENV_PY, os.path.join(REPO, "tools", "kb.py"), "index"],
+               capture_output=True, timeout=3600)
+    print("  índice del RAG %s tras archivar %d correo(s)"
+          % ("al día" if r.returncode == 0 else "SIN reindexar (rc=%d)" % r.returncode, archivados))
+    return r.returncode
 
 # (usuario, servicio del Llavero). Se omite la cuenta cuyo servicio no exista (fail-soft).
 ACCOUNTS = [
@@ -264,6 +291,7 @@ def main(argv):
             i = args.index("--account")
             if i + 1 < len(args):
                 acc_filter = args[i + 1].lower()
+        total = 0
         for user, service in ACCOUNTS:
             if acc_filter and acc_filter not in user.lower():
                 continue
@@ -271,9 +299,11 @@ def main(argv):
             if r.get("skipped"):
                 print("  - %s OMITIDA (%s)" % (user, r["skipped"]))
             else:
+                total += r["archivados"]
                 print("  ok %s [%s]: %d archivados (%d nuevos + %d backfill)%s · %d de backfill pendientes"
                       % (user, r["folder"], r["archivados"], r["nuevos_esta_pasada"],
                          r["backfill_esta_pasada"], " (DRY)" if r["dry"] else "", r["backfill_pendiente"]))
+        reindexar(total, dry)
         return 0
     print("uso: email_archive.py [archive [--account X] [--max N] [--dry] | status]", file=sys.stderr)
     return 2
