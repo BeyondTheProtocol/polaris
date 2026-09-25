@@ -32,6 +32,7 @@ CLI:
   python3 tools/gate_etiqueta.py list --check <check> [--sin-etiquetar]
   python3 tools/gate_etiqueta.py marcar <id> acierto|falso_positivo ["nota"]
   python3 tools/gate_etiqueta.py resumen [--check <check>] [--json]
+  python3 tools/gate_etiqueta.py contexto [--check <check>] [--todas]   # respuesta entera + petición
 
 El log vivo (`gate_salida.jsonl`) y las etiquetas viven en el estado de CASA BASE (gitignored) —
 misma resolución que el hook: `_casa.state_dir()` / `BTP_STATE_DIR`
@@ -134,6 +135,67 @@ def resumen(check=None):
     return out
 
 
+def _transcripts_por_hash(hashes, raiz=None):
+    """{session_hash: ruta del .jsonl} — el hook guarda sha256(session_id)[:16], no el id."""
+    import glob
+    import hashlib
+    raiz = raiz or os.environ.get("BTP_PROJECTS_DIR") or os.path.expanduser("~/.claude/projects")
+    out = {}
+    for ruta in glob.glob(os.path.join(raiz, "*", "*.jsonl")):
+        h = hashlib.sha256(os.path.basename(ruta)[:-6].encode("utf-8")).hexdigest()[:16]
+        if h in hashes:
+            out[h] = ruta
+    return out
+
+
+def _texto(o):
+    c = (o.get("message") or {}).get("content")
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return "\n".join(x.get("text", "") for x in c if isinstance(x, dict) and x.get("type") == "text")
+    return ""
+
+
+def contexto(check=None, solo_sin_etiquetar=True, max_resp=3000, max_pide=800):
+    """Para ETIQUETAR con criterio: la frase suelta no basta. Por cada fila, la respuesta entera
+    donde salió, lo que se pidió en ese turno y las tools usadas. Escala P2 (25-sep-26), idea de
+    {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+    Sale texto CLÍNICO: solo a Claude o local, nunca a un modelo de fuera (`enruta.py`)."""
+    filas = listar(check, solo_sin_etiquetar)
+    rutas = _transcripts_por_hash({f.get("session_hash") for _i, f, _e in filas} - {None})
+    cache, out = {}, []
+    for id_, fila, _et in filas:
+        frase = (fila.get("extracto") or "").rstrip("…").strip()[:60]
+        item = {"id": id_, "check": fila.get("check"), "motivo": fila.get("motivo"),
+                "bloqueo_real": fila.get("bloqueo_real"), "encontrado": False}
+        ruta = rutas.get(fila.get("session_hash"))
+        if ruta and frase:
+            if ruta not in cache:
+                with open(ruta, encoding="utf-8", errors="ignore") as f:
+                    cache[ruta] = [json.loads(l) for l in f if l.strip().startswith("{")]
+            ultimo_pide, tools = "", []
+            for o in cache[ruta]:
+                if o.get("type") == "user" and not o.get("isSidechain"):
+                    t = _texto(o)
+                    if t and not t.lstrip().startswith("<"):
+                        ultimo_pide, tools = t, []
+                if o.get("type") == "assistant":
+                    for x in (o.get("message") or {}).get("content") or []:
+                        if isinstance(x, dict) and x.get("type") == "tool_use":
+                            tools.append(x.get("name"))
+                    t = _texto(o)
+                    if frase in t:
+                        pos = t.index(frase)                   # ventana centrada en la frase
+                        ini = max(0, pos - max_resp * 2 // 3)
+                        item.update(encontrado=True, respuesta=t[ini:ini + max_resp],
+                                    frase=frase,
+                                    pidio=ultimo_pide[:max_pide], tools_del_turno=tools[-40:])
+                        break
+        out.append(item)
+    return out
+
+
 def _arg(a, flag, defecto=None):
     return a[a.index(flag) + 1] if flag in a and len(a) > a.index(flag) + 1 else defecto
 
@@ -157,6 +219,10 @@ def main(argv):
         ok, motivo = marcar(a[0], a[1], a[2] if len(a) > 2 else "")
         print(("✅ " if ok else "❌ ") + motivo)
         return 0 if ok else 1
+    if cmd == "contexto":
+        print(json.dumps(contexto(_arg(a, "--check"), "--todas" not in a), ensure_ascii=False,
+                         indent=1))
+        return 0
     if cmd == "resumen":
         r = resumen(_arg(a, "--check"))
         if "--json" in a:

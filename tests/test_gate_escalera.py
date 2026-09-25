@@ -56,7 +56,7 @@ class Propuestas(unittest.TestCase):
 
     def test_suprime_info_nunca_sube_sin_recall(self):
         _montar("falsa_certeza", ["acierto"] * 100)
-        m = gs.medir({"falsa_certeza": {"modo": "aviso"}})["falsa_certeza"]
+        m = gs.medir({"falsa_certeza": {"modo": "aviso"}}, rec={})["falsa_certeza"]
         self.assertEqual(m["propone"], "aviso")
         self.assertIn("recall", m["porque"])
 
@@ -69,6 +69,47 @@ class Propuestas(unittest.TestCase):
         _montar("x", [])
         m = gs.medir({"falsa_certeza": {"modo": "bloqueo"}})["falsa_certeza"]
         self.assertIn("SIN ninguna etiqueta", m["porque"])
+
+    def test_suprime_info_sube_con_fp_y_recall(self):
+        _montar("falsa_certeza", ["acierto"] * 59)
+        m = gs.medir({"falsa_certeza": {"modo": "aviso"}},
+                     rec={"falsa_certeza": (30, 30)})["falsa_certeza"]
+        self.assertEqual(m["propone"], "bloqueo")
+
+    def test_recall_27_de_30_no_basta(self):
+        _montar("falsa_certeza", ["acierto"] * 59)
+        m = gs.medir({"falsa_certeza": {"modo": "aviso"}},
+                     rec={"falsa_certeza": (27, 30)})["falsa_certeza"]
+        self.assertEqual(m["propone"], "aviso")
+        self.assertIn("76 %", m["porque"])
+
+    def test_sembrados_reales_se_miden(self):
+        r = gs.recall()
+        for c in ("falsa_certeza", "no_puedo_falso"):
+            self.assertEqual(r[c][1], 30, "30 casos sembrados por check")
+
+    def test_fijo_no_baja(self):
+        _montar("citas_fabricadas", ["falso_positivo"] * 4)
+        m = gs.medir({"citas_fabricadas": {"modo": "bloqueo"}})["citas_fabricadas"]
+        self.assertEqual(m["propone"], "bloqueo")
+        self.assertIn("arreglar el check", m["porque"])
+
+    def test_desde_descarta_lo_de_la_version_vieja(self):
+        with open(ge.LOG, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"check": "x", "ts": 1000.0, "session_hash": "a"}) + "\n")
+            f.write(json.dumps({"check": "x", "ts": 4e9, "session_hash": "a"}) + "\n")
+        with open(ge.ETIQUETAS, "w", encoding="utf-8") as f:
+            json.dump({"0": {"veredicto": "falso_positivo"}, "1": {"veredicto": "acierto"}}, f)
+        m = gs.medir({"x": {"modo": "bloqueo", "desde": "2026-09-25"}}, rec={})["x"]
+        self.assertEqual((m["disparos"], m["etiquetados"], m["fp"]), (1, 1, 0))
+
+    def test_fila_sintetica_no_cuenta(self):
+        with open(ge.LOG, "w", encoding="utf-8") as f:
+            f.write(json.dumps({"check": "x", "ts": 1.0, "session_hash": None}) + "\n")
+            f.write(json.dumps({"check": "x", "ts": 2.0, "session_hash": "abc"}) + "\n")
+        with open(ge.ETIQUETAS, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+        self.assertEqual(gs.medir({})["x"]["disparos"], 1)
 
     def test_no_escribe_normas(self):
         antes = open(gs.NORMAS, encoding="utf-8").read()

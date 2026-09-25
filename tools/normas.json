@@ -84,7 +84,9 @@
      "fecha": "2026-07-31",
      "firma": "sin firma registrada",
      "base": "2 hallazgos en 6 días; 0 etiquetados a 25-sep"
-    }
+    },
+    "desde": "2026-09-25T17:13",
+    "medida_version_vieja": "106 disparos; doble ciego 82 acordados: 75 FP, 7 aciertos. Reescrito 25-sep: sobre esos datos 16 FP y 7/7 aciertos (in-sample); lote apartado 6/30 → 12/30; replay 7 días 43 → 46 disparos."
    }
   },
   {
@@ -370,7 +372,9 @@
      "fecha": "2026-07-31",
      "firma": "sin firma registrada",
      "base": "SIEMPRE_BLOQUEA: una cita inventada leída no se deshace; determinista (verifica_citas.py)"
-    }
+    },
+    "desde": "2026-09-25T17:13",
+    "medida_version_vieja": "4/4 bloqueos FP (Zenodo/DataCite, DOI de plantilla), arreglados."
    }
   },
   {

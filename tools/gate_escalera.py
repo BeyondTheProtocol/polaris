@@ -22,6 +22,7 @@ Cota: Clopper-Pearson a una cola 95 %, stdlib (bisección sobre la binomial).
 
 CLI:
   python3 tools/gate_escalera.py [--check X] [--json]
+Recall: casos malos sembrados en `tests/gate_sembrados.json` (offline; los checks con red no).
 """
 import json
 import os
@@ -40,6 +41,10 @@ BAJAR_COTA, BAJAR_MIN_N, BAJAR_SEGUIDOS = 0.30, 20, 3
 # Clase por defecto de los checks de estilo; el resto cuenta como `suprime_info` (el listón
 # estricto) salvo que su norma diga otra cosa en `escalera.clase`.
 ESTILO = {"tells_ia", "secuencia_sin_tabla"}
+# Fijos a bloqueo por diseño (`gate_salida.SIEMPRE_BLOQUEA`): la escalera no propone bajarlos;
+# si acumulan FP, lo que toca es arreglar el check. Caso real: los 4 FP de citas_fabricadas
+# (25-sep-26) eran bugs de extracción/registro ya arreglados (1dfe573, filtro de plantilla P2).
+FIJOS = {"citas_fabricadas"}
 
 
 def cota_superior(fp, n, alfa=ALFA):
@@ -61,6 +66,33 @@ def cota_superior(fp, n, alfa=ALFA):
     return lo
 
 
+SEMBRADOS = os.path.join(REPO, "tests", "gate_sembrados.json")
+GATE = os.path.join(REPO, ".claude", "hooks", "gate_salida.py")
+RECALL_MIN = 0.90          # cota INFERIOR exigida: 30/30 sembrados la da (90,5 %); 27/30, solo 76 %
+
+
+def recall(ruta=SEMBRADOS, gate=GATE):
+    """{check: (cazados, total)} corriendo cada check sobre sus casos malos sembrados. Offline."""
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            d = json.load(f)
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("gate_escalera_gate", gate)
+        g = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(g)
+    except Exception:
+        return {}
+    out = {}
+    for c, casos in d.items():
+        if c.startswith("_") or c not in g.CHECKS:
+            continue
+        # Si hay lote APARTADO, el recall sale de él: el de entrenamiento ya se usó para ajustar
+        # el check y daría una cifra inflada.
+        casos = d.get(c + "_holdout", casos)
+        out[c] = (sum(1 for t in casos if g.CHECKS[c](t, [])), len(casos))
+    return out
+
+
 def _normas_por_check(ruta=NORMAS):
     """{check: {"modo": ..., "clase": ...}} leído de normas.json (mecanismo `gate_salida.py::X`)."""
     try:
@@ -76,6 +108,9 @@ def _normas_por_check(ruta=NORMAS):
             continue
         check = mec.split("::", 1)[1].split()[0]
         r = out.setdefault(check, {})
+        desde = (n.get("escalera") or {}).get("desde")
+        if desde:
+            r["desde"] = desde
         if n.get("modo") and r.get("modo") != "bloqueo":     # el más estricto manda
             r["modo"] = n["modo"]
         clase = (n.get("escalera") or {}).get("clase")
@@ -84,12 +119,30 @@ def _normas_por_check(ruta=NORMAS):
     return out
 
 
-def medir(normas=None):
+def _ts(fecha):
+    """«2026-09-25» o «2026-09-25T18:30» → epoch local."""
+    import datetime
+    try:
+        return datetime.datetime.fromisoformat(fecha).timestamp()
+    except Exception:
+        return 0
+
+
+def medir(normas=None, rec=None):
     normas = _normas_por_check() if normas is None else normas
+    rec = recall() if rec is None else rec
     etiquetas = ge._cargar_etiquetas()
     por_check = {}
     for id_, fila in ge._leer_log():
+        # Con `ts` y sin sesión = la escribió un test o un `--check` a mano sobre el log vivo,
+        # no una respuesta real (fila 1114, «El inhibidor A…», 25-sep-26). No cuenta.
+        if fila.get("ts") and not fila.get("session_hash"):
+            continue
         c = fila.get("check")
+        # `escalera.desde`: el check se reescribió; lo medido con la versión vieja no la juzga.
+        desde = normas.get(c, {}).get("desde")
+        if desde and (fila.get("ts") or 0) < _ts(desde):
+            continue
         r = por_check.setdefault(c, {"disparos": 0, "veredictos": []})
         r["disparos"] += 1
         et = etiquetas.get(id_)
@@ -109,21 +162,33 @@ def medir(normas=None):
         seguidos = len(vs) >= BAJAR_SEGUIDOS and all(
             v == "falso_positivo" for v in vs[-BAJAR_SEGUIDOS:])
         propone, porque = modo, ""
-        if modo == "bloqueo":
+        if modo == "bloqueo" and c in FIJOS:
+            if fp:
+                porque = "fijo a bloqueo: %d FP → arreglar el check, no bajarlo" % fp
+            elif n == 0:
+                porque = "fijo a bloqueo, sin etiquetas"
+        elif modo == "bloqueo":
             if seguidos:
                 propone, porque = "aviso", "%d FP seguidos" % BAJAR_SEGUIDOS
             elif n >= BAJAR_MIN_N and cota > BAJAR_COTA:
                 propone, porque = "aviso", "cota %.0f %% > %.0f %%" % (cota * 100, BAJAR_COTA * 100)
             elif n == 0:
                 porque = "bloquea SIN ninguna etiqueta: bloqueo no respaldado"
-        elif modo in ("aviso", "sombra") and n and cota <= UMBRAL[clase]:
-            if clase == "suprime_info":
-                porque = "listón de FP cumplido; falta recall medido con casos sembrados"
+        cazados, total = rec.get(c, (0, 0))
+        rec_inf = 1 - cota_superior(total - cazados, total) if total else None
+        if modo in ("aviso", "sombra") and n and cota <= UMBRAL[clase]:
+            if clase == "suprime_info" and (rec_inf is None or rec_inf < RECALL_MIN):
+                porque = ("listón de FP cumplido; recall %s" % (
+                    "sin medir (faltan casos sembrados)" if rec_inf is None else
+                    "%d/%d, cota inf. %.0f %% < %.0f %%" % (cazados, total, rec_inf * 100,
+                                                           RECALL_MIN * 100)))
             else:
                 propone, porque = "bloqueo", "cota %.1f %% ≤ %.0f %%" % (cota * 100,
                                                                       UMBRAL[clase] * 100)
         out[c] = {"modo": modo, "clase": clase, "disparos": r["disparos"], "etiquetados": n,
-                  "fp": fp, "cota_fp": round(cota, 4), "propone": propone, "porque": porque}
+                  "fp": fp, "cota_fp": round(cota, 4), "propone": propone, "porque": porque,
+                  "recall": "%d/%d" % (cazados, total) if total else None,
+                  "recall_inf": round(rec_inf, 4) if rec_inf is not None else None}
     return out
 
 
@@ -135,13 +200,13 @@ def main(argv):
     if "--json" in argv:
         print(json.dumps(m, ensure_ascii=False, indent=1, sort_keys=True))
         return 0
-    print("%-24s %-7s %-12s %8s %5s %4s %8s  %s" % (
-        "check", "modo", "clase", "disparos", "etiq", "FP", "cota FP", "propone"))
+    print("%-24s %-7s %-12s %8s %5s %4s %8s %7s  %s" % (
+        "check", "modo", "clase", "disparos", "etiq", "FP", "cota FP", "recall", "propone"))
     for c, v in sorted(m.items(), key=lambda kv: (kv[1]["modo"] != "bloqueo", kv[0] or "")):
         cambio = "→ %s" % v["propone"] if v["propone"] != v["modo"] else "="
-        print("%-24s %-7s %-12s %8d %5d %4d %7.1f%%  %s %s" % (
+        print("%-24s %-7s %-12s %8d %5d %4d %7.1f%% %7s  %s %s" % (
             c, v["modo"], v["clase"], v["disparos"], v["etiquetados"], v["fp"],
-            v["cota_fp"] * 100, cambio, v["porque"]))
+            v["cota_fp"] * 100, v["recall"] or "—", cambio, v["porque"]))
     print("— mide y propone; cada subida la firma {{TITULAR}} en tools/normas.json")
     return 0
 

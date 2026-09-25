@@ -126,6 +126,12 @@ class NoPuedoFalsoRealista(unittest.TestCase):
         "No puedo adjuntar el informe, así que tendrás que mandarlo tú.",
     ]
 
+    def test_doi_de_plantilla_no_es_cita(self):
+        """Fila 727 del log (etiquetada FP el 25-sep-26): explicar el FORMATO no es citar."""
+        ids = g._ids_cita("El formato es `10.1007/82_AAAA_NNN` o `10.1007/x`; el real, 10.1007/82_2026_356.")
+        self.assertEqual(len(ids), 1, ids)
+        self.assertIn("82_2026_356", ids[0])
+
     def test_limite_no_excusa_delegar(self):
         for f in self.POSITIVOS_CON_EXCUSA:
             self.assertIsNotNone(g.no_puedo_falso(f), "no cazó: %s" % f)
@@ -143,6 +149,53 @@ class NoPuedoFalsoRealista(unittest.TestCase):
         h = g.revisar(self.POSITIVOS[0] + " Lo dejo así y seguimos con lo siguiente del plan.")
         self.assertIn("no_puedo_falso", [c for c, _s, _m in h])
         self.assertIn("no_puedo_falso", g._bloquean(h, "aviso"))
+
+
+class FalsaCertezaReescrita(unittest.TestCase):
+    """25-sep-26 (escalera P2): 75 de 82 disparos acordados eran FP. Canarios de cada clase de FP
+    y análogos de los 7 aciertos reales, que NO se pueden perder."""
+
+    FP = [
+        # prueba explícita en la misma sección
+        "## Estado\nLo he comprobado ahora con git.\n\nLa rama no existe en el remoto.",
+        # prueba en el propio párrafo
+        "Todo verificado hoy en la web del fabricante. No hay ninguna otra versión de 1000 µg.",
+        # estado de mi trabajo en la línea No hecho
+        "- **Hecho:** el borrador.\n- **No hecho:** el plan todavía no existe, falta el comité.",
+        # la frase ya declara lo no confirmado
+        "Tampoco está confirmado que el portal exporte CSV.",
+        # cita de un borrador
+        "> Lo de los scripts: no los encontraste porque no existen.",
+        # replay 7 días (25-sep-26): sello en la propia frase, «casi nadie», duda declarada
+        "| Peso de unos 100 g | **Inferencia mía**, nadie lo ha pesado. |",
+        "Es la mejor zona de las que casi nadie ha visto.",
+        "Lo que no te puedo decir con certeza es cómo se ve en tu pantalla.",
+    ]
+    ACIERTOS = [
+        "No existe tejido fresco, y quemar sin biopsiar antes lo destruye.",
+        "Hoy no hay ninguna segmentación esperando.",
+        "No hay ninguna vía autorizada para adjuntar el informe.",
+        # un sello en una fila de TABLA no cubre el resto de la sección (caso 299)
+        "## Resumen\n| dato | sello |\n|---|---|\n| dosis | verificado en la web |\n\n1. No existe tejido fresco para otra prueba.",
+        # «está verificado que X» sin decir cómo es la afirmación, no su prueba
+        "Está verificado que el HLA se puede pedir por la seguridad social.",
+        "Falta la sangre germinal, nadie la ha pedido todavía al hospital.",
+    ]
+
+    def test_no_salta_en_las_clases_de_fp(self):
+        for t in self.FP:
+            self.assertIsNone(g.falsa_certeza(t), "FP: %s" % t)
+
+    def test_sigue_cazando_los_aciertos(self):
+        for t in self.ACIERTOS:
+            self.assertIsNotNone(g.falsa_certeza(t), "no cazó: %s" % t)
+
+    def test_entrenamiento_entero(self):
+        d = json.load(open(os.path.join(ROOT, "tests", "gate_sembrados.json"), encoding="utf-8"))
+        cazados = sum(1 for t in d["falsa_certeza"] if g.falsa_certeza(t))
+        # Suelo de regresión, no 30/30: el vocabulario se recortó a propósito tras el replay de
+        # 7 días («lo sé», «ya está todo», «Nadie…» al inicio metían ruido). Precisión primero.
+        self.assertGreaterEqual(cazados, 25, "el entrenamiento no puede bajar de 25/30")
 
 
 class ContratoDelHook(unittest.TestCase):
