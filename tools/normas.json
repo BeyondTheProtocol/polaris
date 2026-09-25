@@ -3221,6 +3221,30 @@
    "auditable": false,
    "repetida": false,
    "nota": "25-sep-26: rechazó nombres reales técnicos («no me gusta nada, tiene que ser tan bonito como contacto»)."
+  },
+  {
+   "slug": "feedback-cetir-qt-it-error-conocido-ignorar",
+   "que": "«tratada con QT e IT» en los PET de CETIR es un error conocido: no dispara código rojo ni pide corrección",
+   "clase": "contexto",
+   "mecanismo": "ninguno: la memoria, por recall, al tocar CETIR o el código rojo",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace del código rojo del 25-sep-26 (revisión PR 223), que {{TITULAR}} levantó: «es un error y nadie lo tiene en cuenta». Decidir si una frase de un informe amenaza el cribado es criterio; un bloqueo por texto literal taparía el caso nuevo (un cribador que la cite por escrito)."
+  },
+  {
+   "slug": "feedback-sello-dicho-no-es-lo-que-dice-titular",
+   "que": "En /datos, revisar sellos «dicho»/«inferido» y la vigencia de los textos de estado, no solo las cifras",
+   "clase": "contexto",
+   "mecanismo": "ninguno: criterio del revisor; candidato a lint (sello «dicho» sobre estado de tratamiento con correo que lo respalde)",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace del 25-sep-26: «En cribado de TROPION-Breast06» con «lo dice {{TITULAR}}» cuando ya había firmado y había correo de la coordinadora del estudio."
   }
  ]
 }
