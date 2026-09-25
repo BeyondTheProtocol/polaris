@@ -27,6 +27,7 @@ Catálogo entero: `ls tools/`. Las de siempre: `kb.py` (RAG) · `salida.py` (Tel
 - `honestidad_lint.py`: apoyo del sello de evidencia (caza el relay sin verificar).
 - `cosecha_entregables.py`: red de seguridad de «dónde quedó archivado» (encuentra entregables que se quedaron solo en el chat).
 - `ramas.py list`: quién trabaja ahora en qué rama.
+- `dependencias.py`: grafo del repo sin LLM. `quien <script>` = qué se rompe si lo cambias; `huerfanos` = scripts que nadie nombra; `centrales` = los más usados.
 - `cosecha_checklists.py`: sube al Tablero los checklists que viven dentro de los `.md` (la fuente única lo contiene todo).
 - Investigación profunda: la skill `deep-research` YA NO EXISTE (comprobado 30-jul-26); se hace con los MCP de literatura (`search_papers`, `create_systematic_review`, PubMed/PMC) o un `Workflow` de varios agentes.
 

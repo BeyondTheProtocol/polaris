@@ -9,6 +9,7 @@ paths:
 ## Antes de escribir código
 - **¿Ya existe?** Busca en `tools/` y **fuera del repo** antes de decir «no existe» ([[feedback-buscar-fuera-del-repo-antes-de-decir-no-existe]]).
 - **¿Otra rama ya lo toca?** `python3 tools/ramas.py en-vuelo <patron>`.
+- **¿Quién depende de lo que vas a cambiar?** `python3 tools/dependencias.py quien <script> [--hondo]` (imports + rutas en subprocess, .sh, launchd y settings). Antes de renombrar o borrar, siempre.
 - **No sobre-ingenierizar:** filtra por *«¿esto acerca a NED?»* ([[feedback-no-sobreingenierizar-filtrar-por-ned]]).
 - Estándar de código: `00_FUENTE-DE-VERDAD/04 · IA/Calidad-Codigo-Python-Polaris.md`.
 
