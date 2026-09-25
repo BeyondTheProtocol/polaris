@@ -1145,6 +1145,223 @@ def consenso_lentes(t, tools=None):
     return None
 
 
+# ── checks de S15 (25-sep-26): las 24 normas de salida que seguían sin mecanismo ──────────────
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+# Su punto S15: «28 de 53 normas de salida sin mecanismo» (24 al recontarlo esa noche). De esas
+# 24, estas 12 caben en una regex o en las tools del turno; las otras 12 dicen en su `nota` de
+# normas.json por qué no. Todas nacen en `aviso` y se midieron con `replay_gate.py` (30 días,
+# 2.781 turnos) ANTES de registrarse; los negativos de cada test son los falsos positivos que ese
+# replay encontró en la primera versión. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.
+
+def proceso_en_respuesta(t, tools=None):
+    """feedback-pensar-por-dentro-responder-limpio — la auto-mejora pasa, pero en silencio: a ella
+    no le llega «lección guardada», «me lo apunto» ni «no volverá a pasar». Replay: «memoria nueva»
+    salió del patrón porque en los cierres de trabajo de sistema la memoria ES el entregable."""
+    m = re.search(r"(lo (he )?guardad[oa] (en|como) (la |una )?memoria|(lo )?guardo (como|en) "
+                  r"(la |una )?memoria|\bme lo apunto\b|\btomo nota\b|(la |esta )?lecci[óo]n (es|que "
+                  r"(saco|me llevo))\b|lecci[óo]n (guardada|aprendida|capturada|anotada)|"
+                  r"\b(lo )?he aprendido\b|no (me )?volver[áa] a pasar|c[óo]mo lo aplicar[ée])",
+                  _sin_bloques(t), re.I)
+    if not m:
+        return None
+    return ("«%s»: eso es fontanería mía. La lección se guarda en silencio; a ella le llega solo "
+            "la respuesta." % m.group(0))
+
+
+# Familias de código interno que ella citó al quejarse (B1/P1/A4) y la jerga de esa misma queja.
+_CODIGO_INTERNO = r"\b[PABSFDR]\d{1,2}\b"
+_JERGA = r"\b(dispatcher|choke[- ]?point|dead[- ]?man|un[- ]cerebro|fail[- ]?(open|closed)|singleton)\b"
+
+
+def jerga_interna(t, tools=None):
+    """feedback-mensajes-claros-no-cripticos — nada de «B1/P1/A4», «dispatcher» ni «choke-point»
+    sin traducir. Un código con su glosa al lado («P2 (escalera del gate)», «P2: …») no canta, y lo
+    que va entre `backticks` es nombre de fichero, no prosa. Umbral: 3 códigos distintos sin glosa
+    o 2 términos de jerga; uno suelto no hace el mensaje críptico."""
+    x = re.sub(r"\[[^\]]*\]\([^)]*\)", " ", _sin_bloques(t))
+    codigos = {m.group(0) for m in re.finditer(_CODIGO_INTERNO, x)
+               if not re.match(r"\s*[(:—–-]", x[m.end():m.end() + 3])}
+    # Términos DISTINTOS: «dispatcher» repetido tres veces es un daemon con nombre propio, no jerga
+    # amontonada (replay 25-sep-26).
+    jerga = {m.group(0).lower() for m in re.finditer(_JERGA, x, re.I)}
+    if len(codigos) < 3 and len(jerga) < 2:
+        return None
+    muestra = sorted(codigos)[:4] + sorted(jerga)[:2]
+    return ("Mensaje críptico: %s sin traducir. Di qué es cada cosa y qué significa para ella."
+            % ", ".join(muestra))
+
+
+def correo_sin_html(t, tools=None):
+    """feedback-correos-formato-html — un correo a terceros va SIEMPRE en HTML (negritas, enlaces
+    que se pueden pulsar, listas). Mira la ENTRADA de create_draft/update_draft vía `_marcas`."""
+    if tools and SIN_HTML in tools:
+        return ("Has dejado un borrador de correo a un tercero sin `htmlBody`: sale en texto plano. "
+                "Rehazlo con HTML (negritas, enlaces, listas).")
+    return None
+
+
+_PIEZA = r"(borrador|post|tuit|tweet|comentario|DM|mensaje|correo|email|caption|pie de foto|copy)"
+
+
+def borrador_sin_voz(t, tools=None):
+    """feedback-comentarios-siempre-voz-titular — lo que se escribe en su nombre pasa por
+    `voz-titular` por defecto. Parcial: ve que un borrador presentado («Borrador para {{CONTACTO}}:»,
+    «DM para {{CONTACTO}}:») sale sin que ese agente (ni redes-contenido o comunidad, que lo llaman)
+    haya corrido en el turno. No ve si la voz ya se pasó en un turno anterior: los retoques de un
+    borrador ya voiceado («el resto se queda», «palabra por palabra») no cantan."""
+    if tools is None or not _borradores(t):
+        return None
+    etiqueta = re.search(r"^\W{0,6}(#+\s*)?(?!qu[ée] )[^\n]{0,30}\b" + _PIEZA
+                         + r"\b[^\n]{0,50}(:|:\*\*|\*\*:?)\s*$", t, re.I | re.M)
+    if not etiqueta or re.search(r"espera tu OK|contrapeso|\[verificado", etiqueta.group(0), re.I):
+        return None
+    if re.search(r"(el resto (se queda|igual|es tuyo)|palabra por palabra|tal cual|traducci[óo]n "
+                 r"(directa|literal)|te lo dejo igual)", t, re.I):
+        return None
+    if any(re.search(r"voz-titular|voz_titular|redes-contenido|comunidad", x) for x in tools):
+        return None
+    return ("«%s»: un texto en su nombre sin pasar por `voz-titular` en este turno. Por defecto, "
+            "antes de dárselo." % etiqueta.group(0).strip()[:80])
+
+
+_DM = r"(\bDM\b|mensaje directo|instagram|\bIG\b|whatsapp|\bWA\b|telegram|linkedin)"
+
+
+def dm_formato_email(t, tools=None):
+    """feedback-mensajes-dm-estilo-del-hilo — un DM va corto y al estilo del hilo, no como un
+    email. Parcial: solo ve el andamiaje de correo (asunto, «Estimado», «Atentamente», «Kind
+    regards») dentro de un borrador de DM. El registro fino del hilo necesita juez."""
+    # Replay: los dos únicos disparos de la primera versión eran correos que nombraban LinkedIn o
+    # el hilo. Si la respuesta habla de un correo, el andamiaje formal es legítimo.
+    if not re.search(_DM, _sin_fences(t), re.I) or re.search(r"correo|e-?mail|gmail", t, re.I):
+        return None
+    for b in _borradores(t):
+        m = re.search(r"^\s*(asunto|subject)\s*:|\b(estimad[oa]s?|atentamente|saludos cordiales|"
+                      r"un cordial saludo|quedo a (tu|su) disposici[óo]n|best regards|kind regards|"
+                      r"dear)\b", b, re.I | re.M)
+        if m:
+            return ("Borrador de DM con formato de email («%s»). Un DM va corto y al estilo real "
+                    "del hilo." % m.group(0).strip())
+    return None
+
+
+def suplemento_clinico(t, tools=None):
+    """feedback-suplementos-solo-calidad — al evaluar un suplemento se responde SOLO la calidad del
+    producto (marca, pureza, certificados, lote). Canta si esa ficha mete evidencia clínica o la
+    manda a esperar a Lola o a la analítica. Un texto sobre un ensayo (NCT) no es una ficha."""
+    x = _sin_bloques(t)
+    if not re.search(r"\bsuplement|\bc[áa]psulas?\b|\bnutrac[ée]ut", x, re.I):
+        return None
+    if not re.search(r"\b(marca|certificad|pureza|an[áa]lisis de terceros|lote|excipiente)", x, re.I):
+        return None
+    if re.search(r"\bNCT\d{6}|\bfase (I|II|III|[123])\b|\bbrazo\b|TROPION|DESTINY", x, re.I):
+        return None
+    m = re.search(r"(\bPMID\b|ensayo cl[íi]nico|\bRCT\b|metaan[áa]lisis|estudios? (muestran|"
+                  r"demuestran|sugieren)|evidencia cl[íi]nica|preg[úu]ntale a Lola|consult(a|alo) "
+                  r"con Lola|espera a la anal[íi]tica)", x, re.I)
+    if not m:
+        return None
+    return ("Ficha de suplemento con «%s». Aquí solo va la calidad del producto; lo clínico es de "
+            "Lola." % m.group(0))
+
+
+def cierre_sin_lo_tuyo(t, tools=None):
+    """feedback-cierre-lo-tuyo-ahora — al cerrar una tarea, al final y sin jerga, qué le toca a
+    ELLA; si no le toca nada, también se dice. Parcial: solo mira respuestas que se anuncian como
+    cierre («Hecho», «Qué hice», «Sesión cerrada», «Fusionado», «Listo»)."""
+    if len(t) < 500:
+        return None
+    if not re.search(r"(^\s*\**hecho[.:*]|\*\*hecho:?\*\*|^#+\s*qu[ée] hice|\*\*qu[ée] hice\*\*|"
+                     r"sesi[óo]n cerrada|^\s*\**(fusionado|cerrado|listo)[.:,*])", t, re.I | re.M):
+        return None
+    if re.search(r"(espera tu OK|lo tuyo|te toca|para ti\b|tu parte|de ti (necesito|solo)|"
+                 r"nada (para ti|que hacer|de tu parte|pendiente)|\bno hecho\b|siguiente:|a un clic|"
+                 r"lo firmas|tu firma|tienes que|te queda|necesito (tu|que)|sin nada tuyo)", t, re.I):
+        return None
+    return ("Cierras la tarea sin decirle qué le toca a ella. Si no le toca nada, dilo también.")
+
+
+def marca_lidera_causa(t, tools=None):
+    """feedback-colaboraciones-marca-no-liderar-con-causa — en un pitch a una marca no se abre con
+    la enfermedad: colab tech estándar, y la retribución va vía donación después. Parcial: mira la
+    apertura (300 caracteres) del borrador."""
+    if not re.search(r"(pitch|colab(oraci[óo]n)? (con|para) (la |una )?marca|\ba la marca\b|"
+                     r"brand deal|patrocini|propuesta comercial|media ?kit|rate card)",
+                     _sin_fences(t), re.I):
+        return None
+    for b in _borradores(t):
+        cab = b.strip()[:300]
+        if re.search(r"\b(c[áa]ncer|met[áa]st|enfermedad|paciente|oncolog|quimio|tumor)", cab, re.I):
+            return ("El pitch a la marca abre con la enfermedad («%s…»). Colab tech estándar; la "
+                    "causa, después y vía donación." % cab[:60].replace("\n", " "))
+    return None
+
+
+def correo_no_existe(t, tools=None):
+    """feedback-gmail-mcp-lag-no-afirmar-no-existe — el MCP de Gmail va horas por detrás. Si solo
+    miré por él, no puedo decir que un correo «no existe» o «no ha llegado»: como mucho «no lo veo
+    por la API, que va con retraso». IMAP o el navegador sí son tiempo real y no cantan."""
+    if tools is None:
+        return None
+    if not any(re.search(r"search_threads|get_thread|list_drafts", x) for x in tools):
+        return None
+    if any(re.search(r"imap|_PRIVADO_CORREO|claude-in-chrome|Claude_Browser", x, re.I) for x in tools):
+        return None
+    m = re.search(r"(no (hay|existe|encuentro|aparece|veo|tengo|ha llegado|consta)|sin rastro de|"
+                  r"todav[íi]a no (ha )?(llegado|contestado|respondido))[^.\n]{0,40}\b(correo|mail|"
+                  r"email|respuesta|contestaci[óo]n)", _sin_bloques(t), re.I)
+    if not m or re.search(r"retraso|con lag|tiempo real|navegador|en vivo|p[ée]gamel|IMAP", t, re.I):
+        return None
+    return ("«%s»: solo miraste por el MCP de Gmail, que va horas por detrás. Di «no lo veo por la "
+            "API» y compruébalo en vivo (IMAP o navegador)." % m.group(0))
+
+
+_INGLES = {"the", "and", "is", "are", "this", "that", "with", "for", "you", "it", "of", "to",
+           "was", "have", "not", "but", "what", "which"}
+_ESPANOL = {"el", "la", "los", "las", "y", "es", "que", "de", "en", "con", "por", "para", "no",
+            "lo", "un", "una", "se", "del", "al"}
+
+
+def respuesta_en_ingles(t, tools=None):
+    """feedback-idioma-espanol — a ella se le habla en español. Un borrador en inglés para un
+    tercero sí vale: fuera citas «>», bloques y lo que va tras un separador «---»."""
+    if t.lstrip().startswith("API Error"):
+        return None
+    x = re.sub(r"^\s*>.*$", " ", _sin_bloques(t), flags=re.M)
+    x = re.split(r"^\s*---+\s*$", x, flags=re.M)[0]
+    pal = re.findall(r"[a-záéíóúñ]+", x.lower())
+    if len(pal) < 60:
+        return None
+    en = sum(w in _INGLES for w in pal)
+    es = sum(w in _ESPANOL for w in pal)
+    if en > 2 * es and en > 0.06 * len(pal):
+        return "La respuesta está en inglés. A ella se le habla en español."
+    return None
+
+
+def tono_builder(t, tools=None):
+    """feedback-no-rollo-builder-voz — nada de tono builder/tech-bro en su voz pública. Parcial:
+    el léxico que lo delata, dentro de un borrador. «10x» y «ship» se probaron y se quitaron en el
+    replay: 10x Genomics y el envío de muestras."""
+    for b in _borradores(t):
+        m = re.search(r"\b(builders?|build(ing)? in public|founder mode|hustle|game[- ]?changer|"
+                      r"disrupt(ive|ivo|ir)?|growth hack\w*|let'?s go+|to the moon|crushing it)\b|🚀",
+                      b, re.I)
+        if m:
+            return ("Borrador con tono builder («%s»). Engancha sin postureo." % m.group(0))
+    return None
+
+
+def lola_sin_nota(t, tools=None):
+    """feedback-todo-lo-elegido-va-a-nota-lola — lo que entra en la nota «Comprar para TB06» va
+    también a «Consultar con Lola», sin esperar a que lo pida. Mira los comandos del turno."""
+    if not tools or not any(re.search(r"Comprar para TB06", x, re.I) for x in tools):
+        return None
+    if any("Lola" in x for x in tools) or re.search(r"nota de Lola|Consultar con Lola", t):
+        return None
+    return ("Añadiste a «Comprar para TB06» sin tocar «Consultar con Lola». Lo elegido va a las dos.")
+
+
 # Checks que corren aunque la respuesta sea corta: «hecho» sin haber lanzado al comité es
 # justo el incumplimiento, y el mínimo de caracteres lo dejaba pasar.
 SIN_MINIMO = {"enrutado_incumplido"}
@@ -1176,6 +1393,18 @@ CHECKS = {
     "importes_recaudacion": importes_recaudacion,
     "cita_ia_buscador": cita_ia_buscador,
     "consenso_lentes": consenso_lentes,
+    "proceso_en_respuesta": proceso_en_respuesta,
+    "jerga_interna": jerga_interna,
+    "correo_sin_html": correo_sin_html,
+    "borrador_sin_voz": borrador_sin_voz,
+    "dm_formato_email": dm_formato_email,
+    "suplemento_clinico": suplemento_clinico,
+    "cierre_sin_lo_tuyo": cierre_sin_lo_tuyo,
+    "marca_lidera_causa": marca_lidera_causa,
+    "correo_no_existe": correo_no_existe,
+    "respuesta_en_ingles": respuesta_en_ingles,
+    "tono_builder": tono_builder,
+    "lola_sin_nota": lola_sin_nota,
 }
 
 
@@ -1274,6 +1503,25 @@ def _es_mensaje_de_titular(d):
     return not texto.lstrip().startswith(("<task-notification", "[SYSTEM NOTIFICATION"))
 
 
+TITULAR_MAIL = "titular.mgp@gmail.com"
+SIN_HTML = "⟨draft sin htmlBody⟩"
+
+
+def _marcas(nombre, entrada):
+    """Señales de la ENTRADA de una tool que un check necesita y que el nombre no dice (25-sep-26).
+    Hoy una: un borrador de correo a un tercero sin `htmlBody` (feedback-correos-formato-html).
+    La usan `_tools_del_turno` y `tools/replay_gate.py`, para que el replay mida lo mismo que ve el
+    hook."""
+    if not re.search(r"(create|update)_draft$", nombre or "") or not isinstance(entrada, dict):
+        return []
+    if str(entrada.get("htmlBody") or "").strip():
+        return []
+    to = str(entrada.get("to") or "") + str(entrada.get("cc") or "")
+    if to and not re.sub(re.escape(TITULAR_MAIL), "", to, flags=re.I).strip(" []'\",;"):
+        return []                                  # un borrador para ella misma no es «a terceros»
+    return [SIN_HTML]
+
+
 def _tools_del_turno(transcript_path):
     """Nombres+entradas de las tools usadas después del último mensaje de {{TITULAR}}. None si no se
     puede saber (el transcript se escribe async y puede ir por detrás) → nunca se acusa a ciegas."""
@@ -1307,6 +1555,7 @@ def _tools_del_turno(transcript_path):
                 v = entrada.get(campo)
                 if isinstance(v, str):
                     usos.append(v[:400])
+            usos.extend(_marcas(x.get("name") or "", entrada))
     # [] = se pudo leer y no se usó nada (que es justo lo que hay que poder acusar);
     # None = no se sabe. Antes las dos cosas eran None, y «no ejecutó nada» pasaba siempre.
     return usos if parsed else None

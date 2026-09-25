@@ -57,8 +57,9 @@ def _es_turno_de_titular(o):
     return bool(t) and not t.lstrip().startswith("[SYSTEM NOTIFICATION")
 
 
-def turnos(ruta):
-    """[(respuesta_final, tools)] de un transcript. Fail-soft."""
+def turnos(ruta, marcas=None):
+    """[(respuesta_final, tools)] de un transcript. Fail-soft. `marcas` = `gate._marcas` (señales de
+    la entrada de una tool, p.ej. borrador sin htmlBody), para medir lo mismo que ve el hook."""
     try:
         lineas = open(ruta, encoding="utf-8", errors="replace").read().splitlines()
     except Exception:
@@ -91,6 +92,8 @@ def turnos(ruta):
                 v = entrada.get(campo)
                 if isinstance(v, str):
                     tools.append(v[:400])
+            if marcas:
+                tools.extend(marcas(x.get("name") or "", entrada))
     if abierto and ultimo:
         out.append((ultimo, tools))
     return out
@@ -117,7 +120,7 @@ def replay(dias=14, gate=None, solo=None, n_ejemplos=20):
                 continue
         except OSError:
             continue
-        for texto, tools in turnos(ruta):
+        for texto, tools in turnos(ruta, getattr(g, "_marcas", None)):
             n_turnos += 1
             corta = len(texto) < g.MIN_CHARS
             if any(u in texto for u in g.URGENTE):

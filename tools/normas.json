@@ -639,7 +639,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe en regex: saber si sostuve o cedí de más exige comparar con lo que ella objetó y con la evidencia. Necesita juez."
   },
   {
    "slug": "feedback-canal-y-contexto-del-contacto-ya-lo-se",
@@ -741,13 +741,14 @@
    "slug": "feedback-cierre-lo-tuyo-ahora",
    "que": "Al cerrar CADA tarea, dile siempre y al final, claro y sin jerga, qué le toca a ELLA (acciones humanas/gated); si no hay nada, dilo también",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/gate_salida.py::cierre_sin_lo_tuyo",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 21 disparos. Parcial: solo respuestas que se anuncian como cierre (Hecho, Qué hice, Sesión cerrada, Fusionado, Listo). Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-coach-colaboracion",
@@ -777,25 +778,27 @@
    "slug": "feedback-colaboraciones-marca-no-liderar-con-causa",
    "que": "En pitches a marcas NO liderar con la causa/enfermedad; posicionar como colab tech estándar; retribución vía DONACIÓN tras encajar el rate (guía de {{CONTACTO}}, validada)",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/gate_salida.py::marca_lidera_causa",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: detectar mención de causa/cáncer en borradores a marcas · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: detectar mención de causa/cáncer en borradores a marcas · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 0 disparos (9 FP en la 1.ª: hilos de X sobre el caso). Parcial: mira la apertura del borrador del pitch. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-comentarios-siempre-voz-titular",
    "que": "Voz de {{TITULAR}}: toda comunicación escrita en su nombre pasa por voz-titular por defecto (que suene a ella); CTA nunca «mi caso» sino «Todo, en abierto»; tono firme sin vacileo/sarcasmo",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/gate_salida.py::borrador_sin_voz",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py::check_paso_por_voz_titular · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py::check_paso_por_voz_titular · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 10 disparos (80 con la 1.ª versión, que tomaba cualquier cita «>» por borrador). Parcial: no ve una pasada de voz hecha en un turno anterior. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-comite-git",
@@ -957,13 +960,14 @@
    "slug": "feedback-correos-formato-html",
    "que": "correos a terceros SIEMPRE en HTML bien formateado (negritas, enlaces clicables, listas) — nunca texto plano",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::correo_sin_html",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: gate_salida.py/lint: draft a tercero sin htmlBody HTML se rechaza · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. Mejor como PreToolUse sobre create_draft (mira htmlBody) que como check de salida."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: gate_salida.py/lint: draft a tercero sin htmlBody HTML se rechaza · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. Mejor como PreToolUse sobre create_draft (mira htmlBody) que como check de salida. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 35 disparos, todos borradores reales a terceros sin htmlBody. Mira la ENTRADA de create_draft vía gate_salida._marcas (el replay usa la misma). Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-cotejar-siempre-fuente-clinica",
@@ -975,7 +979,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: exigir sello en claim clinico; cotejo real=criterio · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. La regex clinico_sin_sello se descartó con replay el 22-sep-26 (~30 % de acierto); consejero-arquitectura propone probar por tools (cifra clínica sin Read del informe)."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: exigir sello en claim clinico; cotejo real=criterio · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. La regex clinico_sin_sello se descartó con replay el 22-sep-26 (~30 % de acierto); consejero-arquitectura propone probar por tools (cifra clínica sin Read del informe). · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: la regex clinico_sin_sello ya se descartó (~30 % de acierto, 22-sep) y el cotejo por tools (cifra clínica sin Read del informe) no distingue qué informe respalda qué cifra. Necesita juez."
   },
   {
    "slug": "feedback-contacto-fuera-del-flujo-web",
@@ -1131,7 +1135,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py check: entregable final sin envio a Telegram · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. Por tools del turno: archivar_nota sin envío a Telegram (propuesta de consejero-arquitectura)."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py check: entregable final sin envio a Telegram · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. Por tools del turno: archivar_nota sin envío a Telegram (propuesta de consejero-arquitectura). · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): probado y descartado: dos formulaciones (archivar_nota sin envío; «a un clic/borrador listo» sin envío) dieron 124 y 131 disparos en 2.781 turnos, casi todos entregables de sistema o de chat que no son «definitivos». Qué es definitivo necesita juez."
   },
   {
    "slug": "feedback-entregable-no-vive-solo-en-chat",
@@ -1204,7 +1208,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es un modo de trabajar, no un patrón en una respuesta. Candidata a clase contexto; no se reclasifica aquí para no maquillar la cifra de S15."
   },
   {
    "slug": "feedback-flujo-redaccion-contactos",
@@ -1282,13 +1286,14 @@
    "slug": "feedback-gmail-mcp-lag-no-afirmar-no-existe",
    "que": "El buscador de Gmail (MCP) va con retraso; no afirmar que un correo \\\"no existe\\\" — re-buscar y fiarse del \\\"mira el hilo\\\" de {{TITULAR}}",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::correo_no_existe",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 4 disparos. Solo canta si el turno miró por el MCP de Gmail y no por IMAP ni navegador. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-hablar-natural-sin-prompt-engineering",
@@ -1330,13 +1335,14 @@
    "slug": "feedback-idioma-espanol",
    "que": "{{TITULAR}} prefiere que le hable SIEMPRE en español",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::respuesta_en_ingles",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: no · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 0 disparos (2 FP en la 1.ª: un error de la API y un borrador en inglés tras «---»). Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-instalar-lo-que-necesite-en-el-mac",
@@ -1360,7 +1366,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: si una decisión debió ir en AskUserQuestion depende del contenido. Candidata a clase contexto (no se reclasifica aquí para no maquillar S15)."
   },
   {
    "slug": "feedback-jaula-segunda-mejor-opcion-gratis",
@@ -1426,25 +1432,27 @@
    "slug": "feedback-mensajes-claros-no-cripticos",
    "que": "Todo mensaje que LLEGA a {{TITULAR}} debe ser claro y humano, nunca jerga interna ni códigos (B1/P1/A4/dispatcher/choke-point); ella se quejó de mensajes crípticos",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::jerga_interna",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: gate_salida.py: lint de jerga/IDs internos en salida a {{TITULAR}} · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: si. Propuesta: gate_salida.py: lint de jerga/IDs internos en salida a {{TITULAR}} · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 28 disparos (41 en la 1.ª versión: «dispatcher» repetido contaba como jerga amontonada). Ruido previsible: códigos de plan que ella misma usa (P2, F1); etiquetar antes de subir. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-mensajes-dm-estilo-del-hilo",
    "que": "Mensajes a un contacto por DM se redactan TIPO DM y al estilo real del hilo (corto, casual, burbujas, emoji), no como un email formal",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/gate_salida.py::dm_formato_email",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: borrador DM con andamiaje de email · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: borrador DM con andamiaje de email · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 0 disparos (2 FP en la 1.ª versión: correos que nombraban LinkedIn). Parcial: solo el andamiaje de email; el estilo del hilo necesita juez. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-minar-informes-proactivo",
@@ -1716,13 +1724,14 @@
    "slug": "feedback-no-rollo-builder-voz",
    "que": "A {{TITULAR}} NO le gusta el tono \"builder\"/tech-bro en su voz pública, aunque enganche — buscar ganchos que enganchen sin postureo",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": "parcial: .claude/hooks/gate_salida.py::tono_builder",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 0 disparos (13 FP en la 1.ª: «10x» de 10x Genomics y «shipped» de envío de muestras). Parcial: léxico, no tono. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-no-sobreingenierizar-filtrar-por-ned",
@@ -1758,7 +1767,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe todavía: haría falta un diccionario verificado metáfora→nombre técnico («cerebros», «carriles») y no existe; inventarlo daría falso verde."
   },
   {
    "slug": "feedback-nombres-siguen-la-marca",
@@ -1836,13 +1845,14 @@
    "slug": "feedback-pensar-por-dentro-responder-limpio",
    "que": "Pensar/concluir/aprender por dentro; a {{TITULAR}} le llega SOLO el mensaje limpio, no el proceso ni las conclusiones ni el «lo he guardado/aprendido».",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::proceso_en_respuesta",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py check \"me lo apunto\"/\"lo he guardado\" · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py check \"me lo apunto\"/\"lo he guardado\" · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 20 disparos; «memoria nueva» salió del patrón porque en los cierres de sistema la memoria es el entregable. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-peticion-general-no-es-tarea-suya",
@@ -1866,7 +1876,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: bloquear mencion de medicina china · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: gate_salida.py: bloquear mencion de medicina china · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: descartar el pilar «por no tener RCT» y describir su evidencia legítimamente usan las mismas palabras. Necesita juez."
   },
   {
    "slug": "feedback-plan-primero-luego-ejecutar",
@@ -1950,7 +1960,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es una preferencia de experiencia; verborrea ya cubre la parte medible. Candidata a clase contexto (no se reclasifica aquí)."
   },
   {
    "slug": "feedback-reel-desde-url-necesita-video",
@@ -2454,7 +2464,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): probado y descartado: «tú decides/¿qué prefieres?» al final dio 11 disparos, casi todos DESPUÉS de una propuesta concreta (legítimo). Una regex no ve si hubo propuesta antes. Necesita juez."
   },
   {
    "slug": "feedback-yo-decido-cuando-agentes",
@@ -2665,13 +2675,14 @@
    "slug": "feedback-suplementos-solo-calidad",
    "que": "Al evaluar un suplemento, responder SOLO calidad del producto; nada clínico",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::suplemento_clinico",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": true,
-   "nota": "Es DETECTABLE en la respuesta (una ficha de producto que mete evidencia clínica, «pregúntale a Lola» o «espera a la analítica»), así que la clase es `salida` — pero el check aún NO existe: el mecanismo va a null para que el hueco se vea — y sin mecanismo no puede declararse auditable (regla anti-falso-verde). Clasificada el 17-sep-2026 al cerrar el hueco del registro. · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer."
+   "nota": "Es DETECTABLE en la respuesta (una ficha de producto que mete evidencia clínica, «pregúntale a Lola» o «espera a la analítica»), así que la clase es `salida` — pero el check aún NO existe: el mecanismo va a null para que el hueco se vea — y sin mecanismo no puede declararse auditable (regla anti-falso-verde). Clasificada el 17-sep-2026 al cerrar el hueco del registro. · 25-sep-26 (punto 08): mecanizable por regex o por las tools del turno, aún sin hacer. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 3 disparos (4 en la 1.ª: un ensayo que mencionaba cápsulas). Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-veto-escrito-en-codigo-se-publica",
@@ -2817,7 +2828,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Registrada 20-sep-26 para cerrar el hueco de `normas_sin_clasificar`. Sin mecanismo: es criterio, y decir lo contrario sería falso verde. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Registrada 20-sep-26 para cerrar el hueco de `normas_sin_clasificar`. Sin mecanismo: es criterio, y decir lo contrario sería falso verde. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: qué rótulo es inferido lo sabe el contenido, no la forma. Necesita juez."
   },
   {
    "slug": "feedback-reusar-de-pagina-publicada-copiar-no-mover",
@@ -2847,13 +2858,14 @@
    "slug": "feedback-todo-lo-elegido-va-a-nota-lola",
    "que": "Todo producto elegido en el plan TB06 va también a la nota «Consultar con Lola»",
    "clase": "salida",
-   "mecanismo": "",
+   "mecanismo": ".claude/hooks/gate_salida.py::lola_sin_nota",
    "fresca": true,
    "heredada": false,
    "aplicable": true,
-   "auditable": false,
+   "auditable": true,
    "repetida": false,
-   "nota": "Registrada 20-sep-26 para cerrar el hueco de `normas_sin_clasificar`. Sin mecanismo: es criterio, y decir lo contrario sería falso verde. · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. En rigor es lint-doc (comparar plan TB06 con la nota de Lola)."
+   "nota": "Registrada 20-sep-26 para cerrar el hueco de `normas_sin_clasificar`. Sin mecanismo: es criterio, y decir lo contrario sería falso verde. · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. En rigor es lint-doc (comparar plan TB06 con la nota de Lola). · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): mecanizada en aviso, test en tests/test_gate_s15.py. replay_gate 30 d / 2.781 turnos antes de registrarla: 2 disparos, los dos del 19-sep (el día de la corrección). Por las tools del turno: comando que toca «Comprar para TB06» sin tocar «Consultar con Lola». Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-verificar-el-rojo-antes-de-revertir",
@@ -2890,7 +2902,7 @@
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Registrada 20-sep-26 al cerrar el hueco de normas_sin_clasificar. Sin mecanismo: es criterio. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "Registrada 20-sep-26 al cerrar el hueco de normas_sin_clasificar. Sin mecanismo: es criterio. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: la autocensura es una omisión en la web, no un patrón visible en la respuesta. Necesita juez."
   },
   {
    "slug": "feedback-no-tocar-ficheros-de-un-agente-vivo",
@@ -2986,7 +2998,7 @@
    "aplicable": false,
    "auditable": false,
    "repetida": false,
-   "nota": "20-sep-26, campana de los visores: un copy en su voz le fabricaba una intuicion que ella nunca dijo. Es del eje SALIDA (se veria en el borrador antes de entregarlo), pero hoy no hay check que lo detecte: sin mecanismo, y por eso no se declara auditable. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde."
+   "nota": "20-sep-26, campana de los visores: un copy en su voz le fabricaba una intuicion que ella nunca dijo. Es del eje SALIDA (se veria en el borrador antes de entregarlo), pero hoy no hay check que lo detecte: sin mecanismo, y por eso no se declara auditable. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: una regex ve comillas en su voz, no si ella dijo esa frase. Necesita cotejo contra sus mensajes reales (juez)."
   },
   {
    "slug": "feedback-verificar-lo-que-ya-estaba-no-solo-lo-nuevo",

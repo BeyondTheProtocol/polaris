@@ -525,6 +525,59 @@ class GuardDeSalida(unittest.TestCase):
         self._ok_envio("prográmalo")
         self.assertEqual(self._bash(self.MERGE_WEB % 220), "deny")
 
+    # ── un push que publica sube el commit que ella vio (P3 · F2b, 25-sep-26) ──
+    # Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+    def _repo_web(self):
+        repo = os.path.join(self.tmp, "web")
+        os.makedirs(repo)
+        for a in (["init", "-q", "-b", "main"], ["config", "user.email", "t@t"],
+                  ["config", "user.name", "t"], ["commit", "-q", "--allow-empty", "-m", "uno"]):
+            subprocess.run(["git", "-C", repo] + a, check=True, capture_output=True)
+        return repo
+
+    def _cabeza(self, repo):
+        return subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+
+    def test_push_a_main_con_el_commit_que_vio(self):
+        repo = self._repo_web()
+        self._yo("Listo para subir a main: %s «uno»." % self._cabeza(repo)[:7])
+        self._ok_envio("publícalo")
+        self.assertIsNone(self._bash("git push origin main", cwd=repo))
+
+    def test_push_a_main_sin_haberle_ensenado_el_commit(self):
+        repo = self._repo_web()
+        self._yo("Listo para subir a main.")
+        self._ok_envio("publícalo")
+        self.assertEqual(self._bash("git push origin main", cwd=repo), "deny")
+
+    def test_push_tras_un_commit_nuevo_ya_no_vale(self):
+        """Ella vio el commit A; después se hizo B. Subir B no es lo que firmó."""
+        repo = self._repo_web()
+        self._yo("Listo para subir a main: %s." % self._cabeza(repo)[:7])
+        self._ok_envio("publícalo")
+        subprocess.run(["git", "-C", repo, "commit", "-q", "--allow-empty", "-m", "dos"], check=True)
+        self.assertEqual(self._bash("git push origin main", cwd=repo), "deny")
+
+    def test_push_que_no_se_puede_atar_no_sale(self):
+        repo = self._repo_web()
+        self._yo("Listo para subir a main: %s." % self._cabeza(repo)[:7])
+        self._ok_envio("publícalo")
+        for cmd in ("git push --all origin", "git push origin :main", "git push origin noexiste:main"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self._bash(cmd, cwd=repo), "deny", cmd)
+
+    def test_la_clave_del_push_no_se_puede_colar(self):
+        """Si la llamada trae su propio `_push_shas`, el guard lo pisa con lo que resuelve él."""
+        repo = self._repo_web()
+        self._yo("Listo para subir a main: 0000000.")
+        self._ok_envio("publícalo")
+        r = self._decision(self._hook({"tool_name": "Bash", "cwd": repo,
+                                       "permission_mode": "bypassPermissions",
+                                       "tool_input": {"command": "git push origin main",
+                                                      "_push_shas": ["0000000" + "0" * 33]}}))
+        self.assertEqual(r, "deny")
+
     def test_el_aviso_dice_fusionar(self):
         self._yo("¿fusiono el #224?")
         r = self._ok_envio("fusiona")

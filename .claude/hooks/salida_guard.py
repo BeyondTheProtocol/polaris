@@ -493,6 +493,8 @@ def _bash_envia(cmd, cwd=""):
                 repo = os.path.join(repo, os.path.expanduser(args[1]))
                 args = args[2:]
             if args and args[0] == "push" and _push_publica(args[1:], repo):
+                global _PUSH
+                _PUSH = (repo, args[1:])
                 return "git push que publica (casa base, o main/master) en " + repo
             if args and args[0] == "push":
                 fuera = _git_remoto_fuera(args[1:], repo, cmd)
@@ -525,6 +527,41 @@ def _bash_envia(cmd, cwd=""):
     return ""
 
 
+def _shas_del_push(repo, args):
+    """Commits que sube un `git push`, resueltos en SU repo, o None si no se puede saber
+    (--all/--mirror/--tags, borrar una rama, un ref que no resuelve). None = no se ata = no sale."""
+    if any(a in ("--all", "--mirror", "--tags") for a in args):
+        return None
+    libres = [a for a in args if not a.startswith("-")]
+    out = []
+    for r in (libres[1:] or ["HEAD"]):
+        src = r.lstrip("+").split(":")[0]
+        if not src:
+            return None
+        try:
+            import subprocess
+            p = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", src + "^{commit}"],
+                               capture_output=True, text=True, timeout=5)
+        except Exception:
+            return None
+        sha = (p.stdout or "").strip().lower()
+        if p.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            return None
+        out.append(sha)
+    return out
+
+
+def _con_push(entrada):
+    """P3 · F2b (25-sep-26): la entrada que ve `comprobar_envio`, con los commits que sube el push.
+    La clave la pone SIEMPRE el guard (se borra la que traiga la llamada): no se puede colar.
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026."""
+    e = dict(entrada or {})
+    e.pop("_push_shas", None)
+    if _PUSH:
+        e["_push_shas"] = _shas_del_push(*_PUSH) or []
+    return e
+
+
 def _token_valido(datos=None, entrada=None):
     """(permiso|None, motivo). Un solo uso, 10 minutos, y SUYO de verdad (22-sep-26).
 
@@ -542,7 +579,7 @@ def _token_valido(datos=None, entrada=None):
     if not d:
         _log("token_invalido", datos.get("tool_name") or "?", motivo)
         return None, motivo
-    discrepa = P.comprobar_envio(ctx, entrada, datos.get("tool_name") or "")
+    discrepa = P.comprobar_envio(ctx, _con_push(entrada), datos.get("tool_name") or "")
     if discrepa:
         # No se borra: su OK sigue valiendo para lo que SÍ aprobó.
         _log("token_no_casa", datos.get("tool_name") or "?", discrepa)
@@ -790,6 +827,7 @@ def _acciones_de_batch(entrada):
 
 _CWD = ""   # `cwd` de la entrada del PreToolUse; lo fija `main()` (22-sep-26)
 _POR_QUE = ""   # en Bash, QUÉ orden se ha leído como envío: va al log y al motivo
+_PUSH = None    # (repo, args) del `git push` que publica, para atarlo al commit que ella vio (F2b)
 
 
 def _sale_fuera(tool, entrada):
@@ -831,7 +869,8 @@ def _sale_fuera(tool, entrada):
     if verbo and D is None and not tool.startswith(("mcp__ccd_",)):
         return "clic"
     if tool == "bash":      # ya viene normalizado a minúsculas por _norm_tool
-        global _POR_QUE
+        global _POR_QUE, _PUSH
+        _PUSH = None
         _POR_QUE = _bash_envia((entrada or {}).get("command", ""), _CWD)
         return "envia" if _POR_QUE else None
     return None

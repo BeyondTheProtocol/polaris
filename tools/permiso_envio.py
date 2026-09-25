@@ -539,6 +539,25 @@ def comprobar_fusion(ctx, numero, sha=None):
     return _comprobar_contenido(ctx, numero, sha)
 
 
+def comprobar_push(ctx, shas):
+    """P3 · F2b (25-sep-26): un `git push` que publica sube EXACTAMENTE commits que ella vio.
+
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+    `shas` los resuelve `salida_guard` en el repo del push (vacío = no se pudo saber qué sube:
+    --all, --tags, borrar una rama, un ref que no existe). Cada uno tiene que estar, con 7+
+    caracteres, en lo que ella tenía delante o en su mensaje. Si después de su OK se hace otro
+    commit, la cabeza cambia y el push ya no pasa: tiene que ver el nuevo."""
+    como = "enséñale el commit que sube (`git log -1 --format='%h %s' <rama>`) y pide su OK sobre ese"
+    if not shas:
+        return "no sé qué commit sube este push, así que no puedo atarlo a lo que ella vio; " + como
+    vistos = ctx.get("shas_vistos") or set()
+    for sha in shas:
+        if not any(len(v) >= 7 and sha.startswith(v) for v in vistos):
+            return "el push sube %s, que no estaba en lo que ella tenía delante al decirlo; %s" % (
+                sha[:12], como)
+    return ""
+
+
 def _comprobar_contenido(ctx, numero, sha):
     """P3 · F2 (25-sep-26): la firma va atada al CONTENIDO, no solo al número del PR.
 
@@ -578,6 +597,8 @@ def comprobar_envio(ctx, entrada, tool=""):
                 else "su orden no cubre fusionar un PR")
     if que == "fusionar":
         return comprobar_fusion(ctx, numero, sha_de_merge(entrada.get("command")))
+    if "_push_shas" in entrada:
+        return comprobar_push(ctx, entrada.get("_push_shas"))
     destinos = destinatarios(entrada)
     if ctx.get("emails") and destinos - ctx["emails"]:
         return "va a %s y ella nombró %s" % (", ".join(sorted(destinos - ctx["emails"])),
