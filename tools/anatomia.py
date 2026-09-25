@@ -365,11 +365,19 @@ def _familia_de(nombre):
     return "otras"
 
 
+TEMPORALES = ("_mutante_",)
+
+
 def herramientas():
     """Las tools .py agrupadas por familia, con el total de líneas."""
     fams, lineas = {}, 0
     for p in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py"))):
         nombre = os.path.basename(p)[:-3]
+        # `tools/mutantes.py` escribe copias `_mutante_*.py` junto al original mientras corre una
+        # batería en casa base. No son tools: contarlas hacía oscilar la huella («otras» 3↔4↔6)
+        # según hubiera o no una batería en marcha, y el sello quedaba mintiendo (26-sep-26).
+        if nombre.startswith(TEMPORALES):
+            continue
         fams.setdefault(_familia_de(nombre), []).append(nombre)
         try:
             with open(p, "rb") as f:
