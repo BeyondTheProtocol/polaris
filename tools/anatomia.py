@@ -272,7 +272,10 @@ FAMILIAS = [
                       "anticipa", "triage", "vega_", "persecucion", "dedup",
                       "buzon", "reconcilia", "sync_playbook", "leer_contacto",
                       "responder_con_datos", "viajes", "asistente", "hoy_",
-                      "org_wrap", "cuidado", "etiquetar_")),
+                      "org_wrap", "cuidado", "etiquetar_",
+                      # ordena la bandeja de WhatsApp para Vega, no decide (P5, 25-sep-26): es
+                      # triaje de producción como `triage` y `vega_`, no una medida del sistema
+                      "presorteo")),
     ("dinero", ("coste", "cost_guard", "finanzas", "presupuesto", "pago",
                 "gasto")),
     ("git y ramas", ("git", "ramas", "deploy", "release", "worktree",
@@ -292,7 +295,8 @@ FAMILIAS = [
                        "carril_gratis", "elevenlabs", "voz_", "transcribe",
                        "openrouter",
                        "enruta",     # enruta.py es quien ELIGE el modelo: aqui, no en «otras»
-                       "local")),    # local.py es el LLM que corre en casa (ollama), egress 0
+                       "local",      # local.py es el LLM que corre en casa (ollama), egress 0
+                       "modelo_mlx")),  # el otro LLM de casa (MLX, egress 0) con sus frenos de memoria
     ("documentos", ("md_to_pdf", "drive", "_pdf", "pdf_")),
     ("la casa (infra)", ("_lock", "_net", "_xurl", "_casa", "activar_daemon", "backup",
                          "borde", "preview_remoto", "staging", "mcp_server",
@@ -307,8 +311,6 @@ FAMILIAS = [
                             "bench_determinista",   # mide acierto del triaje, set dorado
                             "bench_jev",            # mide un modelo externo contra el mismo set, tras el muro
                             "bench_modelos",        # modelo LOCAL por tarea contra el determinista (P5)
-                            "modelo_mlx",           # modelo local en MLX con sus frenos de memoria
-                            "presorteo",            # ordena la bandeja de WhatsApp para Vega; no decide
                             "mutantes")),           # comprueba que los tests de verdad protegen
 ]
 
