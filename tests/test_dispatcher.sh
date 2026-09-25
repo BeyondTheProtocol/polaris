@@ -23,7 +23,10 @@ EOF
 q()  { BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cola.py" "$@"; }
 cnt() { wc -l <"$COUNTER" 2>/dev/null | tr -d ' '; }
 run_once() { BTP_TEST_BATTERY=1 BTP_LOG_DIR="$TMP/logs" BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1; }
-fresh() { TMP="$(mktemp -d)"; ST="$TMP/state"; MOCK="$TMP/mock.sh"; COUNTER="$TMP/counter"; HALT="$TMP/.halt"; : >"$COUNTER"; }
+# Cada tmp del test queda apuntado: es la huella que el test deja en un log («state $TMP/state»)
+# y la que el daemon vivo nunca escribe. Ver la comprobación del log real al final.
+MARCAS="$(mktemp)"
+fresh() { TMP="$(mktemp -d)"; ST="$TMP/state"; MOCK="$TMP/mock.sh"; COUNTER="$TMP/counter"; HALT="$TMP/.halt"; : >"$COUNTER"; echo "$TMP" >>"$MARCAS"; }
 
 echo "== Dispatcher (integración) =="
 
@@ -64,6 +67,7 @@ fresh; mkmock 0 0.05 false
 q enqueue --procedencia t "trabajo" >/dev/null
 mkdir -p "$ST/dispatcher/lock"
 sleep 30 & livepid=$!; echo "$livepid" >"$ST/dispatcher/lock/pid"
+echo "pid $livepid)" >>"$MARCAS"   # esta salida temprana no pasa por «dispatcher arriba … state»
 run_once
 [ "$(cnt)" = "0" ] && ok || no "lock: con otro cerebro vivo NO debe trabajar (cnt=$(cnt))"
 kill "$livepid" 2>/dev/null
@@ -231,7 +235,12 @@ q enqueue --procedencia t "trabajo sin BTP_LOG_DIR" >/dev/null
 BTP_TEST_BATTERY=1 BTP_REPO="$ROOT" BTP_STATE_DIR="$ST" BTP_HALT_FILES="$HALT" BTP_RUN_AGENT="$MOCK" BTP_BANDEJA="$TMP/bandeja.md" BTP_PANEL="$TMP/panel.md" BTP_ONCE=1 bash "$ROOT/tools/btp_dispatcher.sh" >/dev/null 2>&1
 grep -q "lanzo job" "$ST/launchd-logs/dispatcher.out" 2>/dev/null && ok || no "log: en batería sin BTP_LOG_DIR va al estado aislado"
 rm -rf "$TMP"
-[ "$(log_sz)" = "$LOG_ANTES" ] && ok || no "el dispatcher.out del árbol bajo prueba creció ($LOG_ANTES → $(log_sz) bytes): un test escribe en el log de verdad"
+# NO se compara el tamaño (25-sep-2026): en casa base el daemon vivo escribe en este mismo fichero
+# («cost_guard … pauso rutina 60s» cada minuto) y el test salía rojo 1 de cada 2 veces sin culpa.
+# Se mira lo AÑADIDO durante el test y se buscan las huellas del test (sus tmp y el pid del lock).
+fuga="$(tail -c +$((LOG_ANTES + 1)) "$LOG_REAL" 2>/dev/null | grep -F -f "$MARCAS")"
+[ -z "$fuga" ] && ok || no "un test escribió en el dispatcher.out de verdad: $(echo "$fuga" | head -2)"
+rm -f "$MARCAS"
 
 [ "$(panel_sz)" = "$PANEL_ANTES" ] && ok || no "el PANEL-LAZO del árbol bajo prueba cambió ($PANEL_ANTES → $(panel_sz) bytes): un test escribe en el panel de verdad"
 
