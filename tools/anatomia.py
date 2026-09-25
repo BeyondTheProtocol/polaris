@@ -210,7 +210,10 @@ FAMILIAS = [
                           "gate_escalera",
                           "replay_gate",       # mide un check nuevo contra respuestas reales (22-sep-26)
                           # a Grok/Perplexity sale el TEMA de la búsqueda, no su frase (22-sep-26)
-                          "reescribe_consulta", "eval_reescritura")),
+                          "reescribe_consulta", "eval_reescritura",
+                          # reinicia el historial del espejo si algo privado ya salió (25-sep-26);
+                          # sin esto caía en «el caso clínico» por llevar «historial» en el nombre
+                          "espejo_reiniciar")),
     ("el caso clínico", ("cascada", "contexto_caso", "elegibilidad", "nct",
                          "estado_actual",   # fecha de §1 de ESTADO-ACTUAL: candado del perfil N1 del radar
                          "invariante", "dosier", "ocr_informes", "postdicom",
