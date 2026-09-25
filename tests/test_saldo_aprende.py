@@ -101,6 +101,30 @@ def main():
     check("run_agent marca «agotado» al ver el 400 de saldo", "cost_guard.py\" credito agotado" in run_agent)
     check("run_agent marca «ok» tras un éxito por la API medida", "cost_guard.py\" credito ok" in run_agent)
 
+    # ── tope de gasto de la consola (26-sep-26): no es saldo ni rate, y avisa con fecha y enlace ──
+    import re
+    import subprocess
+    m = re.search(r"^is_tope_consola\(\) \{.*?^\}", run_agent, re.S | re.M)
+    check("run_agent define is_tope_consola", m is not None)
+    if m:
+        real = ('{"is_error":true,"result":"API Error: 400 {\\"type\\":\\"invalid_request_error\\",'
+                '\\"message\\":\\"You have reached your specified API usage limits. You will regain '
+                'access on 2026-10-01 at 00:00 UTC.\\"}"}')
+        casos = {
+            "respuesta real del 26-sep": (real, 0),
+            "saldo agotado (otra cosa)": ('{"is_error":true,"result":"Credit balance is too low"}', 1),
+            "rate limit pasajero": ('{"is_error":true,"api_error_status":429,"result":"rate limit"}', 1),
+            "respuesta buena que cita el texto": ('{"is_error":false,"result":"usage limits … regain access on"}', 1),
+        }
+        for nombre, (out, rc) in casos.items():
+            r = subprocess.run(["bash", "-c", m.group(0) + '\nis_tope_consola "$1"', "_", out],
+                               capture_output=True, stdin=subprocess.DEVNULL)
+            check("is_tope_consola: " + nombre, r.returncode == rc)
+    check("el tope corta la cadena de modelos (misma cuenta)",
+          'is_credit_out "$OUT" || is_tope_consola "$OUT"; then break' in run_agent)
+    check("el aviso lleva el enlace para subir el límite", "platform.claude.com/settings/limits" in run_agent)
+    check("latido propio «tope_consola»", 'heartbeat "tope_consola"' in run_agent)
+
     print("test_saldo_aprende: %d OK, %d fallos" % (_pass, _fail))
     return 1 if _fail else 0
 

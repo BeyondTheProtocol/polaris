@@ -182,7 +182,7 @@ RUTINAS_NED = (
 )
 ESTADOS_NED_MALOS = {
     "fallo", "critico_bloqueado", "centralita",
-    "aplazado_sin_saldo", "aplazado_tope_local", "aplazado_limite", "credito_agotado",
+    "aplazado_sin_saldo", "aplazado_tope_local", "aplazado_limite", "credito_agotado", "tope_consola",
 }
 RUTINA_NED_DIAS_UMBRAL = 2
 

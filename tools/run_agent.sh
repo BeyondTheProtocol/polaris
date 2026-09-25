@@ -480,6 +480,14 @@ is_limit() {  # $1 = OUT — límite de capacidad/rate REINTENTABLE (NO el saldo
   printf '%s' "$1" | grep -qiE 'overloaded|rate[ _-]?limit|too many requests|usage limit|quota exceeded' && return 0
   return 1
 }
+is_tope_consola() {  # $1 = OUT — TOPE DE GASTO MENSUAL de la consola (26-sep-26). No es saldo ni rate:
+  # «You have reached your specified API usage limits. You will regain access on <fecha>». Ningún
+  # modelo de la cadena ayuda (es la misma cuenta) y reintentar cada minuto durante días no lo
+  # arregla: lo desbloquea {{TITULAR}} subiendo el límite. Antes caía en is_limit («usage limit») y el
+  # lazo aplazaba en silencio hasta el día 1.
+  printf '%s' "$1" | grep -qE '"is_error":[[:space:]]*true' || return 1
+  printf '%s' "$1" | grep -qiE 'specified API usage limits|regain access on'
+}
 is_credit_out() {  # $1 = OUT — saldo de prepago AGOTADO (ningún modelo más barato ayuda).
   printf '%s' "$1" | grep -q '"api_error_status":[[:space:]]*400' \
     && printf '%s' "$1" | grep -qi 'Credit balance is too low'
@@ -655,7 +663,7 @@ print(1 if (d.get("total_cost_usd") or 0) > 0 or (u.get("output_tokens") or 0) >
       _canario_falla "el run de $AGENT_NAME ($M) no dejó testigo y no llegó a trabajar; repito el preflight en el siguiente" ""
     fi
   fi
-  if is_credit_out "$OUT"; then break; fi          # saldo vacío → al manejador de crédito
+  if is_credit_out "$OUT" || is_tope_consola "$OUT"; then break; fi   # misma cuenta: otro modelo no ayuda          # saldo vacío → al manejador de crédito
   # 🔴 CRÍTICO + límite (25-sep-26, deuda carril-clinico-degrada-y-sirve-sin-marcar): NO degrada.
   # El comentario de CRITICO lo prometía («nunca se sirve con un cerebro flojo») y este bucle no lo
   # miraba: una tarea clínica que pedía Fable se respondía con Opus o Sonnet y le llegaba a {{TITULAR}}
@@ -718,6 +726,18 @@ if is_credit_out "$OUT" || is_limit "$OUT"; then
     fi
     : > "$CFLAG" 2>/dev/null || true
   fi
+  if is_tope_consola "$OUT"; then
+    MOTIVO="tope de gasto mensual de la consola"
+    _HASTA="$(printf '%s' "$OUT" | grep -oiE 'regain access on [0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1 | awk '{print $4}')"
+    mkdir -p "$CST/dispatcher" 2>/dev/null || true
+    TFLAG="$CST/dispatcher/aviso-tope-consola-$(date +%F).flag"
+    if [ ! -e "$TFLAG" ] && [ -f "$CST/notif/config.json" ]; then
+      "$PY" "$SALIDA_PY" report \
+        "La API de Anthropic ha llegado al tope de gasto mensual que tienes puesto en la consola${_HASTA:+ (vuelve sola el $_HASTA)}. No es saldo: recargar no lo arregla. Hasta que subas el límite, el lazo se queda en pausa. Se sube aquí: https://platform.claude.com/settings/limits 💜" \
+        >/dev/null 2>&1 || true
+    fi
+    : > "$TFLAG" 2>/dev/null || true
+  fi
   # Respaldo SOLO si es trabajo DISCRETO opt-in (BTP_FREE_OK). Clínico/crítico/agéntico → no.
   if intentar_centralita "$MOTIVO"; then exit 0; fi
   # APLAZAR con exit 75 (EX_TEMPFAIL): el dispatcher REINTENTA cuando Claude vuelva, sin fingir
@@ -750,6 +770,8 @@ if is_credit_out "$OUT" || is_limit "$OUT"; then
   fi
   if is_credit_out "$OUT"; then
     heartbeat "credito_agotado"
+  elif is_tope_consola "$OUT"; then
+    heartbeat "tope_consola"
   else
     echo "run_agent: cadena de modelos agotada por límite → aplazo $AGENT_NAME (reintenta al volver Claude)." >&2
     aviso_clinico "ninguno disponible ahora"
