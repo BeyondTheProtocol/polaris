@@ -141,6 +141,7 @@
     "entrada_guard",
     "gate_salida",
     "gate_subagente",
+    "launch_loopback_guard",
     "memoria_recall",
     "muro_guard",
     "ok_envio_prompt",
