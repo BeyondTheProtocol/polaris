@@ -336,6 +336,84 @@ def _terminos_de_personas():
     return tuple(sorted(terminos, key=lambda t: (-len(t), t)))
 
 
+# ── Excepciones con consentimiento: la cadena EXACTA que sí puede salir, y dónde ────────────
+# 25-sep-2026: tras poner una ficha en `alto`, su nombre se tapaba también en «🙏 Gracias» del
+# README, justo donde la regla de {{TITULAR}} manda nombrar a quien aporta. Pasar la ficha a
+# `publico` publicaría la ficha entera con sus fuentes, y sacar el nombre de pila de la
+# deny-list destaparía a otras personas que lo comparten. Así que la excepción es estrecha:
+#   · la cadena completa y exacta (un nombre suelto no vale: tiene espacio o es una URL),
+#   · solo en los ficheros publicados que declara (`ficheros`, rutas del árbol público),
+#   · con `consentimiento.fecha` y `consentimiento.origen`; si falta algo, no se aplica.
+# Vive en el overlay gitignored `tools/publicos.local.json`:
+#   {"excepciones": [{"texto": "Nombre Apellido", "ficheros": ["README.md"],
+#                     "consentimiento": {"fecha": "AAAA-MM-DD", "origen": "…"}}]}
+# Se protege con un marcador opaco ANTES de las sustituciones y se restaura DESPUÉS; el
+# barrido final la ignora en esos ficheros y en ningún otro.
+_MARCA_PUB = "%s"
+
+
+def _excepcion_valida(e):
+    if not isinstance(e, dict):
+        return False
+    texto = e.get("texto")
+    c = e.get("consentimiento") or {}
+    ficheros = e.get("ficheros")
+    return (isinstance(texto, str) and texto == texto.strip() and len(texto) >= 5
+            and (" " in texto or "://" in texto)
+            and isinstance(c, dict) and str(c.get("fecha") or "").strip()
+            and str(c.get("origen") or "").strip()
+            and isinstance(ficheros, list) and ficheros
+            and all(isinstance(f, str) and f.strip() for f in ficheros))
+
+
+def _leer_excepciones():
+    try:
+        with io.open(_overlay("publicos.local.json"), encoding="utf-8") as fh:
+            d = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    xs = d.get("excepciones") if isinstance(d, dict) else None
+    return xs if isinstance(xs, list) else []
+
+
+def _excepciones_publicas():
+    """{ruta publicada: (cadenas, de la más larga a la más corta)} de las entradas válidas."""
+    por_fichero = {}
+    for e in _leer_excepciones():
+        if _excepcion_valida(e):
+            for f in e["ficheros"]:
+                por_fichero.setdefault(os.path.normpath(f.strip()), set()).add(e["texto"])
+    return {f: tuple(sorted(ts, key=len, reverse=True)) for f, ts in por_fichero.items()}
+
+
+def _excepciones_ignoradas():
+    return sum(1 for e in _leer_excepciones() if not _excepcion_valida(e))
+
+
+_EXCEPCIONES = _excepciones_publicas()
+
+
+def _proteger(texto, rel):
+    """Cambia cada excepción de `rel` por su marcador. Devuelve (texto, marcadores)."""
+    cadenas = _EXCEPCIONES.get(os.path.normpath(rel)) if rel else None
+    if not cadenas:
+        return texto, ()
+    marcas = []
+    for i, c in enumerate(cadenas):
+        rx = re.compile(r"(?<![\w.@/-])%s(?![\w@])" % re.escape(c))
+        if rx.search(texto):
+            m = _MARCA_PUB % chr(0xE100 + i)
+            texto = rx.sub(lambda _m, m=m: m, texto)
+            marcas.append((m, c))
+    return texto, tuple(marcas)
+
+
+def _restaurar(texto, marcas):
+    for m, c in marcas:
+        texto = texto.replace(m, c)
+    return texto
+
+
 def _sin_tildes(t):
     import unicodedata
     return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
@@ -485,12 +563,16 @@ def _excluido(nombre):
     return any(p.search(nombre) for p in EXCLUIR_PAT)
 
 
-def despersonalizar(texto, con_perfil=True):
+def despersonalizar(texto, con_perfil=True, rel=None):
+    """`rel` = ruta en el árbol público; solo con ella se aplican sus excepciones."""
+    texto, marcas = _proteger(texto, rel)
     for patron, reemplazo in SUSTITUCIONES:
         texto = patron.sub(reemplazo, texto)
     # El perfil clínico va aparte: sus reglas viven en `perfil.local.json`, no en el código,
     # y solo se aplican a CONTENIDO (no a nombres de fichero, que no llevan diagnóstico).
-    return _despersonalizar_perfil(texto) if con_perfil else texto
+    if con_perfil:
+        texto = _despersonalizar_perfil(texto)
+    return _restaurar(texto, marcas)
 
 
 def _vetados_del_titular():
@@ -546,8 +628,10 @@ def caso_explicito(texto):
     return MARCA_CASO_EXPLICITO in (texto[:4000] or "")
 
 
-def vetados_en(texto, con_perfil=True):
-    """Los términos vetados que sobreviven. Lista vacía = limpio."""
+def vetados_en(texto, con_perfil=True, rel=None):
+    """Los términos vetados que sobreviven. Lista vacía = limpio. Con `rel`, las excepciones
+    consentidas de ESE fichero no cuentan; en cualquier otro, sí."""
+    texto, _ = _proteger(texto, rel)
     patrones = VETADOS + _vetados_del_titular()
     if con_perfil:
         patrones += _vetados_del_perfil()
@@ -616,7 +700,8 @@ def _copiar_uno(rel, destino):
     if es_texto(origen):
         with io.open(origen, encoding="utf-8", errors="replace") as fh:
             contenido = fh.read()
-        contenido = despersonalizar(contenido, con_perfil=not caso_explicito(contenido))
+        contenido = despersonalizar(contenido, con_perfil=not caso_explicito(contenido),
+                                    rel=os.path.relpath(salida, destino))
         if rel == os.path.join("tests", "test_all.sh"):
             contenido = _coser_runner(contenido)
         with io.open(salida, "w", encoding="utf-8") as fh:
@@ -644,7 +729,7 @@ def _barrer(destino):
                     contenido = fh.read()
                 # Un fichero con el marcador cuenta el caso a propósito: el barrido sigue
                 # exigiendo que no haya identidad, y deja pasar solo el perfil clínico.
-                hits += vetados_en(contenido, con_perfil=not caso_explicito(contenido))
+                hits += vetados_en(contenido, con_perfil=not caso_explicito(contenido), rel=rel)
             if hits:
                 sucios.append((rel, sorted(set(hits))))
     return sucios
@@ -693,6 +778,11 @@ def publicar(destino, forzar=False):
         # con --force. El árbol se deriva; el repo que lo aloja, no.
         _vaciar(destino)
     os.makedirs(destino, exist_ok=True)
+    ignoradas = _excepciones_ignoradas()
+    if ignoradas:
+        print("⚠️  %d excepción(es) de publicos.local.json sin texto completo, ficheros o "
+              "consentimiento (fecha y origen): no se aplican, se sigue tapando" % ignoradas,
+              file=sys.stderr)
 
     entran = [r for r in versionados() if _entra(r)]
     choques = _colisiones(entran)

@@ -283,7 +283,7 @@ también en el código, junto a la pieza que nació de su idea.
   demuestra. De ahí salen, entre otros, el permiso de envío firmado, el panel de alto riesgo
   que abre la fuente clínica en vez de fiarse de la cita (`tools/fuente_clinica.py`) y la
   entrega que no se repite (`tools/salida.py`).
-- **[{{CONTACTO}}](https://contacto)**, con su agente KAI: una revisión de arquitectura,
+- **[Andrea Eskailet](https://eskailet.com)**, con su agente KAI: una revisión de arquitectura,
   código y procesos (25-sep-2026) hecha sobre el propio repo, con la ruta y la línea de cada
   punto, y los fallos de seguridad por el canal privado. De ahí salen el listón numérico para
   pasar un check de avisar a bloquear, el vigilante de las rutinas fuera del Mac, los guards

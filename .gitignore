@@ -187,6 +187,9 @@ tools/identidad.local.json
 # Nombres de terceros que redacta el detector de PII.
 tools/nombres.local.json
 
+# Excepciones EXACTAS con consentimiento para el espejo público: las lee tools/publicar.py.
+tools/publicos.local.json
+
 # Perfil clínico del caso (dianas, cifras, variantes): lo lee tools/publicar.py.
 tools/perfil.local.json
 

@@ -356,6 +356,7 @@ runpy test_rutinas_latido.py              # 25-sep · cadencia real + periodo de
 runpy test_audit_agentes_daemon.py
 runpy test_publicar_fuga.py
 runpy test_publicar_personas.py  # ficha de persona `alto`: ni su apellido ni su ficha salen al espejo
+runpy test_publicar_publicos.py  # excepción con consentimiento: la cadena exacta, solo en sus ficheros
 runpy test_espejo_reiniciar_historial.py  # reiniciar el historial del espejo: ensayo por defecto, sin la palabra no empuja
 runpy test_publicar_overlay_casa_base.py
 runpy test_publicar_sync.py
