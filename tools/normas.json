@@ -3345,6 +3345,18 @@
    "auditable": false,
    "repetida": false,
    "nota": "25-sep-26: bucle_tope_guard construido y descartado por duplicar c5a71ca, fusionado por otra sesión mientras se planeaba. ramas.py en-vuelo no ve lo ya fusionado ni arreglos en ficheros con otro nombre. Mecanizable: parcial (aviso en ramas.py con el git log reciente de master por tema). Propuesta: no por ahora."
+  },
+  {
+   "slug": "feedback-mirar-casa-base-antes-de-arreglar-deuda",
+   "que": "Antes de arreglar una deuda escalada, mirar si casa base u otra rama ya trae su arreglo",
+   "clase": "contexto",
+   "mecanismo": "ninguno: criterio (leer el diff de la rama que toca el mismo fichero)",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": false,
+   "nota": "25-sep-26: arreglo duplicado de test-all-log-rojo-tmp-compartido; otra sesión fusionó el mismo (8c6c399) y el mío se revirtió."
   }
  ]
 }
