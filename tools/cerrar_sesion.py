@@ -411,7 +411,11 @@ def cerrar(apply=False, scope=None, podar=True):
                     % (len(r["repetidos"]), len(r["rescatados"]),
                        ("guardados en " + os.path.relpath(cajon, BASE)) if (apply and r["rescatados"])
                        else "(se guardarían en tools/state/rescate-poda/ al aplicar)"))
-        if apply and limpio and seguro:
+        viva = _sesion_viva_en(wt) if (limpio and seguro) else None
+        if viva:
+            acciones.append("poda: aplazada — %s. Podarlo le quitaría los hooks del muro a esa sesión; "
+                            "lo poda la autopoda diaria (`ramas.py autopoda`, rutina com.btp.git-barrido) cuando se cierre" % viva)
+        elif apply and limpio and seguro:
             # Candado COMPARTIDO "git-mutex" — MISMO nombre que la fusión de arriba (A1, 10-jul-26,
             # hallazgo B): antes esta poda mutaba `.git/worktrees/` SIN candado, así que una fusión
             # concurrente de OTRA sesión (que sí lo tomaba) no la serializaba con esta poda — la
@@ -435,6 +439,30 @@ def cerrar(apply=False, scope=None, podar=True):
         acciones.append("poda: omitida (--no-poda)")
 
     return dict(p, aplicado=apply, fusionado=fusionado, podado=podado, acciones=acciones)
+
+
+def _sesion_viva_en(wt):
+    """Motivo si hay una sesión de Claude viva DENTRO de `wt` (la que llama incluida), o "".
+
+    POR QUÉ (25-sep-26). Los hooks de una sesión se resuelven con `${CLAUDE_PROJECT_DIR}`, que es
+    su worktree. `--apply` podaba siempre el worktree desde el que se le llamaba, así que la sesión
+    que fusionaba y SEGUÍA trabajando se quedaba sin ningún hook: probado, `gh issue create --help`
+    pasó sin denegar en la sesión podada mientras el mismo `salida_guard.py` en casa base sí lo
+    denegaba. Fail-closed: si no se puede saber, se trata como ocupado."""
+    raiz = os.path.realpath(wt).rstrip("/")
+    if os.environ.get("CLAUDECODE") == "1":
+        yo = os.path.realpath(os.getcwd())
+        if yo == raiz or yo.startswith(raiz + "/"):
+            return "la sesión que llama (PID %s) sigue viva en este worktree" % os.environ.get("CLAUDE_PID", "?")
+    try:
+        vivas = _ramas.sesiones()
+    except Exception as e:                                     # noqa: BLE001
+        return "no se pudo comprobar si hay sesiones vivas (%s)" % type(e).__name__
+    for s in vivas:
+        c = os.path.realpath(s.get("cwd") or "") if s.get("cwd") else ""
+        if c and (c == raiz or c.startswith(raiz + "/")):
+            return "hay una sesión de Claude viva en este worktree (PID %s)" % s.get("pid", "?")
+    return ""
 
 
 def _continuidad_al_dia():
