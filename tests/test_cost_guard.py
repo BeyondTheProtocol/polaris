@@ -301,6 +301,116 @@ def main():
     sp2 = cg.saldo_prepago()
     check("2ª recarga manda (frac ≈ 0.4)", abs(sp2["frac"] - 0.4) < 1e-6 and sp2["monto"] == 100.0)
 
+
+    # 12. REGISTRO COMPLETO + DESGLOSE (25-sep-26): el JSON del día recorta a MAX_EVENTOS y no se
+    # podía saber en qué se fue el dinero. Cada apunte va también a detalle-AAAA-MM-DD.jsonl.
+    tmp12 = tempfile.mkdtemp(prefix="test_cost12_")
+    setup(tmp12)
+    cg.TOPE_DIARIO_USD = 540.0
+    n_extra = cg.MAX_EVENTOS + 20
+    for i in range(n_extra):
+        cg.add_cost(0.01, job_id="api-grok")
+    # pesimista: el trabajo no informó (stdin vacío y JSON sin coste)
+    cg.add_cost("", job_id="tecnico-20260925T101010")
+    cg.add_cost('{"is_error": true}', job_id="tecnico-20260925T111111", tope_job_usd=1.0)
+    # JSON real del CLI con coste por modelo
+    cli = {"total_cost_usd": 9.34, "modelUsage": {
+        "claude-opus-5": {"inputTokens": 50, "costUSD": 2.01},
+        "claude-fable-5": {"inputTokens": 76, "costUSD": 7.33}}}
+    cg.add_cost(json.dumps(cli), job_id="asistente-20260925T120000")
+    # job de la cola: el agente sale de su JSON en queue/<estado>/…-<id>.json
+    qd = os.path.join(tmp12, "queue", "done")
+    os.makedirs(qd)
+    json.dump({"id": "0123456789", "agente": "consejero-precision"},
+              open(os.path.join(qd, "1-20260925T051700944191-0123456789.json"), "w"))
+    cg.add_cost({"total_cost_usd": 1.5}, job_id="0123456789")
+    cg.add_cost({"total_cost_usd": 0.5}, job_id="abcdefabcd")    # no está en la cola
+    cg.add_cost(2.0, job_id="sub-x", via="suscripcion")
+    dia = cg._read_today()["fecha"]
+    lineas = [json.loads(l) for l in open(cg._detalle_path(dia), encoding="utf-8")]
+    total_esperado = 0.01 * n_extra + 3.0 + 1.0 + 9.34 + 1.5 + 0.5
+    check("el día sigue recortado a MAX_EVENTOS", len(cg._read_today()["eventos"]) == cg.MAX_EVENTOS)
+    check("registro: TODOS los apuntes, sin recorte (>50)", len(lineas) == n_extra + 6)
+    check("total del día intacto (= suma de apuntes api)",
+          abs(cg.today_spent() - total_esperado) < 1e-6
+          and abs(sum(l["usd"] for l in lineas if l["via"] == "api") - total_esperado) < 1e-6)
+    check("registro solo lleva ids y cifras",
+          all(set(l) <= {"ts", "job", "usd", "via", "pesimista", "modelos"} for l in lineas))
+    pes = [l for l in lineas if l["pesimista"]]
+    check("pesimista marcado (stdin vacío y JSON sin coste)",
+          [(l["job"], l["usd"]) for l in pes] == [("tecnico-20260925T101010", 3.0),
+                                                  ("tecnico-20260925T111111", 1.0)])
+    check("un coste informado NO es pesimista",
+          not any(l["pesimista"] for l in lineas if l["job"] == "asistente-20260925T120000"))
+    check("modelos leídos de modelUsage",
+          [l.get("modelos") for l in lineas if l["job"] == "asistente-20260925T120000"]
+          == [{"claude-opus-5": 2.01, "claude-fable-5": 7.33}])
+    check("registro con permisos 0600", (os.stat(cg._detalle_path(dia)).st_mode & 0o777) == 0o600)
+    check("el mes no cuenta el registro dos veces", abs(cg.month_spent() - total_esperado) < 1e-6)
+
+    r = cg.desglose(dia)
+    po = r["por_origen"]
+    check("desglose: agrupa api-*", po["api-grok"]["n"] == n_extra
+          and abs(po["api-grok"]["usd"] - 0.01 * n_extra) < 1e-6)
+    check("desglose: agente de run_agent sin el sello de hora",
+          po["tecnico"]["n"] == 2 and abs(po["tecnico"]["pesimista_usd"] - 4.0) < 1e-6)
+    check("desglose: job de la cola → su agente", abs(po["cola:consejero-precision"]["usd"] - 1.5) < 1e-6)
+    check("desglose: job de la cola ilocalizable se dice", "cola:(job no encontrado)" in po)
+    check("desglose: suscripción aparte, no es dinero",
+          abs(po["sub-x"]["suscripcion_usd"] - 2.0) < 1e-6 and po["sub-x"]["usd"] == 0.0
+          and abs(r["cuota_suscripcion_usd"] - 2.0) < 1e-6)
+    check("desglose: por modelo", abs(r["por_modelo"]["claude-fable-5"] - 7.33) < 1e-6
+          and abs(r["por_modelo"]["(pesimista, sin dato)"] - 4.0) < 1e-6)
+    check("desglose: pesimista total", abs(r["pesimista_usd"] - 4.0) < 1e-6 and r["pesimista_n"] == 2)
+    check("desglose: registro completo → nada fuera", r["fuera_del_registro_usd"] == 0.0)
+    check("desglose: texto sale y avisa de lo pesimista", "pesimista" in cg._texto_desglose(r))
+
+    # un día ANTERIOR al registro: el total existe pero el detalle no → se DECLARA, no se calla
+    json.dump({"fecha": "2026-09-24", "gastado_usd": 407.51, "n_jobs": 754, "eventos": []},
+              open(os.path.join(cg.COST, "2026-09-24.json"), "w"))
+    r0 = cg.desglose("2026-09-24")
+    check("día sin registro: todo declarado fuera", abs(r0["fuera_del_registro_usd"] - 407.51) < 1e-6
+          and r0["apuntes"] == 0)
+    check("día sin registro: el texto lo avisa", "NO están en el registro" in cg._texto_desglose(r0))
+    # línea corrupta: no tumba el desglose, se cuenta como ilegible
+    with open(cg._detalle_path("2026-09-24"), "a") as f:
+        f.write("{roto\n")
+    check("línea corrupta → ilegible, no rompe", cg.desglose("2026-09-24")["lineas_ilegibles"] == 1)
+    # CLI: --dia mal formado → uso (rc 2), no traza
+    check("CLI desglose --dia inválido → rc 2", cg.main(["desglose", "--dia", "ayer"]) == 2)
+    # si el registro no se puede escribir, el contador SIGUE sumando (el dinero manda)
+    antes = cg.today_spent()
+    real = cg._detalle_path
+    cg._detalle_path = lambda d: os.path.join(tmp12, "no", "existe", "x.jsonl")
+    try:
+        cg.add_cost(0.25, job_id="api-x")
+    finally:
+        cg._detalle_path = real
+    check("registro que falla no tumba el contador", abs(cg.today_spent() - antes - 0.25) < 1e-6)
+    check("…y el desglose declara lo que falta", abs(cg.desglose(dia)["fuera_del_registro_usd"] - 0.25) < 1e-6)
+
+    # 13. Un TEST nunca escribe en el dinero real (25-sep-26): test_gasto_tarifa apuntaba $4 en el
+    # contador de casa base en cada pasada de la batería. Un proceso `tests/test_*.py` sin
+    # BTP_STATE_DIR ni BTP_TEST_BATTERY va a un tmp; fuera de tests/ sigue siendo casa base.
+    import subprocess
+    tmp13 = tempfile.mkdtemp(prefix="test_cost13_")
+    for sub in ("tests", "tools_fake"):
+        os.makedirs(os.path.join(tmp13, sub))
+        with open(os.path.join(tmp13, sub, "test_sonda.py"), "w") as f:
+            f.write("import sys;sys.path.insert(0,%r);import cost_guard;print(cost_guard.COST)\n"
+                    % os.path.join(ROOT, "tools"))
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("BTP_STATE_DIR", "BTP_TEST_BATTERY", "BTP_REPO")}
+    casa_cost = os.path.join(os.path.expanduser("~/claudecode"), "tools", "state", "cost")
+    sal = {}
+    for sub in ("tests", "tools_fake"):
+        rr = subprocess.run([sys.executable, os.path.join(tmp13, sub, "test_sonda.py")],
+                            capture_output=True, text=True, env=env)
+        sal[sub] = rr.stdout.strip()
+    check("un tests/test_*.py sin aislar NO apunta al dinero real",
+          sal["tests"] and sal["tests"] != casa_cost and "claudecode" not in sal["tests"])
+    check("fuera de tests/ la contabilidad sigue siendo la de casa base", sal["tools_fake"] == casa_cost)
+
     print("RESULTADO cost_guard.py: %d OK, %d fallos" % (_pass, _fail))
     print("✅ COST_GUARD EN VERDE" if _fail == 0 else "❌ revisar fallos")
     return _fail

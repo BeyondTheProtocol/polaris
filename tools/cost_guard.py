@@ -44,9 +44,17 @@ REPO = casa_base()
 # worktree. Seis segundos no son 2.263 llamadas de API: era un test sin aislar, dinero SIMULADO.
 # Mientras la raíz era el worktree, eso solo ensuciaba un árbol que se borra; apuntando a casa
 # base habría entrado en el dinero de verdad. Por eso la migración trae su freno en el mismo sitio.
+# Tercer freno (25-sep-2026): un proceso que ES un test (`tests/test_*.py`) tampoco llega al dinero
+# real aunque se le olvide aislarse. Lo destapó el registro completo el mismo día que nació:
+# `test_gasto_tarifa` apuntaba $4 (grok $3 + perplexity $1) en el contador REAL en cada pasada de
+# `test_all.sh`, que no exporta BTP_TEST_BATTERY, y `test_perplexity_agent` otros céntimos. Ese
+# dinero simulado inflaba el gasto del día y gasta el tope de verdad. Freno de CLASE, no test a test.
+_MAIN = os.path.abspath(sys.argv[0]) if sys.argv and sys.argv[0] not in ("", "-c", "-") else ""
+_ES_TEST = (os.path.basename(os.path.dirname(_MAIN)) == "tests"
+            and os.path.basename(_MAIN).startswith("test_"))
 if os.environ.get("BTP_STATE_DIR"):
     STATE = os.environ["BTP_STATE_DIR"]
-elif os.environ.get("BTP_TEST_BATTERY") == "1":
+elif os.environ.get("BTP_TEST_BATTERY") == "1" or _ES_TEST:
     import tempfile
     STATE = os.path.join(tempfile.gettempdir(), "btp-test-cost-%d" % os.getuid())
 else:
@@ -589,27 +597,47 @@ def tipo_bloqueo(motivo):
 def _coste_de(entrada, tope_job_usd):
     """Extrae un USD del dict de run_agent (--output-format json) o de un número.
     Si no hay coste fiable → PESIMISTA (= tope del job), jamás 0."""
+    return _coste_detalle(entrada, tope_job_usd)[0]
+
+
+def _modelos_de(obj):
+    """{modelo: usd} de `modelUsage` del JSON del CLI de Claude, o None si no lo trae.
+    Solo nombres y cifras: nada del contenido del trabajo."""
+    mu = obj.get("modelUsage") if isinstance(obj, dict) else None
+    if not isinstance(mu, dict):
+        return None
+    out = {}
+    for m, u in mu.items():
+        c = u.get("costUSD") if isinstance(u, dict) else None
+        if isinstance(c, (int, float)) and math.isfinite(c):
+            out[str(m)] = round(float(c), 6)
+    return out or None
+
+
+def _coste_detalle(entrada, tope_job_usd):
+    """(usd, pesimista, modelos). `pesimista` = el trabajo NO informó de su coste y se apunta el
+    de por defecto; `modelos` = coste por modelo si el JSON lo trae. Misma regla que _coste_de."""
     pesimista = min(float(tope_job_usd), _limits()[1]) if tope_job_usd is not None else _limits()[1]
     if isinstance(entrada, (int, float)):
-        return float(entrada)
+        return float(entrada), False, None
     if isinstance(entrada, dict):
         v = entrada.get("total_cost_usd", entrada.get("cost_usd"))
         if isinstance(v, (int, float)):
-            return float(v)
-        return pesimista
+            return float(v), False, _modelos_de(entrada)
+        return pesimista, True, None
     if isinstance(entrada, str):
         s = entrada.strip()
         if not s:
-            return pesimista
+            return pesimista, True, None
         try:
             obj = json.loads(s)
-            return _coste_de(obj, tope_job_usd)
+            return _coste_detalle(obj, tope_job_usd)
         except Exception:
             try:
-                return float(s)
+                return float(s), False, None
             except Exception:
-                return pesimista
-    return pesimista
+                return pesimista, True, None
+    return pesimista, True, None
 
 
 def aprobar_tope_hoy(monto=None):
@@ -645,7 +673,8 @@ def add_cost(entrada, *, job_id=None, tope_job_usd=None, via="api"):
     topes; `cuota_suscripcion_usd` es lo que habría costado por API lo que corrió con el plan Max
     — se guarda para ver el volumen, pero no frena nada. Cada evento lleva su `via`. Los eventos
     viejos no la llevan: se leen como "api" (conservador, cuentan como dinero)."""
-    usd = max(0.0, _coste_de(entrada, tope_job_usd))   # suelo: un coste negativo no resta (H7)
+    usd, pesimista, modelos = _coste_detalle(entrada, tope_job_usd)
+    usd = max(0.0, usd)   # suelo: un coste negativo no resta (H7)
     # Cortacircuitos «de golpe» ({{TITULAR}} 27/6/26): un único cargo >= TOPE_GOLPE_USD es un runaway →
     # CÓDIGO ROJO (para todo + avisa fuerte). Fail-safe: si codigo_rojo no carga, no rompe el conteo.
     if usd >= TOPE_GOLPE_USD:
@@ -671,9 +700,165 @@ def add_cost(entrada, *, job_id=None, tope_job_usd=None, via="api"):
         d["eventos"] = ev[-MAX_EVENTOS:]
         d["tope_diario_usd"] = _limits()[0]
         _write_today(d)
+        # Registro COMPLETO (25-sep-26): el JSON del día recorta a MAX_EVENTOS y así no había forma
+        # de saber en qué se fue el dinero (el 24-sep, 25 apuntes a la vista de $407). Aquí va cada
+        # apunte, sin recorte. Después del contador y sin tumbarlo: el dinero manda, el detalle
+        # informa; si no se pudo escribir, `desglose` lo declara como gasto fuera del registro.
+        linea = {"ts": d["actualizado"], "job": job_id, "usd": round(usd, 6), "via": via,
+                 "pesimista": pesimista}
+        if modelos:
+            linea["modelos"] = modelos
+        _append_detalle(d.get("fecha") or d["actualizado"][:10], linea)
         return usd
     finally:
         _unlock()
+
+
+def _detalle_path(dia):
+    return os.path.join(COST, "detalle-%s.jsonl" % dia)
+
+
+def _append_detalle(dia, linea):
+    """Añade un apunte al registro completo del día. Nunca lanza (lo llama add_cost bajo el lock)."""
+    try:
+        p = _detalle_path(dia)
+        fd = os.open(p, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
+            f.write(json.dumps(linea, ensure_ascii=False) + "\n")
+    except Exception as e:
+        sys.stderr.write("cost_guard: no pude escribir el registro de detalle (%r)\n" % (e,))
+
+
+def _agente_de_cola(job_id, _cache={}):
+    """Agente de un job de la cola, sacado de su JSON en tools/state/queue/*/…-<id>.json.
+    None si no se encuentra; "" si el job no tiene agente."""
+    if job_id in _cache:
+        return _cache[job_id]
+    res = None
+    q = os.path.join(STATE, "queue")
+    try:
+        for sub in sorted(os.listdir(q)):
+            dd = os.path.join(q, sub)
+            if not os.path.isdir(dd):
+                continue
+            for fn in os.listdir(dd):
+                if fn.endswith("-%s.json" % job_id):
+                    try:
+                        res = json.load(open(os.path.join(dd, fn), encoding="utf-8")).get("agente") or ""
+                    except Exception:
+                        continue
+                    break
+            if res is not None:
+                break
+    except Exception:
+        pass
+    _cache[job_id] = res
+    return res
+
+
+def origen_de(job_id):
+    """A quién se le carga un apunte. `agente-AAAAMMDDTHHMMSS` → el agente (run_agent);
+    `api-*` → esa API; id de la cola → `cola:<agente>`; lo demás, el id tal cual."""
+    j = str(job_id or "?")
+    if j.startswith("api-"):
+        return j
+    base, _, sello = j.rpartition("-")
+    if _ and len(sello) == 15 and sello[8] == "T" and (sello[:8] + sello[9:]).isdigit():
+        return base or "(agente sin nombre)"
+    if j.startswith("ia-claude-"):
+        return "ia-claude"
+    if len(j) == 10 and all(c in "0123456789abcdef" for c in j):
+        ag = _agente_de_cola(j)
+        if ag is None:
+            return "cola:(job no encontrado)"
+        return "cola:%s" % (ag or "(sin agente)")
+    return j
+
+
+def desglose(dia=None):
+    """En qué se fue el dinero de un día, desde el registro completo (detalle-AAAA-MM-DD.jsonl).
+    Agrupa por origen y por modelo, separa lo pesimista y declara lo que NO está en el registro
+    (días anteriores al 25-sep-26, o apuntes que no se pudieron escribir) en vez de callárselo."""
+    dia = dia or datetime.now().strftime("%Y-%m-%d")
+    total_api = total_sus = 0.0
+    p_dia = os.path.join(COST, dia + ".json")
+    if os.path.exists(p_dia):
+        try:
+            dd = json.load(open(p_dia, encoding="utf-8"))
+            total_api = float(dd.get("gastado_usd", 0.0))
+            total_sus = float(dd.get("cuota_suscripcion_usd", 0.0))
+        except Exception:
+            pass
+    origenes, modelos = {}, {}
+    reg = {"api": 0.0, "suscripcion": 0.0}
+    pes = {"usd": 0.0, "n": 0}
+    n = malas = 0
+    p = _detalle_path(dia)
+    if os.path.exists(p):
+        for ln in open(p, encoding="utf-8"):
+            try:
+                e = json.loads(ln)
+                usd = float(e.get("usd", 0.0))
+            except Exception:
+                malas += 1
+                continue
+            n += 1
+            via = "suscripcion" if e.get("via") == "suscripcion" else "api"
+            reg[via] += usd
+            o = origenes.setdefault(origen_de(e.get("job")),
+                                    {"usd": 0.0, "n": 0, "pesimista_usd": 0.0, "suscripcion_usd": 0.0})
+            o["n"] += 1
+            if via == "suscripcion":
+                o["suscripcion_usd"] += usd
+            else:
+                o["usd"] += usd
+            if e.get("pesimista"):
+                o["pesimista_usd"] += usd
+                pes["usd"] += usd
+                pes["n"] += 1
+            if via == "api":
+                ms = e.get("modelos")
+                if isinstance(ms, dict) and ms:
+                    for m, c in ms.items():
+                        modelos[m] = modelos.get(m, 0.0) + float(c)
+                else:
+                    k = "(pesimista, sin dato)" if e.get("pesimista") else "(sin desglose por modelo)"
+                    modelos[k] = modelos.get(k, 0.0) + usd
+    r6 = lambda x: round(x, 6)
+    return {
+        "dia": dia, "apuntes": n, "lineas_ilegibles": malas,
+        "gastado_usd": r6(total_api), "en_registro_usd": r6(reg["api"]),
+        "fuera_del_registro_usd": r6(max(0.0, total_api - reg["api"])),
+        "cuota_suscripcion_usd": r6(total_sus), "suscripcion_en_registro_usd": r6(reg["suscripcion"]),
+        "pesimista_usd": r6(pes["usd"]), "pesimista_n": pes["n"],
+        "por_origen": {k: {kk: (r6(vv) if isinstance(vv, float) else vv) for kk, vv in v.items()}
+                       for k, v in sorted(origenes.items(), key=lambda kv: -(kv[1]["usd"] + kv[1]["suscripcion_usd"]))},
+        "por_modelo": {k: r6(v) for k, v in sorted(modelos.items(), key=lambda kv: -kv[1])},
+    }
+
+
+def _texto_desglose(r):
+    L = ["Gasto del %s: $%.2f de API" % (r["dia"], r["gastado_usd"])
+         + (" (+ $%.2f de cuota de suscripción, no es dinero)" % r["cuota_suscripcion_usd"]
+            if r["cuota_suscripcion_usd"] else "")]
+    if r["fuera_del_registro_usd"] > 0.005:
+        L.append("⚠️  $%.2f NO están en el registro (día anterior al registro completo o apuntes "
+                 "perdidos): de eso no se sabe en qué se fue." % r["fuera_del_registro_usd"])
+    L.append("En el registro: $%.2f en %d apuntes · pesimista (el trabajo no informó y se "
+             "apuntó el de por defecto): $%.2f en %d" % (r["en_registro_usd"], r["apuntes"],
+                                                        r["pesimista_usd"], r["pesimista_n"]))
+    if r["lineas_ilegibles"]:
+        L.append("⚠️  %d líneas del registro ilegibles (no suman arriba)" % r["lineas_ilegibles"])
+    L.append("")
+    L.append("%-34s %9s %5s %11s" % ("Origen", "USD", "n", "pesimista"))
+    for k, v in r["por_origen"].items():
+        extra = "  (+$%.2f suscr.)" % v["suscripcion_usd"] if v["suscripcion_usd"] else ""
+        L.append("%-34s %9.2f %5d %11.2f%s" % (k[:34], v["usd"], v["n"], v["pesimista_usd"], extra))
+    L.append("")
+    L.append("%-34s %9s" % ("Modelo (solo API)", "USD"))
+    for k, v in r["por_modelo"].items():
+        L.append("%-34s %9.2f" % (k[:34], v))
+    return "\n".join(L)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -738,6 +923,15 @@ def main(argv):
         rec = registrar_recarga(float(monto))
         print("Recarga anotada: $%.2f el %s. Avisaré al 75%% y al 90%% del gasto." % (rec["monto_usd"], rec["fecha"]))
         return 0
+    if cmd == "desglose":
+        dia = _arg(a, "--dia")
+        if dia and not (len(dia) == 10 and dia[4] == "-" and dia[7] == "-"
+                        and (dia[:4] + dia[5:7] + dia[8:]).isdigit()):
+            print("uso: cost_guard.py desglose [--dia AAAA-MM-DD] [--json]")
+            return 2
+        r = desglose(dia)
+        print(json.dumps(r, ensure_ascii=False, indent=2) if "--json" in a else _texto_desglose(r))
+        return 0
     if cmd == "saldo":
         sp = saldo_prepago()
         if sp is None:
@@ -745,7 +939,7 @@ def main(argv):
             return 0
         print(json.dumps(sp, ensure_ascii=False, indent=2))
         return 0
-    print("uso: cost_guard.py [check [--tope-job N] [--esencial] [--interactivo] [--via api|suscripcion] | add (--stdin|--usd N|--json '..') [--job id] [--via api|suscripcion] | today | month | aprobar [--monto N] | recarga <monto> | saldo]")
+    print("uso: cost_guard.py [check [--tope-job N] [--esencial] [--interactivo] [--via api|suscripcion] | add (--stdin|--usd N|--json '..') [--job id] [--via api|suscripcion] | today | month | aprobar [--monto N] | recarga <monto> | saldo | desglose [--dia AAAA-MM-DD] [--json]]")
     return 2
 
 
