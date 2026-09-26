@@ -1,0 +1,11 @@
+{
+ "pieza": "youtube.py",
+ "estado_ficha": "semilla",
+ "para": "Lee YouTube (Data API v3) en SOLO LECTURA: menciones, comentarios y stats de canal. Sin dependencias (stdlib).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

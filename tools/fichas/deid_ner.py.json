@@ -1,0 +1,11 @@
+{
+ "pieza": "deid_ner.py",
+ "estado_ficha": "semilla",
+ "para": "Capa NER de la de-identificación: modelo del BSC entrenado con historias reales.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_deid_ner.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

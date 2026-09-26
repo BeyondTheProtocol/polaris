@@ -39,13 +39,20 @@ ni en ninguna herramienta. Instalar sin cablear deja piezas muertas que nadie au
       y cuatro eran CLIs de mano sin documentar (se documentaron)
 - [x] Que cada agente declare **cada cuánto** se espera que trabaje (`ritmo:` en la ficha:
       permanente / a-demanda / estacional / dormido), con test que lo exige
-- [ ] Detectar solapes automáticamente: dos piezas que hacen lo mismo con nombres distintos
-- [ ] Un criterio de retirada, no solo de creación
-- [ ] Que crear una herramienta nueva obligue a declarar qué reemplaza
+- [x] Que crear una herramienta nueva obligue a declarar qué reemplaza: ficha por pieza en
+      `tools/fichas/` (para qué, cuándo sí, cuándo no, qué reemplaza, su test). El hook
+      `ficha_guard.py` deniega crearla sin ficha y enseña las 5 más parecidas;
+      `tests/test_fichas.py` lo cierra también por Bash (25-sep, idea de {{CONTACTO}} + KAI)
+- [x] Un criterio de retirada, no solo de creación: `inventario.py --uso` acumula cada noche el
+      uso real; 60 días sin uso → observación, 90 y huérfana → retiro propuesto a Vega. Retirar
+      es rama + `git mv` a `tools/retired/` con OK; nada se borra. Primera medida de 90 días
+      posible hacia el 24-dic-2026 (los transcripts solo guardan ~30 días)
+- [ ] Detectar solapes automáticamente: hoy solo por parecido de nombre y ficha
+      (`capacidades.py --tools`), no por lo que el código hace de verdad
 
-**Estado:** **189 herramientas** en `tools/`, tres modelos descargados en local de los que
-**solo uno está cableado**, **33 agentes** en `.claude/agents/` y **68
-daemons** declarados. Cada problema nuevo tiende a crear una pieza nueva.
+**Estado (25-sep-2026):** **250 herramientas** en `tools/` (223 `.py` + 27 `.sh`), tres modelos
+descargados en local de los que **solo uno está cableado**, **34 agentes** en `.claude/agents/` y
+**69 daemons** declarados (68 + `inventario-uso`). Cada problema nuevo tiende a crear una pieza nueva.
 
 **Por qué duele:** el catálogo crece más rápido que la capacidad de recordarlo. Una herramienta
 que nadie encuentra se reescribe, y entonces hay dos. El auditor vigila los charters de las

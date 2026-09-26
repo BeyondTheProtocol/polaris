@@ -1,0 +1,11 @@
+{
+ "pieza": "activar_daemon.py",
+ "estado_ficha": "semilla",
+ "para": "ÚNICA vía sancionada para encender un daemon launchd de BTP.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_activar_daemon.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

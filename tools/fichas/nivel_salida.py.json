@@ -1,0 +1,11 @@
+{
+ "pieza": "nivel_salida.py",
+ "estado_ficha": "semilla",
+ "para": "el CÓDIGO calcula el nivel de cada salida (P3, fase F1: SOMBRA).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_nivel_salida.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

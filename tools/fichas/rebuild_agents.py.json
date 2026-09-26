@@ -1,0 +1,11 @@
+{
+ "pieza": "rebuild_agents.py",
+ "estado_ficha": "semilla",
+ "para": "el núcleo regenera el borde.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_rebuild_agents.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

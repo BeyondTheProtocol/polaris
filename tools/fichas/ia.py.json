@@ -1,0 +1,11 @@
+{
+ "pieza": "ia.py",
+ "estado_ficha": "semilla",
+ "para": "LA CENTRALITA del motor: un adaptador único sobre los cerebros (F0/F1).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_ia.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

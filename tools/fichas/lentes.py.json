@@ -1,0 +1,11 @@
+{
+ "pieza": "lentes.py",
+ "estado_ficha": "semilla",
+ "para": "el enrutador de reserva de la caja: cuando la tabla no sabe de qué tema es, qué ÁNGULOS tiene.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_lentes.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

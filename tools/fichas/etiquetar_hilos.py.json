@@ -1,0 +1,11 @@
+{
+ "pieza": "etiquetar_hilos.py",
+ "estado_ficha": "semilla",
+ "para": "que ningún hilo abierto se quede sin dueño, sin reloj y sin NED.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_etiquetar_hilos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

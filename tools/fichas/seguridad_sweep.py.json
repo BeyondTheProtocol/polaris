@@ -1,0 +1,11 @@
+{
+ "pieza": "seguridad_sweep.py",
+ "estado_ficha": "semilla",
+ "para": "barrido de seguridad CONTINUO de toda la constelación.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_seguridad_sweep.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

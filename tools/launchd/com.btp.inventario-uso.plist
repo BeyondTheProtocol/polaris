@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Uso real de las piezas de tools/ (inventario.py en modo noche, determinista, $0, sin LLM). 25-sep-2026.
+     Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
+     Acumula en tools/state/uso_piezas.json lo que las sesiones, launchd y las trazas ejecutaron
+     en los últimos 2 días (los transcripts se purgan a ~30 días: lo acumulado es la única memoria
+     más larga), y propone a Vega un hilo si cambia la lista de piezas en observación (60 días) o con
+     retiro propuesto (90 días y huérfana). NO mueve ni borra nada: retirar es rama + OK.
+     Plist propio y no un paso del sweep de seguridad: un fallo del inventario no debe poder tocar
+     el daemon que dispara código rojo. RunAtLoad false; se enciende con tools/activar_daemon.py. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.inventario-uso</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>BTP_STATE_DIR</key><string>/Users/polaris/claudecode/tools/state</string>
+  </dict>
+  <key>ProgramArguments</key><array><string>/Users/polaris/claudecode/.venv/bin/python</string><string>/Users/polaris/claudecode/tools/inventario.py</string><string>--noche</string></array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>3</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/inventario-uso.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/inventario-uso.err</string>
+</dict></plist>

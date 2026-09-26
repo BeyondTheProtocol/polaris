@@ -1,0 +1,11 @@
+{
+ "pieza": "claude_lazo.py",
+ "estado_ficha": "semilla",
+ "para": "la versión de Claude Code que usa el lazo va FIJADA y solo sube con el canario verde.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_claude_lazo.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

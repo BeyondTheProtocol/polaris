@@ -1,0 +1,11 @@
+{
+ "pieza": "anatomia_push.py",
+ "estado_ficha": "semilla",
+ "para": "sube el mapa del sistema al panel, cifrado.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_anatomia_push.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

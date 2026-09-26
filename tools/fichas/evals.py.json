@@ -1,0 +1,11 @@
+{
+ "pieza": "evals.py",
+ "estado_ficha": "semilla",
+ "para": "F2b: el ARNÉS DE EVALS del motor (plan typed-swinging-wand, sección «Evals y testing»).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_evals.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

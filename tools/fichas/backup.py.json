@@ -1,0 +1,11 @@
+{
+ "pieza": "backup.py",
+ "estado_ficha": "semilla",
+ "para": "backup cifrado del sistema con restic a un USB. (Beyond the Protocol)",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_backup.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

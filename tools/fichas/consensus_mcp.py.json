@@ -1,0 +1,11 @@
+{
+ "pieza": "consensus_mcp.py",
+ "estado_ficha": "semilla",
+ "para": "cliente PROPIO del MCP de Consensus, DESACOPLADO de Claude Code.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "caja.py",
+ "estado_ficha": "semilla",
+ "para": "recoge lo que dijeron N subagentes y lo entrega como UN dossier.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_caja.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

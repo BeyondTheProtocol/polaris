@@ -1,0 +1,11 @@
+{
+ "pieza": "backup.sh",
+ "estado_ficha": "semilla",
+ "para": "copia cifrada e incremental de Polaris (restic) → disco POLARIS-BACKUP.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_backup.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

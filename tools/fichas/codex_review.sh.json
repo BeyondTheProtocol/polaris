@@ -1,0 +1,11 @@
+{
+ "pieza": "codex_review.sh",
+ "estado_ficha": "semilla",
+ "para": "Pide a Codex (OpenAI, incluido en el plan ChatGPT de {{TITULAR}}) una SEGUNDA OPINIÓN de código,",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

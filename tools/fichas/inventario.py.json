@@ -1,0 +1,11 @@
+{
+ "pieza": "inventario.py",
+ "estado_ficha": "completa",
+ "para": "Qué piezas de Polaris están vivas y cuáles no llama nadie; mide su uso real (sesiones, launchd, trazas) y lleva el ciclo de vida: 60 días sin uso, observación; 90 y huérfana, retiro propuesto.",
+ "cuando_si": "Para saber si una pieza se usa antes de ampliarla o retirarla; cada noche lo corre com.btp.inventario-uso (--noche).",
+ "cuando_no": "Para saber si una ficha está completa (fichas.py) ni para buscar parecidas (capacidades.py --tools). Nunca retira nada: retirar es rama + git mv a tools/retired/ con OK.",
+ "reemplaza": "Nada; --uso sustituye al último commit como señal de vida para el ciclo.",
+ "test": "tests/test_inventario_uso.py",
+ "alta": "19-sep-2026; uso y ciclo el 2026-09-25",
+ "origen": "Polaris (problema 2 de docs/lo-que-falta.md); uso nocturno y ciclo 60/90: idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026"
+}

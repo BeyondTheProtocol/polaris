@@ -1,0 +1,11 @@
+{
+ "pieza": "prueba_entregable.py",
+ "estado_ficha": "semilla",
+ "para": "¿el job dejó lo que prometió? (20-sep-2026)",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_prueba_entregable.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

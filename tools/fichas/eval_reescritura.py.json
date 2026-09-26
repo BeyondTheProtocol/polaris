@@ -1,0 +1,11 @@
+{
+ "pieza": "eval_reescritura.py",
+ "estado_ficha": "semilla",
+ "para": "rodaje de `borde.preparar_consulta` con el reescritor REAL.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

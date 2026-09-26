@@ -1,0 +1,11 @@
+{
+ "pieza": "cosecha_entregables.py",
+ "estado_ficha": "semilla",
+ "para": "red automática contra \"el entregable se quedó solo en el chat\".",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cosecha_entregables.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

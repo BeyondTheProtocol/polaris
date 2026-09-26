@@ -1,0 +1,11 @@
+{
+ "pieza": "bench_jev.py",
+ "estado_ficha": "semilla",
+ "para": "Jev (TypeSafe AI) contra el set dorado de triage, y contra lo que ya hay.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_bench_jev.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

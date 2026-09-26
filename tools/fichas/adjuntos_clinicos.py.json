@@ -1,0 +1,11 @@
+{
+ "pieza": "adjuntos_clinicos.py",
+ "estado_ficha": "semilla",
+ "para": "baja a local TODOS los informes médicos que están en el correo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_adjuntos_clinicos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

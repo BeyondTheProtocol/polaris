@@ -1,0 +1,11 @@
+{
+ "pieza": "enruta.py",
+ "estado_ficha": "semilla",
+ "para": "decide QUÉ LLM (o cuáles) usar para cada tarea.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_enruta.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

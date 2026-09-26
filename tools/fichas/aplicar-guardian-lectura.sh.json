@@ -1,0 +1,11 @@
+{
+ "pieza": "aplicar-guardian-lectura.sh",
+ "estado_ficha": "semilla",
+ "para": "Durabilidad del guardián de lectura clínica (Capa A).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

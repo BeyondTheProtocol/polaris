@@ -1,0 +1,11 @@
+{
+ "pieza": "email_archive.py",
+ "estado_ficha": "semilla",
+ "para": "ARCHIVO LOCAL de TODO el correo (IMAP solo lectura) → buscable por kb.py.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "instagram_dm.py",
+ "estado_ficha": "semilla",
+ "para": "capa de RESPUESTA a DMs de Instagram (borrador con gate del muro).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_instagram_dm.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

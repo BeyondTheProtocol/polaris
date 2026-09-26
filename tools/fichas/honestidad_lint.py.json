@@ -1,0 +1,11 @@
+{
+ "pieza": "honestidad_lint.py",
+ "estado_ficha": "semilla",
+ "para": "Linter de honestidad — caza afirmaciones FUERTES sin sello de evidencia. Determinista, SIN LLM.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_honestidad_lint.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

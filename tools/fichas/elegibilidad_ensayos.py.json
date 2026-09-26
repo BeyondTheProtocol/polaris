@@ -1,0 +1,11 @@
+{
+ "pieza": "elegibilidad_ensayos.py",
+ "estado_ficha": "semilla",
+ "para": "L3: «CT.gov nunca confirma, solo descarta».",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_elegibilidad_ensayos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

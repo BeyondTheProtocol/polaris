@@ -1,0 +1,11 @@
+{
+ "pieza": "borde.py",
+ "estado_ficha": "semilla",
+ "para": "EL BORDE de confianza no-bypassable (F0-mínima del motor agnóstico).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_borde.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

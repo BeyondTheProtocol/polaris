@@ -1,0 +1,11 @@
+{
+ "pieza": "soporte_cita.py",
+ "estado_ficha": "semilla",
+ "para": "¿el paper citado RESPALDA la frase, o solo existe?",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_soporte_cita.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

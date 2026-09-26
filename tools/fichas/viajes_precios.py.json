@@ -1,0 +1,11 @@
+{
+ "pieza": "viajes_precios.py",
+ "estado_ficha": "semilla",
+ "para": "Precios reales de vuelos y hoteles vía SerpApi (google_flights + google_hotels).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_viajes_precios.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "sintomas.py",
+ "estado_ficha": "semilla",
+ "para": "el diario de síntomas de {{TITULAR}}.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

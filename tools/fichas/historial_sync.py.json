@@ -1,0 +1,11 @@
+{
+ "pieza": "historial_sync.py",
+ "estado_ficha": "semilla",
+ "para": "que el historial clínico esté al día SOLO, sin que nadie lo empuje.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_historial_sync.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

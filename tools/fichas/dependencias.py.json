@@ -1,0 +1,11 @@
+{
+ "pieza": "dependencias.py",
+ "estado_ficha": "semilla",
+ "para": "quién depende de quién dentro de Polaris.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_dependencias.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "gate_escalera.py",
+ "estado_ficha": "semilla",
+ "para": "la ESCALERA del gate de salida: por check, cuántos casos hay",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_gate_escalera.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "normas.py",
+ "estado_ficha": "semilla",
+ "para": "el REGISTRO de las normas de {{TITULAR}} y su MECANISMO.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

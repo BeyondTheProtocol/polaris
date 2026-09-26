@@ -1,0 +1,11 @@
+{
+ "pieza": "vega_gate.py",
+ "estado_ficha": "semilla",
+ "para": "gate DETERMINISTA (gratis, 0 tokens) del ciclo de vigilancia de Vega.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_vega_gate.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

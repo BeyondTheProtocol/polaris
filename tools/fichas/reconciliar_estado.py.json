@@ -1,0 +1,11 @@
+{
+ "pieza": "reconciliar_estado.py",
+ "estado_ficha": "semilla",
+ "para": "reconciliador determinista de estado del lazo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_reconciliar_estado.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

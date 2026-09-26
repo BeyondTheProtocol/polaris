@@ -1,0 +1,11 @@
+{
+ "pieza": "opencode_jaula.sh",
+ "estado_ficha": "semilla",
+ "para": "invoca OpenCode ENJAULADO contra el gateway del borde (F3, plan",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

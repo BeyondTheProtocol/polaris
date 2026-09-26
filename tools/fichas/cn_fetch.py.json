@@ -1,0 +1,11 @@
+{
+ "pieza": "cn_fetch.py",
+ "estado_ficha": "semilla",
+ "para": "Lee webs chinas geobloqueadas sin tocar la VPN.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cn_fetch.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "estado_rutina.py",
+ "estado_ficha": "semilla",
+ "para": "distinguir «no había nada que hacer» de «lleva un mes rota».",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_estado_rutina.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

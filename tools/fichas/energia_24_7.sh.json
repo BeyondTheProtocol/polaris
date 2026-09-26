@@ -1,0 +1,11 @@
+{
+ "pieza": "energia_24_7.sh",
+ "estado_ficha": "semilla",
+ "para": "ajustes de energía para que la caja Polaris viva 24/7.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

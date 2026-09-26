@@ -1,0 +1,11 @@
+{
+ "pieza": "aplicar-guardian-agentes.sh",
+ "estado_ficha": "semilla",
+ "para": "Capa B del guardián: quita la herramienta Bash a los agentes PÚBLICOS que NO la necesitan,",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

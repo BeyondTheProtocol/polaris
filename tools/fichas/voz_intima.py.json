@@ -1,0 +1,11 @@
+{
+ "pieza": "voz_intima.py",
+ "estado_ficha": "semilla",
+ "para": "Captura PERMANENTE de la voz hablada ÍNTIMA de {{TITULAR}} a partir de SUS notas de voz de",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

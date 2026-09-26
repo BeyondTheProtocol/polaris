@@ -1,0 +1,11 @@
+{
+ "pieza": "preview_remoto.py",
+ "estado_ficha": "semilla",
+ "para": "Relay TCP PRIVADO para previsualizar un dev server local desde los dispositivos de {{TITULAR}}",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_cn_vps.py",
+ "estado_ficha": "semilla",
+ "para": "barrido de los registros chinos desde el VPS de Hong Kong (18-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

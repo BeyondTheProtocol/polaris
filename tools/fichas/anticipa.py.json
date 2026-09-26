@@ -1,0 +1,11 @@
+{
+ "pieza": "anticipa.py",
+ "estado_ficha": "semilla",
+ "para": "F4.3: anticipación. El bloque \"🔭 ESTA SEMANA\" (determinista, $0, read-only).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_anticipa.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

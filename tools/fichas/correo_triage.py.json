@@ -1,0 +1,11 @@
+{
+ "pieza": "correo_triage.py",
+ "estado_ficha": "semilla",
+ "para": "correo \"fino + monitorizado + organizado\" (2/7/26).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_correo_triage.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

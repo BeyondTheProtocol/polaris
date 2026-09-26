@@ -1,0 +1,11 @@
+{
+ "pieza": "bucles_colgados.py",
+ "estado_ficha": "semilla",
+ "para": "para bucles de espera (until/while + sleep) colgados de una",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_bucles_colgados.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

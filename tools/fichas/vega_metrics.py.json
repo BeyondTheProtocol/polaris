@@ -1,0 +1,11 @@
+{
+ "pieza": "vega_metrics.py",
+ "estado_ficha": "semilla",
+ "para": "F4.4: observabilidad de Vega (determinista, read-only, $0).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_vega_metrics.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

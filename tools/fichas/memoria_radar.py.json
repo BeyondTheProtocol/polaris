@@ -1,0 +1,11 @@
+{
+ "pieza": "memoria_radar.py",
+ "estado_ficha": "semilla",
+ "para": "dos pellizcos sobre el GRAFO de memorias (sin motor nuevo).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_memoria_radar.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

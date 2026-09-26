@@ -1,0 +1,11 @@
+{
+ "pieza": "responder_con_datos.py",
+ "estado_ficha": "semilla",
+ "para": "EL RESPONDEDOR AGNÓSTICO (solo-lectura) del gabinete.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "eval_triage.py",
+ "estado_ficha": "semilla",
+ "para": "el SET DORADO del triage: con qué medir antes de creerse a nadie.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

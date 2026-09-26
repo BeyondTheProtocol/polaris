@@ -1,0 +1,11 @@
+{
+ "pieza": "correo_imap.py",
+ "estado_ficha": "semilla",
+ "para": "lector de correo en TIEMPO REAL por IMAP (solo lectura).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_correo_imap.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

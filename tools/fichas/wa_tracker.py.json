@@ -1,0 +1,11 @@
+{
+ "pieza": "wa_tracker.py",
+ "estado_ficha": "semilla",
+ "para": "Trackea chats de WhatsApp desde la base LOCAL del WhatsApp de escritorio",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

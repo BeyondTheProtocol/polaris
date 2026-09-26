@@ -1,0 +1,11 @@
+{
+ "pieza": "repeticiones_semana.py",
+ "estado_ficha": "semilla",
+ "para": "la cifra semanal de correcciones repetidas.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_repeticiones_semana.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

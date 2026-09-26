@@ -1,0 +1,11 @@
+{
+ "pieza": "fichas.py",
+ "estado_ficha": "completa",
+ "para": "Registro de fichas de las piezas de tools/: comprueba que cada una tiene la suya, siembra las heredadas y busca parecidas antes de crear.",
+ "cuando_si": "Antes de crear una herramienta (parecidas), al darla de alta (plantilla) y en la batería (comprobar).",
+ "cuando_no": "Para medir uso real: eso es inventario.py --uso. Para buscar agentes: capacidades.py sin --tools.",
+ "reemplaza": "Nada: antes no había registro de herramientas. La búsqueda de parecidas reutiliza capacidades.py.",
+ "test": "tests/test_fichas.py",
+ "alta": "2026-09-25",
+ "origen": "Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026"
+}

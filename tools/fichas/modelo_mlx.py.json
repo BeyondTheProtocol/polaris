@@ -1,0 +1,11 @@
+{
+ "pieza": "modelo_mlx.py",
+ "estado_ficha": "semilla",
+ "para": "un modelo local en MLX, con los frenos de memoria. Lo usan el bench y el presorteo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

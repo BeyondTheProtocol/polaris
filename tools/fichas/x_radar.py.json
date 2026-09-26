@@ -1,0 +1,11 @@
+{
+ "pieza": "x_radar.py",
+ "estado_ficha": "semilla",
+ "para": "Radar de X hacia la vacuna (5 modos), sobre `xurl` (X API v2, solo lectura).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

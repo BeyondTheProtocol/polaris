@@ -1,0 +1,11 @@
+{
+ "pieza": "setup_polaris_air.sh",
+ "estado_ficha": "semilla",
+ "para": "monta Polaris en el MacBook Air desde el bundle. Corre EN EL AIR.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

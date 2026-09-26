@@ -1,0 +1,11 @@
+{
+ "pieza": "replay_guard.py",
+ "estado_ficha": "semilla",
+ "para": "reproduce los comandos Bash REALES contra dos versiones de un hook.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

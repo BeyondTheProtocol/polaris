@@ -1,0 +1,11 @@
+{
+ "pieza": "reescribe_consulta.py",
+ "estado_ficha": "semilla",
+ "para": "pasa una búsqueda a TEMA antes de que salga a un tercero.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_reescribe_consulta.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

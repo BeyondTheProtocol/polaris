@@ -1,0 +1,11 @@
+{
+ "pieza": "errores.py",
+ "estado_ficha": "semilla",
+ "para": "el sistema nervioso de errores de Polaris (pieza de unificación).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_errores.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

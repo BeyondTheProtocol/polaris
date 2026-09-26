@@ -109,7 +109,7 @@
     "muro y seguridad": 28,
     "otras": 3,
     "redes y prensa": 13,
-    "salud del sistema": 20
+    "salud del sistema": 21
   },
   "glosario": [
     "caja",
@@ -139,6 +139,7 @@
     "cosecha_panel",
     "enrutado_guard",
     "entrada_guard",
+    "ficha_guard",
     "gate_salida",
     "gate_subagente",
     "launch_loopback_guard",
@@ -233,6 +234,7 @@
     "com.btp.historial-sync",
     "com.btp.hoy-compose",
     "com.btp.instagram",
+    "com.btp.inventario-uso",
     "com.btp.kb-reindex",
     "com.btp.living-context",
     "com.btp.nct-cache",

@@ -1,0 +1,11 @@
+{
+ "pieza": "triage_route_correo.py",
+ "estado_ficha": "semilla",
+ "para": "puente DETERMINISTA cuarentena → privilegiado para CORREO.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_triage_route_correo.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

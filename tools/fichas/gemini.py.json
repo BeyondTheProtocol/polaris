@@ -1,0 +1,11 @@
+{
+ "pieza": "gemini.py",
+ "estado_ficha": "semilla",
+ "para": "Cliente de Gemini (Google) por API — razonamiento ingeniero de apoyo. Sin pip.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "postdicom.py",
+ "estado_ficha": "semilla",
+ "para": "Subida REUTILIZABLE de estudios DICOM a tu PostDICOM (estándar DICOMweb / STOW-RS).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

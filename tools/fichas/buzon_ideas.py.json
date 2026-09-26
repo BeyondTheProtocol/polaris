@@ -1,0 +1,11 @@
+{
+ "pieza": "buzon_ideas.py",
+ "estado_ficha": "semilla",
+ "para": "captura DETERMINISTA de los enlaces que {{TITULAR}} suelta por Telegram.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_buzon_ideas.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

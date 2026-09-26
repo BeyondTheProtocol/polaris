@@ -1,0 +1,11 @@
+{
+ "pieza": "interfaces.sh",
+ "estado_ficha": "semilla",
+ "para": "arranca/para las DOS caras de Polaris (Open WebUI + LibreChat), endurecidas",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

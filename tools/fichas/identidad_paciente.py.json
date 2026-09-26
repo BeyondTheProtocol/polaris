@@ -1,0 +1,11 @@
+{
+ "pieza": "identidad_paciente.py",
+ "estado_ficha": "semilla",
+ "para": "estar en su carpeta NO prueba que el informe sea suyo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_identidad_paciente.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

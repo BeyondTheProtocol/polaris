@@ -1,0 +1,11 @@
+{
+ "pieza": "cn.py",
+ "estado_ficha": "semilla",
+ "para": "escape libre: buscar CUALQUIER cosa en internet chino (20-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cn.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

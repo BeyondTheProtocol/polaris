@@ -1,0 +1,11 @@
+{
+ "pieza": "tiempo_sesiones.py",
+ "estado_ficha": "semilla",
+ "para": "¿en qué se va el TIEMPO de reloj de las sesiones con Polaris?",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_tiempo_sesiones.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

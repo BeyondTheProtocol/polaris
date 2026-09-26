@@ -1,0 +1,11 @@
+{
+ "pieza": "pr_portar.py",
+ "estado_ficha": "semilla",
+ "para": "trae un PR del repo PÚBLICO a la casa base, que es la fuente.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

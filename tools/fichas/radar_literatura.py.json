@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_literatura.py",
+ "estado_ficha": "semilla",
+ "para": "Radar de literatura — barrido de papers/ensayos NUEVOS sobre las dianas del caso (vía Perplexity academic).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

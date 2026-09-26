@@ -1,0 +1,11 @@
+{
+ "pieza": "caso_publico.py",
+ "estado_ficha": "semilla",
+ "para": "construye el panel clínico público de helptitular.com/datos.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_caso_publico.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

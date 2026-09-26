@@ -1,0 +1,11 @@
+{
+ "pieza": "lector_clinico.py",
+ "estado_ficha": "semilla",
+ "para": "Ventanilla AUDITADA para leer dato clínico (N2).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

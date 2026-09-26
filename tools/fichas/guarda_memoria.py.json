@@ -1,0 +1,11 @@
+{
+ "pieza": "guarda_memoria.py",
+ "estado_ficha": "semilla",
+ "para": "lanza un comando con TECHO de memoria y lo mata si lo pasa.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_guarda_memoria.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

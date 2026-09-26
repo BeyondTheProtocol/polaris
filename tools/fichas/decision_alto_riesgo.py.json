@@ -1,0 +1,11 @@
+{
+ "pieza": "decision_alto_riesgo.py",
+ "estado_ficha": "semilla",
+ "para": "Protocolo de DECISIÓN DE ALTO RIESGO (panel de élite).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_decision_alto_riesgo.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

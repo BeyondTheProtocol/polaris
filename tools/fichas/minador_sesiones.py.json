@@ -1,0 +1,11 @@
+{
+ "pieza": "minador_sesiones.py",
+ "estado_ficha": "semilla",
+ "para": "minero de lo que TITULAR dice DENTRO de las sesiones.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "espejo_nudge.py",
+ "estado_ficha": "semilla",
+ "para": "aviso SEMANAL (determinista, sin LLM) de que toca refrescar el espejo de",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

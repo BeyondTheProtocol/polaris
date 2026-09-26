@@ -1,0 +1,11 @@
+{
+ "pieza": "frescura_dosier.py",
+ "estado_ficha": "semilla",
+ "para": "¿el Dosier del protocolo está FRESCO? (núcleo determinista).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_frescura_dosier.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "subir_historial_drive.py",
+ "estado_ficha": "semilla",
+ "para": "pone al día el Drive del historial con lo que hay en local.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_subir_historial_drive.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

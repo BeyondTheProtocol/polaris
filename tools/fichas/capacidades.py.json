@@ -1,0 +1,11 @@
+{
+ "pieza": "capacidades.py",
+ "estado_ficha": "completa",
+ "para": "«Reusar antes de crear»: devuelve los agentes (o, con --tools, las herramientas) más parecidos a una capacidad propuesta.",
+ "cuando_si": "Antes de montar un agente, comité, caja o herramienta nueva; lo usa el hook ficha_guard.py al denegar un alta.",
+ "cuando_no": "Para saber si una pieza se usa (inventario.py) o si una ficha está completa (fichas.py comprobar).",
+ "reemplaza": "Nada.",
+ "test": "tests/test_capacidades.py",
+ "alta": "anterior al 25-sep-2026; ficha completada el 2026-09-25",
+ "origen": "Polaris (anti-sprawl del constructor); modo --tools por la idea de {{CONTACTO}}, 25-sep-2026"
+}

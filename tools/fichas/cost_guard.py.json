@@ -1,0 +1,11 @@
+{
+ "pieza": "cost_guard.py",
+ "estado_ficha": "semilla",
+ "para": "freno de gasto DURO del lazo 24/7 (P1, MF-9 / A2). FAIL-CLOSED.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cost_guard.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

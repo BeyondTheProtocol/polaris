@@ -1,0 +1,11 @@
+{
+ "pieza": "carril_gratis.py",
+ "estado_ficha": "semilla",
+ "para": "PELDAÑO 3 del freno de gasto: ejecutor GRATIS (NVIDIA NIM).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

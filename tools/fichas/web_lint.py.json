@@ -1,0 +1,11 @@
+{
+ "pieza": "web_lint.py",
+ "estado_ficha": "semilla",
+ "para": "el freno del contenido que se publica SOLO en la web.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_web_lint.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

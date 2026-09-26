@@ -1,0 +1,11 @@
+{
+ "pieza": "presorteo.py",
+ "estado_ficha": "semilla",
+ "para": "anota y ORDENA la bandeja de WhatsApp antes de que la juzgue Vega. No decide.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_presorteo.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

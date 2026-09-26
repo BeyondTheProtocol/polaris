@@ -1,0 +1,11 @@
+{
+ "pieza": "borde_gateway.py",
+ "estado_ficha": "semilla",
+ "para": "F3: el GATEWAY del borde (plan playful-crafting-pancake / typed-swinging-wand).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_borde_gateway.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

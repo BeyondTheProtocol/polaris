@@ -1,0 +1,11 @@
+{
+ "pieza": "mini.sh",
+ "estado_ficha": "semilla",
+ "para": "trabaja DENTRO del mini desde el Air, sin copias que diverjan.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_mini.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

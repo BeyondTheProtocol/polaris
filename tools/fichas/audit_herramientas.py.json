@@ -1,0 +1,11 @@
+{
+ "pieza": "audit_herramientas.py",
+ "estado_ficha": "semilla",
+ "para": "Auditoría autónoma de USO + SALUD de herramientas/IAs.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_audit_herramientas.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

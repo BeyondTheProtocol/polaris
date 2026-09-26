@@ -1,0 +1,11 @@
+{
+ "pieza": "elevenlabs_voz.py",
+ "estado_ficha": "semilla",
+ "para": "Voz hablada de {{TITULAR}} vía ElevenLabs (el \"pase de voz\" HABLADO, en español).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

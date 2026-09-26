@@ -1,0 +1,11 @@
+{
+ "pieza": "sonda_silencio.py",
+ "estado_ficha": "semilla",
+ "para": "Sonda del SILENCIO: lo que debía pasar y no pasó, y nadie dijo nada.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_sonda_silencio.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

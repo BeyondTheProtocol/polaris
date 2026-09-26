@@ -1,0 +1,11 @@
+{
+ "pieza": "decide_peticion.py",
+ "estado_ficha": "semilla",
+ "para": "UNA decisión por petición: quién responde y con qué.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_decide_peticion.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

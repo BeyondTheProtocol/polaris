@@ -1,0 +1,11 @@
+{
+ "pieza": "x_mcp_puente.py",
+ "estado_ficha": "semilla",
+ "para": "envoltorio stdio del MCP de X que no se queda ciego (14-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_x_mcp_puente.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "setup_macbook.sh",
+ "estado_ficha": "semilla",
+ "para": "convierte un MacBook en la CABINA DE MANDO portátil de",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

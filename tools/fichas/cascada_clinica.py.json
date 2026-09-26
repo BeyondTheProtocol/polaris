@@ -1,0 +1,11 @@
+{
+ "pieza": "cascada_clinica.py",
+ "estado_ficha": "semilla",
+ "para": "la CASCADA CLÍNICA: cuando el historial de {{TITULAR}} cambia",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cascada_clinica.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

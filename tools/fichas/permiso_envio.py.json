@@ -1,0 +1,11 @@
+{
+ "pieza": "permiso_envio.py",
+ "estado_ficha": "semilla",
+ "para": "el permiso de envío que abre {{TITULAR}}, y cómo se comprueba que es suyo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

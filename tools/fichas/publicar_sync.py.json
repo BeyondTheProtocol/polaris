@@ -1,0 +1,11 @@
+{
+ "pieza": "publicar_sync.py",
+ "estado_ficha": "semilla",
+ "para": "mantiene el repo PÚBLICO al día con lo que se fusiona a casa base.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_publicar_sync.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

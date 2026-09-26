@@ -1,0 +1,11 @@
+{
+ "pieza": "vigia.py",
+ "estado_ficha": "semilla",
+ "para": "EL VIGÍA: caza cuando el sistema NO respondió bien y se arregla/escala solo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_vigia.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

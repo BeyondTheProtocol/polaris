@@ -1,0 +1,11 @@
+{
+ "pieza": "ciclo_agentes.py",
+ "estado_ficha": "semilla",
+ "para": "el ciclo de vida de cada agente: id, a qué turno pertenece y por qué terminó.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_ciclo_agentes.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

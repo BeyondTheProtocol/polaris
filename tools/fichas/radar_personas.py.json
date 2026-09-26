@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_personas.py",
+ "estado_ficha": "semilla",
+ "para": "los GEMELOS DE CRITERIO se mantienen frescos (o cantan que no).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_radar_personas.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

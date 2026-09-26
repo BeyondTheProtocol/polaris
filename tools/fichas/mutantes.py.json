@@ -1,0 +1,11 @@
+{
+ "pieza": "mutantes.py",
+ "estado_ficha": "semilla",
+ "para": "comprueba que un test DE VERDAD protege lo que dice proteger.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_mutantes.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "md_to_pdf_pericial.py",
+ "estado_ficha": "semilla",
+ "para": "Markdown -> PDF con formato de INFORME PERICIAL profesional (reportlab).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

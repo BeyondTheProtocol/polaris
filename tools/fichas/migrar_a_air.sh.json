@@ -1,0 +1,11 @@
+{
+ "pieza": "migrar_a_air.sh",
+ "estado_ficha": "semilla",
+ "para": "empaqueta Polaris (casa base) para llevarlo FÍSICO al MacBook Air.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

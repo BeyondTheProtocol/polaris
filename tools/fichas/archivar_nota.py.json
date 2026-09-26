@@ -1,0 +1,11 @@
+{
+ "pieza": "archivar_nota.py",
+ "estado_ficha": "semilla",
+ "para": "persiste un ENTREGABLE que acabo de producir a la fuente de verdad.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_archivar_nota.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

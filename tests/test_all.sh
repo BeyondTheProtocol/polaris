@@ -85,6 +85,7 @@ runpy test_enruta.py
 runpy test_enruta_salud_compartida.py   # 25-sep · una sola caché de salud para todos los árboles; sonda de grok sin búsqueda
 runpy test_enruta_comite.py
 runpy test_decide_peticion.py
+runpy test_enrutado_herencia.py        # 26-sep · las órdenes de control («Fusiona», «Siguiente») no heredan el comité clínico
 runpy test_lentes.py
 runpy test_gate_salida.py
 runpy test_replay_gate.py
@@ -419,6 +420,8 @@ runpy test_onco.py
 runpy test_inventario.py
 runpy test_edad_en_publico.py   # 26-sep · la edad de {{TITULAR}} SÍ se dice en público
 runpy test_inventario_viejas_modelos.py   # 24-sep · issues #2 y #5 (PR #23 de fuera, incorporado con cambios)
+runpy test_fichas.py                      # 25-sep · ninguna tool sin ficha; idea de {{CONTACTO}} + KAI
+runpy test_inventario_uso.py              # 25-sep · uso real acumulado y ciclo 60/90 (clasificar no es borrar)
 runpy test_estado_rutina.py               # 24-sep · issue #4 (PR #22 de fuera, incorporado con cambios)
 runpy test_rutinas_latido.py              # 25-sep · cadencia real + periodo declarado + cola del comité ({{CONTACTO}}+KAI)
 runpy test_audit_agentes_daemon.py

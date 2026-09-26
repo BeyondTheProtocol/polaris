@@ -1,0 +1,11 @@
+{
+ "pieza": "audit_agentes.py",
+ "estado_ficha": "semilla",
+ "para": "¿QUÉ AGENTE Y QUÉ SKILL SE USAN DE VERDAD, Y CON QUÉ MODELO?",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

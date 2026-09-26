@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_ned_dia.sh",
+ "estado_ficha": "semilla",
+ "para": "el ciclo DIARIO de vigilancia hacia NED (17-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

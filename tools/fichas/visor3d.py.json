@@ -1,0 +1,11 @@
+{
+ "pieza": "visor3d.py",
+ "estado_ficha": "semilla",
+ "para": "Del DICOM al mapa 3D de un órgano (hígado primero), 100 % local.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_visor3d.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

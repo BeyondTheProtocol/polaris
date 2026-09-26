@@ -1,0 +1,11 @@
+{
+ "pieza": "anatomia_mapa.py",
+ "estado_ficha": "semilla",
+ "para": "El Mapa — la Anatomía dibujada como constelación, y exportable a GIF.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_anatomia_mapa.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "enruta_comite.py",
+ "estado_ficha": "semilla",
+ "para": "la centralita de COMITÉS. Decide QUIÉN analiza, no con qué modelo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_enruta_comite.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

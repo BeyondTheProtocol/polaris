@@ -1,0 +1,11 @@
+{
+ "pieza": "vigia_sesiones.py",
+ "estado_ficha": "semilla",
+ "para": "vigia_sesiones — aviso suave de higiene de sesiones (ahorro de gasto).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

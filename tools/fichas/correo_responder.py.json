@@ -1,0 +1,11 @@
+{
+ "pieza": "correo_responder.py",
+ "estado_ficha": "semilla",
+ "para": "borrador de respuesta en la VOZ DE TITULAR (Fase 1, componente B).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_correo_responder.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

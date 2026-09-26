@@ -1,0 +1,11 @@
+{
+ "pieza": "anatomia.py",
+ "estado_ficha": "semilla",
+ "para": "La Anatomía — el mapa vivo de Polaris.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_anatomia.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

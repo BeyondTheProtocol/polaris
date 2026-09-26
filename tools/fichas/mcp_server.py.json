@@ -1,0 +1,11 @@
+{
+ "pieza": "mcp_server.py",
+ "estado_ficha": "semilla",
+ "para": "Servidor MCP propio de Polaris (Fase 2 de la migración Baifo=cara).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_mcp_server.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

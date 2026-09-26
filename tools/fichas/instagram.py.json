@@ -1,0 +1,11 @@
+{
+ "pieza": "instagram.py",
+ "estado_ficha": "semilla",
+ "para": "Lee Instagram (Graph API de Meta) en SOLO LECTURA: publicaciones, comentarios y menciones.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

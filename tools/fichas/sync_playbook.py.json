@@ -1,0 +1,11 @@
+{
+ "pieza": "sync_playbook.py",
+ "estado_ficha": "semilla",
+ "para": "sync_playbook — sincroniza el playbook clínico (ESTADO-ACTUAL.md) entre las dos",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "contexto_caso.py",
+ "estado_ficha": "semilla",
+ "para": "Cableado de RECUPERACIÓN de contexto para el cerebro GRATIS/LOCAL (F3b).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_contexto_caso.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "replay_gate.py",
+ "estado_ficha": "semilla",
+ "para": "pasa las respuestas REALES de las sesiones por el gate de salida.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_replay_gate.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

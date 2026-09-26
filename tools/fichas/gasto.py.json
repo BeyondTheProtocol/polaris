@@ -1,0 +1,11 @@
+{
+ "pieza": "gasto.py",
+ "estado_ficha": "semilla",
+ "para": "LEDGER de gasto de APIs de PAGO por uso.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

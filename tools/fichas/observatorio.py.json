@@ -1,0 +1,11 @@
+{
+ "pieza": "observatorio.py",
+ "estado_ficha": "semilla",
+ "para": "El Observatorio: sala de control viva de Polaris.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_observatorio.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

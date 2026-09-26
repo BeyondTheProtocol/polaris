@@ -1,0 +1,11 @@
+{
+ "pieza": "gate_etiqueta.py",
+ "estado_ficha": "semilla",
+ "para": "etiqueta los hallazgos del gate de salida para PROMOVER un check de",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_gate_etiqueta.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

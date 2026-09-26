@@ -1,0 +1,11 @@
+{
+ "pieza": "actualizar_nct_cache.py",
+ "estado_ficha": "semilla",
+ "para": "actualiza el caché local de overallStatus de los NCTs vigilados.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

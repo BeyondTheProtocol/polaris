@@ -1,0 +1,11 @@
+{
+ "pieza": "canario_preflight.sh",
+ "estado_ficha": "semilla",
+ "para": "canario_preflight.sh <claude> <settings.json> [<dir_testigo>] — ¿carga ESTE binario los hooks de ESE",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

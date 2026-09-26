@@ -1,0 +1,11 @@
+{
+ "pieza": "setup_keychain.sh",
+ "estado_ficha": "semilla",
+ "para": "guarda en el Llavero de macOS las claves de Beyond the Protocol.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

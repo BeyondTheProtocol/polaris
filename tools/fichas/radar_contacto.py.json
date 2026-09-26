@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_contacto.py",
+ "estado_ficha": "semilla",
+ "para": "SHIM. El radar de {{CONTACTO}} vive ahora en `radar_personas.py contacto`.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

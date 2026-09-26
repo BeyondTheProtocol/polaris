@@ -1,0 +1,11 @@
+{
+ "pieza": "git_mutex.py",
+ "estado_ficha": "semilla",
+ "para": "CANDADO ÚNICO para TODA mutación del `.git` de la CASA BASE.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_git_mutex.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

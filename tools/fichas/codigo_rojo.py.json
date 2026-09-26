@@ -1,0 +1,11 @@
+{
+ "pieza": "codigo_rojo.py",
+ "estado_ficha": "semilla",
+ "para": "CORTAFUEGOS de emergencia del sistema (regla inquebrantable).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_codigo_rojo.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

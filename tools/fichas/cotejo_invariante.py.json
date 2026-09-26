@@ -1,0 +1,11 @@
+{
+ "pieza": "cotejo_invariante.py",
+ "estado_ficha": "semilla",
+ "para": "EL CORTAFUEGOS DE COTEJO OBLIGATORIO del Guardián-bisturí.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cotejo_invariante.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

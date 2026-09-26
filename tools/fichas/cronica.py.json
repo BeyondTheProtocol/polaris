@@ -1,0 +1,11 @@
+{
+ "pieza": "cronica.py",
+ "estado_ficha": "semilla",
+ "para": "el Cronista AUTOMÁTICO: que se va registrando todo, solo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cronica.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

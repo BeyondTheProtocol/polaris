@@ -1,0 +1,11 @@
+{
+ "pieza": "persecucion.py",
+ "estado_ficha": "semilla",
+ "para": "F4.1: Vega no solo AVISA, EJECUTA hasta cerrar (determinista, drive-to-close).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_persecucion.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

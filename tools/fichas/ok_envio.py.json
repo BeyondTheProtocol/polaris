@@ -1,0 +1,11 @@
+{
+ "pieza": "ok_envio.py",
+ "estado_ficha": "semilla",
+ "para": "abre el permiso de UN envío concreto, cuando {{TITULAR}} lo ha pedido.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

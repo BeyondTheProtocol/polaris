@@ -1,0 +1,11 @@
+{
+ "pieza": "paso_consolidacion.py",
+ "estado_ficha": "semilla",
+ "para": "Consolidador: junta las contribuciones de varios subagentes en UN dossier.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_paso_consolidacion.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "prefiltro_juez.py",
+ "estado_ficha": "semilla",
+ "para": "prefiltro DETERMINISTA del juez de las normas de salida (capa 3).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

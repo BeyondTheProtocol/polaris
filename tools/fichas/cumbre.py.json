@@ -1,0 +1,11 @@
+{
+ "pieza": "cumbre.py",
+ "estado_ficha": "semilla",
+ "para": "la BRÚJULA del lazo: la ruta a NED como DATO vivo (P1, esquema).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cumbre.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

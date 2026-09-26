@@ -1,0 +1,11 @@
+{
+ "pieza": "deid_eval.py",
+ "estado_ficha": "semilla",
+ "para": "banco de medida de la de-identificación: recall por entidad, con cifra.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_deid_eval.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

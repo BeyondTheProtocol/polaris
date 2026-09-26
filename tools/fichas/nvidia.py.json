@@ -1,0 +1,11 @@
+{
+ "pieza": "nvidia.py",
+ "estado_ficha": "semilla",
+ "para": "Llama a la API GRATIS de NVIDIA NIM (modelos abiertos, OpenAI-compatible). Sin dependencias (stdlib).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

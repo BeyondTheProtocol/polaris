@@ -1,0 +1,11 @@
+{
+ "pieza": "deid.py",
+ "estado_ficha": "semilla",
+ "para": "De-identificador del NÚCLEO F3b (capa de CONTEXTO para el cerebro local/gratis).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_deid.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

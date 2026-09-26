@@ -1,0 +1,11 @@
+{
+ "pieza": "lazo_telegram.sh",
+ "estado_ficha": "semilla",
+ "para": "interruptor del lazo 24/7 por Telegram.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

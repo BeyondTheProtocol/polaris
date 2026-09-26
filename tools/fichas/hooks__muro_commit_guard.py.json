@@ -1,0 +1,11 @@
+{
+ "pieza": "hooks/muro_commit_guard.py",
+ "estado_ficha": "semilla",
+ "para": "Guardián del MURO en cada commit.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

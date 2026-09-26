@@ -1,0 +1,11 @@
+{
+ "pieza": "seguimiento.py",
+ "estado_ficha": "semilla",
+ "para": "vigía DETERMINISTA de hilos abiertos (\"que no se te escape nada\").",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_seguimiento.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

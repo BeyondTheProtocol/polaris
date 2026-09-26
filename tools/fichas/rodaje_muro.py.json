@@ -1,0 +1,11 @@
+{
+ "pieza": "rodaje_muro.py",
+ "estado_ficha": "semilla",
+ "para": "las 24 h de rodaje de un hook del muro, medidas en vez de prometidas.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

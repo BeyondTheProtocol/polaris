@@ -1,0 +1,11 @@
+{
+ "pieza": "elicit.py",
+ "estado_ficha": "semilla",
+ "para": "Busca literatura ingeniera en Elicit (138M+ papers) vía su API oficial.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_elicit.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "verifica_citas.py",
+ "estado_ficha": "semilla",
+ "para": "Gate determinista de EXISTENCIA de citas — caza citas FABRICADAS antes de razonar.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_verifica_citas.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

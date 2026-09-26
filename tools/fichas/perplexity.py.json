@@ -1,0 +1,11 @@
+{
+ "pieza": "perplexity.py",
+ "estado_ficha": "semilla",
+ "para": "Pregunta a Perplexity (Sonar) con búsqueda web EN VIVO y CITAS. Sin dependencias (stdlib).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "dedup_hilos.py",
+ "estado_ficha": "semilla",
+ "para": "pasada de dedup DETERMINISTA de hilos en seguimiento.json.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_dedup_hilos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

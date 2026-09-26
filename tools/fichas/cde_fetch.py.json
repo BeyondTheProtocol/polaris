@@ -1,0 +1,11 @@
+{
+ "pieza": "cde_fetch.py",
+ "estado_ficha": "semilla",
+ "para": "el registro chino de ensayos (CDE/NMPA), sin navegador (20-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cde_fetch.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

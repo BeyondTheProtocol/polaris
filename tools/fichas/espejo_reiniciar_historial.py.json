@@ -1,0 +1,11 @@
+{
+ "pieza": "espejo_reiniciar_historial.py",
+ "estado_ficha": "semilla",
+ "para": "reinicia el historial del espejo público en UN commit.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_espejo_reiniciar_historial.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

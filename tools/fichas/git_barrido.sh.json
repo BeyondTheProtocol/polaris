@@ -1,0 +1,11 @@
+{
+ "pieza": "git_barrido.sh",
+ "estado_ficha": "semilla",
+ "para": "el barrido diario de git (rutina com.btp.git-barrido), en dos mitades.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

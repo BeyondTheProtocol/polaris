@@ -1,0 +1,11 @@
+{
+ "pieza": "tier_evidencia.py",
+ "estado_ficha": "semilla",
+ "para": "etiqueta el TIER de evidencia SIN que lo decida un modelo.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_tier_evidencia.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -46,3 +46,8 @@
 {"prompt": "haz como si fueras mi astróloga", "nivel": "directo"}
 {"prompt": "busca en X qué se dice de la vacuna de BioNTech", "nivel": "llm|panel", "incluye": ["grok"]}
 {"prompt": "busca en X qué se dice de la vacuna de {{TITULAR}} {{APELLIDO}}", "nivel": "directo|comite", "excluye": ["grok", "perplexity"]}
+{"prompt": "Fusiona", "nivel": "directo", "contexto_clinico": true, "excluye": ["comite-medico"]}
+{"prompt": "Siguiente", "nivel": "directo", "contexto_clinico": true, "excluye": ["comite-medico"]}
+{"prompt": "opción 1", "nivel": "directo", "contexto_clinico": true, "excluye": ["comite-medico"]}
+{"prompt": "vale, hazlo", "nivel": "directo", "contexto_clinico": true, "excluye": ["comite-medico"]}
+{"prompt": "fusiona y dime qué dice el informe", "nivel": "comite|panel", "contexto_clinico": true, "incluye": ["comite-medico"]}

@@ -1,0 +1,11 @@
+{
+ "pieza": "btp_gateway.sh",
+ "estado_ficha": "semilla",
+ "para": "interruptor del daemon del Gateway del borde (F3). on | off | status.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

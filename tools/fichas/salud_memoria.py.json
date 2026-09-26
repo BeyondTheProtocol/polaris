@@ -1,0 +1,11 @@
+{
+ "pieza": "salud_memoria.py",
+ "estado_ficha": "semilla",
+ "para": "Vigila que las reglas del sistema SIGAN CARGÁNDOSE en cada sesión.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

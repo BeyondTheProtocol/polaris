@@ -1,0 +1,11 @@
+{
+ "pieza": "pendientes.py",
+ "estado_ficha": "semilla",
+ "para": "persigue lo que ESPERA RESPUESTA de {{TITULAR}} (hermano de correo.py).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_pendientes.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

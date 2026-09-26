@@ -1,0 +1,11 @@
+{
+ "pieza": "visor3d_superpone_focos.py",
+ "estado_ficha": "semilla",
+ "para": "¿Puede el esqueleto REAL sustituir al dibujo sin recolocar los 19 focos a ojo?",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

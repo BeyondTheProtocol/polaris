@@ -1,0 +1,11 @@
+{
+ "pieza": "ff_al_abrir.sh",
+ "estado_ficha": "semilla",
+ "para": "el PORTÁTIL se pone al día de código solo, al abrir una sesión.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_ff_al_abrir.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

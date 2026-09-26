@@ -1,0 +1,11 @@
+{
+ "pieza": "esquema_estado.py",
+ "estado_ficha": "semilla",
+ "para": "el Tablero no puede tener hilos con el estado roto.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_esquema_estado.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

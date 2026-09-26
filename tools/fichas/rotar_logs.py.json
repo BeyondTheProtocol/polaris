@@ -1,0 +1,11 @@
+{
+ "pieza": "rotar_logs.py",
+ "estado_ficha": "semilla",
+ "para": "higiene de logs y JSONL del sistema (Fase 3c).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_rotar_logs.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

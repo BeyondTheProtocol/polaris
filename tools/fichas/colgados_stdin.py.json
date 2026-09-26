@@ -1,0 +1,11 @@
+{
+ "pieza": "colgados_stdin.py",
+ "estado_ficha": "semilla",
+ "para": "encuentra (y con --matar, termina) los tools colgados esperando stdin.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_colgados_stdin.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

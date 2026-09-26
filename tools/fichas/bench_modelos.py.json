@@ -1,0 +1,11 @@
+{
+ "pieza": "bench_modelos.py",
+ "estado_ficha": "semilla",
+ "para": "¿qué modelo local, para qué tarea, en 16 GB? Contra lo determinista.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_bench_modelos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

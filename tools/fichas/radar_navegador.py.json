@@ -1,0 +1,11 @@
+{
+ "pieza": "radar_navegador.py",
+ "estado_ficha": "semilla",
+ "para": "el carril de los registros que NO tienen API (18-sep-2026).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_radar_navegador.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "cosecha_checklists.py",
+ "estado_ficha": "semilla",
+ "para": "cosechador de cabos sueltos escritos DENTRO de ficheros .md.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_cosecha_checklists.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

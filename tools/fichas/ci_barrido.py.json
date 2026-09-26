@@ -1,0 +1,11 @@
+{
+ "pieza": "ci_barrido.py",
+ "estado_ficha": "semilla",
+ "para": "el muro en la PUERTA DE ENTRADA: lo que llega por PR al repo público.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_ci_barrido.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

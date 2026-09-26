@@ -1,0 +1,11 @@
+{
+ "pieza": "dosier_invariantes.py",
+ "estado_ficha": "semilla",
+ "para": "L1: invariantes deterministas del Dosier-JSONL.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_dosier_invariantes.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

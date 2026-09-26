@@ -1,0 +1,11 @@
+{
+ "pieza": "kpi_ned.py",
+ "estado_ficha": "semilla",
+ "para": "los dos números que el bucle de auto-mejora tiene que MOVER.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_kpi_ned.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -149,6 +149,17 @@
         ]
       },
       {
+        "_comment": "Ficha antes de alta (25-sep-26, idea de {{CONTACTO}} + KAI, problema 2 de docs/lo-que-falta.md). Deniega el Write que CREA tools/**/<nueva>.py|.sh si no hay ficha completa en tools/fichas/, y enseña las 5 piezas más parecidas: «busca antes de crear; si hay algo parecido, amplíalo». Las ediciones pasan. NO cubre Bash: el freno último es tests/test_fichas.py en test_all.sh. FAIL-OPEN.",
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/ficha_guard.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "_comment": "Un preview escucha solo en este Mac (26-sep-26). Al escribir o editar un .claude/launch.json, cada configuración que arranca un servidor (port + comando) tiene que atarse a 127.0.0.1/localhost; si no, DENY con el arreglo. Nació de *:3217 abierto a la red por un preview de Nitro sin HOST (test_puertos_loopback en rojo, deuda preview_node_expuesto_lan). FAIL-OPEN; escotilla BTP_LOOPBACK_OK=1. No ve launch.json escritos por Bash: ahí sigue el test de puertos. Desde el 26-sep-26 mira también Bash: un servidor conocido (nuxt dev, vite, next, http.server, uvicorn, Nitro, pnpm/npm dev) arrancado sin host de loopback → DENY; nuxt dev exige además atar el HMR con vite:extendConfig (el HMR se abría en *:24678).",
         "matcher": "Write|Edit|MultiEdit|Bash",
         "hooks": [

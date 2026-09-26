@@ -1,0 +1,11 @@
+{
+ "pieza": "tests_afectados.py",
+ "estado_ficha": "semilla",
+ "para": "qué baterías de tests/test_all.sh tocan los ficheros cambiados de la rama.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_tests_afectados.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

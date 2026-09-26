@@ -1,0 +1,11 @@
+{
+ "pieza": "pipeline_vacuna.py",
+ "estado_ficha": "semilla",
+ "para": "tablero VIVO del flujo biopsia → vacuna (neoantígenos).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_pipeline_vacuna.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

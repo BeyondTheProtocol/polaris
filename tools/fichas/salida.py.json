@@ -1,0 +1,11 @@
+{
+ "pieza": "salida.py",
+ "estado_ficha": "semilla",
+ "para": "ÚNICO punto de salida hacia fuera del lazo 24/7 (B3 del muro).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_salida.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

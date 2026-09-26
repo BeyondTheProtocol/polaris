@@ -72,6 +72,27 @@ INVESTIGACION_CN = re.compile(
     re.I)
 
 
+# Órdenes de CONTROL: mueven el trabajo que ya está en marcha, no traen material nuevo. Nunca
+# heredan el nivel clínico de la sesión (26-sep-26: «Fusiona» y «Siguiente» pedían comité médico
+# porque la sesión había cotejado analíticas horas antes; 151 de 289 omisiones registradas eran
+# esa misma pareja heredada). Lista CERRADA y el mensaje entero tiene que ser la orden: «fusiona
+# y dime qué dice el informe» no es control. Si el texto es clínico por sí mismo, `enruta_comite`
+# sigue decidiendo: esto solo quita la herencia.
+_PALABRA_CONTROL = (
+    r"(?:fusi[oó]n(?:a|alo|ala)|merge(?:a|alo)?|siguiente|sifuiente|siguienre|sigue|contin[uú]a|"
+    r"adelante|dale|venga|s[ií]|vale|ok(?:ay)?|de acuerdo|hazlo|para|stop|listo|hecho|"
+    r"commit(?:ea|ealo)?|push(?:ea|ealo)?|publ[ií]ca(?:lo|la)?|progr[aá]ma(?:lo|la)?|"
+    r"cerramos(?: sesi[oó]n)?|(?:la )?opci[oó]n\s*\d|la \d|\d|la primera|la segunda|la tercera|"
+    r"por favor|porfa|gracias)")
+ORDEN_CONTROL = re.compile(
+    r"^%s(?:[\s,]+(?:y\s+)?%s)*[\s.!¡]*$" % (_PALABRA_CONTROL, _PALABRA_CONTROL), re.I)
+
+
+def es_orden_control(prompt):
+    texto = ("" if prompt is None else str(prompt)).strip()
+    return len(texto) <= 40 and bool(ORDEN_CONTROL.match(texto))
+
+
 def es_del_sistema(prompt):
     p = (prompt or "").lstrip()
     return any(p.startswith(x) for x in PREFIJOS_SISTEMA)
@@ -110,7 +131,7 @@ def decidir(prompt, *, contexto_clinico=False, sesion_sensible=None, estado=None
         out["motivos"].extend(dc["motivos"])
     elif dc["comites"]:
         out["sugeridos"].extend(dc["comites"])
-    if contexto_clinico and not comites:
+    if contexto_clinico and not comites and not es_orden_control(texto):
         comites = ["comite-medico", "verificacion"]
         out["motivos"].append("la sesión ya trabaja material clínico: lo que venga hereda el nivel")
     out["comites"] = comites

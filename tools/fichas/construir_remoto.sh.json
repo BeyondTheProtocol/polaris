@@ -1,0 +1,11 @@
+{
+ "pieza": "construir_remoto.sh",
+ "estado_ficha": "semilla",
+ "para": "el MODO CONSTRUIR de Polaris en remoto: OpenCode (agente que ACTÚA",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

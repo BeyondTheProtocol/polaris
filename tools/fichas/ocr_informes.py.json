@@ -1,0 +1,11 @@
+{
+ "pieza": "ocr_informes.py",
+ "estado_ficha": "semilla",
+ "para": "OCR 100% LOCAL de informes escaneados → texto para el RAG.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "hooks/instalar.sh",
+ "estado_ficha": "semilla",
+ "para": "Activa el hook del muro para este repo y sus worktrees (config compartida).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

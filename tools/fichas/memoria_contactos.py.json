@@ -1,0 +1,11 @@
+{
+ "pieza": "memoria_contactos.py",
+ "estado_ficha": "semilla",
+ "para": "F4.2: la ficha viva de un contacto, EN UNA LLAMADA (Vega va a la fuente).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_memoria_contactos.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

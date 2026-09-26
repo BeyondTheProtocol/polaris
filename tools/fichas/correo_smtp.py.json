@@ -1,0 +1,11 @@
+{
+ "pieza": "correo_smtp.py",
+ "estado_ficha": "semilla",
+ "para": "envío REAL de correo para Beyond the Protocol (Fase 2).",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_correo_smtp.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}

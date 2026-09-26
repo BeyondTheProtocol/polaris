@@ -1,0 +1,11 @@
+{
+ "pieza": "memoria_contradicciones.py",
+ "estado_ficha": "semilla",
+ "para": "memorias que se contradicen o se han quedado viejas. SOLO INFORMA.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_memoria_contradicciones.py",
+ "alta": "heredada, ficha sembrada el 2026-09-26",
+ "origen": ""
+}

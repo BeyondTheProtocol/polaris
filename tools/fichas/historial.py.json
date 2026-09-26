@@ -1,0 +1,11 @@
+{
+ "pieza": "historial.py",
+ "estado_ficha": "semilla",
+ "para": "el historial médico como sistema: partir, clasificar, indexar.",
+ "cuando_si": "",
+ "cuando_no": "",
+ "reemplaza": "",
+ "test": "tests/test_historial.py",
+ "alta": "heredada, ficha sembrada el 2026-09-25",
+ "origen": ""
+}
