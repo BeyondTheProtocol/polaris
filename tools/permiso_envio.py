@@ -198,8 +198,40 @@ def permite(ctx, que):
     return que in (TODO if a is None else a)
 
 
-def token_path():
+def dir_permisos():
+    """Un permiso por SESIÓN (26-sep-26, deuda `ok_envio_fusionar_permiso_se_pierde`). Antes había
+    un solo `ok_envio.json` para todas: si dos sesiones esperaban al CI con su «fusiona», la orden
+    de una pisaba la de la otra y la primera se quedaba sin permiso. Ahora cada sesión tiene su
+    fichero en este directorio, que el muro protege entero como zona de escritura."""
+    return os.path.join(_casa.state_dir(), "ok_envio")
+
+
+def _sid(sesion):
+    """El nombre de fichero de una sesión: solo [A-Za-z0-9_-], máx. 64. Un `../` no sale del
+    directorio. Vacío → `sin-sesion`."""
+    return re.sub(r"[^A-Za-z0-9_-]", "", str(sesion or ""))[:64] or "sin-sesion"
+
+
+def token_path(sesion=""):
+    return os.path.join(dir_permisos(), _sid(sesion) + ".json")
+
+
+def _legado():
+    """El hueco único de antes. Se ignora y se borra: caducaba a los 10 minutos igualmente."""
     return os.path.join(_casa.state_dir(), "ok_envio.json")
+
+
+def _todos():
+    try:
+        return [os.path.join(dir_permisos(), n) for n in os.listdir(dir_permisos())
+                if n.endswith(".json")]
+    except Exception:
+        return []
+
+
+def hay_alguno():
+    """¿Hay algún permiso emitido, de cualquier sesión? Vía rápida para no tocar el Llavero."""
+    return bool(_todos())
 
 
 def usados_path():
@@ -272,8 +304,8 @@ def _mac_ok(d, k):
 
 
 def _escribir(d):
-    ruta = token_path()
-    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    ruta = token_path(d.get("session_id"))
+    os.makedirs(os.path.dirname(ruta), mode=0o700, exist_ok=True)
     tmp = ruta + ".%d.tmp" % os.getpid()
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -291,44 +323,71 @@ def emitir(prompt, session_id, prompt_id, transcript_path, k):
          "transcript_path": transcript_path or "",
          "nonce": secrets.token_hex(8), "usos": 0}
     _escribir(firmar(d, k))
+    _barrer_caducados(k)
     return d
 
 
+def _barrer_caducados(k):
+    """Al emitir, se van los de otras sesiones que ya caducaron (y el hueco único de antes)."""
+    _borrar_ruta(_legado())
+    for ruta in _todos():
+        _leer_ruta(ruta, k)          # leer uno caducado o sin firma ya lo borra
+
+
 # ── leer y comprobar ─────────────────────────────────────────────────────────────────────────
-def borrar():
+def borrar(sesion=""):
+    _borrar_ruta(token_path(sesion))
+
+
+def _borrar_ruta(ruta):
     try:
-        os.remove(token_path())
+        os.remove(ruta)
     except Exception:
         pass
 
 
-def leer(k):
-    """(dict|None, motivo). Firma, origen y caducidad. No mira el transcript."""
+def leer(k, sesion=None):
+    """(dict|None, motivo). Con `sesion`, SOLO el fichero de esa sesión. Sin ella (una tool que no
+    la conoce, como web_novedad), el más reciente de los válidos: lo que hacía el hueco único."""
+    if sesion is not None:
+        return _leer_ruta(token_path(sesion), k)
+    mejor, motivo = None, "nadie lo ha pedido en un mensaje"
+    for ruta in _todos():
+        d, m = _leer_ruta(ruta, k)
+        if d and (mejor is None or d.get("ts", "") > mejor.get("ts", "")):
+            mejor = d
+        elif not d and mejor is None:
+            motivo = m
+    return mejor, ("" if mejor else motivo)
+
+
+def _leer_ruta(ruta, k):
+    """(dict|None, motivo). Firma, origen y caducidad de UN fichero. No mira el transcript."""
     try:
-        with open(token_path(), encoding="utf-8") as f:
+        with open(ruta, encoding="utf-8") as f:
             d = json.load(f)
     except FileNotFoundError:
         return None, "nadie lo ha pedido en un mensaje"
     except Exception:
-        borrar()
+        _borrar_ruta(ruta)
         return None, "permiso ilegible"
     if not isinstance(d, dict):
-        borrar()
+        _borrar_ruta(ruta)
         return None, "permiso ilegible"
     if not _mac_ok(d, k):
         # Escrito a mano, con otra clave o retocado: no vale y no se deja ahí para reintentar.
-        borrar()
+        _borrar_ruta(ruta)
         return None, "el permiso no lleva la firma del hook que lee su mensaje"
     if d.get("origen") not in ORIGENES:
-        borrar()
+        _borrar_ruta(ruta)
         return None, "el permiso no nació de un mensaje suyo (origen %r)" % d.get("origen")
     try:
         edad = (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
     except Exception:
-        borrar()
+        _borrar_ruta(ruta)
         return None, "permiso ilegible"
     if edad > VIDA_S or edad < -60:
-        borrar()
+        _borrar_ruta(ruta)
         return None, "el permiso caducó"
     return d, ""
 
@@ -360,7 +419,7 @@ def marcar_usado(d, por=""):
     os.makedirs(os.path.dirname(ruta), exist_ok=True)
     with open(ruta, "w", encoding="utf-8") as f:
         f.write("\n".join(lineas) + "\n")
-    borrar()
+    borrar(d.get("session_id"))
 
 
 def _crudo(entrada):
@@ -623,21 +682,26 @@ def comprobar_envio(ctx, entrada, tool=""):
 def validar(k, sesion=None):
     """(dict|None, motivo, ctx). Todo menos lo específico de la llamada. `sesion` = la del
     PreToolUse; None cuando lo comprueba una tool (web_novedad), que no la conoce."""
-    d, motivo = leer(k)
+    d, motivo = leer(k, sesion)
     if not d:
+        if sesion is not None and motivo == "nadie lo ha pedido en un mensaje":
+            # Su mensaje AQUÍ no abrió ninguno (si otra sesión tiene el suyo, ese no se toca):
+            # hay que decirle qué frase lo abre.
+            motivo = ("su mensaje en esta sesión no abrió permiso. "
+                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»")
         return None, motivo, {}
     if sesion is not None and sesion != d.get("session_id"):
-        # 25-sep-26: «el permiso es de otra sesión» a secas sonaba a que su orden había llegado y
-        # se había atribuido mal. Lo que pasa es que su mensaje AQUÍ no abrió ninguno (el hueco es
-        # único y guarda el último de cualquier sesión): hay que decirle qué frase lo abre.
+        # Segunda red: el fichero de MI sesión con el session_id de otra (copiado o renombrado a
+        # mano) no vale. La firma cubre session_id, así que renombrar no hereda su permiso.
+        borrar(sesion)
         return None, ("su mensaje en esta sesión no abrió permiso (el que hay es de otra sesión). "
                       "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»"), {}
     if _usado(d):
-        borrar()
+        borrar(d.get("session_id"))
         return None, "ese mensaje suyo ya abrió un envío", {}
     ok, motivo, ctx = contexto(d)
     if not ok:
-        borrar()
+        borrar(d.get("session_id"))
         return None, motivo, {}
     return d, "", ctx
 

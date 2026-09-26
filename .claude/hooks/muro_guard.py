@@ -251,6 +251,8 @@ WRITE_CRIT = (".mcp.json", "/.git/", ".git/", ".github/", ".gitignore", ".gitlea
               # El permiso de envío y su libro de usados, por NOMBRE (22-sep-26): segunda red
               # por si la ruta real no se puede resolver (`$VAR/ok_envio.json`).
               "ok_envio.json", "ok_envio_usados.jsonl",
+              # 26-sep-26: un permiso por sesión, en `tools/state/ok_envio/<sesión>.json`.
+              "tools/state/ok_envio/",
               # Dotfiles de SHELL: un proceso permitido (cualquier shell nuevo, y el propio
               # muro_guard.sh corre bajo bash) los auto-ejecuta al arrancar -> misma clase B3
               # (plantar+autoejecutar saltandose el choke-point). .zshenv se lee en TODO zsh.
@@ -484,7 +486,8 @@ PROYECTOS_CC = os.path.join(_HOME, ".claude", "projects")
 _STATE_REAL = os.environ.get("BTP_STATE_DIR") or os.path.join(REPO, "tools", "state")
 _PERMISO_ENVIO = tuple(os.path.join(d, n)
                        for d in sorted({os.path.join(REPO, "tools", "state"), _STATE_REAL})
-                       for n in ("ok_envio.json", "ok_envio_usados.jsonl"))
+                       for n in ("ok_envio.json", "ok_envio_usados.jsonl",
+                                 "ok_envio"))   # 26-sep-26: el directorio de permisos por sesión
 ZONAS_ESCRITURA = (os.path.join(REPO, "tools", "state", "cost"),
                    os.path.join(REPO, "tools", "state", "healthcheck"),
                    PROYECTOS_CC) + _PERMISO_ENVIO

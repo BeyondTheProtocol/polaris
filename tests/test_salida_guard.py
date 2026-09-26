@@ -173,8 +173,8 @@ class GuardDeSalida(unittest.TestCase):
                          "el permiso es de UN SOLO USO: el segundo envío no puede colarse")
 
     def test_un_permiso_caducado_no_vale(self):
-        token = os.path.join(self.tmp, "ok_envio.json")
-        os.makedirs(self.tmp, exist_ok=True)
+        token = os.path.join(self.tmp, "ok_envio", self.sesion + ".json")   # su permiso (26-sep-26)
+        os.makedirs(os.path.dirname(token), exist_ok=True)
         with open(token, "w", encoding="utf-8") as f:
             json.dump({"ts": (datetime.now() - timedelta(minutes=30)).isoformat(),
                        "motivo": "viejo"}, f)
@@ -196,8 +196,9 @@ class GuardDeSalida(unittest.TestCase):
     def test_un_token_sin_origen_prompt_no_vale(self):
         """Si alguien (o algo) escribe el fichero a mano, no sirve: falta la marca que solo pone
         el hook del prompt."""
-        os.makedirs(self.tmp, exist_ok=True)
-        with open(os.path.join(self.tmp, "ok_envio.json"), "w", encoding="utf-8") as f:
+        token = os.path.join(self.tmp, "ok_envio", self.sesion + ".json")   # su permiso (26-sep-26)
+        os.makedirs(os.path.dirname(token), exist_ok=True)
+        with open(token, "w", encoding="utf-8") as f:
             json.dump({"ts": datetime.now().isoformat(), "motivo": "colado"}, f)
         self.assertEqual(self._decision(self._hook(
             {"tool_name": "mcp__b47695e8__send_message", "tool_input": {}})), "deny")

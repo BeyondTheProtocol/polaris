@@ -169,7 +169,9 @@ class QuienLoPide(unittest.TestCase):
 
     def _token(self, origen):
         import datetime as dt
-        with open(os.path.join(self.tmp, "ok_envio.json"), "w", encoding="utf-8") as f:
+        ruta = os.path.join(self.tmp, "ok_envio", "s1.json")   # un permiso por sesión (26-sep-26)
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
             json.dump({"ts": dt.datetime.now().isoformat(), "origen": origen, "motivo": "x"}, f)
 
     def test_sin_mensaje_suyo_no_se_publica(self):

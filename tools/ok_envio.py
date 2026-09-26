@@ -28,14 +28,14 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import permiso_envio as P  # noqa: E402
 
-TOKEN = P.token_path()
 VIDA_S = P.VIDA_S
 
 
 def estado():
     """Consulta, no abre. Desde el 22-sep-26 dice también si el permiso VALE (firma, sesión,
-    prompt humano en el transcript), no solo si el fichero existe."""
-    if not os.path.exists(TOKEN):
+    prompt humano en el transcript), no solo si el fichero existe. Desde el 26-sep-26 hay uno por
+    sesión: esto enseña el más reciente."""
+    if not P.hay_alguno():
         print("sin permiso abierto (todo lo que sale al mundo está denegado).")
         return 0
     d, motivo, _ctx = P.validar(P.clave())
@@ -72,11 +72,11 @@ def main():
     if args[0] == "--estado":
         return estado()
     if args[0] == "--cerrar":
-        if os.path.exists(TOKEN):
-            os.remove(TOKEN)
-            print("permiso revocado.")
-        else:
-            print("no había ninguno abierto.")
+        # Revocar es cerrar, nunca abrir: borra los de todas las sesiones.
+        rutas = P._todos()
+        for ruta in rutas:
+            P._borrar_ruta(ruta)
+        print("permiso revocado." if rutas else "no había ninguno abierto.")
         return 0
     motivo = " ".join(args).strip()
     if len(motivo) < 10:

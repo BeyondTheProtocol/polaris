@@ -93,7 +93,7 @@ def lo_pide_titular():
     humano, el último suyo y con la orden— y el contador de usos va firmado, así que no se puede
     rebobinar a mano. La clave NUNCA sale del entorno: esta tool la lanza el agente, y con
     `BTP_OK_ENVIO_CLAVE=x` firmaría lo que quisiera."""
-    if not os.path.exists(P.token_path()):   # lo normal: nadie ha pedido nada (y sin tocar el Llavero)
+    if not P.hay_alguno():   # lo normal: nadie ha pedido nada (y sin tocar el Llavero)
         return False, "nadie lo ha pedido en un mensaje"
     k = P.clave(permitir_env=False)
     if not k:

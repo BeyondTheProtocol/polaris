@@ -21,6 +21,7 @@ Lo que se fija aquí, por capas (cada una aguanta aunque caiga la anterior):
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,9 @@ EMISOR = os.path.join(HOOKS, "ok_envio_prompt.py")
 MURO = os.path.join(HOOKS, "muro_guard.py")
 CASA = os.path.expanduser("~/claudecode")
 TOKEN_REAL = os.path.join(CASA, "tools", "state", "ok_envio.json")
+# 26-sep-26: un permiso por sesión, en tools/state/ok_envio/<sesión>.json.
+DIR_REAL = os.path.join(CASA, "tools", "state", "ok_envio")
+POR_SESION_REAL = os.path.join(DIR_REAL, "x.json")
 USADOS_REAL = os.path.join(CASA, "tools", "state", "ok_envio_usados.jsonl")
 CLAVE = "a" * 64
 GMAIL = "mcp__b47695e8-1614-4b1d-81db-9d1d88117c68__"
@@ -105,8 +109,13 @@ class _Base(unittest.TestCase):
         return self._salida(GMAIL + tool, entrada or {"to": ["alguien@hospital.org"],
                                                       "subject": "s", "body": "b"}, **kw)
 
+    def _token(self, sesion=None):
+        """El fichero de permiso de una sesión (por defecto, esta)."""
+        return os.path.join(self.tmp, "ok_envio", (sesion or self.sesion) + ".json")
+
     def _forjar(self, contenido=FORJADO):
-        with open(os.path.join(self.tmp, "ok_envio.json"), "w", encoding="utf-8") as f:
+        os.makedirs(os.path.dirname(self._token()), exist_ok=True)
+        with open(self._token(), "w", encoding="utf-8") as f:
             f.write(contenido)
 
 
@@ -130,6 +139,14 @@ ESCRITURAS_BASH = [
     "dd if=/tmp/x of=tools/state/ok_envio.json",
     "D=tools/state; echo x > $D/ok_envio.json",
     "echo x > tools/state/ok_envio_usados.jsonl",
+    # 26-sep-26: el directorio de permisos por sesión, igual de cerrado.
+    "echo '%s' > %s" % (FORJADO, POR_SESION_REAL),
+    "echo '%s' | tee tools/state/ok_envio/x.json" % FORJADO,
+    "cd tools/state/ok_envio && echo x > y.json",
+    "cp /tmp/x.json tools/state/ok_envio/",
+    "mv /tmp/x.json tools/state/ok_envio/x.json",
+    "python3 -c \"open('tools/state/ok_envio/x.json','w').write('x')\"",
+    "D=tools/state; echo x > $D/ok_envio/x.json",
     "echo '{}' >> ~/.claude/projects/-Users-polaris-claudecode/abc.jsonl",
     "cp /tmp/falso.jsonl ~/.claude/projects/-Users-polaris-claudecode/abc.jsonl",
 ]
@@ -160,6 +177,10 @@ class EscribirElPermisoSeDeniega(_Base):
                 ("MultiEdit", {"file_path": TOKEN_REAL, "edits": []}),
                 ("Write", {"file_path": USADOS_REAL, "content": ""}),
                 ("Write", {"file_path": os.path.join(self.tmp, "ok_envio.json"), "content": FORJADO}),
+                ("Write", {"file_path": POR_SESION_REAL, "content": FORJADO}),
+                ("Write", {"file_path": "tools/state/ok_envio/x.json", "content": FORJADO}),
+                ("Edit", {"file_path": POR_SESION_REAL, "old_string": "a", "new_string": "b"}),
+                ("Write", {"file_path": self._token(), "content": FORJADO}),
                 ("Write", {"file_path": os.path.expanduser(
                     "~/.claude/projects/-Users-polaris-claudecode/abc.jsonl"), "content": "{}"})):
             with self.subTest(tool=tool, ruta=entrada["file_path"]):
@@ -258,12 +279,12 @@ class ElPermisoForjadoNoVale(_Base):
         pid = self._humano("envíalo a alguien@hospital.org")
         self._emitir("envíalo a alguien@hospital.org", pid,
                      env=dict(self.env, BTP_OK_ENVIO_CLAVE="b" * 64))
-        self.assertTrue(os.path.exists(os.path.join(self.tmp, "ok_envio.json")))
+        self.assertTrue(os.path.exists(self._token()))
         self.assertEqual(self._enviar(), "deny")
 
     def test_mac_valido_pero_campo_retocado(self):
         self._ordenar("envíalo a alguien@hospital.org")
-        ruta = os.path.join(self.tmp, "ok_envio.json")
+        ruta = self._token()
         d = json.load(open(ruta, encoding="utf-8"))
         d["ts"] = (datetime.now() + timedelta(hours=1)).replace(microsecond=0).isoformat()
         json.dump(d, open(ruta, "w", encoding="utf-8"))
@@ -356,7 +377,7 @@ class LaValvulaDeTitular(_Base):
         env["BTP_OK_ENVIO_SIN_LLAVERO"] = "1"
         pid = self._humano("envíalo")
         r = self._emitir("envíalo", pid, env=env)
-        self.assertFalse(os.path.exists(os.path.join(self.tmp, "ok_envio.json")))
+        self.assertFalse(os.path.exists(self._token()))
         self.assertIn("no se ha podido abrir", r.stdout)
 
 
@@ -498,11 +519,75 @@ class WebNovedadNoSeRompe(_Base):
         self._ordenar("añádelo a la cronología: hoy hemos abierto novedades")
         wn = self._wn()
         self.assertTrue(wn.lo_pide_titular()[0])
-        ruta = os.path.join(self.tmp, "ok_envio.json")
+        ruta = self._token()
         d = json.load(open(ruta, encoding="utf-8"))
         d["usos"] = 0
         json.dump(d, open(ruta, "w", encoding="utf-8"))
         self.assertFalse(wn.lo_pide_titular()[0])
+
+
+# ═══ 7 · Un permiso por sesión: dos órdenes a la vez no se pisan (26-sep-26) ════════════════════
+class DosSesionesNoSePisan(_Base):
+    """El caso real (deuda `ok_envio_fusionar_permiso_se_pierde`): el 26-sep, dos sesiones
+    esperaban al CI con su «fusiona» y el hueco único hacía que la orden de una borrara la de la
+    otra. Ahora cada una tiene su fichero."""
+
+    def _otra_sesion(self):
+        """Cambia esta prueba a una sesión nueva, con su propio transcript. Devuelve la anterior."""
+        antes = (self.sesion, self.transcript)
+        self.sesion = str(uuid.uuid4())
+        self.transcript = os.path.join(self.tmp, self.sesion + ".jsonl")
+        open(self.transcript, "w").close()
+        return antes
+
+    def test_las_dos_ordenes_valen_y_cada_una_una_vez(self):
+        self._ordenar("envíalo a alguien@hospital.org")                 # sesión A
+        a_sesion, a_transcript = self._otra_sesion()
+        self._ordenar("envíalo a alguien@hospital.org")                 # sesión B, después
+        b_sesion, b_transcript = self.sesion, self.transcript
+        self.sesion, self.transcript = a_sesion, a_transcript
+        self.assertIsNone(self._enviar(), "A conserva su permiso aunque B pidiera después")
+        self.assertEqual(self._enviar(), "deny", "y A lo gasta una sola vez")
+        self.sesion, self.transcript = b_sesion, b_transcript
+        self.assertIsNone(self._enviar(), "B no perdió el suyo cuando A envió")
+        self.assertEqual(self._enviar(), "deny", "y B también una sola vez")
+
+    def test_sin_orden_propia_explica_que_frase_lo_abre(self):
+        """Si solo la OTRA sesión tiene permiso, esta no lo hereda y se le dice qué lo abre."""
+        self._ordenar("envíalo a alguien@hospital.org")
+        self._otra_sesion()
+        payload = {"hook_event_name": "PreToolUse", "tool_name": GMAIL + "send_message",
+                   "tool_input": {"to": ["alguien@hospital.org"], "subject": "s", "body": "b"},
+                   "session_id": self.sesion, "transcript_path": self.transcript, "cwd": CASA,
+                   "permission_mode": "bypassPermissions"}
+        r = subprocess.run([sys.executable, SALIDA], input=json.dumps(payload),
+                           capture_output=True, text=True, timeout=60, env=self.env)
+        self.assertEqual(_decision(r), "deny")
+        self.assertIn("no abrió permiso", r.stdout)
+
+    def test_copiar_el_permiso_de_otra_sesion_a_mi_nombre_no_vale(self):
+        """La firma cubre session_id: copiar el fichero de A con el nombre de B no le da a B el
+        permiso de A (y el muro ya deniega escribir ahí; esto es la red de debajo)."""
+        self._ordenar("envíalo a alguien@hospital.org")
+        origen = self._token()
+        a_sesion, _ = self._otra_sesion()
+        shutil.copy(origen, self._token())
+        self.assertEqual(self._enviar(), "deny")
+
+    def test_una_sesion_con_barras_no_sale_del_directorio(self):
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import permiso_envio as P
+        viejo = os.environ.get("BTP_STATE_DIR")
+        os.environ["BTP_STATE_DIR"] = self.tmp
+        try:
+            for raro in ("../../etc/passwd", "a/b", "..", "", "x" * 200):
+                ruta = os.path.realpath(P.token_path(raro))
+                self.assertEqual(os.path.dirname(ruta), os.path.realpath(P.dir_permisos()), raro)
+        finally:
+            if viejo is None:
+                os.environ.pop("BTP_STATE_DIR", None)
+            else:
+                os.environ["BTP_STATE_DIR"] = viejo
 
 
 if __name__ == "__main__":

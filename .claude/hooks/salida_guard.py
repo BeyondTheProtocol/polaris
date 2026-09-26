@@ -60,7 +60,7 @@ try:
 except Exception:
     D = None
 
-TOKEN = os.path.join(STATE, "ok_envio.json")
+TOKEN = os.path.join(STATE, "ok_envio")     # un permiso por sesión dentro (26-sep-26)
 LOG = os.path.join(STATE, "salida_guard.jsonl")
 
 # Lo que de verdad sale al mundo. Anclado al final del nombre de la tool para que
@@ -572,10 +572,15 @@ def _token_valido(datos=None, entrada=None):
     tiene que casar con lo que aprobó (direcciones que nombró, borrador que tenía delante)."""
     if P is None:
         return None, "falta tools/permiso_envio.py"
-    if not os.path.exists(P.token_path()):
-        return None, ""
     datos = datos or {}
-    d, motivo, ctx = P.validar(P.clave(permitir_env=True), sesion=datos.get("session_id") or "")
+    sesion = datos.get("session_id") or ""
+    if not os.path.exists(P.token_path(sesion)):    # SU permiso; el de otra sesión no se toca
+        if P.hay_alguno():
+            # Hay uno, pero de otra sesión: que sepa qué frase lo abre AQUÍ (25-sep-26).
+            return None, ("su mensaje en esta sesión no abrió permiso (el que hay es de otra "
+                          "sesión). Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»")
+        return None, ""
+    d, motivo, ctx = P.validar(P.clave(permitir_env=True), sesion=sesion)
     if not d:
         _log("token_invalido", datos.get("tool_name") or "?", motivo)
         return None, motivo
@@ -592,7 +597,7 @@ def _consumir(d, tool):
         P.marcar_usado(d, tool)
     except Exception:
         try:
-            os.remove(P.token_path())
+            os.remove(P.token_path(d.get("session_id")))
         except Exception:
             pass
     _log("permitido", tool, d.get("motivo", ""))
@@ -604,7 +609,9 @@ def _consumir(d, tool):
 # de usados o un transcript de Claude Code (el permiso se comprueba contra él), leer la clave del
 # MAC del Llavero o lanzar a mano el hook que firma. La firma y el transcript siguen siendo la
 # red de debajo: si alguien encuentra una vía que esto no reconoce, el fichero no vale igual.
-_RE_NOMBRE_PERMISO = re.compile(r"(^|/)ok_envio[^/]*\.jsonl?$", re.I)
+# Desde el 26-sep-26 hay un permiso por sesión en `tools/state/ok_envio/<sesión>.json`: el
+# directorio y todo lo que haya dentro cuentan igual que el fichero único de antes.
+_RE_NOMBRE_PERMISO = re.compile(r"(^|/)ok_envio[^/]*\.jsonl?$|(^|/)ok_envio(/[^/]*)?/?$", re.I)
 _TRANSCRIPTS = os.path.realpath(os.path.expanduser("~/.claude/projects")).lower()
 _SERVICIO = "btp-ok-envio-mac"
 # En código en línea (python -c, heredoc, node -e…) se mira lo que HACE, no lo que nombra: un
@@ -641,7 +648,8 @@ _RE_CODIGO_CLAVE = re.compile(
 # o que leen transcripts, y heredocs que editan este mismo guard. Ahora tiene que aparecer, como
 # literal, el permiso o un `.jsonl` de transcript.
 _RE_CODIGO_OBJETIVO = re.compile(
-    r"""['"][^'"]*(?:ok_envio[^'"/]*\.jsonl?|\.claude/projects/[^'"]*\.jsonl)['"]""", re.I)
+    r"""['"][^'"]*(?:ok_envio[^'"/]*\.jsonl?|ok_envio/[^'"]*|\.claude/projects/[^'"]*\.jsonl)['"]""",
+    re.I)
 _RE_CODIGO_ESCRIBE = re.compile(
     r"open\s*\([^,)]*,\s*(?:mode\s*=\s*)?['\"][rbt]*[wax+][rwxabt+]*['\"]|"
     r"mode\s*=\s*['\"][rbt]*[wax+]|write_text|write_bytes|\.write\s*\(|"
