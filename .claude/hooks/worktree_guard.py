@@ -83,6 +83,27 @@ def _candidatas(valor, cwd):
     return out
 
 
+def _wt_de_subagente(cwd, casa):
+    """El agent-worktree que contiene el cwd de la llamada, o None.
+
+    Bug de clase (26-sep-26): un Agent con `isolation: "worktree"` vive en
+    `<casa>/.claude/worktrees/agent-<id>/` y recibe ese cwd, pero el hook que corre es el del
+    padre (CLAUDE_PROJECT_DIR), así que `_raiz_del_proyecto()` da el worktree del PADRE y el
+    árbol propio del subagente salía como «worktree de OTRA sesión». Y Bash tampoco le deja
+    salir de su árbol: se quedaba sin ningún sitio donde escribir.
+
+    Solo vale el prefijo `agent-`: el cwd lo mueve cualquier `cd`, y aceptar cualquier worktree
+    del cwd dejaría al padre escribir en el de otra sesión viva con solo entrar en él.
+    """
+    otros = os.path.join(casa, ".claude", "worktrees")
+    if not _dentro(cwd, otros) or cwd == otros:
+        return None
+    nombre = os.path.relpath(cwd, otros).split(os.sep)[0]
+    if not nombre.startswith("agent-"):
+        return None
+    return os.path.join(otros, nombre)
+
+
 def _veredicto(path, mi_wt, casa):
     """None si pasa; si no, (motivo, sugerencia-dentro-del-worktree o None)."""
     if _dentro(path, mi_wt):
@@ -110,13 +131,16 @@ def main():
         return 0                         # sesión en casa base: no hay nada que separar
     casa = raiz.split(MARCA_WT)[0]
     cwd = data.get("cwd")
-    cwd = cwd if isinstance(cwd, str) and os.path.isabs(cwd) else raiz
+    cwd = os.path.normpath(cwd) if isinstance(cwd, str) and os.path.isabs(cwd) else raiz
+    wt_agente = _wt_de_subagente(cwd, casa)
     ti = data.get("tool_input") or {}
     for clave in ("file_path", "notebook_path"):
         valor = ti.get(clave)
         if not valor:
             continue
         for cand in _candidatas(valor, cwd):
+            if wt_agente and _dentro(cand, wt_agente):
+                continue                 # subagente aislado escribiendo en SU propio árbol
             v = _veredicto(cand, raiz, casa)
             if v:
                 motivo, sugerencia = v

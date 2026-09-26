@@ -34,6 +34,9 @@ _TMP = tempfile.mkdtemp(prefix="wtguard_")
 CASA = _os.path.join(_TMP, "claudecode")
 MI_WT = _os.path.join(CASA, ".claude", "worktrees", "mi-rama")
 OTRO_WT = _os.path.join(CASA, ".claude", "worktrees", "otra-sesion")
+# Subagente con isolation "worktree": hermano de MI_WT, pero el hook que corre es el del padre.
+AGENTE_WT = _os.path.join(CASA, ".claude", "worktrees", "agent-a256534a4f28f0cf0")
+OTRO_AGENTE_WT = _os.path.join(CASA, ".claude", "worktrees", "agent-otro0000")
 for d in (
     # árbol VERSIONADO: existe en casa base y también dentro de cada worktree
     _os.path.join(CASA, "tools"), _os.path.join(CASA, "tests"),
@@ -41,6 +44,7 @@ for d in (
     _os.path.join(MI_WT, "tools"), _os.path.join(MI_WT, "tests"),
     _os.path.join(MI_WT, ".claude", "hooks"),
     _os.path.join(OTRO_WT, "tools"),
+    _os.path.join(AGENTE_WT, "tools"), _os.path.join(OTRO_AGENTE_WT, "tools"),
     # `tools/state/` SÍ está versionado (herramientas.json) y por eso existe en el worktree;
     # `tools/state/cost/` NO lo está: es el estado vivo del lazo. La línea pasa entre los dos.
     _os.path.join(MI_WT, "tools", "state"),
@@ -134,6 +138,22 @@ casos.append(("salir del worktree con '..' → DENIEGA", rc == 2))
 p = subprocess.run([_sys.executable, GUARD], input="{no es json",
                    capture_output=True, text=True, timeout=20, env=ENV)
 casos.append(("payload ilegible → PASA (fail-OPEN deliberado)", p.returncode == 0))
+# 7. subagente aislado (bug 26-sep-26): raíz = worktree del padre, cwd = su agent-worktree
+rc, msg = _rc(_os.path.join(AGENTE_WT, "tools", "visor3d.py"), tool="Edit", cwd=AGENTE_WT)
+casos.append(("subagente edita SU agent-worktree (raíz del padre, cwd agent-X) → PASA", rc == 0))
+rc, _ = _rc("tools/visor3d.py", tool="Write", cwd=_os.path.join(AGENTE_WT, "tools"))
+casos.append(("subagente, ruta relativa desde un subdirectorio de agent-X → PASA", rc == 0))
+rc, _ = _rc(_os.path.join(OTRO_WT, "tools", "anatomia.py"), tool="Edit", cwd=AGENTE_WT)
+casos.append(("subagente edita el worktree de OTRA sesión → DENIEGA", rc == 2))
+rc, _ = _rc(_os.path.join(OTRO_AGENTE_WT, "tools", "x.py"), tool="Edit", cwd=AGENTE_WT)
+casos.append(("subagente edita el agent-worktree de OTRO subagente → DENIEGA", rc == 2))
+rc, _ = _rc(_os.path.join(CASA, "tools", "x.py"), tool="Edit", cwd=AGENTE_WT)
+casos.append(("subagente edita casa base versionada → DENIEGA", rc == 2))
+rc, _ = _rc(_os.path.join(OTRO_WT, "tools", "anatomia.py"), tool="Edit", cwd=OTRO_WT)
+casos.append(("cwd en el worktree de otra sesión (no agent-*) NO abre la puerta → DENIEGA", rc == 2))
+rc, _ = _rc(_os.path.join(AGENTE_WT, "tools", "..", "..", "otra-sesion", "tools", "a.py"),
+            tool="Edit", cwd=AGENTE_WT)
+casos.append(("salir de agent-X con '..' hacia otra sesión → DENIEGA", rc == 2))
 for desc, ok in casos:
     if ok:
         print("  ✅ %s" % desc)
