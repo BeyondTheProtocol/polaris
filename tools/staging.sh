@@ -29,7 +29,7 @@ case "${1:-estado}" in
     launchctl load -w "$LA/$P.plist" 2>/dev/null && echo "  ✓ $P" || echo "  ✗ $P (revisar)"
     sleep 1
     "$PY" "$REPO/tools/staging.py" estado
-    echo "✅ Antesala 24/7 encendida. Abre en tu dispositivo: http://100.114.113.73:3010"
+    echo "✅ Antesala 24/7 encendida. Abre en tu dispositivo: http://polaris.taild7f51c.ts.net:9091"
     ;;
   off)
     echo "→ Parando la antesala…"

@@ -110,7 +110,9 @@ Para parar: `launchctl unload -w ~/Library/LaunchAgents/com.btp.asistente.plist`
 > Volver al relay: `python3 tools/activar_daemon.py com.btp.observatorio-remoto` (el plist sigue en `tools/launchd/`).
 >
 > **No hace falta launchd para usarla puntualmente:** `staging.sh web <rama>` ya la levanta. El `on`
-> solo sirve para dejarla viva 24/7 (tras reinicios). URL fija para {{TITULAR}}: **http://100.114.113.73:3010**
+> solo sirve para dejarla viva 24/7 (tras reinicios). URL fija para {{TITULAR}}: **http://polaris:9091**
+> (la feature en sí: **http://polaris:9094**). Desde el 26-sep-2026 staging.py solo escucha en 127.0.0.1
+> y a la tailnet la sacan `tailscale serve --http=9091 http://127.0.0.1:4000` y `--http=9094 http://127.0.0.1:4011`.
 
 **Uso normal (lo hago yo al construir una feature):**
 ```

@@ -461,6 +461,7 @@ runpy test_contrato_asiento.py
 runpy test_portguard.py
 runpy test_puertos_loopback.py
 runpy test_observatorio_movil.py
+runpy test_staging_loopback.py
 runpy test_rebuild_agents.py
 
 # ── Hallazgos de impacto MEDIO de la auditoría del 25-jul-26 ─────────────────────

@@ -1,21 +1,14 @@
 {
   "_doc": "Lista cerrada de lo que puede escuchar FUERA de loopback en la casa base. Lo que no esté aquí pone ROJO tests/test_puertos_loopback.py. Nace del punto S14 del feedback de {{CONTACTO}}+KAI (25-sep-2026). Campos: proceso = nombre que da `netstat -anv` (process:pid); puerto = número o \"dinamico\" (solo casa con puertos >= 32768); alcance = \"tailnet\" (IP 100.64/10 o fd7a:115c:a1e0::/48, solo la tailnet de {{TITULAR}}) o \"todas\" (cualquier interfaz, incluida la LAN de casa); argv_contiene = opcional, se exige en la línea de comando del PID; estado = \"excepcion\" (justificada, se queda) o \"revisar\" (pendiente de decisión de {{TITULAR}}, con deuda abierta). Quitar una entrada cuando el servicio se apague. Nunca meter aquí algo con Funnel (público): eso no es excepción, es fallo.",
   "escuchas": [
-    {"proceso": "Python", "puerto": 3010, "alcance": "tailnet", "argv_contiene": "staging.py",
-     "estado": "revisar",
-     "por_que": "Antesala (com.btp.staging, cargada desde jun-2026): relay del índice 3010 -> 127.0.0.1:4000. Mismo patrón que el relay 8788 retirado; tailscale serve 9091 ya publica 127.0.0.1:4000. Visto escuchando tras el reinicio del 26-sep.",
-     "deuda": "antesala-relay-python-tailnet"},
-    {"proceso": "Python", "puerto": 3011, "alcance": "tailnet", "argv_contiene": "staging.py",
-     "estado": "revisar",
-     "por_que": "Antesala (com.btp.staging): relay de la app en pruebas 3011 -> 127.0.0.1:4010.",
-     "deuda": "antesala-relay-python-tailnet"},
-
     {"proceso": "io.tailscale.ipn", "puerto": 5901, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 5901 -> 127.0.0.1:5900: pantalla remota (Jump) desde la tailnet."},
     {"proceso": "io.tailscale.ipn", "puerto": 9090, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 9090 -> 127.0.0.1:8787: el Observatorio."},
     {"proceso": "io.tailscale.ipn", "puerto": 9091, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 9091 -> 127.0.0.1:4000: la Antesala."},
+    {"proceso": "io.tailscale.ipn", "puerto": 9094, "alcance": "tailnet", "estado": "excepcion",
+     "por_que": "tailscale serve 9094 -> 127.0.0.1:4011: la app en pruebas de la Antesala (sustituye al relay Python 3011, 26-sep-2026)."},
     {"proceso": "io.tailscale.ipn", "puerto": 9093, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 9093 -> 127.0.0.1:8791."},
     {"proceso": "io.tailscale.ipn", "puerto": "dinamico", "alcance": "todas", "estado": "excepcion",

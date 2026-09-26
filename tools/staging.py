@@ -2,8 +2,8 @@
 """staging.py — "antesala": ver y probar una feature como en PRODUCCIÓN, en privado,
 desde cualquier dispositivo de {{TITULAR}} (por Tailscale), ANTES de mandarla a producción.
 
-Privado por diseño: el índice escucha solo en localhost y los relays SOLO en la IP de
-Tailscale de Polaris (la tailnet de {{TITULAR}}, NUNCA internet). No despliega nada: "mandar a
+Privado por diseño: todo lo nuestro escucha SOLO en 127.0.0.1. A la tailnet de {{TITULAR}} (NUNCA
+internet) lo saca `tailscale serve`: 9091 → índice (127.0.0.1:4000) y 9094 → app (127.0.0.1:4011). No despliega nada: "mandar a
 producción" lleva al PR para que mergee ella/{{CONTACTO}} (gate del muro). Egress-cero, sin LLM.
 
 Reusa el patrón de relay de tools/preview_remoto.py y las convenciones del repo.
@@ -12,7 +12,7 @@ USO (normalmente lo lanzo yo; el interruptor para {{TITULAR}} es tools/staging.s
   python3 tools/staging.py web <rama> [--modo prod|dev]   # web helptitular.com
   python3 tools/staging.py port <N> [--nombre "X"] [--pr URL]  # un tool con interfaz web
   python3 tools/staging.py on | off | estado
-Luego, en su dispositivo (con Tailscale):  http://100.114.113.73:3010
+Luego, en su dispositivo (con Tailscale):  http://polaris.taild7f51c.ts.net:9091
 """
 import json
 import os
@@ -31,9 +31,14 @@ CURRENT = os.path.join(STATE_DIR, "current.json")
 DAEMON_PID = os.path.join(STATE_DIR, "daemon.pid")
 LOG = os.path.join(REPO, "tools", "launchd", "logs", "staging.log")
 
-TS_IP = "100.114.113.73"     # Polaris en la tailnet (solo la red privada de {{TITULAR}})
-INDEX_LOCAL, INDEX_TS = 4000, 3010   # página índice (la antesala)
-APP_LOCAL, APP_TS = 4010, 3011       # app en pruebas (web build o tool)
+# Hasta el 26-sep-2026 había relays Python en 100.114.113.73:3010/3011. Ahora nada nuestro escucha
+# fuera de loopback: `tailscale serve --http=9091 http://127.0.0.1:4000` y `--http=9094
+# http://127.0.0.1:4011` (tailnet only). serve enruta por NOMBRE, así que los enlaces llevan TS_HOST.
+# Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026
+TS_HOST = "polaris.taild7f51c.ts.net"   # Polaris en la tailnet (solo la red privada de {{TITULAR}})
+INDEX_LOCAL, INDEX_TS = 4000, 9091      # página índice (la antesala) · puerto de tailscale serve
+APP_LOCAL, APP_TS = 4010, 9094          # app en pruebas (web build o tool) · puerto de tailscale serve
+APP_PROXY = 4011                        # relay en loopback → app_local dinámico (serve 9094 apunta aquí)
 
 PNPM = "/opt/homebrew/bin/pnpm"
 
@@ -113,16 +118,17 @@ def _pipe(a, b):
 
 
 def _relay(listen_port, target_resolver):
-    """Escucha SOLO en TS_IP:listen_port y reenvía a 127.0.0.1:target_resolver().
-    target_resolver es una función → puerto local (permite destino dinámico)."""
+    """Escucha SOLO en 127.0.0.1:listen_port y reenvía a 127.0.0.1:target_resolver().
+    target_resolver es una función → puerto local (permite destino dinámico). Lo saca a la
+    tailnet `tailscale serve`, no este proceso."""
     # Arranque LIMPIO: libera al relay huérfano propio que siguiera ocupando ESTE puerto y reintenta
     # (port-scoped: no toca el otro relay/índice de la antesala, que escuchan en otros puertos).
     try:
-        srv = portguard.reusable_tcp_server(TS_IP, listen_port, markers=("staging.py",), backlog=128, log=_log)
+        srv = portguard.reusable_tcp_server("127.0.0.1", listen_port, markers=("staging.py",), backlog=128, log=_log)
     except OSError as e:
-        _log("relay %d no pudo escuchar en %s (%s). ¿Tailscale activo?" % (listen_port, TS_IP, e))
+        _log("relay %d no pudo escuchar en 127.0.0.1 (%s)" % (listen_port, e))
         return
-    _log("relay vivo: %s:%d -> 127.0.0.1 (dinámico)" % (TS_IP, listen_port))
+    _log("relay vivo: 127.0.0.1:%d -> 127.0.0.1 (dinámico)" % listen_port)
     while True:
         try:
             cli, _ = srv.accept()
@@ -165,7 +171,7 @@ def _estado_payload():
     app_local = c.get("app_local", APP_LOCAL)
     c = dict(c)
     c["app_viva"] = _port_open("127.0.0.1", app_local)
-    c["app_url"] = "http://%s:%d/" % (TS_IP, APP_TS)
+    c["app_url"] = "http://%s:%d/" % (TS_HOST, APP_TS)
     return c
 
 
@@ -200,7 +206,7 @@ def _index_html():
         ver_ok = False
 
     ver_btn = ('<a class="btn btn-go" href="http://%s:%d/" target="_blank" rel="noopener">Ver la feature</a>'
-               % (TS_IP, APP_TS)) if ver_ok else \
+               % (TS_HOST, APP_TS)) if ver_ok else \
               ('<span class="btn btn-dis" aria-disabled="true">Ver la feature</span>')
 
     if pr:
@@ -305,7 +311,7 @@ def _start_index_server():
             self.end_headers()
 
     # Arranque LIMPIO: liberar al daemon huérfano propio que siguiera ocupando el puerto del índice
-    # (matarlo aquí suelta también sus relays 3010/3011, que viven en el mismo proceso) y reintentar.
+    # (matarlo aquí suelta también su relay de loopback 4011, que vive en el mismo proceso) y reintentar.
     httpd = portguard.http_server(ThreadingHTTPServer, "127.0.0.1", INDEX_LOCAL, H,
                                   markers=("staging.py",), log=_log)   # solo localhost
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -366,13 +372,13 @@ def serve():
     with open(DAEMON_PID, "w") as f:
         f.write(str(os.getpid()))
     _start_index_server()
-    threading.Thread(target=_relay, args=(INDEX_TS, lambda: INDEX_LOCAL), daemon=True).start()
+    # El índice no lleva relay: tailscale serve 9091 va directo a 127.0.0.1:4000.
     threading.Thread(
         target=_relay,
-        args=(APP_TS, lambda: load_current().get("app_local", APP_LOCAL)),
+        args=(APP_PROXY, lambda: load_current().get("app_local", APP_LOCAL)),
         daemon=True,
     ).start()
-    _log("antesala arriba: http://%s:%d (índice) / :%d (app)" % (TS_IP, INDEX_TS, APP_TS))
+    _log("antesala arriba: http://%s:%d (índice) / :%d (app)" % (TS_HOST, INDEX_TS, APP_TS))
     try:
         while True:
             time.sleep(3600)
@@ -501,8 +507,8 @@ def cmd_port(n, nombre, pr):
 
 def _ok_banner():
     print("\n✅ Antesala lista. Abre en tu iPhone/iPad/portátil (con Tailscale):")
-    print("   👉 http://%s:%d" % (TS_IP, INDEX_TS))
-    print("   (la feature en sí: http://%s:%d )" % (TS_IP, APP_TS))
+    print("   👉 http://%s:%d" % (TS_HOST, INDEX_TS))
+    print("   (la feature en sí: http://%s:%d )" % (TS_HOST, APP_TS))
 
 
 # ──────────────────────────── on/off/estado ────────────────────────────
@@ -533,8 +539,8 @@ def cmd_estado():
     c = load_current()
     print("== Antesala ==")
     print("  índice (localhost:%d): %s" % (INDEX_LOCAL, "vivo" if _port_open("127.0.0.1", INDEX_LOCAL) else "parado"))
-    print("  relay índice  %s:%d : %s" % (TS_IP, INDEX_TS, "escuchando" if _port_open(TS_IP, INDEX_TS) else "no"))
-    print("  relay app     %s:%d : %s" % (TS_IP, APP_TS, "escuchando" if _port_open(TS_IP, APP_TS) else "no"))
+    print("  relay app     127.0.0.1:%d : %s" % (APP_PROXY, "escuchando" if _port_open("127.0.0.1", APP_PROXY) else "no"))
+    print("  (a la tailnet lo sacan `tailscale serve` %d → :%d y %d → :%d)" % (INDEX_TS, INDEX_LOCAL, APP_TS, APP_PROXY))
     if c:
         print("  cargado: %s (%s) — %s" % (c.get("kind"), c.get("status"), c.get("rama") or c.get("nombre") or ""))
         print("  app local :%s viva: %s" % (c.get("app_local"), _port_open("127.0.0.1", c.get("app_local", APP_LOCAL))))
@@ -542,7 +548,7 @@ def cmd_estado():
             print("  PR: %s" % c["pr_url"])
     else:
         print("  (nada cargado)")
-    print("  URL para {{TITULAR}}: http://%s:%d" % (TS_IP, INDEX_TS))
+    print("  URL para {{TITULAR}}: http://%s:%d" % (TS_HOST, INDEX_TS))
 
 
 # ──────────────────────────── main ────────────────────────────
