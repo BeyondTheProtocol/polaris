@@ -1201,14 +1201,14 @@
   {
    "slug": "feedback-flujo-arbol-decisiones",
    "que": "{{TITULAR}} quiere flujo predecible tipo árbol de decisiones, respuestas al punto, y una línea visible antes de ejecutar herramientas para romper el silencio",
-   "clase": "salida",
+   "clase": "contexto",
    "mecanismo": null,
    "fresca": true,
    "heredada": false,
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es un modo de trabajar, no un patrón en una respuesta. Candidata a clase contexto; no se reclasifica aquí para no maquillar la cifra de S15."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es un modo de trabajar, no un patrón en una respuesta. Candidata a clase contexto; no se reclasifica aquí para no maquillar la cifra de S15. · 26-sep-26 (paso 5 del plan del juez, capa 3, aprobado por {{TITULAR}}; Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026): RECLASIFICADA de salida a contexto. Motivo: es un modo de trabajar (flujo predecible, línea antes de ejecutar), no un patrón que se vea en una respuesta suelta; ningún check ni juez por turno lo puede afirmar sin falso verde. Sin garantía, y se dice así en vez de fingir un mecanismo."
   },
   {
    "slug": "feedback-flujo-redaccion-contactos",
@@ -1359,14 +1359,14 @@
   {
    "slug": "feedback-interfaz-simple-inputs-y-autoaceptar",
    "que": "Norma de interacción — dale TODO en formato simple tipo inputs/botones (AskUserQuestion); auto-acepta los pop-ups que puedas con computer-use y deja SOLO lo crucial para ella",
-   "clase": "salida",
+   "clase": "contexto",
    "mecanismo": null,
    "fresca": true,
    "heredada": false,
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: si una decisión debió ir en AskUserQuestion depende del contenido. Candidata a clase contexto (no se reclasifica aquí para no maquillar S15)."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: si una decisión debió ir en AskUserQuestion depende del contenido. Candidata a clase contexto (no se reclasifica aquí para no maquillar S15). · 26-sep-26 (paso 5 del plan del juez, capa 3, aprobado por {{TITULAR}}; Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026): RECLASIFICADA de salida a contexto. Motivo: si una decisión debió ir en AskUserQuestion o un pop-up se podía auto-aceptar depende del contenido y del momento, no de la forma de la respuesta; es un modo de trabajar. Sin garantía, y se dice así en vez de fingir un mecanismo."
   },
   {
    "slug": "feedback-jaula-segunda-mejor-opcion-gratis",
@@ -1760,14 +1760,14 @@
   {
    "slug": "feedback-nombrar-tecnico-no-solo-metafora",
    "que": "{{TITULAR}} es ingeniera — llama a las cosas por su nombre TÉCNICO estándar, no solo por la metáfora de la casa («cerebros», «carriles»); si usas la metáfora, que aparezcan las dos",
-   "clase": "salida",
+   "clase": "contexto",
    "mecanismo": null,
    "fresca": true,
    "heredada": false,
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe todavía: haría falta un diccionario verificado metáfora→nombre técnico («cerebros», «carriles») y no existe; inventarlo daría falso verde."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe todavía: haría falta un diccionario verificado metáfora→nombre técnico («cerebros», «carriles») y no existe; inventarlo daría falso verde. · 26-sep-26 (paso 5 del plan del juez, capa 3, aprobado por {{TITULAR}}; Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026): RECLASIFICADA de salida a contexto. Motivo: haría falta un diccionario verificado metáfora→nombre técnico («cerebros», «carriles») y no existe; inventarlo daría falso verde. Si algún día existe, vuelve a salida. Sin garantía, y se dice así en vez de fingir un mecanismo."
   },
   {
    "slug": "feedback-nombres-siguen-la-marca",
@@ -1953,14 +1953,14 @@
   {
    "slug": "feedback-reducir-overhead-polaris",
    "que": "{{TITULAR}} quiere experiencia más cercana a Claude nativo — menos overhead de Polaris, flujo de árbol de decisiones consistente, respuestas entre explicar y gastar tokens",
-   "clase": "salida",
+   "clase": "contexto",
    "mecanismo": null,
    "fresca": true,
    "heredada": false,
    "aplicable": true,
    "auditable": false,
    "repetida": false,
-   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es una preferencia de experiencia; verborrea ya cubre la parte medible. Candidata a clase contexto (no se reclasifica aquí)."
+   "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: parcial. Propuesta: no · 25-sep-26 (punto 08): solo contexto: es un modo de trabajar, no un patrón detectable en una respuesta. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: es una preferencia de experiencia; verborrea ya cubre la parte medible. Candidata a clase contexto (no se reclasifica aquí). · 26-sep-26 (paso 5 del plan del juez, capa 3, aprobado por {{TITULAR}}; Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026): RECLASIFICADA de salida a contexto. Motivo: es una preferencia de experiencia (menos overhead, más cercano a Claude nativo); la parte medible ya la cubre `verborrea` y el resto es criterio. Sin garantía, y se dice así en vez de fingir un mecanismo."
   },
   {
    "slug": "feedback-reel-desde-url-necesita-video",
@@ -2992,13 +2992,14 @@
    "slug": "feedback-no-inventarle-frases-en-primera-persona",
    "que": "En su voz, ninguna frase entrecomillada como algo que ella siente o dijo puede ser inventada",
    "clase": "salida",
-   "mecanismo": null,
+   "mecanismo": ".claude/hooks/gate_salida.py::frase_inventada",
    "fresca": true,
    "heredada": false,
-   "aplicable": false,
-   "auditable": false,
+   "aplicable": true,
+   "auditable": true,
    "repetida": false,
-   "nota": "20-sep-26, campana de los visores: un copy en su voz le fabricaba una intuicion que ella nunca dijo. Es del eje SALIDA (se veria en el borrador antes de entregarlo), pero hoy no hay check que lo detecte: sin mecanismo, y por eso no se declara auditable. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: una regex ve comillas en su voz, no si ella dijo esa frase. Necesita cotejo contra sus mensajes reales (juez)."
+   "nota": "20-sep-26, campana de los visores: un copy en su voz le fabricaba una intuicion que ella nunca dijo. Es del eje SALIDA (se veria en el borrador antes de entregarlo), pero hoy no hay check que lo detecte: sin mecanismo, y por eso no se declara auditable. · 25-sep-26 (punto 08): necesita juez (criterio sobre el sentido, no un patrón); una regex daría falso verde. · 25-sep-26 (S15, idea de {{CONTACTO}} con KAI): no cabe: una regex ve comillas en su voz, no si ella dijo esa frase. Necesita cotejo contra sus mensajes reales (juez). · 26-sep-26 (paso 2 del juez, capa 3; Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026): mecanizado en AVISO con cotejo sin LLM (tools/cotejo_frases.py): cada frase entrecomillada que un texto en su voz le atribuye (la frase dice lo que siente/piensa/dijo, o va tras un verbo suyo) se busca en sus mensajes de la sesión y en sus WhatsApp (local, solo lectura). Mira la respuesta, lo que se escribe en el turno (Write/Edit de prosa, cuerpo de borrador de correo) y lo que escriben sus sub-agentes. Replay 30 días (2.888 turnos): 2 disparos, 1 acierto (el caso origen del 20-sep) y 1 falso positivo (copy suyo citado en una nota). Parcial: no ve una paráfrasis ni una traducción, y lo que no está en sus mensajes pero ella dijo en voz alta o por otro canal saldrá como aviso.",
+   "modo": "aviso"
   },
   {
    "slug": "feedback-verificar-lo-que-ya-estaba-no-solo-lo-nuevo",

@@ -228,6 +228,9 @@ FAMILIAS = [
                           # PROPONE, firma {{TITULAR}} (25-sep-26, idea de {{CONTACTO}} + KAI)
                           "gate_escalera",
                           "replay_gate",       # mide un check nuevo contra respuestas reales (22-sep-26)
+                          # marca los turnos candidatos del juez de normas (capa 3, 26-sep-26, idea de
+                          # {{CONTACTO}} + KAI)
+                          "prefiltro_juez",
                           # a Grok/Perplexity sale el TEMA de la búsqueda, no su frase (22-sep-26)
                           "reescribe_consulta", "eval_reescritura",
                           # reinicia el historial del espejo si algo privado ya salió (25-sep-26);

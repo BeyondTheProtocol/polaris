@@ -1392,6 +1392,45 @@ def lola_sin_nota(t, tools=None):
     return ("Añadiste a «Comprar para TB06» sin tocar «Consultar con Lola». Lo elegido va a las dos.")
 
 
+# Sus mensajes de la sesión: los pone main() leyendo el transcript, y `tools/replay_gate.py` turno a
+# turno. None = no se sabe → `frase_inventada` no acusa a ciegas.
+SUYOS = None
+FRASE_SUYA = "⟨frase en su voz⟩ "
+MAX_FRASES = 5
+
+
+def frase_inventada(t, tools=None):
+    """feedback-no-inventarle-frases-en-primera-persona — en su voz, ninguna frase entrecomillada
+    como algo que ella siente o dijo puede ser inventada (20-sep-26: «me dio la sensación de que
+    aparecieron todas de golpe», que ella nunca dijo).
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026:
+    paso 2 del juez de las normas de salida (capa 3). Cotejo SIN LLM (`tools/cotejo_frases.py`):
+    cada frase que un borrador en su voz le atribuye se busca en sus mensajes de la sesión y en sus
+    WhatsApp (local, solo lectura). Mira la respuesta, lo que se escribió en el turno (`_marcas`:
+    Write/Edit de prosa, cuerpo de un borrador de correo) y lo que escribieron sus sub-agentes
+    (`_frases_de_subagentes`). No ve una paráfrasis ni una traducción. Replay de 30 días (26-sep-26,
+    2.888 turnos): 2 disparos, 1 el caso origen y 1 falso positivo."""
+    if SUYOS is None:
+        return None
+    try:
+        import cotejo_frases as cf
+    except Exception:
+        return None
+    frases = cf.frases_en_su_voz(_borradores(t))
+    frases += [x[len(FRASE_SUYA):] for x in (tools or []) if x.startswith(FRASE_SUYA)]
+    frases = list(dict.fromkeys(frases))[:MAX_FRASES]
+    if not frases:
+        return None
+    faltan = [f for f in frases if cf.respaldo(f, SUYOS) is None]
+    if faltan:                                   # WhatsApp solo si la sesión no lo respalda
+        wa = cf.corpus_whatsapp()
+        faltan = [f for f in faltan if cf.respaldo(f, [], wa) is None]
+    if not faltan:
+        return None
+    return ("«%s»: se la atribuyes en su voz y no está en sus mensajes (ni en esta sesión ni en su "
+            "WhatsApp). Si es inventada, quítala, o díselo al entregar." % faltan[0][:120])
+
+
 # Checks que corren aunque la respuesta sea corta: «hecho» sin haber lanzado al comité es
 # justo el incumplimiento, y el mínimo de caracteres lo dejaba pasar.
 SIN_MINIMO = {"enrutado_incumplido"}
@@ -1435,6 +1474,7 @@ CHECKS = {
     "respuesta_en_ingles": respuesta_en_ingles,
     "tono_builder": tono_builder,
     "lola_sin_nota": lola_sin_nota,
+    "frase_inventada": frase_inventada,
 }
 
 
@@ -1538,6 +1578,39 @@ SIN_HTML = "⟨draft sin htmlBody⟩"
 
 
 def _marcas(nombre, entrada):
+    """Señales de la ENTRADA de una tool que un check necesita y que el nombre no dice. Dos:
+    borrador de correo sin HTML (`_marca_html`) y frases en su voz de lo que se escribe
+    (`_marca_frases`, para `frase_inventada`, 26-sep-26)."""
+    return _marca_html(nombre, entrada) + _marca_frases(nombre, entrada)
+
+
+def _marca_frases(nombre, entrada):
+    """Frases entrecomilladas que un texto escrito en el turno le atribuye a ella (Write, Edit,
+    MultiEdit, cuerpo de un borrador de correo). Cada párrafo es un bloque. Fail-open."""
+    if not isinstance(entrada, dict) or not re.search(
+            r"^(Write|Edit|MultiEdit)$|(create|update)_draft$", nombre or ""):
+        return []
+    # Solo ficheros de PROSA fuera del taller: el replay de 30 días (26-sep-26) dio 37 turnos con
+    # Write/Edit de código, tests, memorias y prompts («font-family:…», regex, «resume mis
+    # correos»), ninguno un texto en su voz. El copy vive en .md/.txt/.html/.astro/.mdx.
+    ruta = str(entrada.get("file_path") or "")
+    if ruta and (not re.search(r"\.(md|mdx|txt|html?|astro)$", ruta, re.I)
+                 or re.search(r"/memory/|/tests?/|/\.claude/|/tools/|/scratchpad/|CLAUDE\.md|"
+                              r"AGENTS\.md|README", ruta)):
+        return []
+    textos = [entrada.get(k) for k in ("content", "new_string", "body", "htmlBody")]
+    textos += [e.get("new_string") for e in (entrada.get("edits") or []) if isinstance(e, dict)]
+    try:
+        import cotejo_frases as cf
+        textos = [re.sub(r"<[^>]*>", "\n\n", x) if isinstance(x, str) and "<" in x else x
+                  for x in textos]
+        bloques = [b for x in textos if isinstance(x, str) for b in re.split(r"\n\s*\n", x)]
+        return [FRASE_SUYA + f for f in cf.frases_en_su_voz(bloques)][:MAX_FRASES]
+    except Exception:
+        return []
+
+
+def _marca_html(nombre, entrada):
     """Señales de la ENTRADA de una tool que un check necesita y que el nombre no dice (25-sep-26).
     Hoy una: un borrador de correo a un tercero sin `htmlBody` (feedback-correos-formato-html).
     La usan `_tools_del_turno` y `tools/replay_gate.py`, para que el replay mida lo mismo que ve el
@@ -1550,6 +1623,57 @@ def _marcas(nombre, entrada):
     if to and not re.sub(re.escape(TITULAR_MAIL), "", to, flags=re.I).strip(" []'\",;"):
         return []                                  # un borrador para ella misma no es «a terceros»
     return [SIN_HTML]
+
+
+def _mensajes_suyos(transcript_path):
+    """Todos sus mensajes de la sesión (texto). None si no se puede leer."""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return None
+    out = []
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as f:
+            lineas = f.readlines()
+        for ln in lineas:
+            try:
+                d = json.loads(ln)
+            except Exception:
+                continue
+            if _es_mensaje_de_titular(d):
+                c = (d.get("message") or {}).get("content")
+                out.append(c if isinstance(c, str) else " ".join(
+                    x.get("text", "") for x in c if isinstance(x, dict) and x.get("type") == "text"))
+    except Exception:
+        return None
+    return out
+
+
+def _frases_de_subagentes(transcript_path, desde, hasta=None):
+    """Marcas FRASE_SUYA de lo que los SUB-AGENTES escribieron entre `desde` y `hasta` (ISO). El
+    caso que originó `frase_inventada` fue un Write de `redes-contenido` (20-sep-26), que vive en
+    `<sesión>/subagents/*.jsonl` y no en el transcript principal. Solo se añaden estas marcas, no
+    las tools del sub-agente (otros checks miran las tools del hilo principal). Fail-open."""
+    if not transcript_path or not desde:
+        return []
+    out = []
+    try:
+        import glob
+        carpeta = os.path.join(os.path.splitext(transcript_path)[0], "subagents")
+        for ruta in glob.glob(os.path.join(carpeta, "*.jsonl")):
+            with open(ruta, encoding="utf-8", errors="replace") as f:
+                lineas = f.readlines()
+            for ln in lineas:
+                if '"tool_use"' not in ln:
+                    continue
+                d = json.loads(ln)
+                ts = str(d.get("timestamp") or "")
+                if ts < desde or (hasta and ts >= hasta):
+                    continue
+                for x in (d.get("message") or {}).get("content") or []:
+                    if isinstance(x, dict) and x.get("type") == "tool_use":
+                        out += [m for m in _marca_frases(x.get("name") or "", x.get("input") or {})]
+    except Exception:
+        return out
+    return out[:MAX_FRASES]
 
 
 def _tools_del_turno(transcript_path):
@@ -1586,6 +1710,8 @@ def _tools_del_turno(transcript_path):
                 if isinstance(v, str):
                     usos.append(v[:400])
             usos.extend(_marcas(x.get("name") or "", entrada))
+    if parsed:
+        usos.extend(_frases_de_subagentes(transcript_path, str(parsed[ini].get("timestamp") or "")))
     # [] = se pudo leer y no se usó nada (que es justo lo que hay que poder acusar);
     # None = no se sabe. Antes las dos cosas eran None, y «no ejecutó nada» pasaba siempre.
     return usos if parsed else None
@@ -1706,8 +1832,9 @@ def main():
         # Con `stop_hook_active` ya frené una vez este turno: sin tiempo, se deja pasar (sin bucle).
         _watchdog.armar(8, "gate_salida", al_vencer=lambda s: 0 if data.get("stop_hook_active")
                         else _al_vencer(texto, s))
-    global SESION
+    global SESION, SUYOS
     SESION = str(data.get("session_id") or data.get("transcript_path") or "") or None
+    SUYOS = _mensajes_suyos(data.get("transcript_path"))
     if data.get("stop_hook_active"):
         # Ya frenó una vez este turno: no hacemos bucle, pero la reescritura SÍ se apunta
         # (`reintento: true`), o el log vivo cuenta de menos y las cotas de la escalera mienten.

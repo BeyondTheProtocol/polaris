@@ -5,6 +5,9 @@ Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep
 53 normas de salida sin mecanismo» (24 al recontarlo esa noche). De esas 24, doce caben en una regex
 o en las tools del turno y aquí están; las otras doce justifican en su `nota` de normas.json por qué
 no (y `test_las_que_no_caben_lo_justifican` lo exige).
+26-sep-26 (plan del juez, capa 3, pasos 2 y 5): de esas doce, `no-inventarle-frases` pasó a tener
+check (`frase_inventada`, en aviso, ver tests/test_juez_capa3.py) y cuatro se reclasificaron a
+`contexto` con su motivo en la nota. Quedan 7 de salida sin mecanismo (49 de salida, 42 con él).
 
 Cada check con POSITIVOS (lo que tiene que cazar) y NEGATIVOS (los falsos positivos que el replay de
 30 días, 2.781 turnos reales, encontró en la primera versión, reescritos sin datos suyos). Además el

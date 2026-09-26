@@ -57,14 +57,29 @@ def _es_turno_de_titular(o):
     return bool(t) and not t.lstrip().startswith("[SYSTEM NOTIFICATION")
 
 
-def turnos(ruta, marcas=None):
-    """[(respuesta_final, tools)] de un transcript. Fail-soft. `marcas` = `gate._marcas` (señales de
-    la entrada de una tool, p.ej. borrador sin htmlBody), para medir lo mismo que ve el hook."""
+def turnos_ricos(ruta, marcas=None):
+    """Como `turnos`, pero cada turno es un dict con lo que un juez necesita además de la respuesta:
+    `ts` (ISO del mensaje de {{TITULAR}} que abre el turno), `pregunta` (ese mensaje), `previa` (la
+    respuesta final del turno anterior, para ver si ella la cuestiona) y `suyos` (TODOS sus
+    mensajes de la sesión hasta este turno incluido, para cotejar frases que se le atribuyen).
+    Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026:
+    el prefiltro del juez de las normas de salida (capa 3) reutiliza este mismo partido de turnos.
+    Fail-soft."""
     try:
         lineas = open(ruta, encoding="utf-8", errors="replace").read().splitlines()
     except Exception:
         return []
     out, tools, ultimo, abierto = [], [], "", False
+    ts, pregunta, previa, suyos = "", "", "", []
+
+    sub = getattr(getattr(marcas, "__globals__", {}), "get", lambda _k: None)("_frases_de_subagentes")
+
+    def _cierra(hasta=None):
+        if sub:                                 # lo que escribieron sus sub-agentes, como el hook
+            tools.extend(sub(ruta, ts, hasta))
+        out.append({"ts": ts, "pregunta": pregunta, "previa": previa, "suyos": list(suyos),
+                    "respuesta": ultimo, "tools": tools})
+
     for ln in lineas:
         try:
             o = json.loads(ln)
@@ -72,8 +87,11 @@ def turnos(ruta, marcas=None):
             continue
         if _es_turno_de_titular(o):
             if abierto and ultimo:
-                out.append((ultimo, tools))
+                _cierra(str(o.get("timestamp") or "") or None)
+                previa = ultimo
             tools, ultimo, abierto = [], "", True
+            ts, pregunta = str(o.get("timestamp") or ""), cc._texto_de_mensaje(o) or ""
+            suyos.append(pregunta)
             continue
         if not abierto or o.get("type") != "assistant" or o.get("isSidechain"):
             continue
@@ -95,8 +113,14 @@ def turnos(ruta, marcas=None):
             if marcas:
                 tools.extend(marcas(x.get("name") or "", entrada))
     if abierto and ultimo:
-        out.append((ultimo, tools))
+        _cierra()
     return out
+
+
+def turnos(ruta, marcas=None):
+    """[(respuesta_final, tools)] de un transcript. Fail-soft. `marcas` = `gate._marcas` (señales de
+    la entrada de una tool, p.ej. borrador sin htmlBody), para medir lo mismo que ve el hook."""
+    return [(d["respuesta"], d["tools"]) for d in turnos_ricos(ruta, marcas)]
 
 
 def _deid(s):
@@ -120,7 +144,10 @@ def replay(dias=14, gate=None, solo=None, n_ejemplos=20):
                 continue
         except OSError:
             continue
-        for texto, tools in turnos(ruta, getattr(g, "_marcas", None)):
+        for d in turnos_ricos(ruta, getattr(g, "_marcas", None)):
+            texto, tools = d["respuesta"], d["tools"]
+            if hasattr(g, "SUYOS"):             # sus mensajes de la sesión, como en el hook
+                g.SUYOS = d["suyos"]
             n_turnos += 1
             corta = len(texto) < g.MIN_CHARS
             if any(u in texto for u in g.URGENTE):
