@@ -231,6 +231,9 @@ FAMILIAS = [
                           # marca los turnos candidatos del juez de normas (capa 3, 26-sep-26, idea de
                           # {{CONTACTO}} + KAI)
                           "prefiltro_juez",
+                          # el juez de esas normas (Claude sin tools, rúbrica, modo sombra),
+                          # pasos 3 y 4 (26-sep-26, idea de {{CONTACTO}} + KAI)
+                          "juez_normas",
                           # a Grok/Perplexity sale el TEMA de la búsqueda, no su frase (22-sep-26)
                           "reescribe_consulta", "eval_reescritura",
                           # reinicia el historial del espejo si algo privado ya salió (25-sep-26);

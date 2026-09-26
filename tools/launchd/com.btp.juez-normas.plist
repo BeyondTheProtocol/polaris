@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.juez-normas</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- JUEZ DE LAS NORMAS DE SALIDA, capa 3 (26-sep-2026). Idea de {{CONTACTO}}
+       (https://contacto), con su agente KAI, revisión del 25-sep-2026. Aprobado en MODO SOMBRA
+       por {{TITULAR}} el 26-sep-2026: prefiltro sin LLM sobre los turnos de AYER, juez Claude sin tools
+       (borde antes de cada llamada) y apunta los `incumple` en gate_salida.jsonl con modo=sombra
+       para que gate_etiqueta / gate_escalera los midan. NO avisa a {{TITULAR}}. Subir a aviso exige el
+       listón estricto (FP ≤ 20 % por cota y recall ≥ 60 %) y su firma. Coste medido ≈ 0,06-0,09 $/día.
+       Diario 03:40, hueco libre antes del backup (04:30). Invoca python directo, NO run_agent.sh. -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/juez_normas.py</string>
+    <string>diario</string>
+    <string>--modo</string>
+    <string>sombra</string>
+  </array>
+  <key>StartCalendarInterval</key><dict>
+    <key>Hour</key><integer>3</integer>
+    <key>Minute</key><integer>40</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/juez-normas.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/juez-normas.err</string>
+</dict></plist>

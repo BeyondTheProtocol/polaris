@@ -1,0 +1,11 @@
+{
+ "pieza": "juez_normas.py",
+ "estado_ficha": "completa",
+ "para": "juez LLM (Claude, sin tools) de las normas de salida que no caben en regex (capa 3): hoy solo cotejar_fuente, en MODO SOMBRA (apunta en gate_salida.jsonl, no avisa).",
+ "cuando_si": "rutina diaria com.btp.juez-normas sobre los candidatos de prefiltro_juez.py; medir el juez contra tests/juez_banco.json (metricas, puede).",
+ "cuando_no": "para bloquear o avisar a {{TITULAR}} sin haber pasado el listón estricto (FP <= 20 % con cota Clopper-Pearson y recall >= 60 %) y sin su firma.",
+ "reemplaza": "nada: pieza nueva; completa a prefiltro_juez.py, no lo sustituye",
+ "test": "tests/test_juez_normas.py",
+ "alta": "2026-09-26, plan aprobado por {{TITULAR}} (pasos 3 y 4 y modo sombra)",
+ "origen": "Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026"
+}

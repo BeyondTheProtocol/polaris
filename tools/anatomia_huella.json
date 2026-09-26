@@ -106,7 +106,7 @@
     "mejora del sistema": 9,
     "memoria y saber": 15,
     "modelos de IA": 15,
-    "muro y seguridad": 28,
+    "muro y seguridad": 29,
     "otras": 3,
     "redes y prensa": 13,
     "salud del sistema": 21
@@ -235,6 +235,7 @@
     "com.btp.hoy-compose",
     "com.btp.instagram",
     "com.btp.inventario-uso",
+    "com.btp.juez-normas",
     "com.btp.kb-reindex",
     "com.btp.living-context",
     "com.btp.nct-cache",

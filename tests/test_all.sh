@@ -92,6 +92,7 @@ runpy test_replay_gate.py
 runpy test_gate_punto08.py
 runpy test_gate_s15.py   # 25-sep · S15 {{CONTACTO}}+KAI: 12 normas de salida más con check (aviso), medidas con replay
 runpy test_juez_capa3.py   # 26-sep · juez capa 3 ({{CONTACTO}}+KAI), pasos 1, 2 y 5: prefiltro, frase_inventada (aviso), 4 normas a contexto
+runpy test_juez_normas.py  # 26-sep · juez capa 3 ({{CONTACTO}}+KAI), pasos 3 y 4: banco doble ciego, juez Claude sin tools, sin rutina hasta pasar el listón
 runpy test_gate_presupuesto.py
 runpy test_launch_loopback.py
 runpy test_nvidia_tope.py

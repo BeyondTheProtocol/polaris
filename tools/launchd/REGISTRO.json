@@ -345,6 +345,11 @@
    "script": "radar_ned_dia.sh",
    "concern": "radar-ned-diario",
    "nota": ""
+  },
+  "com.btp.juez-normas": {
+   "script": "juez_normas.py",
+   "concern": "juez-normas",
+   "nota": "Juez de las normas de salida, capa 3 (idea de {{CONTACTO}} + KAI, 25-sep-26). Diario 03:40, MODO SOMBRA aprobado por {{TITULAR}} el 26-sep-26: prefiltro sin LLM + juez Claude sin tools sobre los turnos de ayer (solo cotejar_fuente), apunta en gate_salida.jsonl con modo=sombra, NO avisa. Aviso exige listón estricto y su firma. ~0,06-0,09 $/día. NO cargado hasta fusionar (gate de activar_daemon.py)."
   }
  }
 }

@@ -27,6 +27,7 @@ import argparse
 import collections
 import datetime
 import glob
+import hashlib
 import json
 import os
 import re
@@ -109,11 +110,128 @@ def inventarle_frases(d, g):
     return list(dict.fromkeys(fr)) or None
 
 
+# Rúbrica aclarada por {{TITULAR}} (26-sep-26): citar el informe concreto que se LEYÓ ANTES EN LA MISMA
+# SESIÓN cuenta como cotejado. El juez necesita ver esas lecturas previas: estas son las señales.
+_LECTURA_SESION = re.compile(
+    r"informe|_PRIVADO|lector_clinico|kb\.py|FUENTE-DE-VERDAD|\.pdf|pdftotext|Perfil-Molecular|"
+    r"anal[ií]tica|Guardant|Foundation|{{CENTRO}}|dicom|\.dcm|\bPET\b|biopsia|RAG_md|read_file_content|"
+    r"comite-medico|oncologo-virtual|verificacion|tabla-de-alteraciones", re.I)
+
+# 26-sep-26 (medida de la reserva v2): con solo las 60 últimas lecturas, recortadas a 200
+# caracteres, el juez NO veía que el PET y la histología se habían leído el día anterior EN LA MISMA
+# sesión (sesión de 3 días) y lo contaba como «otra sesión»: 3 de los 4 FP. Ahora se sacan los
+# DOCUMENTOS con nombre del historial clínico de la entrada ENTERA de cada tool, con la fecha de
+# la lectura, sin tope por antigüedad dentro de la sesión.
+_DOC = re.compile(r"(\d{4}-\d\d-\d\d - [^\"\\/\n]{3,160}?\.(?:ocr\.txt|pdf|md|txt|docx|png|jpe?g))", re.I)
+_OTRA_FUENTE = re.compile(r"(Perfil-Molecular-Maestro[\w.-]*|tabla-de-alteraciones[\w-]*|"
+                          r"kb\.py ask \"[^\"]{1,80}\"|read_file_content)", re.I)
+
+
+def documentos_leidos(ruta):
+    """[(ts ISO, documento)] de las fuentes clínicas que tocan las tools del hilo principal de la
+    sesión, leídas de la entrada COMPLETA (no del recorte de `turnos_ricos`). Fail-soft."""
+    out = []
+    try:
+        fh = open(ruta, encoding="utf-8", errors="replace")
+    except Exception:
+        return out
+    with fh:
+        for ln in fh:
+            if '"tool_use"' not in ln:
+                continue
+            try:
+                o = json.loads(ln)
+            except Exception:
+                continue
+            if o.get("type") != "assistant" or o.get("isSidechain"):
+                continue
+            for x in (o.get("message") or {}).get("content") or []:
+                if not (isinstance(x, dict) and x.get("type") == "tool_use"):
+                    continue
+                s = json.dumps(x.get("input") or {}, ensure_ascii=False)
+                if x.get("name", "").endswith("read_file_content"):
+                    out.append((o.get("timestamp") or "", "Drive: read_file_content"))
+                for m in _DOC.findall(s) + _OTRA_FUENTE.findall(s):
+                    out.append((o.get("timestamp") or "", m.strip()))
+    return out
+
+
+def calibrar_amplio(d):
+    """`calibrar` + las señales de rechazo/corrección de `cosecha_correcciones` (26-sep-26): el
+    patrón estrecho no trajo ningún incumplimiento en 60 días. Recall primero; el juez filtra."""
+    hit = calibrar(d)
+    if hit or not d["previa"]:
+        return hit
+    import cosecha_correcciones as cc
+    s = cc.detectar_senales(d["pregunta"][:1500])
+    return ("señal:" + ",".join(sorted(set(s) & {"rechazo", "correccion"}))) if (
+        "rechazo" in s or "correccion" in s) else None
+
+
 def _dia(ts):
     try:
         return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone().date()
     except Exception:
         return None
+
+
+def id_turno(ruta, ts):
+    """Id estable y sin PII de un turno: 8 primeros de la sesión + ts ISO de su mensaje."""
+    return "%s@%s" % (os.path.basename(ruta)[:8], ts)
+
+
+def candidatos(dias=30, solo=None, desde=None, hasta=None):
+    """Candidatos CON su contexto, para el banco (paso 3) y el juez (paso 4) de cotejar_fuente y
+    calibrar. Ventana: [desde, hasta] (fechas) o los últimos `dias`. Cada uno:
+    {id, norma, slug, dia, disparo, pregunta, previa, respuesta, tools, fuente_en_turno}.
+    CRUDO: lleva datos clínicos. Solo a estado de casa base o al scratchpad, nunca al repo."""
+    g = rg.cargar_gate()
+    base = os.environ.get("BTP_PROJECTS_DIR") or os.path.expanduser("~/.claude/projects")
+    hasta = hasta or datetime.date.today()
+    desde = desde or (hasta - datetime.timedelta(days=dias - 1))
+    corte = time.mktime(desde.timetuple()) - 86400
+    out = []
+    for ruta in sorted(glob.glob(os.path.join(base, "*", "*.jsonl"))):
+        try:
+            if os.path.getmtime(ruta) < corte:
+                continue
+        except OSError:
+            continue
+        previas = []                        # lecturas de fuente en turnos ANTERIORES de la sesión
+        docs = None                         # documentos leídos en la sesión (se carga si hace falta)
+        inicio = None
+        for d in rg.turnos_ricos(ruta, getattr(g, "_marcas", None)):
+            inicio = inicio or d["ts"]
+            antes = list(dict.fromkeys(previas))[-60:]
+            previas.extend(x[:200] for x in d["tools"] if x and _LECTURA_SESION.search(x))
+            dia = _dia(d["ts"])
+            if not dia or dia < desde or dia > hasta:
+                continue
+            if any(u in d["respuesta"] for u in g.URGENTE):
+                continue
+            for nombre, fn in (("cotejar_fuente", cotejar_fuente), ("calibrar", calibrar_amplio)):
+                if solo and nombre not in solo:
+                    continue
+                hit = fn(d)
+                if not hit:
+                    continue
+                sesion = os.path.basename(ruta)[:-6]
+                if docs is None:
+                    docs = documentos_leidos(ruta)
+                vistos, docs_antes = set(), []
+                for ts, doc in docs:
+                    if ts and ts < d["ts"] and doc not in vistos:
+                        vistos.add(doc)
+                        docs_antes.append("%s · %s" % (str(_dia(ts)), doc[:170]))
+                out.append({"sesion_desde": str(_dia(inicio)),
+                            "documentos_sesion_previos": docs_antes[-150:],"id": id_turno(ruta, d["ts"]), "norma": nombre,
+                            "session_hash": hashlib.sha256(sesion.encode()).hexdigest()[:16],
+                            "slug": NORMAS[nombre], "dia": str(dia), "disparo": hit,
+                            "pregunta": d["pregunta"], "previa": d["previa"],
+                            "respuesta": d["respuesta"], "tools": [t for t in d["tools"] if t],
+                            "lecturas_sesion_previas": antes,
+                            "fuente_en_turno": any(_FUENTE_LEIDA.search(x) for x in d["tools"])})
+    return out
 
 
 def medir(dias=30, solo=None, n_ejemplos=0, usar_wa=True):
