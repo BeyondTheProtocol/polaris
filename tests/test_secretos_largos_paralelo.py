@@ -23,6 +23,10 @@ for p in procs:
     if p.returncode:
         print(out[-800:])
 
+if all(rc == 77 for rc in rcs):
+    print("⏭️  SKIP: los tres test_secretos_largos saltan aquí (rc=77)")
+    sys.exit(77)
+
 ok = all(rc == 0 for rc in rcs)
 print("  %s tres test_secretos_largos a la vez: rc=%s" % ("✅" if ok else "❌", rcs))
 print("\nVEREDICTO: %s" % ("TODO CORRECTO" if ok else "FALLOS"))
