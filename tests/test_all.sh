@@ -27,24 +27,41 @@ exec </dev/null
 # 10 sí pasarían allí; se pierden a cambio de que el semáforo vuelva a significar algo.
 SOLO_CASA_BASE="test_xurl.py test_x_guardados_enriquecido.py test_llavero_mudo.py
 test_bucles_colgados.py test_plists_home.py test_anatomia_tecnica.py test_auto_mejora_turnos.py
-test_digest.sh test_muro_costura_rm.py test_coste_repo.py test_healthcheck_halt_inactividad.py"
+test_digest.sh test_muro_costura_rm.py test_coste_repo.py test_healthcheck_halt_inactividad.py
+test_chrome_headless_cierra.py"
 # `$(echo …)` colapsa los saltos de línea de la lista: sin eso, las baterías que caen al
 # principio o al final de cada línea no casaban y seguían corriendo (4 rojos en el primer CI).
 _salta() { [ -n "$BTP_PORTABLE" ] || return 1
            case " $(echo $SOLO_CASA_BASE) " in *" $1 "*) return 0;; esac; return 1; }
-run() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
+run() { _fuera "$1" && return 0; _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
         [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
         [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
                            echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
 # El nombre del test que se pone ROJO se DICE (27/7/26). Antes runpy solo incrementaba el contador:
 # la batería acababa en "❌ 1 batería(s) con fallos" sin decir cuál, y había que ir a mano fichero a
 # fichero. Con el log guardado, además, el fallo se puede mirar después (importa para los flakes).
-runpy() { _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; "$PY" "$ROOT/tests/$1" >/tmp/t.$$ 2>/tmp/t.$$.err; local rc=$?; tail -1 /tmp/t.$$;
+runpy() { _fuera "$1" && return 0; _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; "$PY" "$ROOT/tests/$1" >/tmp/t.$$ 2>/tmp/t.$$.err; local rc=$?; tail -1 /tmp/t.$$;
           [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
           # stderr va al log del rojo (22-sep-26): `unittest` escribe AHÍ el fallo, y sin esto el
           # paso «Qué falló exactamente» del CI público salía vacío con test_web_lint en rojo.
           [ $rc -ne 0 ] && { fail=$((fail+1)); cat /tmp/t.$$ /tmp/t.$$.err > "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
                              echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
+
+# --cambiados (26-sep-26): solo las baterías que tocan los ficheros cambiados de la rama
+# (tools/tests_afectados.py). Es para comprobar sobre la marcha sin esperar 10+ minutos, con
+# varias sesiones a la vez en la misma máquina. NO vale para fusionar a casa base: el resumen lo
+# dice y no escribe «TODO EN VERDE». Test: test_tests_afectados.py.
+CAMBIADOS=""; SELECCION=""; fuera=0
+if [ "$1" = "--cambiados" ]; then
+  _sel=$("$PY" "$ROOT/tools/tests_afectados.py")
+  if [ "$(echo "$_sel" | head -1)" != "TODO" ]; then
+    CAMBIADOS=1; SELECCION=" $(echo $_sel) "
+    echo "⚡ MODO --cambiados: $(echo "$_sel" | grep -c .) batería(s) afectada(s). Antes de fusionar, la suite completa."
+  else
+    echo "⚡ --cambiados: se tocó test_all.sh, así que va la suite completa."
+  fi
+fi
+_fuera() { [ -n "$CAMBIADOS" ] || return 1; case "$SELECCION" in *" $1 "*) return 1;; esac; fuera=$((fuera+1)); return 0; }
 
 run   test_fuga.sh
 run   test_halt.sh
@@ -287,6 +304,9 @@ runpy test_healthcheck_llms.py
 runpy test_perplexity_agent.py
 runpy test_healthcheck_alerta_str.py
 runpy test_bucles_colgados.py
+runpy test_chrome_headless_cierra.py   # 26-sep · el ayudante de Chrome headless lo cierra siempre (Chrome real, solo casa base)
+runpy test_healthcheck_cpu.py   # 26-sep · CPU saturada dos vueltas seguidas avisa; un pico no
+runpy test_tests_afectados.py   # 26-sep · test_all --cambiados elige bien las baterías
 runpy test_activar_daemon.py
 runpy test_activar_daemon_deshabilitado.py
 runpy test_plists_home.py
@@ -474,6 +494,7 @@ runpy test_session_start_lazo.py      # 25-sep · el lazo no lanza el drenaje de
 # dry/fixture; hasta entonces se corren a mano.
 
 # Meta-check: que este runner no se vuelva a quedar atrás solo.
+if [ -z "$CAMBIADOS" ]; then
 echo "── meta: tests no invocados ──"
 _huerf=""
 for _f in "$ROOT"/tests/test_*.py "$ROOT"/tests/test_*.sh; do
@@ -487,12 +508,17 @@ if [ -n "$_huerf" ]; then
 else
   echo "✅ ningún test huérfano"
 fi
+fi
 
 echo
 # Un SKIP no es ni verde ni rojo: es «necesita algo que aquí no está» (ver tests/_entorno.py).
 # Se dice aparte para que el número de rojos signifique lo que parece.
 [ "$skip" -gt 0 ] && echo "⏭️  $skip batería(s) saltada(s): falta el contenido, el estado vivo, los overlays locales o el lazo (HALT activo)"
+if [ -n "$CAMBIADOS" ]; then
+  [ "$fail" -eq 0 ] && echo "✅ PARCIAL en verde: $fuera batería(s) no se corrieron (--cambiados). NO es «todo en verde»: antes de fusionar, la suite completa." || echo "❌ $fail batería(s) con fallos (parcial, --cambiados) · logs: $ROJO_DIR"
+else
 [ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos · logs de ESTA ejecución: $ROJO_DIR"
+fi
 # Sin rojos, la carpeta propia sobra (nunca /tmp ni una que haya dado el llamador).
 [ "$fail" -eq 0 ] && [ -z "$CI" ] && [ -z "$BTP_ROJO_DIR" ] && rmdir "$ROJO_DIR" 2>/dev/null
 exit "$fail"

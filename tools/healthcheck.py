@@ -990,6 +990,76 @@ def _check_recursos():
              % (swap_gb, libre_txt, quien)], info)
 
 
+CPU_CARGA_FACTOR = float(os.environ.get("BTP_CPU_CARGA_FACTOR") or 2.0)
+
+
+def _cpu_ahora():
+    """(carga media de 5 min, núcleos, [(%cpu, pid, nombre)] de los 3 que más gastan) o None."""
+    try:
+        carga = os.getloadavg()[1]
+        nucleos = os.cpu_count() or 1
+    except Exception:
+        return None
+    top = []
+    try:
+        out = subprocess.run(["/bin/ps", "-Aro", "pcpu=,pid=,comm="], capture_output=True,
+                             text=True, timeout=10).stdout
+        for linea in out.splitlines()[:3]:
+            pc, pid, comm = linea.strip().split(None, 2)
+            top.append((float(pc), int(pid), os.path.basename(comm)))
+    except Exception:
+        pass
+    return carga, nucleos, top
+
+
+def _check_cpu(ahora_fn=_cpu_ahora):
+    """La casa base lleva rato con la CPU saturada. Salud OPERATIVA, nunca código rojo.
+
+    EL FALLO QUE LO TRAJO (26-sep-26): tres Chrome headless huérfanos de un script de captura
+    muerto pasaron ~27 h con dos pestañas cada uno al 100 %. La carga del Mac estuvo en 46-82
+    con 10 núcleos, los 9 hooks de cada Bash pasaron de 0,7 s a 6,5 s y todo Polaris iba lento.
+    Lo notó {{TITULAR}} («cada tarea tarda muchísimo»), no el sistema: `_check_recursos` mira memoria
+    y swap, y la memoria estaba bien. La causa concreta ya la limpia `bucles_colgados.run_chrome`;
+    esto cubre la clase entera: cualquier cosa que se coma la CPU tiene que decirlo ella.
+
+    Mismo criterio que _check_recursos: carga media de 5 min por encima de CPU_CARGA_FACTOR ×
+    núcleos DOS vueltas seguidas (un build o una suite de tests no es un ahogo), aviso con
+    throttle de ~1 h, y no mata nada. Dice quién gasta para que se pueda actuar.
+    """
+    import json as _json
+    state_p = os.path.join(HC, "cpu.json")
+    prev = {}
+    try:
+        prev = _json.load(open(state_p, encoding="utf-8"))
+    except Exception:
+        pass
+    if not isinstance(prev, dict):
+        prev = {}
+    ahora = ahora_fn()
+    if ahora is None:
+        return [], {"error": "no se pudo leer la carga"}
+    carga, nucleos, top = ahora
+    ahogo = carga >= CPU_CARGA_FACTOR * nucleos
+    info = {"carga_5m": round(carga, 1), "nucleos": nucleos, "ahogo": ahogo, "top": top,
+            "ts": time.time()}
+    try:
+        _ensure()
+        _write_atomic(state_p, dict(info, aviso_ts=prev.get("aviso_ts", 0)))
+    except Exception:
+        pass
+    if not (ahogo and prev.get("ahogo")):
+        return [], info
+    if (time.time() - prev.get("aviso_ts", 0)) / 3600.0 < RECURSOS_INTERVAL_H:
+        return [], dict(info, throttled=True)
+    try:
+        _write_atomic(state_p, dict(info, aviso_ts=time.time()))
+    except Exception:
+        pass
+    quien = "; ".join("%s (pid %d, %.0f %%)" % (n, pid, pc) for pc, pid, n in top) or "?"
+    return (["La casa base lleva rato con la CPU saturada: carga %.0f con %d núcleos. Todo va a ir "
+             "lento. Lo que más gasta: %s. No he tocado nada." % (carga, nucleos, quien)], info)
+
+
 # Sonda del cerebro (24-sep-26): primer intento corto; si falla por algo TRANSITORIO (timeout,
 # no se puede crear el proceso), espera y reintenta más largo antes de avisar.
 CEREBRO_TIMEOUT_S = 30
@@ -3659,6 +3729,16 @@ def run():
     except Exception as e:
         chk["bucles_colgados_error"] = "%r" % e
 
+    # 3e-bis. CHROME HEADLESS HUÉRFANO (26-sep-26): tres Chrome de un script de captura muerto
+    #     pasaron ~27 h al 100 % de CPU y todo Polaris iba lento sin que nadie avisara. Mismo
+    #     esquema que los bucles: activo por defecto, BTP_BUCLE_SOLO_AVISO=1 lo deja en aviso.
+    try:
+        ch_alertas, ch_info = bucles_colgados.run_chrome()
+        chk["chrome_huerfano"] = ch_info
+        alertas.extend(ch_alertas)
+    except Exception as e:
+        chk["chrome_huerfano_error"] = "%r" % e
+
     # 3d-quater. DRIFT DE DAEMONS (item #2): las tres capas DEFINIDO/INSTALADO/CARGADO cruzadas con
     #     REGISTRO.json. Determinista, SURFACEA y NO auto-arregla. Cubre lo que B1 no ve (roster salido
     #     de los plists instalados): fantasmas cargados-sin-instalar, escapados del registro, y plists
@@ -3753,6 +3833,15 @@ def run():
         alertas.extend(rc_alertas)
     except Exception as e:
         chk["recursos_error"] = "%r" % e       # log técnico, nunca para {{TITULAR}}
+
+    # 3e-quinquies. CPU (26-sep-26): un día entero con la carga a 46-82 por Chrome huérfanos y
+    #         nadie avisó; _check_recursos solo mira memoria.
+    try:
+        cpu_alertas, cpu_info = _check_cpu()
+        chk["cpu"] = cpu_info
+        alertas.extend(cpu_alertas)
+    except Exception as e:
+        chk["cpu_error"] = "%r" % e
 
     # 3e-ter. SALDO DE API (18-sep-26): sin saldo, el lazo se para entero y los daemons siguen
     #         saliendo en verde. La API lo dice con todas las letras en sus logs; esto lo lee.

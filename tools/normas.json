@@ -3370,6 +3370,18 @@
    "auditable": true,
    "repetida": false,
    "nota": "26-sep-26: el «ni edad» del charter de diseno hizo que una sesión propusiera quitar la edad del hero. El test impide que el veto vuelva a colarse en charters y reglas."
+  },
+  {
+   "slug": "feedback-estimar-en-tiempo-de-agente",
+   "que": "Estimar en tiempo real de ejecución del agente (y separar esperas de máquina y de calendario), no en horas humanas",
+   "clase": "contexto",
+   "mecanismo": "ninguno: la memoria, por recall, al dar un plazo en un plan o en unas opciones",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "Nace de @aiteamdigital en X (26-sep-26) y de esta misma sesión (estimé «2-3 h» para el permiso por sesión y llevó bastante menos). Cuánto tarda algo es criterio: un lint que cazara «horas» en un plan daría falsos positivos con esperas reales (rodaje de 24 h)."
   }
  ]
 }

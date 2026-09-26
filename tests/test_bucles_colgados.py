@@ -344,5 +344,79 @@ _ADVERSARIAL = [
 for _nombre, _payload, _esperado in _ADVERSARIAL:
     check("adversarial %s → %s" % (_nombre, _esperado), bc.bucle_sin_tope(_payload) is _esperado)
 
+
+# ── Chrome headless huérfano (26-sep-2026, deuda chrome_headless_huerfano) ───────────────────
+# Tres Chrome de un script de captura muerto pasaron ~27 h al 100 % de CPU. La DETECCIÓN se
+# prueba con un `ps` inyectado (no se puede fingir un Chrome real sin lanzarlo); la PARADA, con
+# procesos reales efímeros (un `sleep` como «Chrome» y otro como su pestaña).
+_UID = os.getuid()
+_CH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+_HELPER = ("/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/"
+           "Versions/154.0.8037.57/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/"
+           "Google Chrome Helper (Renderer) --type=renderer --user-data-dir=/tmp/cap-9561")
+
+
+def _ps(*filas):
+    return lambda: "\n".join("%d %d %s %d %s" % f for f in filas) + "\n"
+
+
+_HUERFANO = (101, 1, "1-03:12:00", _UID, _CH + " --headless=new --remote-debugging-port=9561 "
+             "--user-data-dir=/tmp/cap-9561 about:blank")
+_PESTANA = (102, 101, "1-03:12:00", _UID, _HELPER)
+casos_chrome = [
+    ("huérfano de 27 h con perfil en /tmp → candidato", [_HUERFANO, _PESTANA], [101]),
+    ("perfil en /var/folders (TMPDIR) → candidato",
+     [(103, 1, "02:00:00", _UID, _CH + " --headless=new --user-data-dir=/var/folders/_l/x/T/cap-ab "
+       "about:blank")], [103]),
+    ("padre vivo → no se toca (alguien lo usa)",
+     [(104, 555, "05:00:00", _UID, _CH + " --headless=new --user-data-dir=/tmp/cap-1")], []),
+    ("el Chrome de {{TITULAR}} (sin --headless) → nunca",
+     [(105, 1, "3-00:00:00", _UID, _CH + " --user-data-dir=/tmp/raro")], []),
+    ("perfil fuera de /tmp → no se toca",
+     [(106, 1, "05:00:00", _UID, _CH + " --headless=new --user-data-dir=/Users/x/perfil")], []),
+    ("menos de 1 h → aún no", [(107, 1, "40:00", _UID, _CH + " --headless=new "
+                                                         "--user-data-dir=/tmp/cap-2")], []),
+    ("de otro usuario → nunca", [(108, 1, "05:00:00", _UID + 1, _CH + " --headless=new "
+                                                                    "--user-data-dir=/tmp/cap-3")], []),
+    ("una pestaña (Helper) no es el proceso principal", [(109, 1, "05:00:00", _UID, _HELPER)], []),
+]
+for _nombre, _filas, _esperado in casos_chrome:
+    _c, _ = bc.detectar_chrome(ps_runner=_ps(*_filas))
+    check("chrome: %s" % _nombre, [x["pid"] for x in (_c or [])] == _esperado)
+
+_c, _ = bc.detectar_chrome(ps_runner=_ps(_HUERFANO, _PESTANA))
+check("chrome: las pestañas van con el huérfano", _c and _c[0]["hijos"] == [102])
+_c, _ = bc.detectar_chrome(ps_runner=lambda: (_ for _ in ()).throw(RuntimeError("ps roto")))
+check("chrome: ps roto → None (no se mata nada)", _c is None)
+
+# Parada real: un `sleep` hace de Chrome y otro de su pestaña.
+_falso = subprocess.Popen(["sleep", "100"])
+_pestana = subprocess.Popen(["sleep", "100"])
+_esperar_visible(_falso.pid)
+_esperar_visible(_pestana.pid)
+try:
+    _cand = {"pid": _falso.pid, "hijos": [_pestana.pid], "etime": "1-00:00:00", "etime_seg": 86400,
+             "cmd": _CH + " --headless=new --user-data-dir=/tmp/cap-test"}
+    _r = bc._parar_chrome(_cand, dry_run=True)
+    check("chrome: dry-run no mata", _falso.poll() is None and _pestana.poll() is None
+          and _r["parado"] is False)
+    _r = bc._parar_chrome(_cand, wait=2.0)
+    _falso.wait(timeout=5)
+    _pestana.wait(timeout=5)
+    check("chrome: para el proceso y su pestaña", _r["parado"] and _falso.poll() is not None
+          and _pestana.poll() is not None)
+    check("chrome: el registro dice el perfil", _r.get("perfil") == "/tmp/cap-test")
+finally:
+    for _p in (_falso, _pestana):
+        if _p.poll() is None:
+            _p.kill()
+
+# run_chrome con ps inyectado y dry-run: avisa sin tocar.
+_al, _inf = bc.run_chrome(dry_run=True, ps_runner=_ps(_HUERFANO, _PESTANA))
+check("chrome: run_chrome dry-run avisa", _inf.get("candidatos") == 1 and _al
+      and _al[0][0] == "chrome_huerfano_detectado")
+_al, _inf = bc.run_chrome(dry_run=True, ps_runner=_ps(_PESTANA))
+check("chrome: sin huérfanos no hay aviso", _al == [] and _inf.get("candidatos") == 0)
+
 print("test_bucles_colgados: %d OK, %d fallos" % (_pass, _fail))
 sys.exit(1 if _fail else 0)

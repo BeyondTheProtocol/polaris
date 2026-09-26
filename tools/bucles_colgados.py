@@ -530,6 +530,124 @@ def _parar_uno(p, dry_run=False, wait=WAIT_SIGKILL):
     return registro
 
 
+# ── Chrome headless huérfano (26-sep-2026, deuda `chrome_headless_huerfano`) ─────────────────
+# Tres Chrome headless que lanzó `tools/captura_visor.mjs` se quedaron huérfanos cuando el
+# script murió a medias: ~27 h con dos pestañas cada uno al 100 % de CPU, unos 6 de los 10
+# núcleos del Mac. Los 9 hooks de cada Bash pasaron de 0,7 s a 6,5 s y todo Polaris iba lento.
+# Nadie avisó. `tools/_chrome_headless.mjs` ya cierra Chrome en cualquier salida del script;
+# esto es la red de debajo para lo que no se puede atrapar (un `kill -9` al script) y para los
+# scripts que no usen el ayudante.
+#
+# CANDIDATO = proceso principal de Google Chrome (no un Helper) que:
+#   · lleva `--headless`: el Chrome de {{TITULAR}} no lo lleva, así que nunca se toca;
+#   · tiene el perfil en /tmp o en el TMPDIR del sistema (/var/folders): es de un script;
+#   · es HUÉRFANO (PPID 1): si su padre sigue vivo, alguien lo está usando;
+#   · es de nuestro uid y lleva más de UMBRAL_CHROME_SEG vivo.
+# Se para el proceso y sus hijos directos (las pestañas, que eran las que quemaban CPU).
+UMBRAL_CHROME_SEG = int(os.environ.get("BTP_CHROME_UMBRAL_SEG") or 3600)
+_RE_CHROME_PRINCIPAL = re.compile(r"Google Chrome\.app/Contents/MacOS/Google Chrome(?=\s|$)")
+_RE_PERFIL_TEMPORAL = re.compile(
+    r"--user-data-dir=(?:/private)?(?:/tmp/|/var/folders/)")
+
+
+def detectar_chrome(ps_runner=None, umbral_seg=None):
+    """(candidatos, por_pid). candidatos es None si `ps` no fue fiable: fail-safe, no se mata."""
+    umbral = UMBRAL_CHROME_SEG if umbral_seg is None else umbral_seg
+    lista = _listar_ps(ps_runner)
+    if lista is None:
+        return None, {}
+    por_pid = {p["pid"]: p for p in lista}
+    mi_uid = os.getuid()
+    candidatos = []
+    for p in lista:
+        cmd = p["cmd"]
+        if p["uid"] != mi_uid or p["ppid"] != 1:
+            continue
+        if not _RE_CHROME_PRINCIPAL.search(cmd) or "--headless" not in cmd:
+            continue
+        if not _RE_PERFIL_TEMPORAL.search(cmd):
+            continue
+        etime_seg = _etime_a_seg(p["etime"])
+        if etime_seg is None or etime_seg < umbral:
+            continue
+        c = dict(p)
+        c["etime_seg"] = etime_seg
+        c["hijos"] = [q["pid"] for q in lista if q["ppid"] == p["pid"] and q["uid"] == mi_uid]
+        candidatos.append(c)
+    return candidatos, por_pid
+
+
+def _parar_chrome(p, dry_run=False, wait=WAIT_SIGKILL):
+    """SIGTERM al Chrome y a sus pestañas; SIGKILL a lo que siga vivo tras `wait`. Nunca lanza."""
+    perfil = re.search(r"--user-data-dir=(\S+)", p["cmd"])
+    registro = {"tipo": "chrome_headless_huerfano", "pid": p["pid"], "hijos": p.get("hijos", []),
+                "etime": p.get("etime"), "etime_seg": p.get("etime_seg"),
+                "perfil": perfil.group(1) if perfil else None}
+    if dry_run:
+        registro.update(parado=False, accion="dry-run: no se tocó")
+        return registro
+    pids = [p["pid"]] + list(p.get("hijos", []))
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except Exception:
+            pass
+    deadline = time.time() + wait
+    while time.time() < deadline and any(_existe(x) for x in pids):
+        time.sleep(0.1)
+    accion = "SIGTERM"
+    vivos = [x for x in pids if _existe(x)]
+    if vivos:
+        accion = "SIGTERM+SIGKILL"
+        for pid in vivos:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except Exception:
+                pass
+        time.sleep(0.2)
+    vivo = _existe(p["pid"])
+    registro.update(parado=not vivo, accion=accion if not vivo else accion + " (sigue vivo)")
+    _log_auditable(registro)
+    return registro
+
+
+def run_chrome(*, dry_run=None, umbral_seg=None, ps_runner=None):
+    """Mismo contrato que run(): (alertas, info)."""
+    if dry_run is None:
+        dry_run = SOLO_AVISO
+    umbral = UMBRAL_CHROME_SEG if umbral_seg is None else umbral_seg
+    alertas, info = [], {"umbral_seg": umbral, "dry_run": dry_run}
+    candidatos, _ = detectar_chrome(ps_runner=ps_runner, umbral_seg=umbral)
+    if candidatos is None:
+        info["ps_error"] = True
+        return alertas, info
+    info["candidatos"] = len(candidatos)
+    if not candidatos:
+        return alertas, info
+    resultados = [_parar_chrome(p, dry_run=dry_run) for p in candidatos]
+    info["resultado"] = resultados
+    parados = [r for r in resultados if r.get("parado")]
+    pids = ", ".join(str(p["pid"]) for p in candidatos)
+    if dry_run:
+        alertas.append(("chrome_huerfano_detectado",
+                        "🧟 %d Chrome headless huérfano(s) de un script de captura llevan más de %s "
+                        "vivos (dry-run, no se tocaron): pid %s." % (len(candidatos), _fmt_dur(umbral), pids)))
+    elif parados:
+        try:
+            import deuda as _deuda_mod
+            _deuda_mod.visto("chrome_headless_huerfano",
+                             nota="parado(s) por bucles_colgados.py: %d, ej. pid %d, perfil %s"
+                                  % (len(parados), parados[0]["pid"], parados[0].get("perfil")))
+        except Exception:
+            pass
+        alertas.append(("chrome_huerfano_parado",
+                        "🧟 Cerré %d Chrome headless huérfano(s) de un script de captura (más de %s "
+                        "vivos, sin padre): pid %s. Se comían CPU para nada. Registro en "
+                        "tools/state/healthcheck/bucles_colgados.jsonl."
+                        % (len(parados), _fmt_dur(umbral), ", ".join(str(r["pid"]) for r in parados))))
+    return alertas, info
+
+
 # ── Enganche al patrón de healthcheck.py: run() → (alertas, info) ────────────────────────────
 def run(*, dry_run=None, umbral_seg=None, ps_runner=None, bajo_claude_fn=None):
     if dry_run is None:
@@ -606,7 +724,9 @@ def _nacidos_tras_cierre(parados, clave, ahora=None):
 def main(argv):
     dry = "--dry-run" in argv
     alertas, info = run(dry_run=True if dry else None)
-    print(json.dumps({"alertas": alertas, "info": info}, ensure_ascii=False, indent=2))
+    ch_alertas, ch_info = run_chrome(dry_run=True if dry else None)
+    print(json.dumps({"alertas": alertas + ch_alertas, "info": info, "chrome": ch_info},
+                     ensure_ascii=False, indent=2))
     return 0
 
 

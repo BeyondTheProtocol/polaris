@@ -12,16 +12,15 @@
 //
 // Uso:  node tools/captura_visor.mjs <url> <salida.png>
 // Luego, a 1000x1000 y webp:  (Pillow) redimensionar + cwebp -q 86
-import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
+import { lanzarChrome } from './_chrome_headless.mjs'
 
 const [url, salida] = process.argv.slice(2)
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-const puerto = 9400 + Math.floor(Math.random() * 500)
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${puerto}`,
-  '--use-angle=metal', '--ignore-gpu-blocklist', '--hide-scrollbars',
-  '--window-size=1400,1600', '--force-device-scale-factor=2',
-  `--user-data-dir=/tmp/cap-${puerto}`, 'about:blank'], { stdio: 'ignore' })
+// Chrome se cierra solo al salir, con error, con señal o a los 3 min (26-sep-26: antes solo se
+// cerraba en los caminos felices y dejó huérfanos al 100 % de CPU durante un día).
+const { puerto, cerrar } = lanzarChrome(['--use-angle=metal', '--ignore-gpu-blocklist',
+  '--hide-scrollbars', '--window-size=1400,1600', '--force-device-scale-factor=2'],
+{ topeMs: Number(process.env.BTP_CAPTURA_TOPE_MS) || 180000 })
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms))
 
 let ws
@@ -33,7 +32,7 @@ for (let i = 0; i < 60 && !ws; i++) {
     if (pag) ws = new WebSocket(pag.webSocketDebuggerUrl)
   } catch {}
 }
-if (!ws) { chrome.kill(); console.error('Chrome no arrancó'); process.exit(1) }
+if (!ws) { console.error('Chrome no arrancó'); cerrar(); process.exit(1) }
 await new Promise((r) => ws.addEventListener('open', r, { once: true }))
 
 let id = 0
@@ -64,7 +63,7 @@ for (let i = 0; i < 60 && !listo; i++) {
   listo = await ev(`document.querySelectorAll('.lv-anillo').length >= 2`)
   if (!listo) await dormir(1000)
 }
-if (!listo) { console.error('los anillos no aparecieron'); ws.close(); chrome.kill(); process.exit(1) }
+if (!listo) { console.error('los anillos no aparecieron'); ws.close(); cerrar(); process.exit(1) }
 await dormir(2500)
 
 // Quemar la leyenda DENTRO de la caja, con la tipografía del propio sitio
@@ -101,4 +100,4 @@ const shot = await cmd('Page.captureScreenshot', {
 })
 writeFileSync(salida, Buffer.from(shot.data, 'base64'))
 console.log('ok', salida, Math.round(rect.w) + 'x' + Math.round(rect.h), '(x2)')
-ws.close(); chrome.kill()
+ws.close(); cerrar()
