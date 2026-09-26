@@ -13,7 +13,7 @@ Un daemon launchd se enciende **SOLO desde casa base** (nunca desde un worktree 
 
 **Antes de crear un plist nuevo:** `python3 tools/launchd/registro.py estado` (¿qué trabajo ya está cubierto?).
 
-**Rutinas activas** (las que `CLAUDE.md` prohíbe duplicar): HOY 8:12 · Radar día 1 · auto-mejora lun/mié/vie/dom ~5:08 · prensa diario · WhatsApp ~8:07.
+**Rutinas activas** (las que `CLAUDE.md` prohíbe duplicar): la lista viva es `python3 tools/launchd/registro.py estado`. Las que más se duplican son las de agente (asistente, correo, dm-inbox, radar, prensa, auto-mejora, crónica): no las dupliques.
 **Antes de construir en un subsistema:** `python3 tools/ramas.py en-vuelo <patron>` (¿otra rama ya lo toca?).
 
 Activar o recargar launchd es uno de los **3 singletons** que sí se serializan entre sesiones paralelas. Encender y fusionar siguen siendo **gate de {{TITULAR}}**.

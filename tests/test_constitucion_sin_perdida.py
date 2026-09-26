@@ -96,7 +96,7 @@ MOVIDAS = [
     ("`cosecha_checklists.py`: sube al Tablero los checklists que viven dentro de los `.md`",
      "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
     # ── la lista de rutinas → launchd-daemons.md (en CLAUDE.md queda la norma «no las dupliques»)
-    ("HOY 8:12 · Radar día 1 · auto-mejora lun/mié/vie/dom ~5:08 · prensa diario · WhatsApp ~8:07",
+    ("la lista viva es `python3 tools/launchd/registro.py estado`",
      "rules/launchd-daemons.md", ".claude/rules/launchd-daemons.md", "CLAUDE.md"),
     # ── lo que decía CLAUDE.md de las normas sin paths → dentro de ellas mismas. Se cargan
     #    SIEMPRE, así que el puntero es el propio fichero (no hace falta otro en CLAUDE.md).

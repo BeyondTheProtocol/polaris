@@ -6,7 +6,7 @@ description: >-
   arreglos concretos por framework. Úsala al construir o revisar cualquier
   superficie visible —web, dashboards, paneles, PDFs con HTML— y siempre que se
   toque color, foco, movimiento, semántica, formularios o áreas táctiles. La
-  auditoría la firma el comité `ceci`; esto es la vara contra la que audita.
+  auditoría la firma el comité `diseno`; esto es la vara contra la que audita.
 ---
 
 # Accesibilidad — la vara
@@ -32,5 +32,5 @@ ARIA y los arreglos por framework. Léelo antes de dar por buena una pieza.
 
 1. Antes de construir: mira los anti-patrones de la familia que vas a tocar.
 2. Al terminar: calcula los contrastes **sobre el código real**, no de memoria.
-3. Pásale la pieza al comité `ceci`, que audita y devuelve aprobado / con matiz /
-   con cambios. `ceci` se consulta y su criterio pesa, pero no decide.
+3. Pásale la pieza al comité `diseno`, que audita y devuelve aprobado / con matiz /
+   con cambios. `diseno` se consulta y su criterio pesa, pero no decide.

@@ -32,6 +32,6 @@ Todo lo que salga en su nombre pasa por `voz-titular` como última capa. Copy p�
 - **Web/Diseño**: pixel-perfect sin descuadres, pero **prevalece la sencillez y familiaridad del usuario sobre el pixel del mockup**; **NUNCA elementos que tapen texto**; controles equivalentes se comportan igual.
 - **Exigencia pixel (zoom de esquina)**: círculos y badges nunca embutidos ni clipados por un `border-radius` (inset > radio + aire); el raíl no atraviesa sucio un nodo (moat de fondo); **centrado óptico**, no matemático; marcas e iconos como **SVG**, no glifos Unicode (tofu).
 - **Nomenclatura**: naming, términos, unidades y símbolos consistentes; **una sola fuente por etiqueta** (constantes/i18n); sin erratas ni restos de versiones previas; mismos términos en cada idioma en paralelo.
-- **Accesibilidad**: **contraste WCAG por encima del mockup**; teclado; alternativa en texto o fuente de verdad; táctil ≥44px. Auditora: agente `ceci`.
+- **Accesibilidad**: **contraste WCAG por encima del mockup**; teclado; alternativa en texto o fuente de verdad; táctil ≥44px. Vara: skill `a11y`; audita el comité `diseno` (lente de accesibilidad).
 
 **Un fallo = recalibrar la vara y RE-BARRER la pieza entera cazando esa CLASE**, no solo el caso que te enseñaron.

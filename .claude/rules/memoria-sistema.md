@@ -21,7 +21,7 @@ Cuatro capas. Cada norma vive en **una** de ellas, no en varias.
 
 ## Los límites son reales, no estéticos
 - **`MEMORY.md`: solo se cargan las primeras 200 líneas O 25KB**, lo que llegue antes. Lo que sobra **se pierde en silencio**. Objetivo: **< 15KB**.
-- **`CLAUDE.md` se carga entero**, pero más largo = **menos adherencia** (la doc oficial recomienda **< 200 líneas**). Umbral aquí: **aviso a 14KB, techo 15KB** (equivalente en volumen a esas 200 líneas; el 25-jul quedó en **14.0KB / 86 líneas**, bajando desde 33.9KB; el 11-sep, en **12.5KB / 68 líneas**, con `tests/test_constitucion_sin_perdida.py` vigilando que no vuelva a engordar ni pierda una norma al recortar). Si lo pasa, **algo tiene que salir** a una regla `paths:` o a una memoria, no se sube el techo.
+- **`CLAUDE.md` se carga entero**, pero más largo = **menos adherencia** (la doc oficial recomienda **< 200 líneas**). Techo real: **12.500 B**, el que hace cumplir `tests/test_constitucion_sin_perdida.py` (con la carga fija ≤ 80 % de 20 KB). `salud_memoria.py` avisa a 14 KB, pero el test rompe antes. Tamaño de hoy: `python3 tools/salud_memoria.py`. Si lo pasa, **algo tiene que salir** a una regla `paths:` o a una memoria, no se sube el techo.
 - Guardián: `python3 tools/salud_memoria.py` (en `test_all.sh`). Avisa **antes** de rozar el corte.
 
 ## Dónde meter una norma nueva
