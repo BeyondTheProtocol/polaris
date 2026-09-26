@@ -28,6 +28,7 @@ Catálogo entero: `ls tools/`. Las de siempre: `kb.py` (RAG) · `salida.py` (Tel
 - `cosecha_entregables.py`: red de seguridad de «dónde quedó archivado» (encuentra entregables que se quedaron solo en el chat).
 - `ramas.py list`: quién trabaja ahora en qué rama.
 - `dependencias.py`: grafo del repo sin LLM. `quien <script>` = qué se rompe si lo cambias; `huerfanos` = scripts que nadie nombra; `centrales` = los más usados.
+- **Grafo de evidencia del caso** (graphify, 26-sep-26): 1849 nodos de los 74 análisis de `01 · Tratamiento`, de-identificados. Consulta por relaciones (diana ↔ fármaco ↔ ensayo ↔ estudio): `~/.venvs/graphify/bin/graphify query "<pregunta>" --graph "00_FUENTE-DE-VERDAD/01 · Tratamiento/_grafo-evidencia/corpus-deid/graphify-out/graph.json" --budget 2000`. Son conexiones entre NUESTROS análisis, no evidencia nueva; el 15 % son inferidas: cotejar contra el documento original antes de sostener nada. Actualizar = de-identificar lo nuevo con `deid.py` y relanzar `graphify extract` (incremental; cuesta API: piloto y saldo antes, `feedback-lote-api-piloto-y-saldo-antes`). Nota: `04 · IA/Notas/grafo-de-evidencia-del-caso-con-graphify-2026-09-26.md`.
 - `cosecha_checklists.py`: sube al Tablero los checklists que viven dentro de los `.md` (la fuente única lo contiene todo).
 - Investigación profunda: la skill `deep-research` YA NO EXISTE (comprobado 30-jul-26); se hace con los MCP de literatura (`search_papers`, `create_systematic_review`, PubMed/PMC) o un `Workflow` de varios agentes.
 
