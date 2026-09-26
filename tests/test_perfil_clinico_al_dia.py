@@ -28,7 +28,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
-from estado_actual import _fecha, fecha_estado, fecha_novedades  # noqa: E402
+from estado_actual import _fecha, fecha_estado, fecha_novedades, huella_s1, lee_registro  # noqa: E402
 
 MEMORIA = os.path.join(
     os.environ.get("BTP_MEMORY_DIR")
@@ -77,9 +77,26 @@ def sitios(texto):
     return {s for s, pat in SITIOS.items() if re.search(pat, texto, re.I)}
 
 
-def problemas(memoria, estado):
-    """Lista de motivos por los que la memoria está por detrás de ESTADO-ACTUAL (vacía = al día)."""
+_SIN = object()
+
+
+def problemas(memoria, estado, registro=_SIN):
+    """Lista de motivos por los que la memoria está por detrás de ESTADO-ACTUAL (vacía = al día).
+    Con `registro` (el de `estado_actual.registrar_cotejo`, o None si no hay), mira además la HUELLA
+    de §1: si §1 cambió desde el último cotejo, rojo aunque no traiga «Novedades del …» (26-sep-26)."""
     out = []
+    if registro is not _SIN:
+        fc_mem = fecha_cotejo(memoria)
+        if not registro:
+            out.append("no hay registro del último cotejo (`python3 tools/estado_actual.py cotejado` "
+                       "tras re-cotejar la memoria)")
+        else:
+            if registro.get("huella_s1") != huella_s1(estado):
+                out.append("§1 de ESTADO-ACTUAL cambió desde el cotejo del %s: re-cotejar"
+                           % registro.get("fecha_cotejo"))
+            if fc_mem and registro.get("fecha_cotejo") != "%04d-%02d-%02d" % fc_mem:
+                out.append("la memoria dice cotejo del %04d-%02d-%02d y el registro, del %s"
+                           % (fc_mem + (registro.get("fecha_cotejo"),)))
     fe, fc = fecha_estado(estado), fecha_cotejo(memoria)
     if fc is None:
         out.append("la memoria no declara «Cotejo: DD-mmm-AAAA contra … ESTADO-ACTUAL»")
@@ -129,6 +146,18 @@ def main():
        "memoria cotejada el mismo día de las novedades: al día")
     fuera = ESTADO_FIX + "- **Novedades del 30-sep:** esto es de la sección 2\n"
     ok(fecha_novedades(fuera) is None, "unas novedades fuera de §1 no cuentan")
+    # Huella de §1 (26-sep-26): lo que entra SIN la fórmula «Novedades del …» también cuenta.
+    reg = {"fecha_cotejo": "2026-09-13", "huella_s1": huella_s1(ESTADO_FIX)}
+    ok(problemas(buena, ESTADO_FIX, reg) == [], "registro con la huella de hoy: al día")
+    citado = ESTADO_FIX.replace("- algo", "- algo\n> Lo dice {{TITULAR}} el 20-sep: dato nuevo en un bloque citado")
+    ok(fecha_novedades(citado) is None, "EL HUECO REAL: un bloque citado no es «Novedades del …»")
+    ok(any("cambió" in p for p in problemas(buena, citado, reg)),
+       "…pero cambia la huella de §1 → rojo hasta re-cotejar")
+    fuera2 = ESTADO_FIX + "- cambio en la sección 2\n"
+    ok(problemas(buena, fuera2, reg) == [], "un cambio fuera de §1 no toca la huella")
+    ok(any("no hay registro" in p for p in problemas(buena, ESTADO_FIX, None)), "sin registro: rojo")
+    ok(any("registro, del" in p for p in problemas(buena, ESTADO_FIX, dict(reg, fecha_cotejo="2026-09-01"))),
+       "la fecha de la memoria y la del registro no casan: rojo")
 
     # --- 2. Contra los ficheros reales ---
     if not (os.path.isfile(MEMORIA) and os.path.isfile(ESTADO)):
@@ -138,7 +167,7 @@ def main():
             mem = f.read()
         with open(ESTADO, encoding="utf-8") as f:
             est = f.read()
-        reales = problemas(mem, est)
+        reales = problemas(mem, est, lee_registro())
         ok(not reales, "reference-clinical-profile al día con ESTADO-ACTUAL: %s" % "; ".join(reales))
 
     print("RESULTADO perfil_clinico_al_dia: %d OK, %d fallos" % (_pass, _fail))

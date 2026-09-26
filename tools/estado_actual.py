@@ -61,3 +61,57 @@ def lee_fecha_clinica(ruta=None):
         return None, f"ESTADO-ACTUAL ilegible ({type(e).__name__})"
     f = fecha_clinica(texto)
     return (f, "ok") if f else (None, "ESTADO-ACTUAL sin «## 1. Clínico (al …)»")
+
+
+# ── Huella de §1 (26-sep-26) ───────────────────────────────────────────────────────────────────────
+# Las fechas no bastan: §1 se actualiza también con bloques citados («Lo dice {{TITULAR}} el 20-sep…») o
+# filas «(NUEVO)» sin la fórmula «Novedades del …», y el test del perfil siguió en verde con tres
+# novedades posteriores al cotejo (verificacion, 26-sep). Y buscar cualquier fecha no vale: §1 lleva
+# fechas FUTURAS (citas, caducidades). Así que se compara el CONTENIDO: al re-cotejar la memoria
+# clínica se guarda la huella de §1, y si §1 cambia después, el perfil vuelve a estar por re-cotejar.
+import hashlib  # noqa: E402
+import json  # noqa: E402
+import sys  # noqa: E402
+
+REGISTRO = os.path.join(os.environ.get("BTP_STATE_DIR") or os.path.join(
+    os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode"), "tools", "state"),
+    "perfil_clinico_cotejo.json")
+
+
+def huella_s1(texto):
+    """16 hex del texto de §1, normalizado en espacios. None si no hay §1. No devuelve contenido."""
+    m = re.search(r"^##\s*1\.\s*Cl[íi]nico.*?(?=^##\s|\Z)", texto or "", re.M | re.S)
+    if not m:
+        return None
+    return hashlib.sha256(re.sub(r"\s+", " ", m.group(0)).strip().encode("utf-8")).hexdigest()[:16]
+
+
+def lee_registro(ruta=None):
+    try:
+        with open(ruta or REGISTRO, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def registrar_cotejo(fecha_cotejo, texto_estado, ruta=None):
+    """Lo llama quien ACABA de re-cotejar la memoria clínica contra ESTADO-ACTUAL (no antes)."""
+    d = {"fecha_cotejo": "%04d-%02d-%02d" % fecha_cotejo, "huella_s1": huella_s1(texto_estado)}
+    ruta = ruta or REGISTRO
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    with open(ruta + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(ruta + ".tmp", ruta)
+    return d
+
+
+if __name__ == "__main__" and sys.argv[1:2] == ["cotejado"]:
+    # Uso: python3 tools/estado_actual.py cotejado  — tras re-cotejar `reference-clinical-profile`.
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests"))
+    mem = os.path.join(os.environ.get("BTP_MEMORY_DIR") or os.path.expanduser(
+        "~/.claude/projects/-Users-polaris-claudecode/memory"), "reference-clinical-profile.md")
+    from test_perfil_clinico_al_dia import fecha_cotejo  # noqa: E402
+    fc = fecha_cotejo(open(mem, encoding="utf-8").read())
+    if not fc:
+        sys.exit("la memoria no declara «Cotejo: DD-mmm-AAAA contra … ESTADO-ACTUAL»: no registro nada")
+    print(registrar_cotejo(fc, open(ESTADO, encoding="utf-8").read()))
