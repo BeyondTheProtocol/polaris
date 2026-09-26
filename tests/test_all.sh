@@ -241,6 +241,7 @@ runpy test_deid_ner.py           # 25-sep · P4: capa NER del BSC; con NER pedid
 runpy test_deid_diccionario.py   # 25-sep · P4: sus identificadores concretos, sin etiqueta y partidos
 runpy test_deid_eval.py          # 25-sep · P4: el banco mide bien y el suelo de recall sobre MEDDOCAN no baja
 runpy test_kb_pdf_avisos.py
+runpy test_kb_pdf_truncado.py
 runpy test_kb_fts5.py
 runpy test_kb_hibrido.py
 runpy test_kb_lock.py
