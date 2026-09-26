@@ -265,7 +265,9 @@ def _tomar_lock():
 
 def build():
     files = []
-    for ext in ("*.md", "*.txt", "*.pdf"):
+    # Sin distinguir mayúsculas: `glob` compara el nombre tal cual, también en macOS, y `*.pdf`
+    # dejaba fuera un `SCAN0001.PDF` sin decir nada.
+    for ext in ("*.[mM][dD]", "*.[tT][xX][tT]", "*.[pP][dD][fF]"):
         files += glob.glob(os.path.join(FV, "**", ext), recursive=True)
     # FAIL-LOUD antes de tocar nada: sin pypdf este build dejaría fuera todos los PDFs y
     # reemplazaría un índice bueno por uno cojo, sin decir una palabra.

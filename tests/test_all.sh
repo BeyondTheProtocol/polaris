@@ -244,6 +244,7 @@ runpy test_kb_pdf_avisos.py
 runpy test_kb_fts5.py
 runpy test_kb_hibrido.py
 runpy test_kb_lock.py
+runpy test_kb_extensiones.py   # 26-sep · issue #39: un .PDF/.MD/.TXT en mayúsculas también se indexa
 runpy test_contexto_caso.py
 runpy test_ia.py
 runpy test_cn_fetch.py
