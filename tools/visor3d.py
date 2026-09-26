@@ -821,6 +821,58 @@ def _cmd_fase(a):
 UMBRAL_PEQUENA_MM = 10     # por debajo, sensibilidad publicada ~10 % (dossier 19-sep)
 MIN_VOXELES = 5            # componentes más pequeños = ruido de segmentación
 
+# ─── máscara del hígado: unión de dos modelos ────────────────────────────────────────────
+#
+# `total/liver` de TotalSegmentator recorta la periferia. En el TC del 8-sep-26 se deja fuera la
+# punta del lóbulo izquierdo (11,8 mm en el corte 151) y, en total, 86 ml que `liver_segments`
+# (mismo TotalSegmentator, otro modelo, ya en caché) sí cubre; al revés solo son 6 ml. Por eso la
+# marca M17 del radiólogo, que está DENTRO del hígado (parénquima de ~138 HU bajo la marca;
+# cotejado por comite-medico y verificacion por separado, 26-sep-26), salía 6,4 mm fuera de la
+# malla pública. La máscara por defecto es ahora la UNIÓN de los dos modelos, quedándose solo
+# con los trozos de la unión que tocan `total/liver` (un islote suelto del segundo modelo no es
+# hígado). `total` y `segmentos` quedan como opciones explícitas (`--mascara-higado`) para
+# reproducir lo de antes o auditar la diferencia. Lo fija tests/test_visor3d_mascara_union.py.
+MASCARAS_HIGADO = ("union", "total", "segmentos")
+MASCARA_HIGADO = "union"
+
+
+def _mascara_higado(total_liver, segmentos, modo=None):
+    """Máscara booleana del hígado a partir de `total/liver` (bool) y de `liver_segments`
+    (etiquetas 1-8; >0 = hígado), las dos en la MISMA rejilla.
+
+    union (por defecto): total ∪ segmentos, sin los componentes de la unión que no tocan `total`.
+    total: solo `total/liver` (lo de antes del 26-sep-26). segmentos: solo `liver_segments`."""
+    import numpy as np
+    from scipy import ndimage
+    modo = modo or MASCARA_HIGADO
+    if modo not in MASCARAS_HIGADO:
+        raise SystemExit("ABORTA: máscara del hígado desconocida %r (vale: %s)"
+                         % (modo, ", ".join(MASCARAS_HIGADO)))
+    total_liver = np.asarray(total_liver, bool)
+    if modo == "total":
+        return total_liver.copy()
+    if segmentos is None:
+        raise SystemExit("ABORTA: máscara %r pedida y la serie no tiene liver_segments; "
+                         "segmenta antes o pide --mascara-higado total a sabiendas." % modo)
+    seg = np.asarray(segmentos) > 0
+    if seg.shape != total_liver.shape:
+        raise SystemExit("ABORTA: total %s y liver_segments %s no están en la misma rejilla"
+                         % (total_liver.shape, seg.shape))
+    if modo == "segmentos":
+        return seg
+    union = total_liver | seg
+    if not total_liver.any() or not union.any():
+        return union
+    # Etiquetar solo la caja de la unión: sobre el volumen entero de un TC de cuerpo entero el
+    # `label` pediría cientos de MB (la lección de tests/test_visor3d_malla_recorte.py).
+    _, caja = _caja_de(union, margen=1)
+    comp, n = ndimage.label(union[caja])
+    if n > 1:
+        toca = np.unique(comp[total_liver[caja]])
+        toca = toca[toca > 0]
+        union[caja] = np.isin(comp, toca)
+    return union
+
 
 def _carga(ruta):
     import nibabel as nib
@@ -851,17 +903,18 @@ def _diametro_axial_mayor(mask, esp):
     return mejor
 
 
-def lesiones(raices, serie):
-    """Lista de lesiones de una serie, desde liver_lesions, recortadas al hígado."""
+def lesiones(raices, serie, mascara=None):
+    """Lista de lesiones de una serie, desde liver_lesions, recortadas al hígado.
+    `mascara`: de qué sale el hígado (MASCARAS_HIGADO; por defecto la unión de los dos modelos)."""
     import numpy as np
     from scipy import ndimage
     from totalsegmentator.map_to_binary import class_map
     seg = segmenta(raices, serie)
     total, aff = _carga(seg["total"])
     cm = {v: k for k, v in class_map["total"].items()}
-    higado = total == cm["liver"]
     les, _ = _carga(seg.get("liver_lesions") or seg.get("liver_lesions_mr"))
     segm = _carga(seg.get("liver_segments") or seg.get("liver_segments_mr"))[0]
+    higado = _mascara_higado(total == cm["liver"], segm, mascara)
     tumor_v = seg.get("liver_vessels")
     tumor_v = (_carga(tumor_v)[0] == 2) if tumor_v else None
     esp = np.abs(np.diag(aff)[:3])
@@ -908,6 +961,7 @@ def lesiones(raices, serie):
     return {
         "serie": serie,
         "procedencia": procedencia(raices, serie, seg),
+        "mascara_higado": mascara or MASCARA_HIGADO,
         "volumen_higado_ml": round(float(higado.sum()) * vox_ml, 1),
         "centro_higado_mm": [round(float(c), 1) for c in
                              (aff @ np.append(np.argwhere(higado).mean(axis=0), 1.0))[:3]],
@@ -962,8 +1016,11 @@ def empareja(a, b, tolerancia_mm=15.0, tolerancia_mismo_segmento_mm=25.0):
     return pares
 
 
-def compara(raices, serie_a, serie_b):
-    a, b = lesiones(raices, serie_a), lesiones(raices, serie_b)
+def compara(raices, serie_a, serie_b, mascara=None):
+    # Sin máscara explícita se llama como siempre (tests/test_visor3d_procedencia.py sustituye
+    # lesiones() por una de dos argumentos); con ella, los DOS lados la usan.
+    extra = {"mascara": mascara} if mascara else {}
+    a, b = lesiones(raices, serie_a, **extra), lesiones(raices, serie_b, **extra)
     # Antes de emparejar nada: si los dos lados no salen del mismo modelo y la misma receta, la
     # «evolución» mediría el cambio de modelo. Aborta, no avisa.
     exige_procedencia_comparable(a.get("procedencia"), b.get("procedencia"))
@@ -979,12 +1036,12 @@ def compara(raices, serie_a, serie_b):
 
 
 def _cmd_compara(a):
-    res, ruta = compara(a.raices, a.series[0], a.series[1])
+    res, ruta = compara(a.raices, a.series[0], a.series[1], a.mascara_higado)
     for lado in ("antes", "despues"):
         r = res[lado]
-        print("%s %s: hígado %.0f ml · lesiones candidatas %d · volumen tumoral %.1f ml"
-              % (lado, r["serie"], r["volumen_higado_ml"], len(r["lesiones"]),
-                 r["volumen_tumoral_ml"]))
+        print("%s %s: hígado %.0f ml (máscara %s) · lesiones candidatas %d · volumen tumoral %.1f ml"
+              % (lado, r["serie"], r["volumen_higado_ml"], r.get("mascara_higado"),
+                 len(r["lesiones"]), r["volumen_tumoral_ml"]))
         for L in r["lesiones"]:
             print("   L%-2d  %5.1f mm  %7.2f ml  seg %-4s %s acuerdo2=%s"
                   % (L["id"], L["diametro_mm"], L["volumen_ml"], L["segmento"],
@@ -1177,8 +1234,9 @@ def _taubin(v, f, iteraciones=12, lam=0.5, mu=-0.53):
     return v
 
 
-def assets(raices, serie, destino, voxel_mm=2.0):
-    """Volúmenes enmascarados + etiquetas + mallas + lesiones.json de UNA serie."""
+def assets(raices, serie, destino, voxel_mm=2.0, mascara=None):
+    """Volúmenes enmascarados + etiquetas + mallas + lesiones.json de UNA serie.
+    `mascara`: de qué sale el hígado (MASCARAS_HIGADO; por defecto la unión de los dos modelos)."""
     import nibabel as nib
     import numpy as np
     from nibabel.processing import resample_from_to, resample_to_output
@@ -1190,7 +1248,7 @@ def assets(raices, serie, destino, voxel_mm=2.0):
     if meta.get("texto_quemado"):
         raise SystemExit("ABORTA: la serie %s lleva texto quemado; no genera assets." % serie)
     seg = segmenta(raices, serie)
-    info = lesiones(raices, serie)
+    info = lesiones(raices, serie, mascara)
     ct = resample_to_output(nib.load(imagen), voxel_sizes=voxel_mm, order=1)
     afin = ct.affine
 
@@ -1199,7 +1257,9 @@ def assets(raices, serie, destino, voxel_mm=2.0):
 
     cm = {v: k for k, v in class_map["total"].items()}
     total = a_ct(seg["total"])
-    higado = total == cm["liver"]
+    ruta_sg = seg.get("liver_segments") or seg.get("liver_segments_mr")
+    sg = a_ct(ruta_sg).astype(np.uint8) if ruta_sg else None
+    higado = _mascara_higado(total == cm["liver"], sg, mascara)
     lab = np.zeros(higado.shape, np.uint8)
     lab[higado] = ETIQUETAS["higado"]
     if "liver_vessels" in seg:
@@ -1235,8 +1295,7 @@ def assets(raices, serie, destino, voxel_mm=2.0):
     afin_c[:3, 3] = (afin @ np.append(lo, 1.0))[:3]
     nib.save(nifti_limpio(datos[sl], afin_c, np.int16), os.path.join(destino, "ct.nii.gz"))
     nib.save(nifti_limpio(lab[sl], afin_c, np.uint8), os.path.join(destino, "etiquetas.nii.gz"))
-    if "liver_segments" in seg or "liver_segments_mr" in seg:
-        sg = a_ct(seg.get("liver_segments") or seg.get("liver_segments_mr")).astype(np.uint8)
+    if sg is not None:
         sg[~higado] = 0
         nib.save(nifti_limpio(sg[sl], afin_c, np.uint8), os.path.join(destino, "segmentos.nii.gz"))
     mallas = {}
@@ -1273,6 +1332,7 @@ def assets(raices, serie, destino, voxel_mm=2.0):
     fecha = meta["fecha"]
     salida = {"fecha": "%s-%s-%s" % (fecha[:4], fecha[4:6], fecha[6:]), "modalidad": meta["modalidad"],
               "voxel_mm": voxel_mm, "ventana_hu": ventana, "etiquetas": ETIQUETAS,
+              "mascara_higado": info["mascara_higado"],
               "volumen_higado_ml": info["volumen_higado_ml"],
               "volumen_tumoral_ml": info["volumen_tumoral_ml"],
               "lesiones": info["lesiones"], "mallas": mallas}
@@ -1293,9 +1353,10 @@ def _cmd_assets(a):
         _, meta = convierte(a.raices, serie)
         # 2 mm para la web; 1 mm (sufijo _hd) para el render de vídeo
         destino = os.path.join(base, meta["fecha"] + ("" if a.voxel >= 2 else "_hd"))
-        r = assets(a.raices, serie, destino, voxel_mm=a.voxel)
-        print("%s: %d lesiones, %d mallas → %s" % (r["fecha"], len(r["lesiones"]),
-                                                  len(r["mallas"]), os.path.basename(destino)))
+        r = assets(a.raices, serie, destino, voxel_mm=a.voxel, mascara=a.mascara_higado)
+        print("%s: %d lesiones, %d mallas · hígado %.0f ml (máscara %s) → %s"
+              % (r["fecha"], len(r["lesiones"]), len(r["mallas"]), r["volumen_higado_ml"],
+                 r["mascara_higado"], os.path.basename(destino)))
     return 0
 
 
@@ -3285,6 +3346,163 @@ def _cmd_marcas(a):
     return 0
 
 
+# RAS (mm) -> ejes de three, IGUAL que `tools/visor3d_web/render.js:77` y
+# `tools/visor_video_x/x.js:50` (const RAS_A_THREE = new THREE.Matrix4().set(-1,0,0,0, 0,0,1,0,
+# 0,1,0,0, 0,0,0,1)). `_cmd_web` referenciaba una `RAS_A_THREE` que en Python NUNCA se definio
+# (NameError si `pet_meta` trae focos sueltos) -- deuda abierta aparte
+# (`web-focos-ras-a-three-no-definida`); esta es la reconstruccion fiel desde el JS que si corre
+# en el navegador, para que las 35 esferas del radiologo caigan en el mismo marco que las mallas.
+RAS_A_THREE_NP = __import__("numpy").array(
+    [[-1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=float)
+
+# Las dos salvedades del radiologo, por el numero de imagen del TC (no por texto): imagen 127
+# = tres lesiones que se tocan entre si (el las cuenta como tres); imagen 123 = pegada a la
+# capsula del higado, que limita su crecimiento y la hace mas dificil de valorar. Correccion
+# cotejada contra el DM del radiologo (26-sep-26): la spec de diseno decia "confluente = una
+# sola lesion partida por el corte", que NO es lo que dijo -- aqui prevalece el DM.
+CATEGORIA_POR_IMAGEN = {127: "confluente", 123: "subcapsular"}
+
+
+def _cmd_marcas_web(a):
+    """`marcas.json` (ya generado por `marcas`) -> SOLO geometria publica de las 35 marcas
+    'solo radiologo' con posicion 3D: centro (mismo marco que las mallas publicas, RAS -> ejes
+    de three, menos el centro del higado, igual que `_cmd_web`) + radio (mm/2) + categoria
+    (confluente/subcapsular/estandar). Nada de id, corte, segmento, fuente ni nombre: eso se
+    queda en zona clinica. Con --diagnostico anade a stderr, por cada lesion automatica
+    revisada por el radiologo, su centro transformado -- para cotejarlo a mano contra el
+    centro de la malla YA PUBLICA del mismo id (verificacion cruzada sin exponer nada nuevo)."""
+    import numpy as np
+    destino = _dir("assets", a.fecha)
+    marcas = json.load(open(os.path.join(destino, "marcas.json")))
+    dm = _dir("assets", a.carpeta_mallas)
+    est = json.load(open(os.path.join(dm, "estudio.json")))
+    centro = _centro_web(_lee_ply(os.path.join(dm, est["mallas"]["higado"])),
+                         getattr(a, "centro_de", None))
+    esferas = []
+    for m in marcas["marcas"]:
+        v4 = np.append(np.array(m["centro_mm"], float) - centro, 1.0)
+        xyz = (RAS_A_THREE_NP @ v4)[:3]
+        esferas.append({"centro": [round(float(c), 2) for c in xyz],
+                        "radio_mm": round(m["mm"] / 2.0, 2),
+                        "categoria": CATEGORIA_POR_IMAGEN.get(m["corte"], "estandar")})
+    if a.diagnostico:
+        by_id = {L["id"]: L for L in est["lesiones"]}
+        for lid_str, info in marcas["automaticas"].items():
+            L = by_id.get(int(lid_str))
+            if not L:
+                continue
+            v4 = np.append(np.array(L["centro_mm"], float) - centro, 1.0)
+            xyz = (RAS_A_THREE_NP @ v4)[:3]
+            print("DIAG automatica id=%s diametro_auto_mm=%.1f radiologo_mm=%s corte=%s -> centro_three=%s"
+                  % (lid_str, L["diametro_mm"], info["radiologo_mm"], info["corte"],
+                     [round(float(c), 2) for c in xyz]), file=sys.stderr)
+    salida = {"esferas": esferas, "recuento": len(esferas)}
+    json.dump(salida, sys.stdout, ensure_ascii=False, indent=1)
+    print()
+    return 0
+
+
+def _cruces_rayo(o, d, tri, eps=1e-9):
+    """Cuántos triángulos (n,3,3) cruza el rayo o + t·d con t>0 (Möller-Trumbore, vectorizado)."""
+    import numpy as np
+    v0, v1, v2 = tri[:, 0], tri[:, 1], tri[:, 2]
+    e1, e2 = v1 - v0, v2 - v0
+    h = np.cross(d, e2)
+    a = (e1 * h).sum(1)
+    ok = np.abs(a) > eps
+    inva = np.where(ok, 1.0 / np.where(ok, a, 1.0), 0.0)
+    s = o - v0
+    u = (s * h).sum(1) * inva
+    q = np.cross(s, e1)
+    w = (d * q).sum(1) * inva
+    t = (e2 * q).sum(1) * inva
+    return int((ok & (u >= 0) & (w >= 0) & (u + w <= 1) & (t > eps)).sum())
+
+
+def _dist_punto_triangulos(p, tri):
+    """Distancia exacta (mm) del punto p a cada triángulo de tri (n,3,3): punto más cercano
+    por regiones de Voronoi del triángulo (Ericson, Real-Time Collision Detection, 5.1.5)."""
+    import numpy as np
+    a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
+    ab, ac, bc = b - a, c - a, c - b
+    d1, d2 = (ab * (p - a)).sum(1), (ac * (p - a)).sum(1)
+    d3, d4 = (ab * (p - b)).sum(1), (ac * (p - b)).sum(1)
+    d5, d6 = (ab * (p - c)).sum(1), (ac * (p - c)).sum(1)
+    va, vb, vc = d3 * d6 - d5 * d4, d5 * d2 - d1 * d6, d1 * d4 - d3 * d2
+
+    def _div(x, y):
+        return np.divide(x, y, out=np.zeros_like(x, dtype=float), where=y != 0)
+    den = va + vb + vc
+    v, w = _div(vb, den), _div(vc, den)
+    q = a + ab * v[:, None] + ac * w[:, None]                       # interior
+    # de menor a mayor prioridad (el último `where` que se cumple manda)
+    t = _div(d4 - d3, (d4 - d3) + (d5 - d6))
+    q = np.where(((va <= 0) & (d4 - d3 >= 0) & (d5 - d6 >= 0))[:, None], b + bc * t[:, None], q)
+    t = _div(d2, d2 - d6)
+    q = np.where(((vb <= 0) & (d2 >= 0) & (d6 <= 0))[:, None], a + ac * t[:, None], q)
+    t = _div(d1, d1 - d3)
+    q = np.where(((vc <= 0) & (d1 >= 0) & (d3 <= 0))[:, None], a + ab * t[:, None], q)
+    q = np.where(((d6 >= 0) & (d5 <= d6))[:, None], c, q)
+    q = np.where(((d3 >= 0) & (d4 <= d3))[:, None], b, q)
+    q = np.where(((d1 <= 0) & (d2 <= 0))[:, None], a, q)
+    return np.linalg.norm(q - p, axis=1)
+
+
+def _punto_vs_malla(p, v, f, candidatos=4000):
+    """(dentro, distancia_mm) de un punto frente a una malla cerrada. Dentro = paridad de
+    cruces de tres rayos (+x, +y, +z), por mayoría (un rayo que roza una arista se cuenta
+    dos veces y ese voto se pierde). Distancia = mínima a los `candidatos` triángulos de
+    centroide más cercano (exacta punto-triángulo); con triángulos de 1-2 mm es la real."""
+    import numpy as np
+    from scipy.spatial import cKDTree
+    p = np.asarray(p, float)
+    tri = v[f].astype(float)
+    k = min(candidatos, len(tri))
+    idx = cKDTree(tri.mean(1)).query(p, k=k)[1]
+    dist = float(_dist_punto_triangulos(p, tri[np.atleast_1d(idx)]).min())
+    votos = sum(_cruces_rayo(p, np.eye(3)[eje], tri) % 2 for eje in range(3))
+    return votos >= 2, dist
+
+
+def _cmd_marcas_dentro(a):
+    """¿Cae cada marca DENTRO de la malla del hígado? Para las esferas de marcas.json (solo
+    radiólogo) y las lesiones automáticas de estudio.json: dentro/fuera contra la malla,
+    distancia a la superficie (mm; negativa = dentro) y segmento de Couinaud leído en
+    segmentos.nii.gz en el centro. No mueve ninguna marca: solo mide. Nació el 26-sep-26 para
+    comprobar que, con la máscara unión, M17 (dentro del hígado según dos revisiones) ya no
+    sale fuera; antes se hacía a mano y sin registro."""
+    import numpy as np
+    d = _dir("assets", a.fecha)
+    marcas = json.load(open(os.path.join(d, "marcas.json")))
+    est = json.load(open(os.path.join(d, "estudio.json")))
+    ruta = a.malla or os.path.join(d, est["mallas"]["higado"])
+    v, f = _lee_ply_caras(ruta)
+    segm, aff = _carga(os.path.join(d, "segmentos.nii.gz"))
+    inv = np.linalg.inv(aff)
+    puntos = [("M%02d" % m["id"], m["corte"], m["mm"], m["centro_mm"]) for m in marcas["marcas"]]
+    puntos += [("L%02d" % L["id"], None, L["diametro_mm"], L["centro_mm"]) for L in est["lesiones"]]
+    print("malla: %s (%d vértices, %d caras) · máscara del estudio: %s"
+          % (os.path.basename(ruta), len(v), len(f), est.get("mascara_higado", "total (sin sello)")))
+    cuenta = {"M": [0, 0], "L": [0, 0]}
+    fuera = []
+    for nombre, corte, mm, c in puntos:
+        c = np.array(c, float)
+        dentro, dist = _punto_vs_malla(c, v, f)
+        ijk = np.round(inv @ np.append(c, 1.0))[:3].astype(int)
+        s = int(segm[tuple(ijk)]) if all(0 <= i < n for i, n in zip(ijk, segm.shape)) else 0
+        cuenta[nombre[0]][0 if dentro else 1] += 1
+        if not dentro:
+            fuera.append((nombre, dist))
+        print("  %s  %-8s %5.2f mm  %s  superficie a %5.1f mm  segmento %s"
+              % (nombre, "img %s" % corte if corte else "auto", mm,
+                 "DENTRO" if dentro else "FUERA ", -dist if dentro else dist, s or "-"))
+    print("esferas del radiólogo: %d dentro, %d fuera · lesiones automáticas: %d dentro, %d fuera"
+          % (cuenta["M"][0], cuenta["M"][1], cuenta["L"][0], cuenta["L"][1]))
+    for nombre, dist in fuera:
+        print("  FUERA: %s a %.1f mm de la superficie" % (nombre, dist))
+    return 1 if fuera else 0
+
+
 def _cmd_video(a):
     """Vídeo vertical del 3D (Reels/TikTok): graba video.html con Chrome sin interfaz y monta
     el MP4 con ffmpeg. Necesita `sirve` corriendo. Salida en zona clínica: es imagen suya y no
@@ -3419,6 +3637,18 @@ def _cmd_exporta(a):
     shutil.copy(mp4, dst)
     print("exportado (borrador, NO publicado):", os.path.relpath(dst, REPO))
     return 0
+
+
+def _centro_web(vertices_higado, centro_de=None):
+    """Centro de las mallas públicas (se resta en RAS antes de rotar a los ejes de three): el
+    de la caja del hígado de la carpeta o, con `--centro-de`, el de la caja de OTRO PLY. Lo
+    segundo es para sustituir UNA malla pública (p.ej. el hígado tras cambiar de máscara) sin
+    mover ni una micra las lesiones y esferas ya publicadas, que se centraron con el hígado
+    de antes. Si se regenera todo junto, no hace falta."""
+    v = _lee_ply(centro_de) if centro_de else vertices_higado
+    if centro_de:
+        print("centro de las mallas tomado de %s" % os.path.basename(centro_de), file=sys.stderr)
+    return (v.min(0) + v.max(0)) / 2
 
 
 def _lee_ply(ruta):
@@ -3724,8 +3954,7 @@ def _cmd_web(a):
         res = _malla(nuevo, img.affine, 0.6 / (vox / 2.0), min_componente=int(300 / vox ** 3))
         if res:
             geos["vasos"] = (res[0], res[1], geos["vasos"][2])
-    vh = geos["higado"][0]
-    centro = (vh.min(0) + vh.max(0)) / 2
+    centro = _centro_web(geos["higado"][0], getattr(a, "centro_de", None))
     dst = _marca("web-lesiones", a.carpeta)
     os.makedirs(dst, exist_ok=True)
     total = 0
@@ -5456,6 +5685,12 @@ def main(argv=None):
         ps.add_argument("series", nargs="+", help="huellas de serie (del inventario)")
         if nombre == "assets":
             ps.add_argument("--voxel", type=float, default=2.0)
+        if nombre in ("assets", "compara"):
+            ps.add_argument("--mascara-higado", dest="mascara_higado", choices=MASCARAS_HIGADO,
+                            default=MASCARA_HIGADO,
+                            help="de qué sale el hígado: union (total/liver ∪ liver_segments, por "
+                                 "defecto), total (solo total/liver: lo de antes del 26-sep-26) "
+                                 "o segmentos")
         if nombre == "segmenta":
             ps.add_argument("--tareas", nargs="*")
             ps.add_argument("--device", default="mps")
@@ -5543,6 +5778,9 @@ def main(argv=None):
                      help="mm; cierra huecos de la segmentación de las venas hepáticas")
     pwe.add_argument("--solo-conectados", action="store_true",
                      help="con --cierre-vasos: quita las venas que no llegan a porta ni cava")
+    pwe.add_argument("--centro-de", dest="centro_de",
+                     help="PLY (zona clínica) cuya caja centra las mallas en vez del hígado de la "
+                          "carpeta: para sustituir UNA malla pública sin mover las demás")
     pwe.set_defaults(fn=_cmd_web)
     pfo = sub.add_parser("focos", help="focos de realce de la resta: de ahí sale la semilla")
     pfo.add_argument("--raiz", dest="raices", action="append", required=True)
@@ -5673,6 +5911,17 @@ def main(argv=None):
     pmr.add_argument("--posicion", action="append", help="MARCA:x,y,z re-medida sobre su captura")
     pmr.add_argument("--fuente-posicion", help="cómo se re-midieron las posiciones")
     pmr.set_defaults(fn=_cmd_marcas)
+    pmw = sub.add_parser("marcas-web", help="marcas.json -> SOLO geometria publica (centro+radio+categoria) para el visor de la web")
+    pmw.add_argument("--fecha", required=True, help="carpeta de assets donde esta marcas.json")
+    pmw.add_argument("--carpeta-mallas", required=True, help="carpeta de assets cuyo higado.ply centra las mallas publicas (el mismo --carpeta que uso `web`)")
+    pmw.add_argument("--diagnostico", action="store_true", help="a stderr: centro transformado de cada lesion automatica, para cotejar a mano contra la malla ya publica")
+    pmw.add_argument("--centro-de", dest="centro_de",
+                     help="PLY (zona clínica) cuya caja centra las esferas, igual que `web --centro-de`")
+    pmw.set_defaults(fn=_cmd_marcas_web)
+    pmd = sub.add_parser("marcas-dentro", help="¿cae cada marca (esferas del radiólogo + lesiones automáticas) DENTRO de la malla del hígado? distancia y segmento; no mueve nada")
+    pmd.add_argument("--fecha", required=True, help="carpeta de assets con marcas.json, estudio.json y segmentos.nii.gz")
+    pmd.add_argument("--malla", help="PLY del hígado contra el que medir (por defecto el de estudio.json de esa carpeta)")
+    pmd.set_defaults(fn=_cmd_marcas_dentro)
     pw = sub.add_parser("sirve", help="sirve el visor en 127.0.0.1")
     pw.add_argument("--puerto", type=int, default=8794)
     pw.set_defaults(fn=_cmd_sirve)
