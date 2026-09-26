@@ -2604,7 +2604,11 @@ def niveles_por_reparto(lab, nombres, afin):
     # Los extremos salen de la PROPIA columna, no del cráneo: el cráneo baja más que la
     # cervical alta (mandíbula, base), y repartir desde ahí dejaba seis niveles en el aire.
     # El corte más alto con hueso vertebral ES C1, y el más bajo, L5 sobre el sacro.
-    zv = np.nonzero(vert.any(axis=(0, 1)))[0]
+    # Ojo: el tramo se mide SIN S1. `vert` la incluye (CADENA acaba en S1), y con ella el extremo
+    # bajo era el fondo de S1: toda la cadena salía estirada y L5 caía encima de S1. En su TC,
+    # S1 medida quedaba por ENCIMA de L5 estimada (PR #216 de la web, 26-sep-2026).
+    tramo = np.isin(lab, [ids[n] for n in CADENA[:-1] if n in ids])
+    zv = np.nonzero((tramo if tramo.any() else vert).any(axis=(0, 1)))[0]
     lo, hi = int(zv.min()), int(zv.max())
     z_sa = int(np.nonzero(m_sa.any(axis=(0, 1)))[0].max())
     if not (lo <= z_sa <= hi or abs(z_sa - lo) < abs(z_sa - hi)):
@@ -2620,8 +2624,18 @@ def niveles_por_reparto(lab, nombres, afin):
         z = int(round(lo + (hi - lo) * (k + 0.5) / n))
         corte = vert[:, :, max(0, z - 2):z + 3]
         if not corte.any():
-            fuera.append(nom)
-            continue
+            # Un hueco de la segmentación justo en el corte del nivel (le pasó a T8 el
+            # 26-sep-2026) no invalida el reparto entero: se toma el corte CON hueso más cercano,
+            # pero solo dentro de medio tramo, para que el nivel no invada al vecino ni cambie el
+            # orden. Más lejos, el freno para como siempre.
+            medio = int((hi - lo) / n / 2)
+            cerca = next((z2 for d in range(1, medio + 1) for z2 in (z - d, z + d)
+                          if lo <= z2 <= hi and vert[:, :, z2].any()), None)
+            if cerca is None:
+                fuera.append(nom)
+                continue
+            z = cerca
+            corte = vert[:, :, z:z + 1]
         com = np.asarray(ndimage.center_of_mass(corte))
         com[2] = z
         centros[nom] = [round(float(v), 1) for v in (afin @ np.append(com, 1.0))[:3]]

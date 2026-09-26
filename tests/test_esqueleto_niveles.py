@@ -103,6 +103,49 @@ check(all(a < b for a, b in zip(z, z[1:])) or all(a > b for a, b in zip(z, z[1:]
 dentro = sum(1 for n, c in centros.items() if vol[:, :, int(round(c[2]))].any())
 check(dentro == len(centros), "todos caen en un corte CON hueso (%d de %d)" % (dentro, len(centros)))
 
+# 2b) el fallo del 26-sep-2026 (PR #216 de la web): con S1 segmentada, el tramo del reparto
+#     llegaba hasta el FONDO de S1, toda la cadena salía estirada hacia abajo y L5 caía encima
+#     de S1 (en su TC, S1 medida v=0,7345 por encima de L5 estimada v=0,7556). Aquí el cuerpo
+#     más bajo es S1: L5 tiene que caer en el cuerpo de encima, no en S1.
+print("\n— S1 segmentada no estira el reparto —")
+nombres_s1 = {1: "vertebrae_C1", 2: "skull", 3: "sacrum", 4: "vertebrae_S1"}
+# orientación del TC real: z bajo = craneal (C1 sale en `lo`), así que S1 es el cuerpo de z alto
+nz = vol.shape[2]
+lab3 = np.zeros(vol.shape, np.int16)
+lab3[vol] = 1
+s1 = np.zeros(vol.shape, bool)
+s1[:, :, nz - 12:] = vol[:, :, nz - 12:]  # el último cuerpo (z 276..285) es S1
+lab3[s1] = 4
+lab3[16:24, 16:24, :6] = 2               # "cráneo" arriba (z bajo)
+lab3[18:22, 18:22, -6:] = 3              # "sacro" abajo (z alto)
+c3 = V.niveles_por_reparto(lab3, nombres_s1, afin)
+z_l5 = c3.get("vertebrae_L5", [0, 0, -1])[2]
+z_s1 = float(np.nonzero(s1.any(axis=(0, 1)))[0].mean())
+check(264 <= z_l5 <= 273, "L5 cae en el cuerpo de encima de S1 (z=%.1f, ese cuerpo = 264..273)" % z_l5)
+check(z_l5 < z_s1, "L5 estimada queda por encima de S1 medida (%.1f < %.1f)" % (z_l5, z_s1))
+check(len(c3) == len(V.CADENA) - 1, "y siguen saliendo los 24 niveles de C1 a L5 (%d)" % len(c3))
+
+# 2c) el hueco de T8 (26-sep-2026): un nivel cuyo corte cae en un hueco de la segmentación no
+#     tumba el reparto entero si hay hueso DENTRO de su propio tramo; se usa el corte con hueso
+#     más cercano. Si el hueco es mayor que medio tramo, el freno sigue parando todo.
+print("\n— un hueco pequeño no tumba el reparto —")
+lab4 = lab.copy()
+lo4, hi4 = 0, int(np.nonzero(vol.any(axis=(0, 1)))[0].max())
+z10 = int(round(lo4 + (hi4 - lo4) * 10.5 / 24))       # el nivel k=10 (T4)
+lab4[:, :, z10 - 4:z10 + 5][lab4[:, :, z10 - 4:z10 + 5] == 1] = 0
+c4 = V.niveles_por_reparto(lab4, nombres, afin)
+check(len(c4) == len(V.CADENA) - 1, "un hueco de 9 cortes deja los 24 niveles (%d)" % len(c4))
+zt4 = c4.get("vertebrae_T4", [0, 0, -99])[2]
+medio = (hi4 - lo4) / 24 / 2
+check(abs(zt4 - z10) <= medio and (lab4[:, :, int(round(zt4))] == 1).any(),
+      "T4 va al hueso más cercano, dentro de su tramo (z=%.1f, ideal %d ± %.1f)" % (zt4, z10, medio))
+z4 = [c4[n][2] for n in V.CADENA[:-1] if n in c4]
+check(all(a < b for a, b in zip(z4, z4[1:])), "y la cadena sigue en orden")
+lab5 = lab.copy()
+lab5[:, :, z10 - 20:z10 + 21][lab5[:, :, z10 - 20:z10 + 21] == 1] = 0
+check(V.niveles_por_reparto(lab5, nombres, afin) == {},
+      "un hueco mayor que medio tramo SIGUE parando el reparto")
+
 # 3) sin sacro no se reparte nada: mejor ningún nivel que niveles corridos
 print("\n— sin puntos de anclaje —")
 lab2 = np.zeros(vol.shape, np.int16)
