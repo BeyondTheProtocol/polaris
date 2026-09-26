@@ -90,13 +90,13 @@ class _FuenteSintetica(unittest.TestCase):
 
 class ExtensionEnMayusculas(_FuenteSintetica):
     def test_md_y_txt_en_mayusculas_se_indexan(self):
-        self.escribir("nota.md", "Control: la revisión anual en minúsculas sigue igual que siempre.")
+        self.escribir("control.md", "Control: la revisión anual en minúsculas sigue igual que siempre.")
         self.escribir("NOTA.MD", "Nota con extensión en mayúsculas sobre la revisión trimestral.")
         self.escribir("Resumen.Md", "Resumen con la extensión mezclada, preparado para la consulta.")
         self.escribir("apuntes.TXT", "Apuntes en texto plano con la extensión escrita en mayúsculas.")
         self.indexar()
         self.assertEqual(self.rutas_indexadas(),
-                         {"nota.md", "NOTA.MD", "Resumen.Md", "apuntes.TXT"})
+                         {"control.md", "NOTA.MD", "Resumen.Md", "apuntes.TXT"})
 
     def test_pdf_en_mayusculas_se_indexa_y_se_encuentra(self):
         """Antes quedaba fuera y `retrieve()` no lo devolvía nunca."""
