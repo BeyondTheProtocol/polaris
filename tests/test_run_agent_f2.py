@@ -667,6 +667,52 @@ def clinico_sin_modelo_tests():
     ok(m == "sonnet", "rutina sin modelo sigue en sonnet (visto: %r)" % m)
 
 
+def latido_sin_agente_tests():
+    """Issue #44 (26-sep-26). Un run sin agente (el triaje de la cola) escribía su latido en
+    asistente.json, el del barrido de las 7:55: un triaje OK tapaba un barrido muerto y uno fallido
+    avisaba de que «el barrido diario de Vega falló». Ahora no late en el de ninguna rutina."""
+    import glob
+    import plistlib
+    de_rutinas = set()
+    for p in glob.glob(os.path.join(ROOT, "tools", "launchd", "com.btp.*.plist")):
+        try:
+            with open(p, "rb") as fh:
+                env_p = plistlib.load(fh).get("EnvironmentVariables") or {}
+        except Exception:
+            continue
+        nombre = env_p.get("BTP_HEARTBEAT_NAME") or env_p.get("BTP_AGENT")
+        if nombre:
+            de_rutinas.add(nombre)
+    ok("asistente" in de_rutinas,
+       "se leen los latidos de las rutinas de launchd (vistos: %s)" % sorted(de_rutinas))
+    falla = os.path.join(_TMP, "claude_falla.sh")
+    open(falla, "w").write('#!/bin/bash\necho \'{"subtype":"error_during_execution","is_error":true,'
+                           '"num_turns":3,"total_cost_usd":0,"result":""}\'\nexit 1\n')
+    os.chmod(falla, 0o755)
+    for bin_, estado in ((_BIN_OK, "ok"), (falla, "fallo")):
+        tmp = tempfile.mkdtemp(prefix="ra_sin_agente_")
+        hbdir = os.path.join(tmp, "heartbeat")
+        # BTP_AGENT="" y no ausente: es lo que pasa el dispatcher cuando el job no trae agente.
+        env = _clean_env(BTP_CLAUDE_BIN=bin_, BTP_API_KEY_OVERRIDE="x", BTP_COST_GUARDED="1",
+                         BTP_STATE_DIR=tmp, BTP_PERIPHERIES=_REG, BTP_AGENT="", BTP_REPO=ROOT,
+                         BTP_HALT_FILES=os.path.join(tmp, "nh_a") + ":" + os.path.join(tmp, "nh_b"))
+        subprocess.run(["bash", os.path.join(ROOT, "tools", "run_agent.sh"), "TRIAGE: <<<hola>>>"],
+                       capture_output=True, text=True, env=env)
+        try:
+            escritos = sorted(f[:-5] for f in os.listdir(hbdir) if f.endswith(".json"))
+        except OSError:
+            escritos = []
+        ok(escritos and not set(escritos) & de_rutinas,
+           "run sin agente (%s) no late en el fichero de ninguna rutina de launchd (visto: %s)"
+           % (estado, escritos))
+        try:
+            hb = json.load(open(os.path.join(hbdir, "sin-agente.json")))
+        except Exception:
+            hb = {}
+        ok(hb.get("estado") == estado,
+           "run sin agente (%s) deja su latido en sin-agente.json (visto: %r)" % (estado, hb))
+
+
 def main():
     # 1) Rutina AGÉNTICA (sin BTP_FREE_OK) + Claude agotado → APLAZA con exit 75, NO finge con un 3B
     out, err, hb, rc = run_agent("revisa la cola y avanza lo rutinario", "orquestador")
@@ -708,6 +754,7 @@ def main():
     refusal_degrada_tests()
     critico_bordes_tests()
     clinico_sin_modelo_tests()
+    latido_sin_agente_tests()
     print("RESULTADO run_agent F2: %d OK, %d fallos" % (_pass, _fail))
     print("✅ F2 EN VERDE" if _fail == 0 else "❌ revisar fallos")
     return _fail
