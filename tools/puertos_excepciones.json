@@ -1,6 +1,15 @@
 {
   "_doc": "Lista cerrada de lo que puede escuchar FUERA de loopback en la casa base. Lo que no esté aquí pone ROJO tests/test_puertos_loopback.py. Nace del punto S14 del feedback de {{CONTACTO}}+KAI (25-sep-2026). Campos: proceso = nombre que da `netstat -anv` (process:pid); puerto = número o \"dinamico\" (solo casa con puertos >= 32768); alcance = \"tailnet\" (IP 100.64/10 o fd7a:115c:a1e0::/48, solo la tailnet de {{TITULAR}}) o \"todas\" (cualquier interfaz, incluida la LAN de casa); argv_contiene = opcional, se exige en la línea de comando del PID; estado = \"excepcion\" (justificada, se queda) o \"revisar\" (pendiente de decisión de {{TITULAR}}, con deuda abierta). Quitar una entrada cuando el servicio se apague. Nunca meter aquí algo con Funnel (público): eso no es excepción, es fallo.",
   "escuchas": [
+    {"proceso": "Python", "puerto": 3010, "alcance": "tailnet", "argv_contiene": "staging.py",
+     "estado": "revisar",
+     "por_que": "Antesala (com.btp.staging, cargada desde jun-2026): relay del índice 3010 -> 127.0.0.1:4000. Mismo patrón que el relay 8788 retirado; tailscale serve 9091 ya publica 127.0.0.1:4000. Visto escuchando tras el reinicio del 26-sep.",
+     "deuda": "antesala-relay-python-tailnet"},
+    {"proceso": "Python", "puerto": 3011, "alcance": "tailnet", "argv_contiene": "staging.py",
+     "estado": "revisar",
+     "por_que": "Antesala (com.btp.staging): relay de la app en pruebas 3011 -> 127.0.0.1:4010.",
+     "deuda": "antesala-relay-python-tailnet"},
+
     {"proceso": "io.tailscale.ipn", "puerto": 5901, "alcance": "tailnet", "estado": "excepcion",
      "por_que": "tailscale serve 5901 -> 127.0.0.1:5900: pantalla remota (Jump) desde la tailnet."},
     {"proceso": "io.tailscale.ipn", "puerto": 9090, "alcance": "tailnet", "estado": "excepcion",
@@ -18,16 +27,8 @@
      "por_que": "Compartir pantalla (VNC): lo usa Jump vía tailscale serve 5901. macOS lo abre en todas las interfaces. Decidido mantener, 25-sep-2026."},
     {"proceso": "kdc", "puerto": 88, "alcance": "todas", "estado": "excepcion",
      "por_que": "Kerberos local de macOS; lo arrastra Compartir pantalla (sigue abierto con Compartir archivos ya apagado, 25-sep-2026)."},
-    {"proceso": "ControlCenter", "puerto": 5000, "alcance": "todas", "estado": "revisar",
-     "por_que": "Receptor AirPlay en la LAN. Ajuste del sistema: decide {{TITULAR}}.",
-     "deuda": "macos-servicios-en-lan"},
-    {"proceso": "ControlCenter", "puerto": 7000, "alcance": "todas", "estado": "revisar",
-     "por_que": "Receptor AirPlay en la LAN. Ajuste del sistema: decide {{TITULAR}}.",
-     "deuda": "macos-servicios-en-lan"},
     {"proceso": "rapportd", "puerto": "dinamico", "alcance": "todas", "estado": "excepcion",
      "por_que": "Continuidad/Handoff de macOS entre aparatos de la misma cuenta Apple."},
-    {"proceso": "rapportd", "puerto": 49152, "alcance": "todas", "estado": "excepcion",
-     "por_que": "Continuidad/Handoff de macOS (puerto base fijo de rapportd)."},
     {"proceso": "symptomsd", "puerto": "dinamico", "alcance": "todas", "estado": "excepcion",
      "por_que": "Diagnóstico de red de macOS."}
   ]
