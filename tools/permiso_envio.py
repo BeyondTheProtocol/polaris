@@ -217,7 +217,7 @@ def token_path(sesion=""):
 
 
 def _legado():
-    """El hueco único de antes. Se ignora y se borra: caducaba a los 10 minutos igualmente."""
+    """El hueco único de antes. Los hooks nuevos no lo leen; se borra solo cuando ya no vale."""
     return os.path.join(_casa.state_dir(), "ok_envio.json")
 
 
@@ -328,9 +328,11 @@ def emitir(prompt, session_id, prompt_id, transcript_path, k):
 
 
 def _barrer_caducados(k):
-    """Al emitir, se van los de otras sesiones que ya caducaron (y el hueco único de antes)."""
-    _borrar_ruta(_legado())
-    for ruta in _todos():
+    """Al emitir, se van los de otras sesiones que ya caducaron, y el hueco único de antes SOLO si
+    ya no vale. Mientras haya sesiones con los hooks de antes (su worktree nació antes del
+    26-sep-26), su permiso vive en `ok_envio.json`; borrarlo a ciegas era repetir el fallo que esto
+    arregla: la orden de una sesión borrando la de otra (visto el mismo 26-sep, 17:33)."""
+    for ruta in [_legado()] + _todos():
         _leer_ruta(ruta, k)          # leer uno caducado o sin firma ya lo borra
 
 

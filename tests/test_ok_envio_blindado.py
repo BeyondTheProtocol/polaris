@@ -574,6 +574,28 @@ class DosSesionesNoSePisan(_Base):
         shutil.copy(origen, self._token())
         self.assertEqual(self._enviar(), "deny")
 
+    def test_emitir_no_borra_el_permiso_vigente_de_una_sesion_con_hooks_viejos(self):
+        """Transición (26-sep-26, 17:33): una sesión cuyo worktree nació antes guarda su permiso en
+        el `ok_envio.json` de siempre. Que otra sesión reciba su orden no puede borrárselo; uno
+        caducado, sí."""
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import permiso_envio as P
+        legado = os.path.join(self.tmp, "ok_envio.json")
+        ahora = datetime.now().replace(microsecond=0)
+        vigente = P.firmar({"ts": ahora.isoformat(), "origen": "prompt", "motivo": "Fusiona",
+                            "session_id": "sesion-con-hooks-viejos", "prompt_id": "p",
+                            "nonce": "n", "usos": 0}, CLAVE.encode())
+        with open(legado, "w", encoding="utf-8") as f:
+            json.dump(vigente, f)
+        self._ordenar("envíalo a alguien@hospital.org")
+        self.assertTrue(os.path.exists(legado), "el permiso vigente de la otra sesión sigue ahí")
+        caducado = P.firmar(dict(vigente, ts=(ahora - timedelta(minutes=30)).isoformat()),
+                            CLAVE.encode())
+        with open(legado, "w", encoding="utf-8") as f:
+            json.dump(caducado, f)
+        self._ordenar("envíalo a alguien@hospital.org")
+        self.assertFalse(os.path.exists(legado), "el caducado sí se limpia")
+
     def test_una_sesion_con_barras_no_sale_del_directorio(self):
         sys.path.insert(0, os.path.join(ROOT, "tools"))
         import permiso_envio as P
