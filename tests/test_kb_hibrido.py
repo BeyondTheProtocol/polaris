@@ -60,21 +60,23 @@ def _fake_vector(text, dim=384):
 
 
 def _build_temp_index_with_vectors(tmp):
-    """Índice FTS5 + .npy hermano, con vectores sintéticos en el MISMO orden de inserción
-    (rowid i+1 ↔ fila i del .npy — igual invariante que kb.build())."""
+    """Índice FTS5 + una generación de vectores sintéticos en el MISMO orden de inserción
+    (rowid i+1 ↔ fila i del .npy — igual invariante que kb.build()). Se escribe con
+    kb._escribir_generacion, como build(): un .npy suelto sin manifiesto ya no se lee (#17)."""
     import numpy as np
     dbpath = os.path.join(tmp, ".kb_index.db")
-    vecpath = os.path.join(tmp, ".kb_index.vectors.npy")
     con = sqlite3.connect(dbpath)
     con.execute(kb._SCHEMA)
     con.executemany(
         "INSERT INTO chunks(path, title, sensitivity, body) VALUES (?,?,?,?)",
         [(p, os.path.basename(p), s, b) for (p, s, b) in DOCS])
     con.commit()
-    con.close()
     mat = np.stack([_fake_vector(body) for (_p, _s, body) in DOCS])
-    np.save(vecpath, mat)
-    return dbpath, vecpath
+    gen = kb._nueva_generacion()
+    with redirect_stdout(io.StringIO()):
+        kb._escribir_generacion(con, dbpath, gen, [body for (_p, _s, body) in DOCS], mat)
+    con.close()
+    return dbpath, kb._rutas_generacion(dbpath, gen)[0]
 
 
 def _ask(q, scope, k=10, db_path=None):
