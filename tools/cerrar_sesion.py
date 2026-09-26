@@ -540,7 +540,9 @@ def _verificar_en_casa_base(tope_s=600):
             return nombre, False
     with ThreadPoolExecutor(max_workers=4) as ex:
         res = list(ex.map(uno, candidatos))
-    return [n for n, ok in res if not ok], len(candidatos)
+    # Lo rojo en paralelo se repite SOLO, de uno en uno: en su estreno (26-sep) dio `test_fuga.sh`
+    # rojo con 4 a la vez y verde corrido solo (se estorban). Cuenta como rojo lo que repite.
+    return [n for n, ok in res if not ok and not uno(n)[1]], len(candidatos)
 
 
 def _una_linea(r):
