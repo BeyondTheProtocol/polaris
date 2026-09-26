@@ -160,6 +160,7 @@ runpy test_hooks_ejecutables.py
 runpy test_guard_timeout.py   # 25-sep · {{CONTACTO}}/KAI: un guard lento deniega, no deja pasar; deny de respaldo
 runpy test_cerrar_sesion_conflicto.py
 runpy test_cerrar_sesion_poda_viva.py   # 25-sep · no podar el worktree de una sesión viva (le apagaba el muro)
+runpy test_cerrar_sesion_verifica_base.py   # 26-sep · tras fusionar, corre en casa base lo que el worktree salta
 runpy test_run_agent_casa_master.py
 runpy test_ff_al_abrir.py
 runpy test_mini.py

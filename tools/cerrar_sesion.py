@@ -346,6 +346,12 @@ def cerrar(apply=False, scope=None, podar=True):
     else:
         acciones.append("fusión: nada propio que fusionar")
 
+    rojas_base = None
+    if apply and fusionado and not os.environ.get("BTP_CIERRE_SIN_VERIFICAR"):
+        rojas_base, corridas = _verificar_en_casa_base()
+        acciones.append("casa base: %d batería(s) que en el worktree se saltan, corridas allí → %s"
+                        % (corridas, ("ROJAS: " + ", ".join(rojas_base)) if rojas_base else "en verde"))
+
     # (b+d) DOCS + RAG — la fuente de verdad está GITIGNORED, así que los docs NUEVOS no viajan por la
     # fusión: se COPIAN a mano a casa base y se reindexa el RAG desde allí. Solo .md, nunca privados.
     copiados = []
@@ -438,7 +444,8 @@ def cerrar(apply=False, scope=None, podar=True):
     else:
         acciones.append("poda: omitida (--no-poda)")
 
-    return dict(p, aplicado=apply, fusionado=fusionado, podado=podado, acciones=acciones)
+    return dict(p, aplicado=apply, fusionado=fusionado, podado=podado, acciones=acciones,
+                rojas_casa_base=rojas_base)
 
 
 def _sesion_viva_en(wt):
@@ -495,6 +502,47 @@ def _continuidad_al_dia():
         return True, None, "?"        # ante la duda no se molesta: es un aviso, no un guardia
 
 
+# Lo que en un worktree se SALTA (rc=77, `tests/_entorno.exige`) solo se prueba en casa base. El
+# 26-sep-26 una fusión dio «TODO EN VERDE» en el worktree y dejó `test_fuga.sh` ROJO en casa base
+# (lo cazó otra sesión); ya había pasado el 22-sep y la memoria `feedback-verde-en-worktree-no-es-
+# verde` no bastó. Así que el cierre, tras fusionar, corre ESAS baterías allí y lo dice.
+_PUEDE_SALTAR = re.compile(r"exit\(77\)|exit 77|_entorno\.exige|\bexige\(|SKIP\s*=\s*77")
+
+
+def _verificar_en_casa_base(tope_s=600):
+    """(rojas, corridas): corre en casa base los tests que pueden saltarse (rc 77) fuera de ella.
+    rc 0 y 77 son verde/saltado; cualquier otro, o no acabar a tiempo, es rojo."""
+    from concurrent.futures import ThreadPoolExecutor
+    tdir = os.path.join(BASE, "tests")
+    candidatos = []
+    for nombre in sorted(os.listdir(tdir)) if os.path.isdir(tdir) else []:
+        if not (nombre.startswith("test_") and nombre.endswith((".py", ".sh"))):
+            continue
+        try:
+            with open(os.path.join(tdir, nombre), encoding="utf-8", errors="ignore") as f:
+                if _PUEDE_SALTAR.search(f.read()):
+                    candidatos.append(nombre)
+        except Exception:
+            continue
+
+    def uno(nombre):
+        cmd = (["bash"] if nombre.endswith(".sh") else [sys.executable]) + [os.path.join(tdir, nombre)]
+        env = dict(os.environ)
+        for k in ("BTP_STATE_DIR", "BTP_REPO", "CLAUDE_PROJECT_DIR"):
+            env.pop(k, None)
+        try:
+            p = subprocess.run(cmd, cwd=BASE, env=env, capture_output=True, text=True,
+                               timeout=tope_s, stdin=subprocess.DEVNULL)
+            return nombre, p.returncode in (0, 77)
+        except subprocess.TimeoutExpired:
+            return nombre, False
+        except Exception:
+            return nombre, False
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = list(ex.map(uno, candidatos))
+    return [n for n, ok in res if not ok], len(candidatos)
+
+
 def _una_linea(r):
     if r.get("error"):
         return "⚠️ cierre: " + r["error"]
@@ -505,6 +553,10 @@ def _una_linea(r):
              % (modo, r.get("rama", "?"), n_cambios,
                 "fusionado a casa base" if r.get("fusionado") else "sin fusión",
                 n_docs, "podado" if r.get("podado") else "intacto"))
+    if r.get("rojas_casa_base"):
+        linea += ("\n🔴 CASA BASE ROJA tras fusionar: %s. En el worktree se saltaban, así que tu "
+                  "«en verde» no las cubría. Arréglalo antes de dar nada por hecho."
+                  % ", ".join(r["rojas_casa_base"]))
     al_dia, dias, ultima = _continuidad_al_dia()
     if not al_dia:
         cuanto = ("nunca" if dias is None else "hace %.0f día(s), la última es del %s"
