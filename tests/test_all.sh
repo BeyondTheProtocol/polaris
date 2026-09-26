@@ -292,6 +292,7 @@ runpy test_anatomia_tecnica.py
 runpy test_anatomia_mapa.py
 runpy test_anatomia_al_dia.py
 runpy test_anatomia_temporales.py   # 26-sep · la huella no cuenta los _mutante_*.py de una batería en marcha
+runpy test_anatomia_worktree.py    # 26-sep · desde un worktree, la huella usa el código de la rama
 runpy test_traza_subagente.py
 runpy test_ciclo_agentes.py
 runpy test_presencia_cc.py

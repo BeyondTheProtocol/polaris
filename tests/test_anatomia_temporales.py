@@ -23,10 +23,11 @@ class SinTemporales(unittest.TestCase):
         for n in ("kb.py", "_mutante_abc123.py", "_mutante_bla_wiu5.py"):
             with open(os.path.join(self.tmp, "tools", n), "w") as f:
                 f.write("x = 1\n")
-        self.viejo, anatomia.ROOT = anatomia.ROOT, self.tmp
+        # `herramientas()` lee tools/*.py del árbol del CÓDIGO (26-sep-26), no de casa base.
+        self.viejo, anatomia.CODIGO = anatomia.CODIGO, self.tmp
 
     def tearDown(self):
-        anatomia.ROOT = self.viejo
+        anatomia.CODIGO = self.viejo
 
     def test_no_cuenta_mutantes(self):
         h = anatomia.herramientas()

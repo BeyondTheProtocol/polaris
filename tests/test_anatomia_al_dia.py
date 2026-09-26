@@ -61,7 +61,7 @@ class TestPanelAlDia(unittest.TestCase):
                 if ruta in ("tools/", "MCP") or not ruta:
                     continue
                 self.assertTrue(
-                    os.path.exists(os.path.join(anatomia.ROOT, ruta)),
+                    os.path.exists(os.path.join(anatomia.CODIGO, ruta)),
                     "el paso «%s» del camino cita %s y ya no existe" % (paso, ruta))
 
     def test_la_huella_no_nombra_lo_que_no_va_a_git(self):

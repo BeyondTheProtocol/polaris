@@ -47,17 +47,23 @@ import socket
 import subprocess
 import sys
 
-# Casa base SIEMPRE: la Anatomía retrata el sistema VIVO, no el worktree desde el
-# que se lanza (los daemons, el estado y las trazas viven en casa base). Mismo
-# criterio que tools/audit_comites.py.
+# Casa base para lo VIVO: la Anatomía retrata el sistema vivo (los daemons, el
+# estado y las trazas viven en casa base). Mismo criterio que tools/audit_comites.py.
 ROOT = os.environ.get("BTP_REPO") or os.path.expanduser("~/claudecode")
 STATE = os.environ.get("BTP_STATE_DIR") or os.path.join(ROOT, "tools", "state")
-AGENTS_DIR = os.path.join(ROOT, ".claude", "agents")
-SKILLS_DIR = os.path.join(ROOT, ".claude", "skills")
+# Lo VERSIONADO (tools, hooks, agentes, skills, rutinas, .mcp.json, tests) sale del árbol donde vive
+# este fichero; lo VIVO (estado, cajas de la fuente de verdad, disco) sigue en casa base. En casa base
+# son el mismo sitio. Desde un worktree, `sellar` antes comparaba el código de CASA BASE y escribía
+# la huella en el worktree: el 26-sep-26 dijo «nada que sellar» con un hook nuevo en la rama, y
+# `test_anatomia_al_dia` salió rojo en casa base al fusionar (deuda
+# anatomia-sellar-desde-worktree-mira-casa-base).
+CODIGO = os.environ.get("BTP_REPO") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+AGENTS_DIR = os.path.join(CODIGO, ".claude", "agents")
+SKILLS_DIR = os.path.join(CODIGO, ".claude", "skills")
 MEMORY_DIR = os.path.expanduser(
     "~/.claude/projects/-Users-polaris-claudecode/memory")
 
-sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, os.path.join(CODIGO, "tools"))
 
 # Conectores MCP que viven en la CUENTA, no en un fichero del disco: no se
 # pueden derivar leyendo el repo. Se declaran a mano y se marcan como tales en
@@ -371,7 +377,7 @@ TEMPORALES = ("_mutante_",)
 def herramientas():
     """Las tools .py agrupadas por familia, con el total de líneas."""
     fams, lineas = {}, 0
-    for p in sorted(glob.glob(os.path.join(ROOT, "tools", "*.py"))):
+    for p in sorted(glob.glob(os.path.join(CODIGO, "tools", "*.py"))):
         nombre = os.path.basename(p)[:-3]
         # `tools/mutantes.py` escribe copias `_mutante_*.py` junto al original mientras corre una
         # batería en casa base. No son tools: contarlas hacía oscilar la huella («otras» 3↔4↔6)
@@ -402,7 +408,7 @@ def rutinas():
     """Daemons launchd: el REGISTRO (fuente única) cruzado con lo cargado de verdad."""
     reg = {}
     try:
-        with open(os.path.join(ROOT, "tools", "launchd", "REGISTRO.json"),
+        with open(os.path.join(CODIGO, "tools", "launchd", "REGISTRO.json"),
                   encoding="utf-8") as f:
             reg = json.load(f).get("daemons", {})
     except Exception:
@@ -436,7 +442,7 @@ def mcps():
     """MCP del repo (verificado, se lee del disco) + conectores de cuenta (declarados)."""
     locales = []
     try:
-        with open(os.path.join(ROOT, ".mcp.json"), encoding="utf-8") as f:
+        with open(os.path.join(CODIGO, ".mcp.json"), encoding="utf-8") as f:
             locales = sorted(json.load(f).get("mcpServers", {}).keys())
     except Exception:
         pass
@@ -529,7 +535,7 @@ def arquitectos():
     y razona el gabinete. Es una caja intercambiable — y el muro no depende de ella,
     porque vive en hooks y en el gate de egress, no en el prompt del arnés."""
     try:
-        with open(os.path.join(ROOT, "tools", "orquestadores.json"),
+        with open(os.path.join(CODIGO, "tools", "orquestadores.json"),
                   encoding="utf-8") as f:
             reg = json.load(f).get("orquestadores", [])
     except Exception:
@@ -637,7 +643,7 @@ def gasto():
 
 def guardas():
     """Los dientes del muro: los hooks que se meten en medio de cada herramienta."""
-    d = os.path.join(ROOT, ".claude", "hooks")
+    d = os.path.join(CODIGO, ".claude", "hooks")
     if not os.path.isdir(d):
         return []
     # Por NOMBRE, sin extensión y sin repetir: `muro_guard` vive en .py y en .sh
@@ -674,7 +680,7 @@ def memoria():
     mem = len([p for p in glob.glob(os.path.join(MEMORY_DIR, "*.md"))
                if not os.path.basename(p).startswith(("_", "MEMORY"))])
     est = len(glob.glob(os.path.join(STATE, "*.json")))
-    tests = len(glob.glob(os.path.join(ROOT, "tests", "*.py")))
+    tests = len(glob.glob(os.path.join(CODIGO, "tests", "*.py")))
     return {"memorias": mem, "estado": est, "tests": tests}
 
 
