@@ -3503,6 +3503,479 @@ def _cmd_marcas_dentro(a):
     return 1 if fuera else 0
 
 
+# ─── banco: medir el detector contra las marcas del radiólogo (26-sep-26) ────────────────
+#
+# Opción 1 del dossier «¿puede Polaris descubrir las 35 lesiones que se le escaparon?» (26-sep):
+# el MISMO modelo (TotalSegmentator 2.14.0, tarea 591 `liver_lesions`, fold 0) guardando el mapa
+# de probabilidad en vez del argmax, umbralizado a varios cortes dentro del hígado y medido contra
+# las 55 marcas del radiólogo. Es la medida de una HERRAMIENTA, no un recuento clínico: un
+# candidato sin marca NO es un falso positivo (las marcas son una lectura informal, sin informe
+# firmado) y una marca no detectada no es una lesión que nadie haya perdido.
+#
+# Lo que TS hace de fábrica con `liver_lesions` (leído en .venv-imagen, TS 2.14.0):
+#   · la máscara de recorte sale de la tarea 297 (modelo `total` a 3 mm, robust_crop;
+#     python_api.py:722-767), NO de la `total/liver` a 1,5 mm que usa el visor;
+#   · el recorte es la CAJA (bbox) de esa máscara más un margen: la tarea pide 10 mm
+#     (python_api.py:450) pero python_api.py:769 lo sobreescribe a 20 mm siempre que la máscara
+#     sale del modelo `total` (crop_model is None); el margen se pasa a vóxeles de la rejilla
+#     ORIGINAL antes del remuestreo (cropping.py:99: int(20/0,977)=20 en plano, int(20/2,5)=8
+#     cortes);
+#   · el .npz de save_probabilities vive en la rejilla recortada, canónica y remuestreada a
+#     0,75×0,75×1,0 mm (nnunet.py:497-520 y 315-317); el .pkl trae su geometría (sitk_stuff).
+#     Aquí se devuelve a la rejilla del TC con esa geometría antes de emparejar, y se mide
+#     también en la rejilla nativa para ver cuánto cuesta ese viaje de vuelta.
+# Aquí el recorte usa la UNIÓN total ∪ liver_segments del visor (la que cubre la punta del lóbulo
+# izquierdo) con el mismo margen de 20 mm, y se guarda TAMBIÉN la caja que TS habría usado de
+# fábrica (3 mm + 20 mm) para decir de cada marca si el detector de fábrica la tenía en el campo.
+
+BANCO_UMBRALES = (0.5, 0.4, 0.3, 0.2, 0.1)
+BANCO_TRAMOS_MM = (("<3", 0.0, 3.0), ("3-6", 3.0, 6.0), ("6-10", 6.0, 10.0), (">=10", 10.0, None))
+BANCO_TOL_MIN_MM = 5.0     # marca↔detección: centro dentro, o a ≤ max(5 mm, radio de la marca)
+BANCO_MIN_MM3 = 12.0       # ≈ MIN_VOXELES × vóxel del TC (5 × 0,977² × 2,5 = 11,9 mm³; esfera de 2,8 mm)
+BANCO_DILATA_MM = 5.0      # «dentro del hígado» = unión dilatada 5 mm (lesiones() dilata 3 vóxeles)
+BANCO_CROP_ADDON_MM = 20   # el margen REAL de TS (python_api.py:769), no los 10 mm de la tarea
+TS_TAREA_LESIONES = 591
+TS_TAREA_CROP_3MM = 297
+TS_RESAMPLE_LESIONES = [0.75, 0.75, 1.0]
+
+
+def _cota_superior_cp(fp, n, alfa=0.05):
+    """Copia literal de tools/gate_escalera.cota_superior (Clopper-Pearson a una cola, bisección
+    sobre la binomial). Copiada y no importada: visor3d corre en .venv-imagen con tools/ fuera del
+    sys.path (sombra de `queue`). tests/test_visor3d_banco.py comprueba que las dos coinciden."""
+    from math import comb
+    if n <= 0:
+        return 1.0
+    if fp >= n:
+        return 1.0
+
+    def cdf(p):
+        return sum(comb(n, k) * p ** k * (1 - p) ** (n - k) for k in range(fp + 1))
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        m = (lo + hi) / 2
+        if cdf(m) > alfa:
+            lo = m
+        else:
+            hi = m
+    return lo
+
+
+def _cota_inferior_cp(k, n, alfa=0.05):
+    """Cota inferior 95 % (una cola) de la sensibilidad con k detectadas de n: 1 − cota superior
+    de la tasa de fallos (n−k fallos en n). Con k = n queda alfa^(1/n) (55/55 → 0,947)."""
+    if n <= 0:
+        return 0.0
+    return 1.0 - _cota_superior_cp(n - k, n, alfa)
+
+
+def _afin_de_sitk(sitk_stuff):
+    """Afín RAS (nibabel) desde la geometría LPS que nnU-Net guarda en el .pkl: físico = D·diag(sp)·ijk + origen."""
+    import numpy as np
+    sp = np.asarray(sitk_stuff["spacing"], float)
+    org = np.asarray(sitk_stuff["origin"], float)
+    dirn = np.asarray(sitk_stuff["direction"], float).reshape(3, 3)
+    a = np.eye(4)
+    a[:3, :3] = dirn * sp[None, :]
+    a[:3, 3] = org
+    return np.diag([-1.0, -1.0, 1.0, 1.0]) @ a
+
+
+def _prob_lesion(npz, pkl):
+    """(probabilidad de lesión float32 en orden nibabel (x,y,z), afín RAS) desde el .npz/.pkl de
+    nnU-Net. El .npz va en orden (clases, z, y, x) con la transposición ya deshecha (nnunetv2
+    export_prediction.py:58-61). La geometría depende del lector del modelo: la tarea 591 usa
+    NibabelIOWithReorient (dataset.json), que guarda `nibabel_stuff.reoriented_affine` (el afín
+    RAS del volumen tal y como la red lo vio: nibabel_reader_writer.py:123-141); otros modelos
+    usan SimpleITKIO y guardan `sitk_stuff` en LPS. El marco del mundo es el mismo en los dos."""
+    import pickle
+    import numpy as np
+    p = np.load(npz)["probabilities"]
+    props = pickle.load(open(pkl, "rb"))
+    if p.ndim != 4 or p.shape[0] < 2:
+        raise SystemExit("ABORTA: %s no trae (clases≥2, z, y, x): %s" % (npz, p.shape))
+    if "nibabel_stuff" in props:
+        afin = np.asarray(props["nibabel_stuff"]["reoriented_affine"], float)
+    elif "sitk_stuff" in props:
+        afin = _afin_de_sitk(props["sitk_stuff"])
+    else:
+        raise SystemExit("ABORTA: %s no trae geometría (ni nibabel_stuff ni sitk_stuff): %s"
+                         % (pkl, sorted(props)))
+    return np.ascontiguousarray(p[1].transpose(2, 1, 0)).astype(np.float32), afin
+
+
+def _tramo_mm(mm):
+    for nombre, lo, hi in BANCO_TRAMOS_MM:
+        if mm >= lo and (hi is None or mm < hi):
+            return nombre
+    return BANCO_TRAMOS_MM[0][0]
+
+
+def _en_caja(ijk, caja):
+    return all(caja[k][0] <= ijk[k] < caja[k][1] for k in range(3))
+
+
+def probabilidades_lesiones(serie, mascara=None, device="mps"):
+    """Mapa de probabilidad de `liver_lesions` (TS 2.14.0, tarea 591, fold 0) con el recorte a la
+    máscara del hígado del visor (por defecto la unión) + 20 mm, en vez de a la `liver` del modelo
+    de 3 mm. Escribe en <cache>/<serie>/prob/ (zona clínica) el .npz/.pkl de nnU-Net, la
+    segmentación argmax que TS deja en la rejilla del TC y la máscara `liver` del modelo de 3 mm
+    (para reconstruir la caja de fábrica). Todo sellado con su receta; se reutiliza si casa.
+    No descarga nada: si faltan los pesos, aborta."""
+    import nibabel as nib
+    import numpy as np
+    from pathlib import Path
+    exige_telemetria_apagada()
+    from totalsegmentator.config import setup_nnunet, setup_totalseg
+    setup_nnunet()
+    setup_totalseg()
+    from totalsegmentator.nnunet import nnUNet_predict_image
+    from totalsegmentator.cropping import get_bbox_from_mask
+    from totalsegmentator.map_to_binary import class_map
+    from totalsegmentator.libs import get_weights_dir
+    for tid in (TS_TAREA_LESIONES, TS_TAREA_CROP_3MM):
+        if not any(d.startswith("Dataset%d_" % tid) for d in os.listdir(get_weights_dir())):
+            raise SystemExit("ABORTA: faltan los pesos de la tarea %d en %s; este banco no descarga "
+                             "nada." % (tid, get_weights_dir()))
+    cache = _cache(serie)
+    imagen = os.path.join(cache, "imagen.nii.gz")
+    rutas = {t: os.path.join(cache, "seg", t + ".nii.gz") for t in ("total", "liver_segments")}
+    faltan = [r for r in [imagen] + list(rutas.values()) if not os.path.exists(r)]
+    if faltan:
+        raise SystemExit("ABORTA: la serie %s no está convertida y segmentada en caché (falta %s); "
+                         "corre `segmenta` antes." % (serie, ", ".join(os.path.basename(f) for f in faltan)))
+    modo = mascara or MASCARA_HIGADO
+    total, aff = _carga(rutas["total"])
+    segm = _carga(rutas["liver_segments"])[0]
+    cm = {v: k for k, v in class_map["total"].items()}
+    higado = _mascara_higado(total == cm["liver"], segm, modo)
+    img = nib.load(imagen)
+    if tuple(img.shape) != tuple(higado.shape):
+        raise SystemExit("ABORTA: imagen %s y máscara %s no están en la misma rejilla"
+                         % (img.shape, higado.shape))
+    pdir = os.path.join(cache, "prob")
+    os.makedirs(pdir, exist_ok=True)
+    codigo = huella(inspect.getsource(probabilidades_lesiones))
+    comunes = dict(nora_tag="None", preview=False, save_binary=False, nr_threads_resampling=1,
+                   nr_threads_saving=1, output_type="nifti", statistics=False, quiet=True,
+                   verbose=False, test=0, skip_saving=False, device=device)
+    # 1. la máscara `liver` del modelo de 3 mm: es la que TS usa de fábrica para recortar
+    crop3 = os.path.join(pdir, "liver_total3mm.nii.gz")
+    receta3 = _receta_seg("total", device, codigo=codigo, resample=3.0, folds=[0],
+                          fin="mascara de recorte de fabrica de liver_lesions")
+    if not cache_vale(crop3, receta3):
+        organ, _, _ = nnUNet_predict_image(Path(imagen), None, TS_TAREA_CROP_3MM, model="3d_fullres",
+                                           folds=[0], trainer="nnUNetTrainer_4000epochs_NoMirroring",
+                                           tta=False, multilabel_image=True, resample=3.0, crop=None,
+                                           crop_path=None, task_name="total", crop_addon=None,
+                                           **comunes)
+        liver3 = (np.asarray(organ.dataobj) == cm["liver"]).astype(np.uint8)
+        if liver3.shape != higado.shape:
+            raise SystemExit("ABORTA: la máscara de 3 mm volvió en otra rejilla %s" % (liver3.shape,))
+        nib.save(nifti_limpio(liver3, organ.affine, np.uint8), crop3)
+        sella_cache(crop3, receta3)
+    liver3 = _carga(crop3)[0] > 0
+    addon_vox = (np.array([BANCO_CROP_ADDON_MM] * 3) / np.asarray(img.header.get_zooms())).astype(int)
+    caja_fabrica = [[int(a), int(b)] for a, b in get_bbox_from_mask(liver3, outside_value=0, addon=addon_vox)]
+    caja_union = [[int(a), int(b)] for a, b in get_bbox_from_mask(higado, outside_value=0, addon=addon_vox)]
+    # 2. el detector con el recorte a la unión + 20 mm, guardando probabilidades
+    npz = os.path.join(pdir, "liver_lesions_%s.npz" % modo)
+    seg_out = os.path.join(pdir, "liver_lesions_%s.nii.gz" % modo)
+    receta = _receta_seg("liver_lesions", device, codigo=codigo, ml=True,
+                         crop="mascara_higado:" + modo, crop_addon_mm=BANCO_CROP_ADDON_MM,
+                         resample=TS_RESAMPLE_LESIONES, folds=[0], save_probabilities=True)
+    if not (cache_vale(npz, receta) and cache_vale(seg_out, receta)
+            and os.path.exists(npz[:-4] + ".pkl")):
+        crop_img = nib.Nifti1Image(higado.astype(np.uint8), img.affine)
+        nnUNet_predict_image(Path(imagen), Path(seg_out), TS_TAREA_LESIONES, model="3d_fullres_high",
+                             folds=[0], trainer="nnUNetTrainer", tta=False, multilabel_image=True,
+                             resample=TS_RESAMPLE_LESIONES, crop=crop_img, crop_path=None,
+                             task_name="liver_lesions", crop_addon=[BANCO_CROP_ADDON_MM] * 3,
+                             save_probabilities=Path(npz), **comunes)
+        sella_cache(npz, receta)
+        sella_cache(seg_out, receta)
+    return {"npz": npz, "pkl": npz[:-4] + ".pkl", "seg": seg_out, "liver_3mm": crop3,
+            "receta": receta, "receta_crop_3mm": receta3, "higado": higado, "afin": aff,
+            "mascara_higado": modo, "caja_fabrica": caja_fabrica, "caja_union": caja_union,
+            "addon_vox": [int(v) for v in addon_vox]}
+
+
+def _marcas_para_banco(destino):
+    """Las 55 marcas con su posición (mm RAS) y de dónde sale: de la propia marca (las de solo
+    radiólogo) o del centro de la lesión automática con la que `marcas` ya la emparejó (esas 20
+    NO tienen posición propia en marcas.json: a 0,5 se detectan por construcción y se dice).
+    Sin posición → fuera del denominador, declarada con su motivo."""
+    marcas = json.load(open(os.path.join(destino, "marcas.json")))
+    est = json.load(open(os.path.join(destino, "estudio.json")))
+    auto = {L["id"]: L for L in est["lesiones"]}
+    out = []
+    for m in marcas["marcas"]:
+        out.append({"id": "M%02d" % m["id"], "mm": float(m["mm"]), "centro_mm": m["centro_mm"],
+                    "posicion_de": "marca del radiólogo"})
+    for lid, info in marcas["automaticas"].items():
+        L = auto.get(int(lid))
+        out.append({"id": "M%02d" % info["marca"], "mm": float(info["radiologo_mm"]),
+                    "centro_mm": L["centro_mm"] if L else None,
+                    "posicion_de": ("centro de la lesión automática L%s (emparejada en `marcas`; "
+                                    "a 0,5 se detecta por construcción)" % lid) if L
+                    else "sin posición: la lesión automática L%s no está en estudio.json" % lid})
+    for s in marcas["sin_posicion"]:
+        out.append({"id": "M%02d" % s["id"], "mm": float(s["mm"]), "centro_mm": None,
+                    "posicion_de": "sin posición: " + s.get("motivo", "")})
+    out.sort(key=lambda m: m["id"])
+    return out, marcas["recuento"]
+
+
+def _banco_core(prob, afin, higado, marcas, umbrales=BANCO_UMBRALES, tol_min_mm=BANCO_TOL_MIN_MM,
+                min_mm3=BANCO_MIN_MM3, dilata_mm=BANCO_DILATA_MM):
+    """El banco en sí, puro (no lee ni escribe): para cada umbral, componentes conexas de
+    prob ≥ umbral dentro del hígado (dilatado), emparejado UNO A UNO marca↔componente (húngaro
+    sobre la distancia; candidato si el centro de la marca cae en la componente o a
+    ≤ max(tol_min_mm, radio de la marca)), recuentos por tramo de tamaño de la marca, sensibilidad
+    global con cota inferior Clopper-Pearson y candidatos sin marca. Los ambiguos (marca con ≥2
+    componentes candidatas, componente con ≥2 marcas) se LISTAN; la asignación elige una, y se
+    dice cuál.
+    `marcas`: [{id, mm, centro_mm | None, ...}]. Las sin centro salen del denominador."""
+    import numpy as np
+    from scipy import ndimage
+    from scipy.optimize import linear_sum_assignment
+    afin = np.asarray(afin, float)
+    esp = np.sqrt((afin[:3, :3] ** 2).sum(axis=0))
+    vox_mm3 = float(np.prod(esp))
+    inv = np.linalg.inv(afin)
+    dentro = ndimage.binary_dilation(np.asarray(higado, bool), structure=_bola_estructura(esp, dilata_mm))
+    con_pos = [m for m in marcas if m.get("centro_mm") is not None]
+    sin_pos = [m for m in marcas if m.get("centro_mm") is None]
+    ijk = {m["id"]: (inv @ np.append(np.asarray(m["centro_mm"], float), 1.0))[:3] for m in con_pos}
+    en_mascara = {}
+    for m in con_pos:
+        r = np.round(ijk[m["id"]]).astype(int)
+        en_mascara[m["id"]] = bool(all(0 <= v < n for v, n in zip(r, dentro.shape)) and dentro[tuple(r)])
+    resultados = []
+    for u in umbrales:
+        binario = (prob >= u) & dentro
+        comp, n = ndimage.label(binario)
+        vols = np.zeros(0)
+        if n:
+            vols = np.bincount(comp.ravel(), minlength=n + 1)[1:] * vox_mm3
+            keep = vols >= min_mm3
+            mapa = np.zeros(n + 1, np.int32)
+            mapa[1:][keep] = np.arange(1, int(keep.sum()) + 1)
+            comp = mapa[comp]
+            vols = vols[keep]
+            n = int(keep.sum())
+        cand = {}
+        for m in con_pos:
+            c = ijk[m["id"]]
+            r_mm = max(tol_min_mm, m["mm"] / 2.0)
+            rv = np.ceil(r_mm / esp).astype(int)
+            lo = np.maximum(np.floor(c).astype(int) - rv, 0)
+            hi = np.minimum(np.ceil(c).astype(int) + rv + 1, comp.shape)
+            cand[m["id"]] = {}
+            if (hi <= lo).any():
+                continue
+            sub = comp[lo[0]:hi[0], lo[1]:hi[1], lo[2]:hi[2]]
+            rc = np.round(c).astype(int)
+            rc_ok = all(0 <= v < s for v, s in zip(rc, comp.shape))
+            for L in np.unique(sub[sub > 0]):
+                pts = np.argwhere(sub == L) + lo
+                dist = float(np.min(np.linalg.norm((pts - c) * esp, axis=1)))
+                if rc_ok and comp[tuple(rc)] == L:
+                    dist = 0.0
+                if dist <= r_mm:
+                    cand[m["id"]][int(L)] = round(dist, 2)
+        ids = [m["id"] for m in con_pos]
+        labs = sorted({L for d in cand.values() for L in d})
+        pares = {}
+        if ids and labs:
+            grande = 1e6
+            coste = np.full((len(ids), len(labs)), grande)
+            col = {L: j for j, L in enumerate(labs)}
+            for i, mid in enumerate(ids):
+                for L, d in cand[mid].items():
+                    coste[i, col[L]] = d
+            fi, cj = linear_sum_assignment(coste)
+            for i, j in zip(fi, cj):
+                if coste[i, j] < grande:
+                    pares[ids[i]] = (labs[j], float(coste[i, j]))
+        ambiguos = []
+        for mid in ids:
+            if len(cand[mid]) >= 2:
+                ambiguos.append({"marca": mid, "detecciones": {str(k): v for k, v in cand[mid].items()},
+                                 "elegida": pares[mid][0] if mid in pares else None})
+        por_lab = {}
+        for mid in ids:
+            for L in cand[mid]:
+                por_lab.setdefault(L, []).append(mid)
+        for L, ms in sorted(por_lab.items()):
+            if len(ms) >= 2:
+                ambiguos.append({"deteccion": L, "marcas": ms,
+                                 "elegida": [mid for mid in ms if mid in pares and pares[mid][0] == L]})
+        por_tramo = {nombre: {"detectadas": 0, "no_detectadas": 0, "no_detectadas_ids": []}
+                     for nombre, _, _ in BANCO_TRAMOS_MM}
+        for m in con_pos:
+            t = por_tramo[_tramo_mm(m["mm"])]
+            if m["id"] in pares:
+                t["detectadas"] += 1
+            else:
+                t["no_detectadas"] += 1
+                t["no_detectadas_ids"].append(m["id"])
+        k, nn = len(pares), len(con_pos)
+        usados = {L for L, _ in pares.values()}
+        sin_marca = [L for L in range(1, n + 1) if L not in usados]
+        cand_tramo = {nombre: 0 for nombre, _, _ in BANCO_TRAMOS_MM}
+        for L in sin_marca:
+            cand_tramo[_tramo_mm((6.0 * vols[L - 1] / np.pi) ** (1.0 / 3.0))] += 1
+        resultados.append({
+            "umbral": u, "componentes": n, "detectadas": k, "denominador": nn,
+            "sensibilidad": round(k / nn, 3) if nn else None,
+            "cota_inferior_95": round(_cota_inferior_cp(k, nn), 3) if nn else None,
+            "por_tramo": por_tramo,
+            "candidatos_sin_marca": {"total": len(sin_marca), "por_diametro_equivalente": cand_tramo},
+            "emparejadas": {mid: {"deteccion": int(L), "dist_mm": round(d, 2)} for mid, (L, d) in pares.items()},
+            "ambiguos": ambiguos,
+        })
+    por_marca = [{"id": m["id"], "mm": m["mm"], "tramo": _tramo_mm(m["mm"]),
+                  "posicion_de": m.get("posicion_de"), "en_mascara": en_mascara[m["id"]],
+                  "detectada_en": [r["umbral"] for r in resultados if m["id"] in r["emparejadas"]]}
+                 for m in con_pos]
+    return {"umbrales": list(umbrales), "resultados": resultados, "por_marca": por_marca,
+            "sin_posicion": [{"id": m["id"], "mm": m["mm"], "motivo": m.get("posicion_de")} for m in sin_pos],
+            "parametros": {"tolerancia": "centro dentro o ≤ max(%.1f mm, radio)" % tol_min_mm,
+                           "min_mm3": min_mm3, "dilata_mm": dilata_mm, "emparejado": "húngaro, uno a uno"},
+            "rejilla": {"forma": [int(s) for s in prob.shape], "voxel_mm": [round(float(e), 3) for e in esp]}}
+
+
+def _guarda_banco(salida_dir, datos):
+    """Solo en zona clínica: dentro va geometría de sus lesiones."""
+    exige_zona_clinica(salida_dir)
+    os.makedirs(salida_dir, exist_ok=True)
+    ruta = os.path.join(salida_dir, "banco.json")
+    json.dump(datos, open(ruta, "w"), ensure_ascii=False, indent=1, default=_json_numpy)
+    return ruta
+
+
+def _json_numpy(o):
+    """Escalares y arrays de numpy (los bbox de TS, los índices de scipy) a tipos de JSON."""
+    import numpy as np
+    if isinstance(o, np.integer):
+        return int(o)
+    if isinstance(o, np.floating):
+        return float(o)
+    if isinstance(o, np.bool_):
+        return bool(o)
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    raise TypeError("no serializable: %r" % type(o))
+
+
+def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rejillas=("tc", "nativa")):
+    """Banco de `liver_lesions` contra las marcas del radiólogo de <assets/fecha>/marcas.json →
+    <banco/fecha>/banco.json (zona clínica; hashes de marcas.json, estudio.json, .npz y receta,
+    nunca copias). Mide en la rejilla del TC (el mapa devuelto con su geometría) y en la nativa
+    del detector (0,75×0,75×1,0 mm, con la máscara llevada allí)."""
+    import nibabel as nib
+    import numpy as np
+    from nibabel.processing import resample_from_to
+    salida_dir = _dir("banco", fecha)
+    exige_zona_clinica(salida_dir)
+    destino = _dir("assets", fecha)
+    marcas, recuento = _marcas_para_banco(destino)
+    P = probabilidades_lesiones(serie, mascara, device)
+    prob_n, aff_n = _prob_lesion(P["npz"], P["pkl"])
+    higado, aff = P["higado"], P["afin"]
+    prob_tc = np.asarray(resample_from_to(nib.Nifti1Image(prob_n, aff_n), (higado.shape, aff), order=1).dataobj,
+                         dtype=np.float32)
+    seg_ts = _carga(P["seg"])[0] > 0
+    dice = _dice(prob_tc >= 0.5, seg_ts)
+    if dice < 0.5:
+        raise SystemExit("ABORTA: el mapa de probabilidad devuelto a la rejilla del TC no casa con la "
+                         "segmentación que TS escribió (Dice %.2f): geometría mal deshecha." % dice)
+    inv = np.linalg.inv(aff)
+    cajas = []
+    for m in marcas:
+        if m["centro_mm"] is None:
+            continue
+        ijk = (inv @ np.append(np.asarray(m["centro_mm"], float), 1.0))[:3]
+        cajas.append({"id": m["id"], "mm": m["mm"], "en_caja_fabrica": _en_caja(ijk, P["caja_fabrica"]),
+                      "en_caja_union": _en_caja(ijk, P["caja_union"])})
+    salida = {
+        "_que_es": ("Medida de una herramienta (TS liver_lesions con umbral) contra 55 marcas de una "
+                    "lectura informal sin informe firmado. No es un recuento clínico. Un candidato sin "
+                    "marca no es un falso positivo hasta que alguien lo mire."),
+        "serie": serie, "fecha": fecha, "mascara_higado": P["mascara_higado"],
+        "receta": {"detector": P["receta"], "crop_3mm": P["receta_crop_3mm"], "umbrales": list(umbrales),
+                   "tolerancia_min_mm": BANCO_TOL_MIN_MM, "min_mm3": BANCO_MIN_MM3,
+                   "dilata_mm": BANCO_DILATA_MM, "crop_addon_mm": BANCO_CROP_ADDON_MM,
+                   "codigo_banco": huella(inspect.getsource(_banco_core), inspect.getsource(banco))},
+        "hashes": {"marcas.json": _sha256_completo(os.path.join(destino, "marcas.json")),
+                   "estudio.json": _sha256_completo(os.path.join(destino, "estudio.json")),
+                   "probabilidades.npz": _sha256_completo(P["npz"])},
+        "recuento_marcas": recuento,
+        "geometria": {"dice_argmax_vs_seg_ts": dice, "rejilla_nativa": [int(s) for s in prob_n.shape],
+                      "voxel_nativo_mm": [round(float(v), 3) for v in np.sqrt((aff_n[:3, :3] ** 2).sum(axis=0))]},
+        "cajas": {"fabrica_total3mm_mas_20mm": P["caja_fabrica"], "union_mas_20mm": P["caja_union"],
+                  "addon_vox": P["addon_vox"], "marcas": cajas,
+                  "fuera_de_fabrica": [c["id"] for c in cajas if not c["en_caja_fabrica"]],
+                  "fuera_de_union": [c["id"] for c in cajas if not c["en_caja_union"]]},
+        "rejillas": {},
+    }
+    salida["hashes"]["receta"] = huella(json.dumps(salida["receta"], sort_keys=True))
+    for rej in rejillas:
+        if rej == "tc":
+            salida["rejillas"][rej] = _banco_core(prob_tc, aff, higado, marcas, umbrales)
+        elif rej == "nativa":
+            hig_n = np.asarray(resample_from_to(nib.Nifti1Image(higado.astype(np.uint8), aff),
+                                                (prob_n.shape, aff_n), order=0).dataobj) > 0
+            salida["rejillas"][rej] = _banco_core(prob_n, aff_n, hig_n, marcas, umbrales)
+        else:
+            raise SystemExit("ABORTA: rejilla desconocida %r (vale: tc, nativa)" % rej)
+    salida["ruta"] = _guarda_banco(salida_dir, salida)
+    return salida
+
+
+def _imprime_banco(s):
+    """Tabla a stdout SIN geometría: recuentos, ids de marca y mm (lo mismo que ya lista el dossier)."""
+    print("banco %s · serie %s · máscara %s · Dice argmax↔seg TS %.3f · caja fábrica %s · caja unión %s"
+          % (s["fecha"], s["serie"], s["mascara_higado"], s["geometria"]["dice_argmax_vs_seg_ts"],
+             s["cajas"]["fabrica_total3mm_mas_20mm"], s["cajas"]["union_mas_20mm"]))
+    print("marcas fuera de la caja de fábrica: %s · fuera de la caja unión: %s"
+          % (s["cajas"]["fuera_de_fabrica"] or "ninguna", s["cajas"]["fuera_de_union"] or "ninguna"))
+    for rej, r in s["rejillas"].items():
+        print("\n[rejilla %s: %s vóxeles de %s mm] · %d marcas con posición, %d sin (fuera del denominador)"
+              % (rej, r["rejilla"]["forma"], r["rejilla"]["voxel_mm"],
+                 r["resultados"][0]["denominador"] if r["resultados"] else 0, len(r["sin_posicion"])))
+        fuera = [m["id"] for m in r["por_marca"] if not m["en_mascara"]]
+        if fuera:
+            print("  marcas fuera de la máscara dilatada (indetectables por diseño): %s" % fuera)
+        print("  umbral | detectadas/n (cota inf. 95 %) | 3-6 det/no | 6-10 det/no | ≥10 det/no | "
+              "candidatos sin marca (≥3 mm eq.) | ambiguos")
+        for x in r["resultados"]:
+            t = x["por_tramo"]
+            c = x["candidatos_sin_marca"]
+            grandes = sum(v for k, v in c["por_diametro_equivalente"].items() if k != "<3")
+            print("  %4.1f   | %2d/%2d (%.3f)               | %2d/%2d      | %2d/%2d       | %2d/%2d      "
+                  "| %4d (%d)                       | %d"
+                  % (x["umbral"], x["detectadas"], x["denominador"], x["cota_inferior_95"] or 0,
+                     t["3-6"]["detectadas"], t["3-6"]["no_detectadas"],
+                     t["6-10"]["detectadas"], t["6-10"]["no_detectadas"],
+                     t[">=10"]["detectadas"], t[">=10"]["no_detectadas"],
+                     c["total"], grandes, len(x["ambiguos"])))
+        for m in r["por_marca"]:
+            if m["mm"] >= 6.0 and 0.5 not in m["detectada_en"]:
+                print("  %s (%.2f mm, %s): no a 0,5; aparece en %s"
+                      % (m["id"], m["mm"], m["tramo"], m["detectada_en"] or "ningún umbral"))
+    print("\n→ %s" % s["ruta"])
+
+
+def _cmd_banco(a):
+    umbrales = tuple(a.umbrales) if a.umbrales else BANCO_UMBRALES
+    s = banco(a.serie, a.fecha, umbrales=umbrales, mascara=a.mascara_higado, device=a.device,
+              rejillas=tuple(a.rejillas))
+    _imprime_banco(s)
+    return 0
+
+
 def _cmd_video(a):
     """Vídeo vertical del 3D (Reels/TikTok): graba video.html con Chrome sin interfaz y monta
     el MP4 con ffmpeg. Necesita `sirve` corriendo. Salida en zona clínica: es imagen suya y no
@@ -3985,7 +4458,7 @@ def _cmd_web(a):
                 # rotan DESPUÉS, ya en el navegador. Rotar primero y restar después pone el
                 # anillo en otro punto del hígado.
                 v4 = np.append(np.array(f["ras"], float) - centro, 1.0)
-                xyz = (RAS_A_THREE @ v4)[:3]
+                xyz = (RAS_A_THREE_NP @ v4)[:3]
                 escena["focos"].append({"suvmax": f["suvmax"], "segmento": f["segmento"],
                                         "distancia_mm": f["distancia_mm"],
                                         "centro": [round(float(c), 2) for c in xyz]})
@@ -5922,6 +6395,16 @@ def main(argv=None):
     pmd.add_argument("--fecha", required=True, help="carpeta de assets con marcas.json, estudio.json y segmentos.nii.gz")
     pmd.add_argument("--malla", help="PLY del hígado contra el que medir (por defecto el de estudio.json de esa carpeta)")
     pmd.set_defaults(fn=_cmd_marcas_dentro)
+    pba = sub.add_parser("banco", help="mide liver_lesions (mapa de probabilidad, varios umbrales) contra las marcas del radiólogo de marcas.json; banco.json en zona clínica")
+    pba.add_argument("--serie", required=True, help="huella de la serie (caché ya convertida y segmentada)")
+    pba.add_argument("--fecha", required=True, help="carpeta de assets con marcas.json y estudio.json")
+    pba.add_argument("--umbrales", type=float, nargs="*", help="por defecto %s" % (BANCO_UMBRALES,))
+    pba.add_argument("--rejillas", nargs="*", default=["tc", "nativa"], choices=["tc", "nativa"],
+                     help="tc: mapa devuelto a la rejilla del TC; nativa: la del detector (0,75×0,75×1,0)")
+    pba.add_argument("--mascara-higado", dest="mascara_higado", choices=MASCARAS_HIGADO, default=MASCARA_HIGADO,
+                     help="máscara del hígado para el recorte y el «dentro» (por defecto la unión)")
+    pba.add_argument("--device", default="mps")
+    pba.set_defaults(fn=_cmd_banco)
     pw = sub.add_parser("sirve", help="sirve el visor en 127.0.0.1")
     pw.add_argument("--puerto", type=int, default=8794)
     pw.set_defaults(fn=_cmd_sirve)

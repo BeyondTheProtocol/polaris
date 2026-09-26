@@ -374,6 +374,7 @@ runpy test_visor3d_ficha.py
 runpy test_visor3d_carga.py
 runpy test_visor3d_marcas.py
 runpy test_visor3d_mascara_union.py
+runpy test_visor3d_banco.py
 runpy test_visor3d_cateter.py
 runpy test_visor3d_losa.py
 runpy test_visor3d_procedencia.py
