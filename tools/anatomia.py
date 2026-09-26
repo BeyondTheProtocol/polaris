@@ -273,6 +273,7 @@ FAMILIAS = [
                            "bucles_colgados",   # corta bucles de espera colgados (20-sep)
                            "sonda_silencio",    # lo que arrancó y no dejó obra (21-sep)
                            "inventario",        # qué pieza está viva y cuál no (20-sep)
+                           "=fichas",           # ficha por pieza, sin ficha no hay alta (25-sep)
                            "estado_rutina")),   # al día / atrasada / rota (24-sep, PR #22)
     ("memoria y saber", ("archivar", "memoria", "cosecha", "espejo", "living",
                          "cronica", "contexto_lazo", "continuity", "minador")),

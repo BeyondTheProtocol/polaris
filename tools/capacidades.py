@@ -9,11 +9,17 @@ entonces se crea (con caducidad). Así crear es la excepción, no el reflejo.
 
 Determinista, local, sin red: solo lee las descripciones de `.claude/agents/*.md`.
 
+Con `--tools` busca lo mismo entre las HERRAMIENTAS de `tools/`, leyendo sus fichas
+(`tools/fichas/*.json`: pieza, para, cuándo sí). Es el «busca antes de crear» que da el hook
+`ficha_guard.py` al denegar una herramienta sin ficha (25-sep-2026, ver `tools/fichas.py`).
+
 USO:
   python3 capacidades.py "organizar un viaje a una cita en otra ciudad"
   python3 capacidades.py -n 8 "responder comentarios en redes"
+  python3 capacidades.py --tools "barrer ensayos clínicos chinos"
 """
 import glob
+import json
 import math
 import os
 import re
@@ -76,8 +82,35 @@ def _cargar():
     return items
 
 
+def _cargar_herramientas(raiz=ROOT):
+    """(pieza, para, tokens) de cada ficha de tools/fichas/. Sin fichas → lista vacía."""
+    items = []
+    for p in sorted(glob.glob(os.path.join(raiz, "tools", "fichas", "*.json"))):
+        try:
+            with open(p, encoding="utf-8") as fh:
+                fi = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if fi.get("estado_ficha") == "retirada" or not fi.get("pieza"):
+            continue
+        pieza = fi["pieza"]
+        nombre = os.path.splitext(pieza)[0].replace("/", " ").replace("_", " ")
+        texto = " ".join((nombre, fi.get("para") or "", fi.get("cuando_si") or ""))
+        items.append((pieza, fi.get("para") or "", set(_toks(texto))))
+    return items
+
+
+def buscar_herramientas(query, n=5, raiz=ROOT):
+    return _puntuar(_cargar_herramientas(raiz), query, n)
+
+
 def buscar(query, n=5):
-    items = _cargar()
+    return _puntuar(_cargar(), query, n)
+
+
+def _puntuar(items, query, n):
+    """Solapamiento de términos ponderado por rareza (IDF): un término que casi nadie usa pesa
+    más que uno que sale en todas partes."""
     N = max(1, len(items))
     df = Counter()
     for _slug, _desc, toks in items:
@@ -100,11 +133,13 @@ def main(argv):
         i = argv.index("-n")
         n = int(argv[i + 1])
         argv = argv[:i] + argv[i + 2:]
+    tools = "--tools" in argv
+    argv = [a for a in argv if a != "--tools"]
     query = " ".join(argv).strip()
     if not query:
-        print('uso: capacidades.py [-n N] "<capacidad que necesitas>"')
+        print('uso: capacidades.py [-n N] [--tools] "<capacidad que necesitas>"')
         return 2
-    res = buscar(query, n)
+    res = buscar_herramientas(query, n) if tools else buscar(query, n)
     if not res:
         print("🆕 No hay nada parecido en el gabinete → parece un HUECO real.")
         print("   Si lo creas, dale objetivo-NED y caducidad (no dejes zombies).")

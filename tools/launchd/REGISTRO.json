@@ -301,6 +301,11 @@
    "concern": "rotar-logs",
    "nota": "Higiene mensual de logs (dia 1, 04:00). Creado 15-jul-26 con OK de {{TITULAR}} como EXCEPCION al \"NUNCA a launchd\" del docstring: configurado para NO tocar trazas de auditoria (BTP_ROT_DIAS_BORDE/OUTBOX=99999 => ledger/audit nunca caducan). Solo trunca logs .out/.err gordos y archiva observabilidad vieja (>14d) a archive/, jamas borra. RunAtLoad=false."
   },
+  "com.btp.inventario-uso": {
+   "script": "inventario.py",
+   "concern": "inventario-uso",
+   "nota": "Uso real de las piezas de tools/ (diario 03:30, determinista, sin LLM). Creado 25-sep-26 (idea de {{CONTACTO}} + KAI): acumula en state/uso_piezas.json lo que ejecutaron sesiones, launchd y trazas, y propone a Vega un hilo si cambia la lista en observacion (60 dias) o con retiro propuesto (90 y huerfana). No mueve ni borra nada. Plist propio, no un paso del sweep de seguridad (un fallo aqui no debe tocar el daemon de codigo rojo). RunAtLoad=false."
+  },
   "com.btp.cuidado-ventana": {
    "script": "run_agent.sh",
    "concern": "cuidado-ventana",
