@@ -12,7 +12,8 @@ Lo que frena:
      importada: tools/ está fuera del sys.path de la venv de imagen);
   6. la geometría del .npz de nnU-Net (LPS de SimpleITK) vuelve al afín RAS de nibabel;
   7. las 20 marcas ya emparejadas toman el centro de su lesión automática y lo declaran;
-  8. la CLI expone `banco`.
+  8. la CLI expone `banco`;
+  9. la corrida con TTA (espejos de nnU-Net) va en receta, caché y banco-tta.json aparte.
 
 Necesita numpy/scipy/nibabel/SimpleITK (`.venv-imagen`): si faltan se relanza con la venv; sin
 venv, skip (77) solo en modo portátil, en casa base ROJO (igual que test_visor3d_mascara_union.py).
@@ -222,6 +223,36 @@ check(V.BANCO_UMBRALES == (0.5, 0.4, 0.3, 0.2, 0.1) and V.BANCO_CROP_ADDON_MM ==
       "umbrales del encargo y margen de recorte de 20 mm (python_api.py:769)")
 check("exige_zona_clinica(salida_dir)" in inspect.getsource(V.banco).split("_marcas_para_banco")[0],
       "banco() exige zona clínica antes de leer marcas.json")
+
+print("== 9. TTA (espejos de nnU-Net): receta, caché y salida aparte ==")
+# 26-sep-26: {{TITULAR}} pidió probar el mirroring de nnU-Net como última opción barata. Lo que frena:
+# la corrida con TTA NUNCA reutiliza la caché de la corrida sin TTA (ni al revés) y no pisa su banco.json.
+check(V._nombre_banco(False) == "banco.json" and V._nombre_banco(True) == "banco-tta.json",
+      "banco.json sin TTA, banco-tta.json con TTA")
+r_sin = V._receta_seg("liver_lesions", "mps", codigo="x", ml=True, folds=[0], tta=False)
+r_con = V._receta_seg("liver_lesions", "mps", codigo="x", ml=True, folds=[0], tta=True)
+check(r_sin != r_con and r_sin["kw"]["tta"] is False and r_con["kw"]["tta"] is True
+      and V.huella(json.dumps(r_sin, sort_keys=True)) != V.huella(json.dumps(r_con, sort_keys=True)),
+      "la receta lleva tta en kw y su hash cambia")
+f_tta = os.path.join(tmp, "prob.npz")
+open(f_tta, "wb").write(b"npz")
+V.sella_cache(f_tta, r_sin)
+check(V.cache_vale(f_tta, r_sin) and not V.cache_vale(f_tta, r_con),
+      "un .npz sellado sin TTA vale para su receta y NO para la receta con TTA")
+colab = dict(r_sin, origen="colab")
+check(V._receta_colab_casa(colab, r_sin) and not V._receta_colab_casa(colab, r_con),
+      "la equivalencia Colab↔casa también distingue tta (va en kw)")
+src_prob = inspect.getsource(V.probabilidades_lesiones)
+check("tta=False" in src_prob.split("\n")[0] and 'save_probabilities=True, tta=tta)' in src_prob
+      and 'trainer="nnUNetTrainer", tta=tta' in src_prob and '"_tta" if tta else ""' in src_prob,
+      "probabilidades_lesiones: tta va a la receta, al nnUNet_predict_image de la 591 y al nombre del .npz")
+check('trainer="nnUNetTrainer_4000epochs_NoMirroring",\n' in src_prob and "tta=False, multilabel_image=True, resample=3.0" in src_prob,
+      "la máscara de recorte de 3 mm (tarea 297) sigue sin TTA: no depende del flag")
+src_banco = inspect.getsource(V.banco)
+check("tta=False" in src_banco.split('"""')[0] and "probabilidades_lesiones(serie, mascara, device, tta=tta)" in src_banco
+      and '_guarda_banco(salida_dir, salida, _nombre_banco(P["tta"]))' in src_banco and '"tta": P["tta"]' in src_banco,
+      "banco(): pasa tta al detector, lo escribe en el JSON y elige el nombre de salida por él")
+check('"--tta"' in src_main and 'tta=a.tta' in inspect.getsource(V._cmd_banco), "la CLI expone banco --tta")
 
 print("\n%s" % ("VERDE" if not fallos else "ROJO: %d fallos" % len(fallos)))
 sys.exit(1 if fallos else 0)

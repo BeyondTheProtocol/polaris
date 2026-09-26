@@ -14,7 +14,7 @@ paths:
 - Estándar de código: `00_FUENTE-DE-VERDAD/04 · IA/Calidad-Codigo-Python-Polaris.md`.
 
 ## Al terminar
-- **Mientras iteras, corre tu test** (`python3 tests/test_X.py`); **`bash tests/test_all.sh` una vez al final**, antes de «hecho» o de pasar a `git`, no solo tu test ([[feedback-correr-test-all-no-solo-py]]).
+- **Mientras iteras, corre tu test** (`python3 tests/test_X.py`) o `bash tests/test_all.sh --cambiados` (solo las baterías que tocan tus ficheros); **`bash tests/test_all.sh` una vez al final**, antes de «hecho» o de pasar a `git`, no solo tu test ([[feedback-correr-test-all-no-solo-py]]).
 - **Verifica el EFECTO, no que el script corrió sin error** ([[feedback-verificar-efecto-no-que-corrio]]).
 - Si la tool avisa a {{TITULAR}}, el aviso sale por **`salida.py`** (respeta HALT y anti-spam). Todo aviso necesita anti-spam ([[feedback-todo-aviso-a-titular-necesita-anti-spam]]).
 - **Envío opt-in en tests:** ningún test manda mensajes de verdad a {{TITULAR}} ([[feedback-envio-opt-in-para-no-spamear-en-tests]]).

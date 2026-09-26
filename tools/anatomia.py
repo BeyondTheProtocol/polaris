@@ -264,7 +264,7 @@ FAMILIAS = [
                             "cn.py", "cn_", # cn.py: buscar CUALQUIER cosa en la web china (20-sep)
                             "cde_fetch",     # el registro chino de ensayos, sin navegador (20-sep)
                             "onco")),        # grafo abierto de oncología en local (19-sep)
-    ("salud del sistema", ("healthcheck", "vigia", "tiempo_sesiones", "salud", "errores",
+    ("salud del sistema", ("healthcheck", "vigia", "tiempo_sesiones", "tests_afectados", "salud", "errores",
                            # valida la forma de los ficheros de estado (20-sep-26)
                            "esquema_estado",
                            "observabilidad", "heartbeat", "diag", "ia_health",

@@ -3615,13 +3615,17 @@ def _en_caja(ijk, caja):
     return all(caja[k][0] <= ijk[k] < caja[k][1] for k in range(3))
 
 
-def probabilidades_lesiones(serie, mascara=None, device="mps"):
+def probabilidades_lesiones(serie, mascara=None, device="mps", tta=False):
     """Mapa de probabilidad de `liver_lesions` (TS 2.14.0, tarea 591, fold 0) con el recorte a la
     máscara del hígado del visor (por defecto la unión) + 20 mm, en vez de a la `liver` del modelo
     de 3 mm. Escribe en <cache>/<serie>/prob/ (zona clínica) el .npz/.pkl de nnU-Net, la
     segmentación argmax que TS deja en la rejilla del TC y la máscara `liver` del modelo de 3 mm
     (para reconstruir la caja de fábrica). Todo sellado con su receta; se reutiliza si casa.
-    No descarga nada: si faltan los pesos, aborta."""
+    No descarga nada: si faltan los pesos, aborta.
+    `tta`: test-time augmentation por espejos de nnU-Net (TS `tta` → nnUNetPredictor
+    `use_mirroring`, nnunet.py:244-296; el checkpoint de la tarea 591 permite los 3 ejes,
+    `inference_allowed_mirroring_axes=(0,1,2)`, así que son 8 pasadas y ~8× de tiempo). Va a la
+    receta y al nombre del .npz (`_tta`): nunca comparte caché con la corrida sin espejos."""
     import nibabel as nib
     import numpy as np
     from pathlib import Path
@@ -3679,16 +3683,18 @@ def probabilidades_lesiones(serie, mascara=None, device="mps"):
     caja_fabrica = [[int(a), int(b)] for a, b in get_bbox_from_mask(liver3, outside_value=0, addon=addon_vox)]
     caja_union = [[int(a), int(b)] for a, b in get_bbox_from_mask(higado, outside_value=0, addon=addon_vox)]
     # 2. el detector con el recorte a la unión + 20 mm, guardando probabilidades
-    npz = os.path.join(pdir, "liver_lesions_%s.npz" % modo)
-    seg_out = os.path.join(pdir, "liver_lesions_%s.nii.gz" % modo)
+    tta = bool(tta)
+    sufijo = "%s%s" % (modo, "_tta" if tta else "")
+    npz = os.path.join(pdir, "liver_lesions_%s.npz" % sufijo)
+    seg_out = os.path.join(pdir, "liver_lesions_%s.nii.gz" % sufijo)
     receta = _receta_seg("liver_lesions", device, codigo=codigo, ml=True,
                          crop="mascara_higado:" + modo, crop_addon_mm=BANCO_CROP_ADDON_MM,
-                         resample=TS_RESAMPLE_LESIONES, folds=[0], save_probabilities=True)
+                         resample=TS_RESAMPLE_LESIONES, folds=[0], save_probabilities=True, tta=tta)
     if not (cache_vale(npz, receta) and cache_vale(seg_out, receta)
             and os.path.exists(npz[:-4] + ".pkl")):
         crop_img = nib.Nifti1Image(higado.astype(np.uint8), img.affine)
         nnUNet_predict_image(Path(imagen), Path(seg_out), TS_TAREA_LESIONES, model="3d_fullres_high",
-                             folds=[0], trainer="nnUNetTrainer", tta=False, multilabel_image=True,
+                             folds=[0], trainer="nnUNetTrainer", tta=tta, multilabel_image=True,
                              resample=TS_RESAMPLE_LESIONES, crop=crop_img, crop_path=None,
                              task_name="liver_lesions", crop_addon=[BANCO_CROP_ADDON_MM] * 3,
                              save_probabilities=Path(npz), **comunes)
@@ -3696,7 +3702,7 @@ def probabilidades_lesiones(serie, mascara=None, device="mps"):
         sella_cache(seg_out, receta)
     return {"npz": npz, "pkl": npz[:-4] + ".pkl", "seg": seg_out, "liver_3mm": crop3,
             "receta": receta, "receta_crop_3mm": receta3, "higado": higado, "afin": aff,
-            "mascara_higado": modo, "caja_fabrica": caja_fabrica, "caja_union": caja_union,
+            "mascara_higado": modo, "tta": tta, "caja_fabrica": caja_fabrica, "caja_union": caja_union,
             "addon_vox": [int(v) for v in addon_vox]}
 
 
@@ -3846,11 +3852,16 @@ def _banco_core(prob, afin, higado, marcas, umbrales=BANCO_UMBRALES, tol_min_mm=
             "rejilla": {"forma": [int(s) for s in prob.shape], "voxel_mm": [round(float(e), 3) for e in esp]}}
 
 
-def _guarda_banco(salida_dir, datos):
+def _nombre_banco(tta=False):
+    """banco.json sin espejos; banco-tta.json con ellos: dos corridas, dos ficheros, nunca se pisan."""
+    return "banco-tta.json" if tta else "banco.json"
+
+
+def _guarda_banco(salida_dir, datos, nombre="banco.json"):
     """Solo en zona clínica: dentro va geometría de sus lesiones."""
     exige_zona_clinica(salida_dir)
     os.makedirs(salida_dir, exist_ok=True)
-    ruta = os.path.join(salida_dir, "banco.json")
+    ruta = os.path.join(salida_dir, nombre)
     json.dump(datos, open(ruta, "w"), ensure_ascii=False, indent=1, default=_json_numpy)
     return ruta
 
@@ -3869,11 +3880,13 @@ def _json_numpy(o):
     raise TypeError("no serializable: %r" % type(o))
 
 
-def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rejillas=("tc", "nativa")):
+def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rejillas=("tc", "nativa"),
+          tta=False):
     """Banco de `liver_lesions` contra las marcas del radiólogo de <assets/fecha>/marcas.json →
     <banco/fecha>/banco.json (zona clínica; hashes de marcas.json, estudio.json, .npz y receta,
     nunca copias). Mide en la rejilla del TC (el mapa devuelto con su geometría) y en la nativa
-    del detector (0,75×0,75×1,0 mm, con la máscara llevada allí)."""
+    del detector (0,75×0,75×1,0 mm, con la máscara llevada allí). Con `tta` (espejos de nnU-Net)
+    el detector va aparte en caché y el resultado a banco-tta.json, para comparar sin mezclar."""
     import nibabel as nib
     import numpy as np
     from nibabel.processing import resample_from_to
@@ -3881,7 +3894,7 @@ def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rej
     exige_zona_clinica(salida_dir)
     destino = _dir("assets", fecha)
     marcas, recuento = _marcas_para_banco(destino)
-    P = probabilidades_lesiones(serie, mascara, device)
+    P = probabilidades_lesiones(serie, mascara, device, tta=tta)
     prob_n, aff_n = _prob_lesion(P["npz"], P["pkl"])
     higado, aff = P["higado"], P["afin"]
     prob_tc = np.asarray(resample_from_to(nib.Nifti1Image(prob_n, aff_n), (higado.shape, aff), order=1).dataobj,
@@ -3903,8 +3916,9 @@ def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rej
         "_que_es": ("Medida de una herramienta (TS liver_lesions con umbral) contra 55 marcas de una "
                     "lectura informal sin informe firmado. No es un recuento clínico. Un candidato sin "
                     "marca no es un falso positivo hasta que alguien lo mire."),
-        "serie": serie, "fecha": fecha, "mascara_higado": P["mascara_higado"],
-        "receta": {"detector": P["receta"], "crop_3mm": P["receta_crop_3mm"], "umbrales": list(umbrales),
+        "serie": serie, "fecha": fecha, "mascara_higado": P["mascara_higado"], "tta": P["tta"],
+        "receta": {"detector": P["receta"], "crop_3mm": P["receta_crop_3mm"], "tta": P["tta"],
+                   "umbrales": list(umbrales),
                    "tolerancia_min_mm": BANCO_TOL_MIN_MM, "min_mm3": BANCO_MIN_MM3,
                    "dilata_mm": BANCO_DILATA_MM, "crop_addon_mm": BANCO_CROP_ADDON_MM,
                    "codigo_banco": huella(inspect.getsource(_banco_core), inspect.getsource(banco))},
@@ -3930,14 +3944,15 @@ def banco(serie, fecha, umbrales=BANCO_UMBRALES, mascara=None, device="mps", rej
             salida["rejillas"][rej] = _banco_core(prob_n, aff_n, hig_n, marcas, umbrales)
         else:
             raise SystemExit("ABORTA: rejilla desconocida %r (vale: tc, nativa)" % rej)
-    salida["ruta"] = _guarda_banco(salida_dir, salida)
+    salida["ruta"] = _guarda_banco(salida_dir, salida, _nombre_banco(P["tta"]))
     return salida
 
 
 def _imprime_banco(s):
     """Tabla a stdout SIN geometría: recuentos, ids de marca y mm (lo mismo que ya lista el dossier)."""
-    print("banco %s · serie %s · máscara %s · Dice argmax↔seg TS %.3f · caja fábrica %s · caja unión %s"
-          % (s["fecha"], s["serie"], s["mascara_higado"], s["geometria"]["dice_argmax_vs_seg_ts"],
+    print("banco %s · serie %s · máscara %s · TTA %s · Dice argmax↔seg TS %.3f · caja fábrica %s · caja unión %s"
+          % (s["fecha"], s["serie"], s["mascara_higado"], "sí (espejos 3 ejes)" if s.get("tta") else "no",
+             s["geometria"]["dice_argmax_vs_seg_ts"],
              s["cajas"]["fabrica_total3mm_mas_20mm"], s["cajas"]["union_mas_20mm"]))
     print("marcas fuera de la caja de fábrica: %s · fuera de la caja unión: %s"
           % (s["cajas"]["fuera_de_fabrica"] or "ninguna", s["cajas"]["fuera_de_union"] or "ninguna"))
@@ -3971,7 +3986,7 @@ def _imprime_banco(s):
 def _cmd_banco(a):
     umbrales = tuple(a.umbrales) if a.umbrales else BANCO_UMBRALES
     s = banco(a.serie, a.fecha, umbrales=umbrales, mascara=a.mascara_higado, device=a.device,
-              rejillas=tuple(a.rejillas))
+              rejillas=tuple(a.rejillas), tta=a.tta)
     _imprime_banco(s)
     return 0
 
@@ -6404,6 +6419,9 @@ def main(argv=None):
     pba.add_argument("--mascara-higado", dest="mascara_higado", choices=MASCARAS_HIGADO, default=MASCARA_HIGADO,
                      help="máscara del hígado para el recorte y el «dentro» (por defecto la unión)")
     pba.add_argument("--device", default="mps")
+    pba.add_argument("--tta", action="store_true",
+                     help="test-time augmentation por espejos de nnU-Net (8 pasadas, ~8× de tiempo); "
+                          "caché y salida aparte (liver_lesions_<máscara>_tta.npz, banco-tta.json)")
     pba.set_defaults(fn=_cmd_banco)
     pw = sub.add_parser("sirve", help="sirve el visor en 127.0.0.1")
     pw.add_argument("--puerto", type=int, default=8794)
