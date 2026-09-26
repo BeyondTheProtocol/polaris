@@ -31,6 +31,10 @@ test_digest.sh test_muro_costura_rm.py test_coste_repo.py test_healthcheck_halt_
 test_chrome_headless_cierra.py"
 # `$(echo …)` colapsa los saltos de línea de la lista: sin eso, las baterías que caen al
 # principio o al final de cada línea no casaban y seguían corriendo (4 rojos en el primer CI).
+# Cronómetro por batería (26-sep-26): una medición de 7 días dio ~35 h-sesión bloqueadas en
+# 473 pasadas de test_all (mediana 4,0 min). Al final se imprimen las 10 más lentas: el dato para
+# saber qué test adelgazar. No cambia ni el resultado ni el código de salida.
+_tiempos=""
 _salta() { [ -n "$BTP_PORTABLE" ] || return 1
            case " $(echo $SOLO_CASA_BASE) " in *" $1 "*) return 0;; esac; return 1; }
 run() { _fuera "$1" && return 0; _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
@@ -402,6 +406,7 @@ runpy test_visor3d_procedencia.py
 runpy test_visor3d_colab.py
 runpy test_sonda_silencio.py
 runpy test_vigia_latidos.py
+runpy test_tiempo_sesiones.py
 runpy test_cola_ruido.py
 runpy test_worktree_guard.py
 runpy test_zonas_clinicas.py
@@ -510,6 +515,9 @@ else
 fi
 fi
 
+echo
+echo "⏱️  las 10 baterías más lentas (s) · total ${SECONDS}s:"
+printf '%s' "$_tiempos" | sort -rn | head -10 | sed 's/^/   /'
 echo
 # Un SKIP no es ni verde ni rojo: es «necesita algo que aquí no está» (ver tests/_entorno.py).
 # Se dice aparte para que el número de rojos signifique lo que parece.

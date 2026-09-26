@@ -17,7 +17,7 @@
 
 ## Antes de decir «hecho» o «lo que te queda»
 
-- **Verifica con `bash tests/test_all.sh`**, no con un bucle propio sobre los `.py`. [[feedback-correr-test-all-no-solo-py]]
+- **Verifica con `bash tests/test_all.sh`**, no con un bucle propio sobre los `.py`. **Una vez, al final**; iterando, solo tu test. [[feedback-correr-test-all-no-solo-py]]
 
 ## Cómo escribir
 
