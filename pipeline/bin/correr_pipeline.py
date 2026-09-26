@@ -88,7 +88,16 @@ def _valido(x: float, lo: float, hi: float) -> bool:
         and math.isfinite(x) and lo <= float(x) <= hi
 
 
-def filtrar(variantes: list[dict], expr: dict[str, float] | None,
+def _clave_variante(v: dict) -> tuple:
+    """Una variante puede generar varios péptidos; gen/cambio no identifica su locus.
+    Conserva el fallback de anotación para callers históricos sin coordenadas.
+    """
+    locus = tuple(v.get(k) for k in ("chrom", "pos", "ref", "alt"))
+    return ("locus", *locus) if all(x is not None for x in locus) else (
+        "anotacion", v.get("gene"), v.get("aa"))
+
+
+def filtrar(variantes: list[dict], expr: dict[str, float | str] | None,
             umbrales: dict) -> tuple[list[dict], list[tuple]]:
     """Aplica expresión y VAF. Cada candidato lleva su estado EXPLÍCITO por filtro:
       ok          medido, válido y pasa el umbral
@@ -105,18 +114,19 @@ def filtrar(variantes: list[dict], expr: dict[str, float] | None,
     for v in variantes:
         if not v.get("peptide"):
             continue
-        clave = (v.get("gene"), v.get("aa"))
+        clave = _clave_variante(v)
+        etiqueta = (v.get("gene"), v.get("aa"))
         tpm = expr.get(v.get("gene")) if expr is not None else None
         if tpm is None:
             est_expr = "no_medido"
         elif not _valido(tpm, 0.0, math.inf):
             if clave not in vistos:
-                descartes.append((*clave, f"TPM inválido ({tpm!r}): no es un número finito >= 0"))
+                descartes.append((*etiqueta, f"TPM inválido ({tpm!r}): no es un número finito >= 0"))
             vistos.add(clave)
             continue
         elif tpm < umbrales["tpm_min"]:
             if clave not in vistos:
-                descartes.append((*clave, f"expresión baja (TPM={tpm} < {umbrales['tpm_min']})"))
+                descartes.append((*etiqueta, f"expresión baja (TPM={tpm} < {umbrales['tpm_min']})"))
             vistos.add(clave)
             continue
         else:
@@ -126,12 +136,12 @@ def filtrar(variantes: list[dict], expr: dict[str, float] | None,
             est_af = "no_medido"
         elif not _valido(af, 0.0, 1.0):
             if clave not in vistos:
-                descartes.append((*clave, f"AF inválida ({af!r}): no es un número finito en [0, 1]"))
+                descartes.append((*etiqueta, f"AF inválida ({af!r}): no es un número finito en [0, 1]"))
             vistos.add(clave)
             continue
         elif af < umbrales["af_min"]:
             if clave not in vistos:
-                descartes.append((*clave, f"VAF baja (AF={af} < {umbrales['af_min']})"))
+                descartes.append((*etiqueta, f"VAF baja (AF={af} < {umbrales['af_min']})"))
             vistos.add(clave)
             continue
         else:
@@ -178,7 +188,7 @@ def main() -> int:
     hla_todos = ent.leer_hla(args.hla)
     perdidos = ent.leer_hla(args.loh) if args.loh else []
     expr = ent.leer_expresion(args.expresion) if args.expresion else {}
-    n_var = len({(v["chrom"], v["pos"], v["alt"]) for v in variantes})
+    n_var = len({_clave_variante(v) for v in variantes})
     n_pep = len({v["peptide"] for v in variantes if v.get("peptide")})
     print(f"  variantes leídas: {n_var}  | péptidos mutantes únicos: {n_pep}")
     print(f"  HLA tipados: {len(hla_todos)}  | perdidos por LOH: {len(perdidos)}")
@@ -216,22 +226,22 @@ def main() -> int:
         print(f"  - descartado por {motivo}: {gene} {aa}")
     n_inval = sum(1 for _, _, m in descartes if "inválid" in m)
     if n_inval:
-        print(f"  ⚠️  {n_inval} variante(s) con un valor PRESENTE pero inválido (NaN, inf o fuera "
+        print(f"  ⚠️  {n_inval} variante(s) con un valor PRESENTE pero inválido (texto ilegible, NaN, inf o fuera "
               "de rango). No se cuentan como medidas ni entran en el dossier.")
-    n_inc = len({(v['gene'], v['aa']) for v in candidatos if v["evaluacion"] == "incompleta"})
+    n_inc = len({_clave_variante(v) for v in candidatos if v["evaluacion"] == "incompleta"})
     print(f"  candidatos tras filtros de expresión y VAF: {len(candidatos)} péptidos "
-          f"({len({(v['gene'], v['aa']) for v in candidatos})} variantes; "
+          f"({len({_clave_variante(v) for v in candidatos})} variantes; "
           f"{len(descartes)} variantes descartadas; {n_inc} con evaluación INCOMPLETA "
           "por falta de dato, separadas al final)")
 
     if not candidatos:
-        print("  (sin candidatos) — nada que predecir.")
-        return 0
+        print("  (sin candidatos) — nada que predecir; se escriben el dossier sin filas "
+              "y el manifiesto de esta ejecución con sus descartes.")
 
     # --- Etapa D (presentación, LOCAL) ---
     import pandas as pd
     filas = []
-    if args.no_presentacion:
+    if args.no_presentacion or not candidatos:
         for v in candidatos:
             filas.append({**v, "best_allele": None, "presentation_score": None,
                           "presentado": None})
@@ -250,10 +260,16 @@ def main() -> int:
                 "presentado": r.get("presentado"),
             })
 
-    df = pd.DataFrame(filas)
+    # También publicar el resultado vacío: no dejar un dossier/manifiesto de una
+    # corrida anterior bajo las mismas rutas, ni perder el registro de descartes.
+    df = pd.DataFrame(filas) if filas else pd.DataFrame(columns=[
+        "chrom", "pos", "ref", "alt", "gene", "aa", "peptide", "af", "tpm",
+        "estado_expresion", "estado_af", "evaluacion", "best_allele",
+        "presentation_score", "presentado",
+    ])
 
     # --- Anotación estructural opcional (egress genérico) ---
-    if args.estructura:
+    if args.estructura and candidatos:
         from clientes_api import uniprot_accession_de_gen, alphafold_por_accession
         af_urls = {}
         for g in sorted({v["gene"] for v in candidatos if v.get("gene")}):
@@ -284,6 +300,7 @@ def main() -> int:
         "expresion": Path(args.expresion).name if args.expresion else None,
         "loh": Path(args.loh).name if args.loh else None,
         "hla_clase1_usados": len(hla_c1),
+        "estado": "con_candidatos" if candidatos else "sin_candidatos",
         "filas": len(df),
         "filas_completas": int((df["evaluacion"] == "completa").sum()),
         "filas_incompletas": int((df["evaluacion"] != "completa").sum()),
