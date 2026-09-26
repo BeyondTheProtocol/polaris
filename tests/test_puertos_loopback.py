@@ -205,7 +205,11 @@ def parte_viva(exc):
         check("netstat -anv se puede leer (%s)" % e, False)
         return
     esc = parse_netstat(texto)
-    check("netstat devuelve algún LISTEN", len(esc) > 0)
+    # macOS 27 (26-sep-2026): un proceso que cuelga de un Python sin firmar de Apple (Homebrew)
+    # recibe la tabla de sockets VACÍA, sin error. Eso no es «nada escucha»: es no poder mirar.
+    # Se queda en rojo, con el porqué; test_all.sh usa /usr/bin/python3 y sí la ve.
+    check("netstat devuelve algún LISTEN (vacío = este intérprete no puede leer los sockets; "
+          "córrelo con /usr/bin/python3, no con %s)" % sys.executable, len(esc) > 0)
     inf, usadas = evaluar(esc, exc, _argv)
     for proceso, pid, host, puerto, alc in inf:
         check("escucha fuera de loopback SIN excepción: %s:%d en %s:%d (%s)"
