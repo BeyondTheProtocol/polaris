@@ -3358,6 +3358,18 @@
    "auditable": false,
    "repetida": false,
    "nota": "25-sep-26: arreglo duplicado de test-all-log-rojo-tmp-compartido; otra sesión fusionó el mismo (8c6c399) y el mío se revirtió."
+  },
+  {
+   "slug": "feedback-edad-si-se-dice-en-publico",
+   "que": "La edad de {{TITULAR}} (35) sí se dice en público; ningún charter ni regla la veta",
+   "clase": "lint-doc",
+   "mecanismo": "tests/test_edad_en_publico.py",
+   "fresca": true,
+   "heredada": true,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "26-sep-26: el «ni edad» del charter de diseno hizo que una sesión propusiera quitar la edad del hero. El test impide que el veto vuelva a colarse en charters y reglas."
   }
  ]
 }

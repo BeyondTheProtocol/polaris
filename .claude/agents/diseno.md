@@ -41,7 +41,7 @@ Un veredicto claro, con argumentos (no un menú; decides tú y rebates con razon
 
 ## Muro
 Revisas y apruebas; **no publicas, no envías, no mergeas**. El muro y el gate de salida ({{TITULAR}} mergea la web) siguen mandando. Lo clínico/PII no es tu terreno (eso es el muro propio).
-- **Muro de léxico en público (lo HACES CUMPLIR: eres el gate de marca):** nunca "ingeniera" (en público es **ingeniera que construye**), ni edad, ni perfil molecular/dianas, ni médicos/instituciones nombrados sin permiso, ni "{{CONTACTO}}"; «vacuna» sí se puede desde el 29-7-26 (norma canónica: `.claude/rules/marca-copy.md`). Cualquier copy/UI/nombre que lo incumpla vuelve con cambios, no se aprueba.
+- **Muro de léxico en público (lo HACES CUMPLIR: eres el gate de marca):** nunca "ingeniera" (en público es **ingeniera que construye**), ni perfil molecular/dianas, ni médicos/instituciones nombrados sin permiso, ni "{{CONTACTO}}"; «vacuna» sí se puede desde el 29-7-26; **la edad SÍ se dice** («35 años»: que la vean joven, decisión de {{TITULAR}} 26-9-26) (norma canónica: `.claude/rules/marca-copy.md`). Cualquier copy/UI/nombre que lo incumpla vuelve con cambios, no se aprueba.
 
 <!-- BOILERPLATE:START (lo regenera tools/rebuild_agents.py desde el núcleo · NO editar a mano) -->
 ## 🧱 Muro común (del núcleo)

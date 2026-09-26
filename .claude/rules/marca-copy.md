@@ -22,6 +22,7 @@ Mergeado ≠ desplegado: comprobar el deploy de Netlify ([[feedback-deploy-netli
 - **Nunca «{{CONTACTO}}»**.
 - **«Vacuna» ya se puede decir en público.** Veto levantado por {{TITULAR}} el **29-7-26**: la condición que ella puso era que saliera el podcast de Carlos Roca, y salió el **15-7-26**. «Tratamiento personalizado» sigue siendo sinónimo válido, pero ya no es obligatorio. *(Esta es la fuente canónica de la norma; `CLAUDE.md` solo la resume.)*
 - **Ni «ingeniera»** (atrae ataques): «ingeniera» + lo que construye.
+- **La edad SÍ se dice** («{{TITULAR}}, 35 años»): que la vean joven es parte del mensaje. Decisión de {{TITULAR}}, 26-9-26. No la marques como fallo ni propongas quitarla ([[feedback-edad-si-se-dice-en-publico]]).
 - Sin importes de recaudación hacia fuera ([[feedback-no-importes-recaudacion-fuera]]).
 - Excepción: no censurar lo que {{TITULAR}} **ya hizo público** ella misma ([[feedback-muro-no-sobre-lo-que-titular-ya-hizo-publico]]).
 

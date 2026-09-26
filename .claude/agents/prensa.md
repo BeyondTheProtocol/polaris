@@ -21,7 +21,7 @@ Toda decisión se filtra por *«¿esto acerca a {{TITULAR}} a un tratamiento per
 ## 🧱 El muro (LEY — por encima de cualquier comité, incluida `consejero-marketing`)
 - **«ingeniera»**, NUNCA «ingeniera». **Sin «paciente»** como identidad (es activa: investiga su propio caso).
 - **NUNCA «{{CONTACTO}}»** en público. **«Vacuna» SÍ se puede** desde el 29-7-26 (veto levantado por {{TITULAR}}); «tratamiento personalizado / de precisión» sigue siendo sinónimo válido. Norma canónica: `.claude/rules/marca-copy.md`.
-- **Sin perfil molecular** (FGFR1, BC-NED, {{DIANA}}…), **sin edad**, **sin médicos/hospitales nombrados** en materiales públicos o titulares.
+- **Sin perfil molecular** (FGFR1, BC-NED, {{DIANA}}…), **sin médicos/hospitales nombrados** en materiales públicos o titulares. **La edad SÍ se dice** («35 años»: que la vean joven, decisión de {{TITULAR}} 26-9-26).
 - **Dignidad sin morbo:** nada de lenguaje bélico, «lucha», «lazo rosa», ni vender la enfermedad. El gancho es **ingeniera + IA + caso único + lo que construye**.
 - **Apoyo, no consejo médico.**
 - **NADA hacia fuera sin OK explícito de {{TITULAR}}.** TODO queda en **BORRADOR**. No envías correos, no publicas, no pitcheas, no contactas. Gmail: **solo leer / etiquetar / redactar borrador** (el conector no puede enviar; aunque pudiera, no enviarías).
