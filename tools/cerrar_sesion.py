@@ -465,6 +465,10 @@ def _sesion_viva_en(wt):
         vivas = _ramas.sesiones()
     except Exception as e:                                     # noqa: BLE001
         return "no se pudo comprobar si hay sesiones vivas (%s)" % type(e).__name__
+    ilegibles = sum(1 for s in vivas if not s.get("cwd"))
+    if ilegibles:
+        # 26-sep-26: sin cwd no se sabe si están aquí (el agente del barrido podó así 7 vivos).
+        return "%d sesión(es) viva(s) sin cwd legible: no se sabe si están aquí" % ilegibles
     for s in vivas:
         c = os.path.realpath(s.get("cwd") or "") if s.get("cwd") else ""
         if c and (c == raiz or c.startswith(raiz + "/")):

@@ -58,9 +58,13 @@ class Borde:
         self.sellos.append(ev)
 
 
-def _bench(fecha=(2026, 9, 21)):
+H = "0123456789abcdef"  # huella de §1 falsa: el test no lee ESTADO-ACTUAL
+
+
+def _bench(fecha=(2026, 9, 21), huella=H):
     return types.SimpleNamespace(
         DESTINO_N1=bench_jev.DESTINO_N1, PERFIL_N1=bench_jev.PERFIL_N1, PERFIL_N1_FECHA=fecha,
+        PERFIL_N1_HUELLA_S1=huella,
         INSTR_N1=bench_jev.INSTR_N1, _VETADAS_N1=bench_jev._VETADAS_N1,
         preguntar=None, _clave=lambda: "k")
 
@@ -111,28 +115,28 @@ def comprobar(mod):
     # 1. sin trust, no se llama a Jev
     c, jev = _cola(), Jev()
     n, motivo = mod.encaje_n1(c["pendientes"], preguntar=jev, get=get_ok, bench=_bench(),
-                              borde=Borde(trusted=False), fecha_clinica=(2026, 9, 13))
+                              borde=Borde(trusted=False), fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 0 and not jev.llamadas, "sin trust no se llama a Jev")
     f("trust" in motivo, "sin trust, el motivo lo dice")
 
     # 2. perfil caducado: no se llama a Jev y queda aviso
     c, jev = _cola(), Jev()
     n, motivo = mod.encaje_n1(c["pendientes"], preguntar=jev, get=get_ok, bench=_bench(),
-                              borde=Borde(), fecha_clinica=(2026, 9, 28))
+                              borde=Borde(), fecha_clinica=(2026, 9, 28), huella_s1=H)
     f(n == 0 and not jev.llamadas, "perfil caducado no llama a Jev")
     f("caducado" in motivo and "ESTADO-ACTUAL" in motivo, "perfil caducado avisa en el log")
 
     # 2b. HALT activo: nada sale
     c, jev = _cola(), Jev()
     n, _ = mod.encaje_n1(c["pendientes"], preguntar=jev, get=get_ok, bench=_bench(),
-                         borde=Borde(halt=True), fecha_clinica=(2026, 9, 13))
+                         borde=Borde(halt=True), fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 0 and not jev.llamadas, "con HALT no se llama a Jev")
 
     # 3 + 4. camino bueno: solo ensayos con NCT; papers y ChiCTR fuera; cerrados/descartados intactos
     c, jev, bd = _cola(), Jev(), Borde()
     antes = copy.deepcopy(c)
     n, motivo = mod.encaje_n1(c["pendientes"], preguntar=jev, get=get_ok, bench=_bench(),
-                              borde=bd, fecha_clinica=(2026, 9, 13))
+                              borde=bd, fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 2 and motivo == "ok", "puntúa los 2 ensayos con NCT")
     por_uid = {p["uid"]: p for p in c["pendientes"]}
     f(por_uid["e2"].get("p_encaje") == 0.9 and por_uid["e1"].get("p_encaje") == 0.2, "guarda p_encaje")
@@ -146,22 +150,22 @@ def comprobar(mod):
       "no quita ni reordena pendientes")
     # segunda pasada: no repite
     n2, _ = mod.encaje_n1(c["pendientes"], preguntar=jev, get=get_ok, bench=_bench(),
-                          borde=bd, fecha_clinica=(2026, 9, 13))
+                          borde=bd, fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n2 == 0 and len(jev.llamadas) == 2, "no re-puntúa lo ya puntuado")
 
     # 5. fallos de red: la cola queda intacta
     c = _cola()
     antes = copy.deepcopy(c)
     n, _ = mod.encaje_n1(c["pendientes"], preguntar=Jev(falla_en=0), get=get_ok, bench=_bench(),
-                         borde=Borde(), fecha_clinica=(2026, 9, 13))
+                         borde=Borde(), fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 0 and c == antes, "Jev caído: cola intacta")
     c = _cola()
     n, _ = mod.encaje_n1(c["pendientes"], preguntar=Jev(), get=get_falla, bench=_bench(),
-                         borde=Borde(), fecha_clinica=(2026, 9, 13))
+                         borde=Borde(), fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 0 and c == antes, "CT.gov caído: cola intacta")
     c = _cola()
     n, _ = mod.encaje_n1(c["pendientes"], preguntar=Jev(), get=get_ok, bench=_bench(),
-                         borde=Borde(canario=True), fecha_clinica=(2026, 9, 13))
+                         borde=Borde(canario=True), fecha_clinica=(2026, 9, 13), huella_s1=H)
     f(n == 0 and c == antes, "canario: no sale")
     return fallos
 

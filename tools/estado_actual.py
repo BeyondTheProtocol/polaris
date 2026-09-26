@@ -86,6 +86,16 @@ def huella_s1(texto):
     return hashlib.sha256(re.sub(r"\s+", " ", m.group(0)).strip().encode("utf-8")).hexdigest()[:16]
 
 
+def lee_huella_s1(ruta=None):
+    """(huella, motivo). Huella None si ESTADO-ACTUAL no se lee o no tiene §1. Lo usa el candado N1."""
+    try:
+        texto = open(ruta or ESTADO, encoding="utf-8").read()
+    except OSError as e:
+        return None, f"ESTADO-ACTUAL ilegible ({type(e).__name__})"
+    h = huella_s1(texto)
+    return (h, "ok") if h else (None, "ESTADO-ACTUAL sin «## 1. Clínico»")
+
+
 def lee_registro(ruta=None):
     try:
         with open(ruta or REGISTRO, encoding="utf-8") as f:
@@ -104,6 +114,12 @@ def registrar_cotejo(fecha_cotejo, texto_estado, ruta=None):
     os.replace(ruta + ".tmp", ruta)
     return d
 
+
+if __name__ == "__main__" and sys.argv[1:2] == ["huella"]:
+    # Uso: python3 tools/estado_actual.py huella  — la huella de §1 de hoy, para sellar el perfil N1
+    # (`bench_jev.PERFIL_N1_HUELLA_S1`) DESPUÉS de re-cotejar su texto. Solo imprime el hash.
+    h, por_que = lee_huella_s1()
+    sys.exit(por_que) if h is None else print(h)
 
 if __name__ == "__main__" and sys.argv[1:2] == ["cotejado"]:
     # Uso: python3 tools/estado_actual.py cotejado  — tras re-cotejar `reference-clinical-profile`.

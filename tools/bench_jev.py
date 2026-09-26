@@ -217,6 +217,14 @@ PERFIL_N1 = ("Patient: woman with HR-positive metastatic breast cancer; HER2 IHC
 # El radar (`encaje_n1`) NO usa el perfil si §1 es posterior: un cambio de tratamiento (empezar
 # TB06, un ADC o quimio) lo dejaría diciendo algo falso. Al re-cotejar el texto, sube esta fecha.
 PERFIL_N1_FECHA = (2026, 9, 21)
+# Huella de ESTADO-ACTUAL §1 contra la que se cotejó el perfil (`estado_actual.huella_s1`: 16 hex, sin
+# contenido). La fecha sola no basta: §1 recibe novedades como filas «(NUEVO)» o bloques citados sin
+# «Novedades del …» y la fecha no se mueve (26-sep-26: entró un cambio de receptores en el hígado y el
+# candado siguió abierto). El radar se para si §1 cambió desde aquí, y también si esto falta (None).
+# El cotejo del 21-sep no guardó huella y §1 no está en git: no se puede reconstruir, así que queda
+# None hasta el próximo re-cotejo. Al re-cotejar el texto: sube la fecha y pega aquí la salida de
+# `python3 tools/estado_actual.py huella`.
+PERFIL_N1_HUELLA_S1 = None
 INSTR_N1 = ("Based strictly on the trial's eligibility criteria, this patient appears eligible to "
             "enroll (no inclusion criterion she clearly fails and no exclusion criterion she clearly meets).")
 _VETADAS_N1 = ("neuroendocr", "ccnd1", "esr1", "ki67", "ki-67", "sstr", "{{DIANA2}}", "fgfr")

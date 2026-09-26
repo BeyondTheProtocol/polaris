@@ -86,8 +86,18 @@ def worktrees():
     return wts
 
 
+# Rutas absolutas (26-sep-26): `run_agent.sh` fija PATH sin /usr/sbin, donde vive `lsof`. Dentro del
+# agente del barrido `lsof` no existía, `_cwd_de` devolvía "" para las 16 sesiones vivas, todas
+# salían «fuera del repo» y su `autopoda` podó 7 worktrees con sesión dentro (les apagó el muro).
+_LSOF = next((x for x in ("/usr/sbin/lsof", "/usr/bin/lsof") if os.path.exists(x)), "lsof")
+_PS = "/bin/ps" if os.path.exists("/bin/ps") else "ps"
+# Si `ps` falla no sabemos qué sesiones hay: se devuelve una sesión desconocida con cwd ilegible,
+# y todo lo que poda se niega por `ocupacion()["ilegibles"]` (fail-closed, sin cambiar la forma).
+_SESION_DESCONOCIDA = {"pid": "?", "cwd": ""}
+
+
 def _cwd_de(pid):
-    out = _run(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"])
+    out = _run([_LSOF, "-a", "-p", str(pid), "-d", "cwd", "-Fn"])
     for ln in out.splitlines():
         if ln.startswith("n"):
             return ln[1:]
@@ -96,7 +106,9 @@ def _cwd_de(pid):
 
 def claude_sessions():
     """Sesiones de Claude Code vivas (no los procesos helper de la app)."""
-    ps = _run(["ps", "-axo", "pid=,command="])
+    ps = _run_rc([_PS, "-axo", "pid=,command="])
+    if ps is None:
+        return [dict(_SESION_DESCONOCIDA)]
     sess = []
     for ln in ps.splitlines():
         ln = ln.strip()
@@ -127,6 +139,28 @@ def sesiones():
             rama = "casa base" if es_base else best.get("branch", "?")
         out.append({"pid": s["pid"], "cwd": cwd, "rama": rama, "es_base": es_base})
     return out
+
+
+def ocupacion(vivas=None):
+    """Qué worktrees NO se pueden podar por tener una sesión viva. {ramas, paths, ilegibles}.
+
+    Por RAMA y por CWD (26-sep-26): la rama sola no basta (varios worktrees en detached comparten
+    el nombre «(detached)», y una sesión puede estar en un worktree cuya rama cambió). `ilegibles`
+    cuenta las sesiones vivas cuyo cwd no se pudo leer: si hay alguna, no se sabe dónde está, y
+    quien pode debe negarse entero (fail-closed), no tratarla como «fuera del repo»."""
+    vivas = sesiones() if vivas is None else vivas
+    ramas_ = {x["rama"] for x in vivas
+              if not x.get("es_base") and x.get("rama") not in ("(fuera del repo)", "casa base")}
+    paths = {os.path.realpath(x["cwd"]).rstrip("/") for x in vivas if x.get("cwd")}
+    return {"ramas": ramas_, "paths": paths, "ilegibles": sum(1 for x in vivas if not x.get("cwd"))}
+
+
+def _con_sesion_dentro(w, occ):
+    """¿Hay una sesión viva con cwd dentro de este worktree, o en su rama?"""
+    if w.get("branch") in occ["ramas"] and w.get("branch") != "(detached)":
+        return True
+    raiz = os.path.realpath(w["path"]).rstrip("/")
+    return any(c == raiz or c.startswith(raiz + "/") for c in occ["paths"])
 
 
 def _rama_base():
@@ -422,13 +456,14 @@ def _candidatas_vacias():
     contar, NO se propone podar (fail-closed).
     """
     base = _rama_base()
-    ocupadas = {x["rama"] for x in sesiones()
-                if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
+    occ = ocupacion()
+    if occ["ilegibles"]:
+        return []                       # no se sabe dónde están: no se propone podar nada
     cand = []
     for w in worktrees():
         if w["es_base"]:
             continue
-        if w.get("branch") in ocupadas or w.get("locked"):
+        if _con_sesion_dentro(w, occ) or w.get("locked"):
             continue
         # `_run` devuelve "" también si git FALLA (timeout, árbol roto): eso no es «limpio».
         sucio = _run_rc(["git", "-C", w["path"], "status", "--porcelain"])
@@ -777,14 +812,19 @@ def limpia(si=False, avisar=False, rescatar_antes=False):
     # Lo que NO se poda por tener trabajo vivo se DICE. Un "no hay nada que podar" que en
     # realidad significa "hay un borrador dentro" se lee como cola vacía, y el borrador se
     # queda ahí sin que nadie sepa que existe.
-    _ocupadas = {x["rama"] for x in sesiones()
-                 if not x["es_base"] and x["rama"] not in ("(fuera del repo)", "casa base")}
+    occ = ocupacion()
+    if occ["ilegibles"]:
+        print("⛔ NO se poda nada: %d sesión(es) de Claude viva(s) sin cwd legible (¿falta lsof en "
+              "el PATH o falló ps?). Sin saber dónde están, podar podría borrarle el worktree a una "
+              "sesión viva y dejarla sin los hooks del muro (26-sep-26)." % occ["ilegibles"])
+        return 75
     base = _rama_base()
     for w in worktrees():
         if w["es_base"]:
             continue
-        if w.get("branch") in _ocupadas:
-            print("⏸️  %s NO se poda: tienes una sesión trabajando dentro" % w.get("branch", "?"))
+        if _con_sesion_dentro(w, occ):
+            print("⏸️  %s NO se poda: tienes una sesión trabajando dentro (%s)"
+                  % (w.get("branch", "?"), os.path.basename(w["path"].rstrip("/"))))
             continue
         if w.get("locked"):
             print("⏸️  %s NO se poda: git lo tiene BLOQUEADO (%s)"

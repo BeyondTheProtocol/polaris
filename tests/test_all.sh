@@ -268,6 +268,7 @@ runpy test_ramas_detached.py
 runpy test_poda_no_se_lleva_ignorados.py
 runpy test_git_mutex_poda.py
 runpy test_autopoda_residuo.py     # 22-sep · los worktrees fusionados se podan solos; el residuo de tests no los bloquea, lo dudoso sí
+runpy test_autopoda_sesion_viva_cwd.py  # 26-sep · la poda no borra el worktree de una sesión viva: lsof por ruta absoluta, cwd ilegible = no se poda
 runpy test_ramas_conflictos.py
 runpy test_ramas_borrador.py
 runpy test_cierre_continuidad.py
@@ -453,6 +454,7 @@ runpy test_cosecha_whatsapp.py    # 25-sep · la bandeja de WA muestra 300 pero 
 runpy test_eval_triage_residuo.py # 21-sep · el set dorado no sale con fechas, URLs, @handles ni números largos
 runpy test_radar_orden_jev.py     # 21-sep · Jev solo ordena la cola del radar: nunca archiva ni toca lo cruzado
 runpy test_radar_encaje_n1.py     # 22-sep · encaje N1: sin trust o con perfil caducado no sale nada; solo ordena
+runpy test_radar_encaje_n1_huella.py  # 26-sep · candado N1 por huella de §1: si §1 cambió sin mover la fecha, no sale
 runpy test_radar_gate_multicohorte.py # 21-sep · un «encaja» en un ensayo multicohorte exige citar SU cohorte
 runpy test_radar_archivo_cerrados.py # 21-sep · pasar de 200 cierres no borra veredictos ni re-encola leads
 runpy test_radar_reintentos.py     # 21-sep · un fallo de red pasajero no deja un tema del radar sin nada

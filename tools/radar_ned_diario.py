@@ -1291,6 +1291,8 @@ def clave_orden(p):
 #   3. Perfil N1 al dia: si ESTADO-ACTUAL §1 (cabecera o «Novedades del …») es posterior a
 #      `bench_jev.PERFIL_N1_FECHA`, el perfil puede mentir (p. ej. «sin ADC previo» tras empezar
 #      TB06) y daria falsos «encaja». Se para y se avisa. Re-cotejarlo es trabajo de sesion.
+#      Y por CONTENIDO (26-sep): si la huella de §1 no es la sellada en
+#      `bench_jev.PERFIL_N1_HUELLA_S1` (o no hay), tambien se para. Las novedades entran sin fecha.
 #   4. Perfil sin terminos vetados ni identificador directo; estado sin canario.
 # Cada envio se sella en la cadena del borde ANTES de salir; si no se puede sellar, no sale.
 _RE_NCT = re.compile(r"\bNCT\d{8}\b")
@@ -1310,7 +1312,7 @@ def _criterios_ctgov(nct, get=None):
             (ps.get("eligibilityModule") or {}).get("eligibilityCriteria", ""))
 
 
-def candados_n1(bench=None, borde=None, fecha_clinica=None):
+def candados_n1(bench=None, borde=None, fecha_clinica=None, huella_s1=None):
     """(ok, motivo). Fail-closed: cualquier excepcion es un candado cerrado."""
     try:
         if bench is None:
@@ -1329,6 +1331,18 @@ def candados_n1(bench=None, borde=None, fecha_clinica=None):
         if fecha_clinica > tuple(bench.PERFIL_N1_FECHA):
             return False, ("perfil N1 caducado: revísalo contra ESTADO-ACTUAL (§1 del %04d-%02d-%02d, "
                            "perfil del %04d-%02d-%02d)" % (tuple(fecha_clinica) + tuple(bench.PERFIL_N1_FECHA)))
+        if huella_s1 is None:
+            import estado_actual
+            huella_s1, por_que = estado_actual.lee_huella_s1()
+            if huella_s1 is None:
+                return False, f"no se puede comprobar el perfil N1: {por_que}"
+        sellada = getattr(bench, "PERFIL_N1_HUELLA_S1", None)
+        if not sellada:
+            return False, ("perfil N1 sin huella de §1 sellada: re-cotéjalo contra ESTADO-ACTUAL y pon "
+                           "`estado_actual.py huella` en bench_jev.PERFIL_N1_HUELLA_S1")
+        if huella_s1 != sellada:
+            return False, ("perfil N1 caducado: ESTADO-ACTUAL §1 cambió desde su cotejo (huella %s, "
+                           "perfil sellado con %s); revísalo" % (huella_s1, sellada))
         if any(v in bench.PERFIL_N1.lower() for v in bench._VETADAS_N1):
             return False, "el perfil N1 lleva un término vetado"
         crudo, por_que = borde.identificador_directo(bench.PERFIL_N1)
@@ -1340,7 +1354,7 @@ def candados_n1(bench=None, borde=None, fecha_clinica=None):
 
 
 def encaje_n1(pendientes, preguntar=None, clave=None, get=None, bench=None, borde=None,
-              fecha_clinica=None):
+              fecha_clinica=None, huella_s1=None):
     """Anade `p_encaje` a los ENSAYOS con NCT que no lo tienen. Devuelve (n_puntuados, motivo).
     Solo anota: no quita, no reordena, no toca descartados ni cerrados. Fail-open para el orden,
     fail-closed para el egress."""
@@ -1348,7 +1362,8 @@ def encaje_n1(pendientes, preguntar=None, clave=None, get=None, bench=None, bord
                   if p.get("tipo") == "ensayo" and p.get("p_encaje") is None and _nct(p)]
     if not candidatos:
         return 0, "nada que puntuar"
-    ok, motivo = candados_n1(bench=bench, borde=borde, fecha_clinica=fecha_clinica)
+    ok, motivo = candados_n1(bench=bench, borde=borde, fecha_clinica=fecha_clinica,
+                             huella_s1=huella_s1)
     if not ok:
         return 0, motivo
     try:
