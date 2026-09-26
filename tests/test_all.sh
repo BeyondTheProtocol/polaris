@@ -151,6 +151,7 @@ runpy test_normas_mecanizadas.py
 runpy test_githooks_base.py
 runpy test_githooks_marcas.py
 runpy test_recall_memoria.py
+runpy test_memoria_contradicciones.py   # 26-sep · capa 5: memorias que se contradicen (solo informa)
 runpy test_perfil_clinico_al_dia.py
 runpy test_portero_ruido.py
 runpy test_parte_exento_cupo.py
