@@ -40,6 +40,9 @@ def casa(tmp, rojo):
         f.write("import sys\nSKIP = 77\nsys.exit(%d)\n" % (1 if rojo else 0))
     with open(os.path.join(base, "tests", "test_se_salta.py"), "w") as f:
         f.write("import sys\nsys.exit(77)\n")
+    # Como test_fuga.sh: sale rojo si ve el permiso de excepción con el que se llama al cierre.
+    with open(os.path.join(base, "tests", "test_sin_permisos.py"), "w") as f:
+        f.write("import os, sys\nSKIP = 77\nsys.exit(1 if os.environ.get('BTP_GIT_BASE_OK') else 0)\n")
     git(base, "add", "-A")
     git(base, "commit", "-q", "-m", "inicio")
     wt = os.path.join(base, ".claude", "worktrees", "x")
@@ -75,7 +78,8 @@ def main():
     tmp = tempfile.mkdtemp(prefix="cierre_verde_")
     base, wt = casa(tmp, rojo=False)
     salida = cerrar(base, wt, tmp)
-    check("CASA BASE ROJA" not in salida and "en verde" in salida, "dice en verde: %r" % salida[-200:])
+    check("CASA BASE ROJA" not in salida and "en verde" in salida,
+          "dice en verde (y el permiso del cierre no llega a los tests): %r" % salida[-200:])
 
     print("\ntest_cerrar_sesion_verifica_base: %d fallos" % len(fallos))
     return 1 if fallos else 0

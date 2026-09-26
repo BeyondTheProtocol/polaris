@@ -530,6 +530,10 @@ def _verificar_en_casa_base(tope_s=600):
         env = dict(os.environ)
         for k in ("BTP_STATE_DIR", "BTP_REPO", "CLAUDE_PROJECT_DIR"):
             env.pop(k, None)
+        # Ni los permisos de excepción con los que se llama al cierre (`BTP_GIT_BASE_OK=1`…): el
+        # 26-sep daban `test_fuga.sh` rojo en casa base porque el muro veía el permiso puesto.
+        for k in [k for k in env if re.match(r"(BTP_\w*_OK|MURO_ALLOW\w*|BTP_CIERRE_SIN_VERIFICAR)$", k)]:
+            env.pop(k, None)
         try:
             p = subprocess.run(cmd, cwd=BASE, env=env, capture_output=True, text=True,
                                timeout=tope_s, stdin=subprocess.DEVNULL)
