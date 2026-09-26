@@ -1,17 +1,17 @@
 {
-  "_por_que": "24-sep-26. test_biomarcadores_vhio.py es la única defensa de que las 3 analíticas {{CENTRO}} transcritas (CA15.3 509,5, Hb 7,8) siguen entrando y marcándose fuera de rango. Si al quitar una de estas piezas el test sigue verde, esa pieza no está cubierta.",
+  "_por_que": "24-sep-26. test_biomarcadores_vhio.py es la única defensa de que las 3 analíticas {{CENTRO}} transcritas (CA15.3 509,5, Hb 7,8) siguen entrando y marcándose fuera de rango. Si al quitar una de estas piezas el test sigue verde, esa pieza no está cubierta. 26-sep-26: + censurados, lista blanca de MD Anderson, solo_valor y fecha de toma (test_biomarcadores_hormonas.py).",
   "objetivo": "tools/biomarcadores.py",
   "test": [
     "sh",
     "-c",
-    "python3 tests/test_biomarcadores_vhio.py && python3 tests/test_biomarcadores_ggt_alias.py"
+    "python3 tests/test_biomarcadores_vhio.py && python3 tests/test_biomarcadores_ggt_alias.py && python3 tests/test_biomarcadores_hormonas.py"
   ],
   "env": "BTP_BIOMARCADORES",
   "mutaciones": [
     {
       "etiqueta": "fuera de rango: nunca se calcula por valor/rango (solo el asterisco del OCR)",
-      "viejo": "    if not fuera and valor is not None and ref_low is not None and ref_high is not None:\n        fuera = valor < ref_low or valor > ref_high",
-      "nuevo": "    if False:\n        fuera = valor < ref_low or valor > ref_high"
+      "viejo": "    if not fuera and valor is not None and ref_low is not None and ref_high is not None:\n        # con «<X»",
+      "nuevo": "    if False:\n        # con «<X»"
     },
     {
       "etiqueta": "unidad: la familia x10e3 deja de reconocerse (el 10^9/L transcrito no casaría)",
@@ -27,6 +27,26 @@
       "etiqueta": "alias GGT: 'gamma gt' se cae de la lista (vuelve a perder el corpus histórico)",
       "viejo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\", \"gamma gt\"",
       "nuevo": "\"ggt\", \"gamma-glutamil\", \"gamma glutamil\""
+    },
+    {
+      "etiqueta": "censurado: el «<» deja de viajar con el punto (el panel volvería a enseñar «<9» como 9)",
+      "viejo": "    if cmp:\n        punto[\"cmp\"] = cmp",
+      "nuevo": "    if False:\n        punto[\"cmp\"] = cmp"
+    },
+    {
+      "etiqueta": "MD Anderson: la lista blanca deja de aplicarse (su hemograma sin cotejar entraría en las series)",
+      "viejo": "            if permitidas is not None and ent[\"key\"] not in permitidas:\n                continue",
+      "nuevo": "            if False:\n                continue"
+    },
+    {
+      "etiqueta": "solo_valor: «Estradiol libre» vuelve a leerse como estradiol",
+      "viejo": "    if all(c.get(\"solo_valor\") for c in candidatos) and not re.match(",
+      "nuevo": "    if False and not re.match("
+    },
+    {
+      "etiqueta": "fecha de MD Anderson: se pierde la de la toma y cae a la del informe",
+      "viejo": "    m = _RE_TOMA_MUESTRA.search(texto[:6000])",
+      "nuevo": "    m = None"
     }
   ]
 }

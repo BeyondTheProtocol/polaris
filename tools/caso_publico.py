@@ -412,6 +412,11 @@ def _direccion(valor, lo, hi, fuera):
     return "fuera"  # el informe lo marcó y su rango no está: se respeta, sin inventar lado
 
 
+# Sin banda «habitual»: su rango depende de la fase del ciclo y desde jun-2024 Murcia no lo imprime.
+# Un punto sin rango propio NO hereda uno (salía «rango 0–440 *» en el estradiol; `verificacion`, 26-sep).
+SIN_BANDA = {"estradiol", "fsh", "lh"}
+
+
 def analiticas(bio):
     grupos = {}
     for gk, g in (bio.get("grupos") or {}).items():
@@ -423,7 +428,8 @@ def analiticas(bio):
             if "(derivado)" in (a.get("nombre") or "") or any(
                     str(p.get("fuente", "")).startswith("derivado") for p in a.get("puntos", [])):
                 continue
-            ref = a.get("ref") or {}
+            sin_banda = a["key"] in SIN_BANDA
+            ref = {} if sin_banda else (a.get("ref") or {})
             puntos = []
             for p in a.get("puntos", []):
                 if p.get("confianza") == "baja":
@@ -439,13 +445,19 @@ def analiticas(bio):
                     # la banda, se juzga contra esa misma banda; si no, saldría a 2× y «dentro».
                     fuera = (hi is not None and p["valor"] > hi) or \
                             (lo is not None and p["valor"] < lo)
-                puntos.append({"f": p["fecha"], "v": p["valor"], "lo": lo, "hi": hi,
-                               "ref_de": "informe" if propio else "banda",
-                               "fuera": _direccion(p["valor"], lo, hi, fuera)})
+                pt = {"f": p["fecha"], "v": p["valor"], "lo": lo, "hi": hi,
+                      "ref_de": "informe" if propio else "banda",
+                      "fuera": _direccion(p["valor"], lo, hi, fuera)}
+                # «<9»: el laboratorio solo da un límite; la página lo escribe con su «<», nunca como 9
+                if p.get("cmp") in ("<", ">"):
+                    pt["cmp"] = p["cmp"]
+                if propio and p.get("ref_fase") == "folicular":
+                    pt["ref_fase"] = {"es": "fase folicular", "en": "follicular phase"}
+                puntos.append(pt)
             puntos.sort(key=lambda x: x["f"])  # la gráfica une puntos en orden: no fiarse
             if puntos:
                 analitos.append({"key": a["key"], "nombre": a["nombre"], "unidad": a["unidad"],
-                                 "ref": a.get("ref"), "puntos": puntos})
+                                 "ref": None if sin_banda else a.get("ref"), "puntos": puntos})
         if analitos:
             grupos[gk] = {"nombre": g.get("nombre"), "analitos": analitos}
     return {
@@ -457,12 +469,18 @@ def analiticas(bio):
         # PDF original (antes, de una transcripción que omitía filas y rangos).
         "fuente": {"es": "Informes de laboratorio, leídos por el lector de analíticas y fechados "
                          "por el día de la extracción. Las tres de agosto y septiembre de 2026 se "
-                         "extraen del PDF original del laboratorio. Solo muestras de sangre y solo lo "
-                         "leído con confianza alta o media; nada calculado por nosotros.",
+                         "extraen del PDF original del laboratorio. De la analítica de MD Anderson "
+                         "(julio de 2024), solo los marcadores poco frecuentes y las hormonas; su CA 15-3 "
+                         "y su CEA, medidos con otra técnica, no se mezclan con la serie de Murcia. Solo "
+                         "muestras de sangre y solo lo leído con confianza alta o media; nada calculado por nosotros. El signo < "
+                         "marca un valor por debajo del límite que mide el laboratorio.",
                    "en": "Lab reports, read by the lab parser and dated by the day the sample was "
                          "drawn. The three from August and September 2026 are extracted from the "
-                         "lab's original PDF. Blood samples only, only values read with high or "
-                         "medium confidence, nothing calculated by us."},
+                         "lab's original PDF. From the MD Anderson panel (July 2024), only the "
+                         "uncommon markers and the hormones; its CA 15-3 and CEA, run with a different "
+                         "assay, are kept out of the Murcia series. Blood samples only, only values read with high or medium "
+                         "confidence, nothing calculated by us. The < sign marks a value below the limit "
+                         "the lab can measure."},
         "grupos": grupos,
     }
 

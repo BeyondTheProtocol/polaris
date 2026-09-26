@@ -59,6 +59,7 @@ GRUPOS = {
     "renal_hepatico": "Renal · hepático · metabólico",
     "electrolitos": "Electrolitos · calcio",
     "marcadores": "Marcadores tumorales",
+    "hormonas": "Tiroides · hormonas",
 }
 
 ANALITOS = [
@@ -138,6 +139,30 @@ ANALITOS = [
          aliases=["cea", "antígeno carcinoembrionario"], unit_fam="ng/ml", unidad="ng/mL"),
     dict(key="ca125", nombre="CA 125", grupo="marcadores",
          aliases=["ca 125", "ca125"], unit_fam="ui/ml", unidad="UI/mL"),
+    # 26-sep-2026 ({{TITULAR}}, panel /datos «más analítica»): estaban en los informes y no se extraían.
+    dict(key="ca199", nombre="CA 19-9", grupo="marcadores",
+         aliases=["ca 19.9", "ca 19-9", "ca 19,9", "ca19.9", "ca19-9"], unit_fam="ui/ml", unidad="UI/mL"),
+    dict(key="ca2729", nombre="CA 27.29", grupo="marcadores",
+         aliases=["ca 27.29", "ca 27-29", "ca 27,29", "ca27.29"], unit_fam="ui/ml", unidad="UI/mL"),
+    dict(key="b2m", nombre="Beta-2-microglobulina", grupo="marcadores",
+         aliases=["beta 2-microglobulina", "beta-2-microglobulina", "beta 2 microglobulina",
+                  "beta2-microglobulina", "beta2 microglobulina"], unit_fam="mg/l", unidad="mg/L"),
+    dict(key="cga", nombre="Cromogranina A", grupo="marcadores",
+         aliases=["cromogranina a"], unit_fam="ug/l", unidad="µg/L"),
+    dict(key="nse", nombre="Enolasa neuronal específica (NSE)", grupo="marcadores",
+         aliases=["enolasa específica neuronal", "enolasa especifica neuronal",
+                  "enolasa neuronal específica", "enolasa neuronal especifica"], unit_fam="ng/ml", unidad="ng/mL"),
+    # — Tiroides · hormonas — (alias con espacio final: «lh» a secas casaría cualquier línea que empiece así)
+    dict(key="tsh", nombre="TSH", grupo="hormonas",
+         aliases=["tsh "], unit_fam="uui/ml", unidad="µUI/mL", solo_valor=True),
+    dict(key="t4l", nombre="T4 libre", grupo="hormonas",
+         aliases=["t4 libre"], unit_fam="ng/dl", unidad="ng/dL", solo_valor=True),
+    dict(key="estradiol", nombre="Estradiol", grupo="hormonas",
+         aliases=["estradiol "], unit_fam="pg/ml", unidad="pg/mL", solo_valor=True),
+    dict(key="fsh", nombre="FSH", grupo="hormonas",
+         aliases=["fsh "], unit_fam="mui/ml", unidad="mUI/mL", solo_valor=True),
+    dict(key="lh", nombre="LH", grupo="hormonas",
+         aliases=["lh "], unit_fam="mui/ml", unidad="mUI/mL", solo_valor=True),
 ]
 
 # índice alias → entradas (varias si comparten prefijo, p.ej. neutrófilos abs/%)
@@ -162,6 +187,20 @@ def unit_family(u):
         return "pct"
     if s.startswith("mg/dl"):
         return "mg/dl"
+    # µUI/mL = mUI/L = µIU/mL: la misma magnitud (TSH), la escriba como la escriba cada laboratorio
+    if s.startswith(("uui/ml", "uiu/ml", "mu/l", "mui/l", "miu/l")):
+        return "uui/ml"
+    if s.startswith(("mui/ml", "mu/ml", "miu/ml")):
+        return "mui/ml"
+    if s.startswith("ng/dl"):
+        return "ng/dl"
+    if s.startswith("pg/ml"):
+        return "pg/ml"
+    # mg/L = µg/mL (beta-2-microglobulina: Murcia en mg/L, MD Anderson en mcg/mL)
+    if s.startswith(("mg/l", "mcg/ml", "ug/ml")):
+        return "mg/l"
+    if s.startswith(("mcg/l", "ug/l")):
+        return "ug/l"
     if s.startswith("g/dl"):
         return "g/dl"
     if s.startswith("meq/l") or s.startswith("mmol/l"):
@@ -188,16 +227,21 @@ def _num(s):
         return None
 
 
-# valor + unidad + rango opcional, tras el alias (analitos CON unidad)
+# valor + unidad + rango opcional, tras el alias (analitos CON unidad). El valor puede venir
+# CENSURADO («<15», «<9»): el laboratorio solo dice que está por debajo de su límite. Antes la regex
+# saltaba el «<» y el panel público enseñaba «<9 U/L» como 9 (ALT/AST abr-2024, PCR may-2024:
+# cazado el 26-sep-2026). Ahora el comparador viaja con el punto (`cmp`) y el valor es el límite.
 _RE_CON_UNIDAD = re.compile(
-    r"(\*{0,2})\s*(-?\d+(?:[.,]\d+)?)\s+([^\s]+)"
+    r"(\*{0,2})\s*([<>]?)\s*(-?\d+(?:[.,]\d+)?)\s+([^\s]+)"
     r"(?:\s+(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?))?"
 )
 # valor + rango opcional, sin unidad (índices tipo NLR)
 _RE_SIN_UNIDAD = re.compile(
-    r"(\*{0,2})\s*(-?\d+(?:[.,]\d+)?)"
+    r"(\*{0,2})\s*([<>]?)\s*(-?\d+(?:[.,]\d+)?)"
     r"(?:\s+(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?))?"
 )
+# rango escrito como «< 34 U/mL» (MD Anderson): límite superior, sin inferior impreso
+_RE_RANGO_MENOR = re.compile(r"^\s*<\s*(\d+(?:[.,]\d+)?)")
 
 
 # Muestras que NO son sangre: el mismo analito (LDH, glucosa, albúmina, CEA…) medido en otro líquido
@@ -212,6 +256,7 @@ def parse_line(line):
     """Devuelve (entrada_analito, dict_punto) o None. dict_punto: valor, unidad,
     ref_low, ref_high, fuera, confianza."""
     compact = re.sub(r"\s+", " ", line).strip()
+    compact = re.sub(r"^\(i\)\s*", "", compact)  # MD Anderson marca con «(i)» algunas pruebas
     if not compact or compact.startswith("-") or compact.startswith("."):
         return None
     if _RE_NO_SANGRE.search(compact):
@@ -226,6 +271,10 @@ def parse_line(line):
         return None
     candidatos = _ALIAS_IDX[matched_alias]
     tail = compact[len(matched_alias):].strip()
+    # `solo_valor`: tras el nombre viene el valor, no otra palabra («Estradiol libre», «TSH receptor»
+    # son OTRA prueba con el mismo prefijo)
+    if all(c.get("solo_valor") for c in candidatos) and not re.match(r"[*<>:\d-]", tail):
+        return None
 
     # ¿hay candidato con unidad o es índice sin unidad?
     tiene_unidad = any(c["unit_fam"] is not None for c in candidatos)
@@ -234,7 +283,11 @@ def parse_line(line):
         m = _RE_CON_UNIDAD.search(tail)
         if not m:
             return None
-        flag, val, unidad_raw, rlo, rhi = m.groups()
+        flag, cmp, val, unidad_raw, rlo, rhi = m.groups()
+        if rlo is None:
+            mm = _RE_RANGO_MENOR.match(tail[m.end():])
+            if mm:
+                rlo, rhi = "0", mm.group(1)
         valor = _num(val)
         if valor is None:
             return None
@@ -248,7 +301,7 @@ def parse_line(line):
         m = _RE_SIN_UNIDAD.search(tail)
         if not m:
             return None
-        flag, val, rlo, rhi = m.groups()
+        flag, cmp, val, rlo, rhi = m.groups()
         valor = _num(val)
         if valor is None:
             return None
@@ -261,7 +314,14 @@ def parse_line(line):
     # comparamos valor vs [ref_low, ref_high] además de mirar el flag.
     fuera = bool(flag and "*" in flag)
     if not fuera and valor is not None and ref_low is not None and ref_high is not None:
-        fuera = valor < ref_low or valor > ref_high
+        # con «<X» solo se sabe que está por debajo de X: fuera si X ya es menor que el mínimo
+        # (o mayor que el máximo con «>X»); «<9» con rango 7-35 NO se puede dar por fuera
+        if cmp == "<":
+            fuera = valor <= ref_low
+        elif cmp == ">":
+            fuera = valor >= ref_high
+        else:
+            fuera = valor < ref_low or valor > ref_high
 
     # confianza
     if unidad_ok and ref_low is not None and ref_high is not None:
@@ -273,6 +333,11 @@ def parse_line(line):
 
     punto = dict(valor=valor, unidad=elegido["unidad"], ref_low=ref_low,
                  ref_high=ref_high, fuera=fuera, confianza=conf)
+    if cmp:
+        punto["cmp"] = cmp
+    # MD Anderson imprime un rango POR FASE del ciclo y el primero es el folicular: que viaje dicho
+    if ref_high is not None and re.search(r"\bF\.?\s*Folicular", tail, re.I):
+        punto["ref_fase"] = "folicular"
     return elegido, punto
 
 
@@ -291,7 +356,19 @@ _RE_RECEPCION = re.compile(
     re.I)
 
 
+# MD Anderson escribe el mes en letra: «Fecha toma muestra: 12/Jul/2024».
+_MESES = {"ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7, "ago": 8,
+          "sep": 9, "oct": 10, "nov": 11, "dic": 12}
+_RE_TOMA_MUESTRA = re.compile(r"Fecha\s+toma\s+muestra\s*:\s*(\d{1,2})/([A-Za-z]{3})[a-z]*/(\d{4})", re.I)
+
+
 def fecha_de(path, texto):
+    m = _RE_TOMA_MUESTRA.search(texto[:6000])
+    if m and m.group(2).lower() in _MESES:
+        try:
+            return datetime.date(int(m.group(3)), _MESES[m.group(2).lower()], int(m.group(1))).isoformat()
+        except ValueError:
+            pass
     m = _RE_RECEPCION.search(texto[:6000])
     if m:
         d, mes, a = (int(x) for x in m.groups())
@@ -307,14 +384,33 @@ def fecha_de(path, texto):
     return m.group(1) if m else None
 
 
+# Informes de sangre que no se llaman «Lab - Analítica». De ellos se extraen SOLO las claves listadas:
+# el resto de su hemograma/bioquímica viene en otras unidades y formatos (MD Anderson: «10 /µL» partido
+# en dos líneas) y no se ha cotejado, así que no entra en las series existentes.
+FUENTES_EXTRA = {
+    "bioquímica (md anderson)": {"ca199", "ca2729", "ca125", "b2m", "cga", "nse",
+                                 "tsh", "t4l", "estradiol", "fsh", "lh"},
+}
+
+
+def claves_permitidas(path):
+    """None = todas (analítica normal); un set = solo esas (fuente extra)."""
+    name = os.path.basename(path).lower()
+    for patron, claves in FUENTES_EXTRA.items():
+        if patron in name:
+            return claves
+    return None
+
+
 def listar_analiticas():
-    """Solo ficheros de Analítica (excluye Microbiología, Anatomía, etc.)."""
+    """Solo ficheros de Analítica (excluye Microbiología, Anatomía, etc.) y las FUENTES_EXTRA."""
     if not os.path.isdir(RAG_MD):
         return []
     out = []
     for p in glob.glob(os.path.join(RAG_MD, "*.md")):
         name = os.path.basename(p).lower()
-        if " - lab - analítica" in name or " - lab - analitica" in name:
+        if " - lab - analítica" in name or " - lab - analitica" in name \
+                or any(pat in name for pat in FUENTES_EXTRA):
             out.append(p)
     return sorted(out)
 
@@ -333,12 +429,15 @@ def build():
         if not fecha:
             continue
         fuente = os.path.basename(path)
+        permitidas = claves_permitidas(path)
         visto_en_archivo = 0
         for line in texto.splitlines():
             r = parse_line(line)
             if not r:
                 continue
             ent, punto = r
+            if permitidas is not None and ent["key"] not in permitidas:
+                continue
             punto["fecha"] = fecha
             punto["fuente"] = fuente
             visto_en_archivo += 1
@@ -387,7 +486,8 @@ def build():
                 # ref_low/ref_high de SU informe: el panel /datos normaliza a ×LSN punto a
                 # punto; con la banda «más frecuente» un lab con otro rango saldría desplazado.
                 puntos=[dict({k: p[k] for k in ("fecha", "valor", "fuera", "confianza", "fuente")},
-                             ref_low=p.get("ref_low"), ref_high=p.get("ref_high"))
+                             ref_low=p.get("ref_low"), ref_high=p.get("ref_high"),
+                             **{k: p[k] for k in ("cmp", "ref_fase") if p.get(k)})
                         for p in puntos_ok]))
         if analitos_out:
             grupos_out[g_key] = {"nombre": g_nombre, "analitos": analitos_out}
