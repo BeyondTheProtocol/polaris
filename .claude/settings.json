@@ -116,6 +116,17 @@
         ]
       },
       {
+        "_comment": "Lo que sale a scite pasa por el muro (26-sep-26, hallazgo A1 del prompt-audit, plan aprobado por {{TITULAR}}). Las reglas de .claude/rules/scite-mcp.md tienen paths: y no se cargan al llamar a scite; nadie miraba los argumentos en interactivo (en el lazo muro_guard ya deniega todo MCP). Deniega escribir colecciones, pasa los textos por borde.egress_cientifico (misma politica que tools/scite_mcp.py) y deniega 3+ senas del caso juntas (borde.senas_caso). Arranca en modo SOMBRA (tools/state/scite_guard_modo): apunta y avisa sin bloquear; pasar a 'bloquea' es OK de {{TITULAR}}. Log sin texto crudo. Escotilla: BTP_SCITE_OK=1.",
+        "matcher": "mcp__scite__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/scite_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "_comment": "Un correo, UN borrador (18-sep-26, norma feedback-borrador-mejorado-borra-el-anterior, clase BLOQUEO y repetida). Medido sobre los transcripts reales: 47 llamadas a create_draft y 8 pares (destinatario, asunto) con mas de un borrador, uno de ellos SEIS veces — 14 borradores redundantes de 47. Lleva una libreta local de que hilos ya tienen borrador nuestro (tools/state/borradores_correo.json) y deniega un create_draft repetido; update_draft NO se toca, que es justo lo que la norma pide hacer en su lugar. La clave es el threadId si viene y si no (destinatario, asunto SIN Re:/RE:/Fwd:/[Extern]) — sin normalizar los prefijos se colaban justo los casos reales. Caduca a 30 dias por si ella borro el borrador a mano en Gmail. FAIL-OPEN. Escotilla: BTP_BORRADOR_OK=1.",
         "matcher": "mcp__.*__(create|update)_draft",
         "hooks": [

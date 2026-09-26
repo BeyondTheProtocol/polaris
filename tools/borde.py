@@ -434,6 +434,42 @@ def egress_cientifico(texto, *, destino="buscador-ingeniero"):
     return fin(True, "ok (ingeniero genérico, sin identificador de paciente)")
 
 
+# «Tres señas» (regla de scite, `.claude/rules/scite-mcp.md`, 26-sep-26). Cada seña por separado es
+# terminología y puede salir; tres juntas en la misma consulta dibujan a una paciente concreta.
+_SENA_EDAD = re.compile(r"\b\d{2}\s?(?:años|anos|a\.|year[- ]?old|yo|y/o)\b", re.I)
+_SENA_HISTO = re.compile(r"\b(?:(?i:lobulillar|lobular|ductal|neuroendocrin\w*|adenocarcinoma|"
+                         r"carcinoma\s+(?:invasivo|infiltrante|mixto))|NST|ILC|IDC|NEC|NET)\b")
+# (las siglas, en mayúsculas: «net benefit» no es un tumor neuroendocrino)
+_SENA_RECEPT = re.compile(r"\b(?:RH|HR|RE|RP|ER|PR)\s?[+\-−]|\bHER-?2\s?(?:[+\-−]|low|bajo|0|neg\w*|pos\w*)"
+                          r"|\bluminal\s?[AB]\b|\btriple\s+negativ\w*", re.I)
+_SENA_LINEA = re.compile(r"\b(?:primera|segunda|tercera|cuarta|quinta|first|second|third|fourth)"
+                         r"[\s-]+(?:l[ií]nea|line)\b|\b[1-6]L\b|\btras\s+(?:fallo\s+(?:de|a)\s+)?\w+i\b"
+                         r"|\bafter\s+(?:progression\s+on\s+)?\w+(?:ib|ab|i)\b|\bpretratad\w*|\bpre-?treated\b",
+                         re.I)
+
+
+def senas_caso(texto):
+    """(n, [señas]) — cuántas categorías de la «regla de las tres señas» hay en el texto: edad
+    exacta, histología, receptores, variante somática, línea de tratamiento. Con 3 o más, la
+    consulta ya describe a UNA paciente aunque no lleve su nombre. Solo cuenta; decide quien llama.
+    Sin efectos (no sella en el ledger): lo usa un hook con 5 s de presupuesto."""
+    if not isinstance(texto, str) or not texto.strip():
+        return 0, []
+    norm, _low = _normalizar(texto)
+    senas = []
+    if _SENA_EDAD.search(norm) or _RE_EDAD_SEXO.search(norm):
+        senas.append("edad")
+    if _SENA_HISTO.search(norm):
+        senas.append("histología")
+    if _SENA_RECEPT.search(norm) or _RE_CLIN_PCT.search(norm):
+        senas.append("receptores")
+    if _RE_VAR.search(norm) or _RE_VAR_CORTO.search(norm):
+        senas.append("variante")
+    if _SENA_LINEA.search(norm):
+        senas.append("línea de tratamiento")
+    return len(senas), senas
+
+
 def de_identificar(texto):
     """(texto_redactado, n). Sustituye los tramos sensibles por marcadores. Utilidad para la
     'consulta protegida' (preguntar de forma genérica). NO se usa para auto-enviar a ciegas:

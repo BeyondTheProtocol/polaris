@@ -7,6 +7,8 @@ paths:
   - ".claude/agents/verificacion.md"
 ---
 
+> **Freno (26-sep-26):** `.claude/hooks/scite_guard.py` aplica esta regla en cada llamada `mcp__scite__*` (colecciones, `borde.egress_cientifico`, tres señas) y `tools/scite_mcp.py` la misma en el lazo. Arranca en modo sombra (`tools/state/scite_guard_modo`); pasar a `bloquea` es OK de {{TITULAR}}. Los prompts `fact-check-claim` y `systematic-review-screen` no los ve ningún hook.
+
 # Scite por MCP: qué puede salir y qué no
 
 Auditoría del 2-sep-2026 (`acceso-herramientas`), con el mismo listón que dejó a Elicit en

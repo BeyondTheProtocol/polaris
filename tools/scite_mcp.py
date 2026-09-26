@@ -191,6 +191,13 @@ def _clave_estatica(servicio):
         return None
 
 
+ESCRIBE_COLECCIONES = {
+    "create_collection", "update_collection", "delete_collection",
+    "add_dois_to_collection", "remove_dois_from_collection",
+    "create_collection_note", "update_collection_note", "delete_collection_note",
+}
+
+
 def _borde_check(query, destino):
     """MURO: ninguna consulta sale a un buscador externo sin pasar el borde.
     FAIL-CLOSED: si borde no carga, se bloquea (no se sale a ciegas)."""
@@ -205,7 +212,15 @@ def _borde_check(query, destino):
         ok, motivo = borde.egress_cientifico(query, destino=destino)
         if not ok:
             sys.stderr.write("BORDE: no envio a %s - %s\n" % (destino, motivo))
-        return ok
+            return False
+        # «Tres señas» (26-sep-26, misma política que .claude/hooks/scite_guard.py): edad,
+        # histología, receptores, variante y línea juntas describen a una paciente concreta.
+        n, senas = borde.senas_caso(query)
+        if n >= 3:
+            sys.stderr.write("BORDE: no envio a %s - %d señas del caso juntas (%s)\n"
+                             % (destino, n, ", ".join(senas)))
+            return False
+        return True
     except Exception:
         sys.stderr.write("[%s] ERROR: borde.py no disponible - llamada BLOQUEADA\n" % destino)
         return False
@@ -229,6 +244,10 @@ def main():
     if not (login or list_tools) and not query:
         print("uso: scite_mcp.py [--json] [--tool NAME] \"pregunta\"  |  --login  |  --tools", file=sys.stderr)
         sys.exit(2)
+    # MURO: las colecciones son de solo lectura para los agentes (regla scite-mcp.md, 26-sep-26).
+    if tool.split("__")[-1] in ESCRIBE_COLECCIONES:
+        sys.stderr.write("BORDE: %s escribe colecciones de scite; los agentes solo leen\n" % tool)
+        sys.exit(3)
     # MURO: fail-closed antes de salir a scite.
     if query and not _borde_check(query, "scite"):
         sys.exit(3)

@@ -151,6 +151,7 @@
     "rama_vista_guard",
     "regla_en_accion",
     "salida_guard",
+    "scite_guard",
     "session_start",
     "singleton_guard",
     "subagente_contexto",

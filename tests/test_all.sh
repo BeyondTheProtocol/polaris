@@ -100,6 +100,7 @@ runpy test_kpi_ned.py
 runpy test_backup.py
 runpy test_dependencias.py
 runpy test_saldo_aprende.py
+runpy test_scite_guard.py
 runpy test_salud_reconciliar.py
 runpy test_hoy_ruta_unica.py
 runpy test_obs_nombra_el_trabajo.py
