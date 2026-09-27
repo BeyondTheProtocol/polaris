@@ -255,7 +255,9 @@ FAMILIAS = [
     # helptitular.com: el carril que la actualiza sola, su lint y su marcha atrás (20-sep-26)
     ("la web pública", ("web_novedad", "web_lint", "web_revertir", "web_",
                         # el panel clínico público /datos: caso.json con fuente y sello (24-sep-26)
-                        "caso_publico")),
+                        "caso_publico",
+                        # el esqueleto de fondo de /lesiones, entero, desde BodyParts3D (27-sep-26)
+                        "esqueleto_referencia")),
     ("redes y prensa", ("x_", "wa_", "ig_", "dm_", "yt_", "instagram",
                         "youtube", "prensa", "umami", "redes", "reel_")),
     ("buscar y verificar", ("grok", "perplexity", "nvidia", "consensus",

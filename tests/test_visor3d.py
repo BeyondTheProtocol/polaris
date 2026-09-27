@@ -287,5 +287,15 @@ try:
 except SystemExit:
     check(True, "semilla fuera del volumen aborta")
 
+# 17) Una lesión en otro marco (sin restar el centro del hígado) se caza antes de escribirla.
+#     Es el fallo del 27-sep: la diana s.II se publicó 24 cm por debajo del hígado.
+hig = np.array([[-110.0, -60, -80], [105, 60, 80]])
+buena = np.array([[-105.0, 5, 48], [-90, 22, 61]])
+otro_marco = buena + np.array([9.4, 9.4, -241.8])
+check(V._fuera_del_contenedor(hig, {"lesion01": buena, "lesion02": buena}) == [],
+      "lesiones dentro del hígado pasan el freno")
+check(V._fuera_del_contenedor(hig, {"lesion01": otro_marco, "lesion02": buena}) == ["lesion01"],
+      "una lesión en otro marco se nombra y no pasa")
+
 print("\nVEREDICTO: %s" % ("TODO CORRECTO" if not fallos else "%d FALLOS" % len(fallos)))
 sys.exit(1 if fallos else 0)

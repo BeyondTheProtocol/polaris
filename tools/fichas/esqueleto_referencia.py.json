@@ -1,0 +1,11 @@
+{
+ "pieza": "esqueleto_referencia.py",
+ "estado_ficha": "completa",
+ "para": "Dibujar el esqueleto de fondo de /lesiones y /mapa-metastasis ENTERO (cabeza a pies, brazos abajo, caja cerrada por los cartílagos costales) desde el atlas público BodyParts3D (CC BY 4.0), con el mismo contrato PNG + esqueleto.json de centroides por nombre TotalSegmentator que usa EsqueletoFocos.vue.",
+ "cuando_si": "Cuando lo que manda es que la figura esté completa y bien dibujada; los focos siguen siendo suyos y se colocan por el centroide de su hueso.",
+ "cuando_no": "Cuando haga falta SU anatomía medida (volúmenes, posición real de un hueso suyo): eso es visor3d.py esqueleto, sobre su TC, que no llega a los pies ni trae los brazos abajo.",
+ "reemplaza": "Ninguna pieza: visor3d.py esqueleto sigue para su TC. Sustituye solo el PNG/JSON que publica la web.",
+ "test": "tests/test_esqueleto_referencia.py",
+ "alta": "2026-09-27",
+ "origen": "{{TITULAR}}, 27-sep-2026: «quiero un esqueleto así [los ejemplos de TotalSegmentator]; el que hay ahora parece partido por la mitad sin la parte que cierra»."
+}

@@ -392,6 +392,7 @@ runpy test_mutantes.py
 runpy test_visor3d.py
 runpy test_visor3d_mps.py
 runpy test_esqueleto_niveles.py
+runpy test_esqueleto_referencia.py
 runpy test_secretos_largos.py
 runpy test_secretos_largos_paralelo.py
 runpy test_guarda_memoria.py

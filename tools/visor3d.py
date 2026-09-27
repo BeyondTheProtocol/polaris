@@ -4141,6 +4141,17 @@ def _cmd_exporta(a):
     return 0
 
 
+def _fuera_del_contenedor(contenedor, piezas, margen_mm=2.0):
+    """Nombres de las piezas cuya caja se sale de la del contenedor (con margen para lo que
+    toca la cápsula). Todo en el MISMO marco. Nació el 27-sep-2026: lesion01.ply (diana s.II)
+    se sustituyó sin restar el centro del hígado y se publicó 24 cm por debajo de él; el visor
+    cargaba sin errores y solo se vio mirando. El mismo freno vive en la web
+    (scripts/test-mallas-3d.ts); aquí para que no llegue a escribirse."""
+    lo, hi = contenedor.min(0) - margen_mm, contenedor.max(0) + margen_mm
+    return sorted(k for k, v in piezas.items()
+                  if len(v) and ((v.min(0) < lo).any() or (v.max(0) > hi).any()))
+
+
 def _centro_web(vertices_higado, centro_de=None):
     """Centro de las mallas públicas (se resta en RAS antes de rotar a los ejes de three): el
     de la caja del hígado de la carpeta o, con `--centro-de`, el de la caja de OTRO PLY. Lo
@@ -4457,6 +4468,11 @@ def _cmd_web(a):
         if res:
             geos["vasos"] = (res[0], res[1], geos["vasos"][2])
     centro = _centro_web(geos["higado"][0], getattr(a, "centro_de", None))
+    fuera = _fuera_del_contenedor(geos["higado"][0] - centro,
+                                  {k: g[0] - centro for k, g in geos.items() if k.startswith("lesion")})
+    if fuera:
+        raise SystemExit("ABORTA: lesiones fuera del hígado %s (¿otro marco o --centro-de de otra "
+                         "carpeta?). Así se publicó la diana s.II 24 cm por debajo (27-sep)." % fuera)
     dst = _marca("web-lesiones", a.carpeta)
     os.makedirs(dst, exist_ok=True)
     total = 0
