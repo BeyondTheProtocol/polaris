@@ -450,6 +450,28 @@ def _es_humano(e):
     return crudo is not None and not es_automatico(crudo)
 
 
+def _es_humano_encolado(e):
+    """Mensaje que ELLA escribió mientras el agente trabajaba (27-sep-26).
+
+    Claude Code no lo guarda como prompt (`type: user`) sino como `attachment` de tipo
+    `queued_command`, sin `promptId`. Sin esto, su «Fusiona» a mitad de turno no contaba y tenía
+    que repetirlo (#247, #248). Solo vale el que Claude Code marca como humano: los mensajes de
+    otros agentes llegan con `origin: {kind: peer}` y los avisos de tareas con `commandMode:
+    task-notification`, y ninguno de los dos cuenta. Un JSON que imite esto dentro de un resultado
+    de herramienta no es una línea `attachment` del transcript: tampoco cuenta."""
+    a = e.get("attachment")
+    if (e.get("type") != "attachment" or not isinstance(a, dict) or a.get("type") != "queued_command"
+            or a.get("origin") != {"kind": "human"} or a.get("humanTurn") is not True
+            or a.get("commandMode") != "prompt" or e.get("isSidechain") is not False):
+        return False
+    p = a.get("prompt")
+    return isinstance(p, str) and not es_automatico(p)
+
+
+def _hash_texto(t):
+    return hashlib.sha256((t or "").encode("utf-8", "replace")).hexdigest()
+
+
 def _cuerpo(e):
     b = e.get("body")
     if not isinstance(b, str):
@@ -492,8 +514,10 @@ def contexto(d):
         f = open(ruta, encoding="utf-8")
     except Exception:
         return False, "no encuentro el transcript de la sesión", {}
-    humanos, drafts_antes, cambios, suyo = [], [], [], None
-    visto = []                      # lo que le escribí en la vuelta a la que contesta
+    # Primero se recoge TODO en orden; después se elige cuál es su orden. Con los mensajes
+    # encolados (sin promptId) la coincidencia se hace por el hash de su texto y puede aparecer
+    # después de otro candidato: decidir sobre la marcha, como antes, se quedaba con el primero.
+    eventos = []                    # ("h", entrada, texto) · ("t", texto mío) · ("d", borrador)
     with f:
         for linea in f:
             try:
@@ -503,28 +527,52 @@ def contexto(d):
             if not isinstance(e, dict):
                 continue
             if _es_humano(e):
-                humanos.append(e)
-                if e.get("promptId") == d["prompt_id"]:
-                    suyo = e
-                elif suyo is None:
-                    visto = []
+                eventos.append(("h", e, texto_prompt(e) or ""))
+                continue
+            if _es_humano_encolado(e):
+                eventos.append(("h", e, solo_suyo(e["attachment"]["prompt"]) or ""))
                 continue
             if e.get("type") == "assistant":
                 for b in (e.get("message") or {}).get("content") or []:
-                    if suyo is None and isinstance(b, dict) and b.get("type") == "text":
-                        visto.append(b.get("text") or "")
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        eventos.append(("t", b.get("text") or ""))
                     if (isinstance(b, dict) and b.get("type") == "tool_use"
                             and _DRAFT.search(b.get("name", "")) and isinstance(b.get("input"), dict)):
-                        (cambios if suyo is not None else drafts_antes).append(
-                            (len(humanos), b["input"]))
-    if suyo is None:
+                        eventos.append(("d", b["input"]))
+    hash_suyo = d.get("hash_prompt") or ""
+
+    def _es_el_suyo(ev):
+        e = ev[1]
+        if e.get("type") == "user":
+            return e.get("promptId") == d["prompt_id"]
+        crudo = e["attachment"]["prompt"]
+        return bool(hash_suyo) and hash_suyo in (_hash_texto(crudo), _hash_texto(crudo.strip()))
+
+    humanos = [i for i, ev in enumerate(eventos) if ev[0] == "h"]
+    candidatos = [i for i in humanos if _es_el_suyo(eventos[i])]
+    if not candidatos:
         return False, "su mensaje no está en el transcript como prompt humano", {}
-    if humanos[-1] is not suyo and humanos[-1].get("promptId") != d["prompt_id"]:
+    i_suyo = candidatos[-1]
+    texto = eventos[i_suyo][2]
+    if humanos[-1] != i_suyo:
         return False, "después de esa orden escribió otra cosa", {}
-    texto = texto_prompt(suyo) or ""
     if not es_orden(texto):
         return False, "su mensaje no contiene una orden de envío", {}
-    n_suyo = len(humanos)            # índice (1-based) de su orden entre los prompts humanos
+    antes = [i for i in humanos if i < i_suyo]
+    previo = antes[-1] if antes else -1
+    if eventos[i_suyo][1].get("type") == "attachment" and len(antes) >= 1:
+        # Encolado a mitad de turno: el turno lo abrió OTRO mensaje suyo, y lo que ella tenía
+        # delante al escribir la orden es también mi respuesta ANTERIOR a ese mensaje (ahí estaban
+        # el PR y su SHA en el caso real, #247 y #248). Se amplía una vuelta, no más.
+        previo = antes[-2] if len(antes) >= 2 else -1
+    visto = [ev[1] for ev in eventos[previo + 1:i_suyo] if ev[0] == "t"]   # lo que tenía delante
+    drafts_antes, cambios, nh = [], [], 0
+    for i, ev in enumerate(eventos):
+        if ev[0] == "h":
+            nh += 1
+        elif ev[0] == "d":
+            (cambios if i > i_suyo else drafts_antes).append((nh, ev[1]))
+    n_suyo = len(humanos)            # su orden es la última: su índice (1-based) entre los humanos
     hilos, drafts, en_vista = {}, {}, None
     for n, e in drafts_antes:
         info = {"cuerpo": _cuerpo(e), "destinos": destinatarios(e)}
