@@ -556,6 +556,56 @@ class SuFusionaAMitadDeTurno(_Base):
         self.assertEqual(self._merge(), "deny")
 
 
+class AbreElPR(_Base):
+    """27-sep-26 (deuda `ok_envio_no_entiende_abre_pr`): dentro de casa base `gh pr create` es
+    salida y su frase natural no abría nada. Ahora «abre el PR» abre SOLO abrir o editar un PR.
+    Se prueba por el camino real: la frase la emite el hook y se mira qué deja pasar el freno."""
+
+    FRASES_SUYAS = ["abre pr", "fusiona y abre pr",
+                    "Entonces has modificado el render? Haz pr y enseñame el preview",
+                    "y haz tu el pr  que quiero que tengas autonomia", "ábrelo como PR", "crea el PR"]
+    NO_SON_ORDEN = ["¿abrimos un PR?", "el PR que abriste está bien", "abrir un PR sería lo suyo",
+                    "¿has abierto el pr?"]
+
+    def _pr(self, cmd="gh pr create --title t --body b"):
+        return self._salida("Bash", {"command": cmd})
+
+    def _nueva_sesion(self):
+        self.sesion = str(uuid.uuid4())
+        self.transcript = os.path.join(self.tmp, self.sesion + ".jsonl")
+        open(self.transcript, "w").close()
+
+    def test_sus_frases_reales_dejan_crear_el_pr(self):
+        for t in self.FRASES_SUYAS:
+            self._nueva_sesion()
+            self._ordenar(t)
+            self.assertNotEqual(self._pr(), "deny", t)
+
+    def test_lo_que_no_es_orden_no_deja(self):
+        for t in self.NO_SON_ORDEN:
+            self._nueva_sesion()
+            self._ordenar(t)
+            self.assertEqual(self._pr(), "deny", t)
+
+    def test_sin_orden_gh_pr_create_en_casa_se_frena(self):
+        self._humano("mira esto")
+        self.assertEqual(self._pr(), "deny")
+
+    def test_abre_el_pr_no_deja_fusionar(self):
+        self._linea({"type": "assistant", "isSidechain": False, "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "El PR #224 está listo, cabeza 3f2a9c1e."}]}})
+        self._ordenar("abre el PR")
+        self.assertEqual(self._pr("gh pr merge 224 --match-head-commit " + SHA), "deny")
+
+    def test_fusiona_no_deja_crear_un_pr(self):
+        self._ordenar("fusiona")
+        self.assertEqual(self._pr(), "deny")
+
+    def test_abre_el_pr_no_deja_enviar_un_correo(self):
+        self._ordenar("abre el PR")
+        self.assertEqual(self._enviar(), "deny")
+
+
 class WebNovedadNoSeRompe(_Base):
 
     def _wn(self):

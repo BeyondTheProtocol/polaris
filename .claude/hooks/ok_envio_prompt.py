@@ -67,6 +67,11 @@ def main():
                      "**UNA** llamada, 10 minutos, y SOLO para `gh pr merge` del PR que ella nombró o "
                      "que tenía delante en tu último mensaje. No vale para enviar, publicar por otra "
                      "vía ni nada más.")
+        elif "pr" in abre and "programar" not in abre:
+            aviso = ("🔓 {{TITULAR}} ha pedido ABRIR un PR en este mensaje: el freno queda abierto para "
+                     "**UNA** llamada, 10 minutos, y SOLO para `gh pr create/edit/comment/ready/review`. "
+                     "No vale para fusionarlo (eso pide su «fusiona» con el SHA delante), enviar ni "
+                     "publicar por otra vía.")
         else:
             aviso = ("🔓 {{TITULAR}} ha pedido PROGRAMAR una tarea en este mensaje: el freno queda abierto "
                      "para **UNA** llamada, 10 minutos, y SOLO para crear, lanzar o cambiar una tarea "

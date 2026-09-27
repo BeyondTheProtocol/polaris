@@ -123,6 +123,23 @@ ORDEN_FUSIONAR = re.compile(
     r"haz\s+(?:el\s+)?merge\b"
     r")", re.I)
 
+# Órdenes de ABRIR un PR (27-sep-26, deuda `ok_envio_no_entiende_abre_pr`). Dentro de casa base
+# `gh pr create/edit/comment/ready/review` es salida, pero su frase natural no abría nada: escribió
+# «abre pr» y «fusiona y abre pr» (26-sep), antes «Haz pr y enséñame el preview» y «y haz tú el pr»
+# (20-sep), y solo pasaba diciendo «publícalo», que lo abre TODO. Abre el alcance «pr»: vale para
+# abrir o editar un PR y para nada más; fusionarlo sigue pidiendo su «fusiona» con el SHA delante.
+# Imperativo al principio de frase (como fusionar): «¿abrimos un PR?», «el PR que abriste» o
+# «abrir un PR sería…» no son órdenes.
+ORDEN_PR = re.compile(
+    r"(?:^|[\s,.;:¿?¡!])("
+    r"[áa]bre(?:lo|la)\s+(?:como|en)\s+(?:un\s+)?(?:pr|pull\s+request)\b|"
+    r"ya\s+puedes\s+(?:abrir|crear|hacer)\s+(?:el\s+|un\s+)?(?:pr|pull\s+request)\b"
+    r")|" + _INICIO + r"("
+    r"(?:abre|crea|haz)(?:\s+t[úu])?\s+(?:el\s+|un\s+|ese\s+|este\s+)?(?:pr|pull\s+request)\b"
+    r")", re.I)
+# Los `gh pr` que abre ese alcance (el merge NO: ese es «fusionar»).
+_PR_ABRE = re.compile(r"\bgh\s+pr\s+(?:create|edit|comment|ready|review)\b")
+
 # Si el mensaje habla de dejarlo en borrador, NO es una orden de envío aunque use el verbo.
 # `(?:lo|la|los|las)`: «no la envíes, envíala mañana» abría un envío hoy (verificacion, 24-sep-26).
 # Plural (25-sep-26): si la orden entiende «publícalos», el freno tiene que entender el plural y
@@ -164,7 +181,7 @@ def solo_suyo(texto):
     return INYECTADO.sub(" ", texto or "").strip()
 
 
-TODO = frozenset({"envio", "programar", "fusionar"})
+TODO = frozenset({"envio", "programar", "fusionar", "pr"})
 
 
 def alcance(texto):
@@ -183,6 +200,8 @@ def alcance(texto):
         out.add("programar")
     if ORDEN_FUSIONAR.search(texto):
         out.add("fusionar")
+    if ORDEN_PR.search(texto):
+        out.add("pr")
     return out
 
 
@@ -695,17 +714,22 @@ def comprobar_envio(ctx, entrada, tool=""):
     entrada = entrada or {}
     es_merge, numero = (pr_de_merge(entrada.get("command"))
                         if (tool or "") == "Bash" else (False, None))
+    es_pr = (tool or "") == "Bash" and not es_merge and bool(_PR_ABRE.search(entrada.get("command") or ""))
     que = ("programar" if PROGRAMAN.search(tool or "")
-           else "fusionar" if es_merge else "envio")
+           else "fusionar" if es_merge else "pr" if es_pr else "envio")
     if tool and not permite(ctx, que):
         a = (ctx or {}).get("alcance") or set()
         if que == "envio":
-            pidio = " y ".join(x for x in ("programar", "fusionar") if x in a) or "otra cosa"
+            pidio = " y ".join({"programar": "programar", "fusionar": "fusionar", "pr": "abrir un PR"}[x]
+                               for x in ("programar", "fusionar", "pr") if x in a) or "otra cosa"
             return "ella pidió %s, no enviar ni publicar" % pidio
         return ("su orden no cubre programar una tarea" if que == "programar"
+                else "su orden no cubre abrir ni editar un PR" if que == "pr"
                 else "su orden no cubre fusionar un PR")
     if que == "fusionar":
         return comprobar_fusion(ctx, numero, sha_de_merge(entrada.get("command")))
+    if que == "pr":
+        return ""        # abrir o editar un PR no publica: el merge sigue con su propio candado
     if "_push_shas" in entrada:
         return comprobar_push(ctx, entrada.get("_push_shas"))
     destinos = destinatarios(entrada)
@@ -738,14 +762,14 @@ def validar(k, sesion=None):
             # Su mensaje AQUÍ no abrió ninguno (si otra sesión tiene el suyo, ese no se toca):
             # hay que decirle qué frase lo abre.
             motivo = ("su mensaje en esta sesión no abrió permiso. "
-                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»")
+                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR»")
         return None, motivo, {}
     if sesion is not None and sesion != d.get("session_id"):
         # Segunda red: el fichero de MI sesión con el session_id de otra (copiado o renombrado a
         # mano) no vale. La firma cubre session_id, así que renombrar no hereda su permiso.
         borrar(sesion)
         return None, ("su mensaje en esta sesión no abrió permiso (el que hay es de otra sesión). "
-                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»"), {}
+                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR»"), {}
     if _usado(d):
         borrar(d.get("session_id"))
         return None, "ese mensaje suyo ya abrió un envío", {}
