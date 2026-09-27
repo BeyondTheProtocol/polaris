@@ -90,6 +90,18 @@ TAGS_NO_CLINICOS = {"Divulgación", "IA", "Equipo"}
 # ya lo enseña /ciencia y /datos se quedó en la clínica ({{TITULAR}}, 24-sep-2026, v2 del panel).
 SOLO_PRIVADO = ("molecular",)
 
+# El código de cada muestra (número de biopsia, de bloque, de revisión) se queda en el privado:
+# en la web se cuenta qué es cada muestra, no su sigla ({{TITULAR}}, 27-sep-2026). Además, ninguna
+# sigla puede colarse en NINGÚN texto público: ni las que vienen en `codigo` ni las que tienen
+# forma de número de anatomía patológica (24B-1043, VH26B 17664, VH-26-B-20538, B2026.22813,
+# 26-28381, 26B0008505).
+SOLO_PRIVADO_MATERIAL = ("codigo",)
+_RE_CODIGO_AP = re.compile(
+    r"\b(?:e-)?B20\d\d\.\d{3,}"          # B2026.22813 / e-B2026.22813
+    r"|\bVH-?\d{2}-?B(?:-?\s?\d{3,})?"     # VH26B 17664 / VH-26-B-20538
+    r"|\b\d{2}B-?\d{3,}"                   # 24B-1043 / 24B0001043 / 26B0008505
+    r"|\b\d{2}-\d{5}\b")                   # 26-28381
+
 
 class ErrorCaso(Exception):
     """Fallo de validación. `fallos` lleva la lista completa, no solo el primero."""
@@ -507,6 +519,12 @@ def construir(fuente, bio, web):
     publico = dict({k: v for k, v in comun.items() if k not in SOLO_PRIVADO},
                    fuentes={k: {"publico": v["publico"]}
                             for k, v in fuente["fuentes"].items()})
+    if "material" in publico:
+        publico["material"] = [{k: v for k, v in m.items() if k not in SOLO_PRIVADO_MATERIAL}
+                               if isinstance(m, dict) else m for m in publico["material"]]
+    siglas = codigos_en_publico(publico, privado.get("material") or [])
+    if siglas:
+        raise ErrorCaso(siglas)
     import web_lint  # el freno de contenido de la web; aquí, su excepción auditada
     fallos = web_lint.revisar_caso(publico)
     if fallos:
@@ -515,6 +533,46 @@ def construir(fuente, bio, web):
     if futuras:
         raise ErrorCaso(futuras)
     return privado, publico
+
+
+# ── ninguna sigla de muestra en lo público ───────────────────────────────────────────────────
+
+def _siglas_privadas(material):
+    """Trozos con dígito de los `codigo` del privado (B2026.22813, 17664, 26-28381…)."""
+    out = set()
+    for m in material:
+        cod = m.get("codigo") if isinstance(m, dict) else None
+        for t in re.split(r"[\s,;·()=/]+", str(cod or "")):
+            t = t.strip(".-")
+            if len(t) >= 5 and re.search(r"\d", t):
+                out.add(t)
+    return out
+
+
+def codigos_en_publico(pub, material_privado):
+    """Rutas del público donde aparece una sigla de muestra. Vacía = limpio."""
+    siglas = _siglas_privadas(material_privado)
+    malas = []
+
+    def mira(s, ruta):
+        hit = next((x for x in siglas if x in s), None) or \
+            (_RE_CODIGO_AP.search(s).group(0) if _RE_CODIGO_AP.search(s) else None)
+        if hit:
+            malas.append("sigla de muestra «%s» en lo público: %s" % (hit, ruta))
+
+    def recorre(o, ruta):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k != "generado":
+                    recorre(v, "%s.%s" % (ruta, k))
+        elif isinstance(o, list):
+            for i, v in enumerate(o):
+                recorre(v, "%s[%d]" % (ruta, i))
+        elif isinstance(o, str):
+            mira(o, ruta)
+
+    recorre(pub, "$")
+    return malas
 
 
 # ── ninguna cita futura con día en lo público ────────────────────────────────────────────────

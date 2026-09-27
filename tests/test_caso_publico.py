@@ -269,6 +269,16 @@ class Construye(unittest.TestCase):
         self.assertNotIn("bun_cr", claves)
 
 
+    def test_codigo_de_muestra_solo_en_el_privado(self):
+        """27-sep-26 ({{TITULAR}}): en /datos se cuenta qué es cada muestra, no su sigla."""
+        with open(cp.PRIVADO, encoding="utf-8") as f:
+            priv = json.load(f)
+        self.assertEqual(priv["material"][0]["codigo"], "24B-1043 A1")
+        self.assertNotIn("codigo", self.pub["material"][0])
+        self.assertEqual(self.pub["material"][0]["muestra"], "Bloque del primario")
+        self.assertNotIn("24B-1043", json.dumps(self.pub, ensure_ascii=False))
+
+
 class FallaCerrado(unittest.TestCase):
 
     def _falla(self, fuente, trozo):
@@ -290,6 +300,24 @@ class FallaCerrado(unittest.TestCase):
         else:
             f["ficha"]["diagnostico"]["valor"] = d + ". Primera dosis el 3 de marzo de 2099 en el hospital"
         self._falla(f, "fecha futura con día")
+
+    def test_sigla_de_muestra_en_el_texto_no_se_publica(self):
+        # 27-sep-2026: «Revisado en 2026 bajo el número VH26B 17664» se colaba en el texto de la
+        # muestra aunque el campo `codigo` ya no saliera. Ni las del `codigo` ni las que tienen
+        # forma de número de anatomía patológica.
+        for texto, trozo in (("Bloque del primario, igual que 24B-1043 A1", "24B-1043"),
+                             ("Revisado bajo el número VH26B 17664", "VH26B"),
+                             ("Mama, VH-26-B-20538", "VH-26-B"),
+                             ("Hueso, e-B2026.22813 A", "B2026.22813"),
+                             ("Hígado 26-28381", "26-28381")):
+            f = copy.deepcopy(FUENTE)
+            f["material"][0]["muestra"] = texto
+            _preparar(f)
+            with self.assertRaises(cp.ErrorCaso) as cm:
+                cp.cmd_build(WEB)
+            self.assertTrue(any("sigla de muestra" in x and trozo in x for x in cm.exception.fallos),
+                            "esperaba «%s» en %s" % (trozo, cm.exception.fallos))
+            self.assertFalse(os.path.exists(_publico()), "no debe quedar un caso.json a medias")
 
     def test_dato_sin_fuente(self):
         f = copy.deepcopy(FUENTE)
