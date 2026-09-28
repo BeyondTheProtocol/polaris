@@ -1,0 +1,368 @@
+<!doctype html>
+<!-- Vídeo «Polaris» CON HISTORIA (EN, voz de {{TITULAR}}). Mismo motor que polaris.html: grabar.mjs
+     llama a window.pinta(t) fotograma a fotograma. La línea de tiempo NO lleva números a mano:
+     sale de assets/tiempos.js (voz.py, duración real de cada frase de su voz). Plan del 28-sep. -->
+<html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&display=block" rel="stylesheet">
+<script src="assets/cifras.js"></script>
+<script src="assets/tiempos.js"></script>
+<style>
+  @font-face { font-family: 'Fraunces'; font-weight: 600; src: url(assets/Fraunces-600-normal.ttf); font-display: block }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(assets/JetBrains_Mono-400-normal.ttf); font-display: block }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 600; src: url(assets/JetBrains_Mono-600-normal.ttf); font-display: block }
+  :root { --berenjena: #2d1b3d; --crema: #faf6f0; --violeta: #a44db2; --violeta-osc: #c77dd2; --coral: #ff6b47; --lienzo: #1d1127 }
+  * { box-sizing: border-box; margin: 0 }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--berenjena); color: var(--crema) }
+  .capa { position: absolute; inset: 0; opacity: 0 }
+  .d { font-family: 'Fraunces', Georgia, serif; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05 }
+  .m { font-family: 'JetBrains Mono', ui-monospace, monospace; text-transform: uppercase; letter-spacing: 0.14em }
+  .c { font-family: 'Hanken Grotesk', system-ui, sans-serif }
+  .centro { position: absolute; left: 0; right: 0; text-align: center }
+  .marco { position: absolute; border-radius: 26px; overflow: hidden; background: var(--lienzo); box-shadow: 0 30px 80px rgba(0,0,0,.35) }
+  .marco img { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%) }
+  .rotulo { position: absolute; font-size: 26px; color: var(--violeta-osc) }
+
+  /* subtítulos: banda inferior fija (diseño, 28-sep); Hanken y no mono, porque son frases largas */
+  /* subtítulos 2026 ({{TITULAR}}, 28-sep: «que se vean mejor»): trozos cortos de 2-4 palabras, grandes, sin caja,
+     con contorno para leerse sobre cualquier fondo, y la palabra que se dice en una pastilla violeta */
+  #sub { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font-family: 'Hanken Grotesk', system-ui, sans-serif;
+         font-size: 58px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; color: var(--crema);
+         text-shadow: 0 2px 0 rgba(29,17,39,.9), 0 0 18px rgba(29,17,39,.85), 0 0 4px rgba(29,17,39,1) }
+  #sub .w { display: inline-block; padding: 2px 12px; margin: 0 1px; border-radius: 12px }
+  #sub .w.on { background: #a44db2; text-shadow: none }
+
+  #higado { position: absolute; left: 50%; top: 52%; width: 720px; height: 720px; margin: -380px 0 0 -360px; border-radius: 28px;
+             -webkit-mask-image: radial-gradient(circle, #000 52%, transparent 71%) }  /* sin el cuadrado del lienzo: al encoger se lee como un objeto, no como una ventana */
+  #estrella-a, #estrella-b { position: absolute; left: 50%; top: 50%; width: 360px; height: 360px; margin: -180px 0 0 -180px; overflow: visible }
+  #masalla { background: var(--crema); color: var(--berenjena) }
+  #masalla .d { top: 330px; font-size: 150px }
+  #pol .nombre { top: 250px; font-size: 170px }
+  #pol .equipo { top: 470px; font-size: 32px; color: var(--violeta-osc) }
+  #pol .ned { top: 200px; font-size: 300px; letter-spacing: -0.04em; line-height: 1 }
+  #pol .def { top: 520px; font-size: 44px }
+  .nodo { position: absolute; top: 330px; width: 300px; height: 150px; margin-left: -150px; border-radius: 22px; text-align: center; padding-top: 28px;
+          border: 2px solid rgba(199,125,210,.55); background: rgba(250,246,240,.05) }
+  .nodo .m { font-size: 26px; color: var(--violeta-osc) }
+  .nodo .d { font-size: 36px; margin-top: 8px; white-space: nowrap }
+  .nodo.puerta { border-color: var(--coral); background: rgba(255,107,71,.12) }
+  .nodo.puerta .m { color: var(--coral) }
+  .flecha { position: absolute; top: 404px; height: 3px; background: var(--violeta-osc); transform-origin: left center }
+  #globo { position: absolute; left: 50%; top: 42%; width: 640px; height: 640px; margin: -320px 0 0 -320px }
+  .chip { position: absolute; left: 50%; transform: translateX(-50%); padding: 22px 44px; border-radius: 999px; font-size: 54px;
+          border: 2px solid rgba(250,246,240,.35); white-space: nowrap }
+  #cifras .fila { position: absolute; width: 520px }
+  #cifras .fila .d { font-size: 96px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1 }
+  #cifras .fila .m { font-size: 26px; color: var(--violeta-osc); margin-top: 6px }
+  #cifras .izq { left: 120px; text-align: right } #cifras .der { left: 1280px; text-align: left }
+  #medicos .d { font-size: 110px }
+  #cierre .sigue { top: 330px; font-size: 118px }
+  #cierre .url { top: 540px; font-size: 42px; color: var(--violeta-osc); text-transform: none; letter-spacing: 0.04em }
+  #cierre svg { position: absolute; left: 50%; top: 220px; width: 90px; height: 90px; margin-left: -45px; overflow: visible }
+  /* movimiento (28-sep, «más movimiento de gráficos»): cielo de fondo, palabras clave, anillos y pulso */
+  #cielo { position: absolute; inset: 0; width: 1920px; height: 1080px }
+  /* v4 (motion design, 28-sep): el mapa vivo del sistema, en círculo; su centro lleva «POLARIS» en inglés */
+  .mapa { position: absolute; left: 50%; border-radius: 50%; overflow: hidden; background: var(--berenjena) }
+  .mapa img { position: absolute; inset: 0; width: 100%; height: 100% }
+  .mapa .centro-m { position: absolute; left: 50%; top: 50%; width: 19%; height: 19%; transform: translate(-50%,-50%); border-radius: 50%;
+                    background: #a44db2; display: flex; align-items: center; justify-content: center; font-size: 2.6em; color: var(--crema);
+                    box-shadow: 0 0 60px 20px rgba(164,77,178,.45) }
+  #sub .w { transition: none }
+  /* «two sides» ({{TITULAR}}, 28-sep): el esquema del tumor de /science, capturado tal cual; cada mitad llega con su media estrella */
+  .cara { position: absolute; left: 50%; top: 50%; width: 1000px; margin: -264px 0 0 -500px; border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.35) }
+  #cara-izq { clip-path: inset(0 50% 0 0) } #cara-der { clip-path: inset(0 0 0 50%) }
+  /* gancho del fotograma 0 (redes, 28-sep): se lee antes de que hable y sirve de miniatura. Palabras de SU guion. */
+  #gancho { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--berenjena) }
+  #gancho .a { font-size: 150px; letter-spacing: -0.03em; line-height: .95 } #gancho .b { font-size: 150px; color: var(--violeta-osc); letter-spacing: -0.03em; line-height: .95 }
+  #cierre .cta { top: 470px; font-size: 46px; color: var(--crema) }
+  #kw { position: absolute; left: 0; right: 0; top: 40px; text-align: center; font-size: 84px; color: var(--violeta-osc); letter-spacing: -0.02em }
+  #kw-raya { position: absolute; left: 50%; top: 140px; height: 5px; width: 220px; margin-left: -110px; background: var(--violeta-osc); border-radius: 3px; transform-origin: center }
+  .anillo { position: absolute; left: 50%; border-radius: 50%; border: 3px solid var(--violeta-osc); pointer-events: none }
+  #raíl { position: absolute; left: 260px; width: 1400px; top: 506px; height: 2px; background: rgba(199,125,210,.25) }
+  #pulso { position: absolute; top: 507px; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--crema);
+           box-shadow: 0 0 24px 8px rgba(199,125,210,.6) }
+  #masalla .palabra { display: inline-block }
+  #flecha-larga { position: absolute; left: 50%; top: 560px; height: 6px; width: 760px; margin-left: -380px; background: var(--berenjena); transform-origin: left center; border-radius: 3px }
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <!-- Estrella canónica de la marca (Constellation.vue, STAR_D) y sus dos mitades para «two sides» -->
+  <path id="star" d="M10 1.6 C10.8 5,11.4 6.2,12.6 7.4 C14 8.8,16.4 9.4,18.4 10 C16.2 10.8,14.2 11.4,12.8 12.7 C11.5 13.9,10.9 15.7,10 18.4 C9.3 15.9,8.5 14.2,7.2 12.9 C5.8 11.6,3.4 10.7,1.6 10 C3.8 9.1,5.8 8.4,7.2 7.1 C8.4 6,9.2 4.2,10 1.6 Z"/>
+  <clipPath id="izq"><rect x="0" y="0" width="10" height="20"/></clipPath>
+  <clipPath id="der"><rect x="10" y="0" width="10" height="20"/></clipPath>
+</defs></svg>
+
+<svg id="cielo" viewBox="0 0 1920 1080"></svg>
+<img id="higado" alt="">
+<img class="cara" id="cara-izq" src="assets/dos-caras.png" alt=""><img class="cara" id="cara-der" src="assets/dos-caras.png" alt="">
+<div class="anillo" id="anillo-a"></div><div class="anillo" id="anillo-b"></div>
+<svg id="estrella-a" viewBox="0 0 20 20" style="opacity:0"><use href="#star" fill="#c77dd2" clip-path="url(#izq)"/></svg>
+<svg id="estrella-b" viewBox="0 0 20 20" style="opacity:0"><use href="#star" fill="#ff6b47" clip-path="url(#der)"/></svg>
+
+<section class="capa" id="masalla"><div class="d centro"><span class="palabra">Go</span> <span class="palabra">further.</span></div><div id="flecha-larga"></div></section>
+
+<section class="capa" id="pol">
+  <div class="d centro nombre" id="pol-nombre" style="display:none">Polaris</div>
+  <div class="mapa" id="pol-mapa" style="top:100px;width:620px;height:620px;margin-left:-310px;font-size:13px"><img class="mapa-img" alt=""><div class="d centro-m">POLARIS</div></div>
+  <div class="m centro equipo" id="pol-equipo" style="top:800px">a team of AI agents</div>
+  <div class="d centro ned" id="pol-ned">NED</div>
+  <div class="c centro def" id="pol-def">no evidence of disease</div>
+  <div id="pol-diagrama">
+    <div class="nodo" style="left:260px"><div class="m">Input</div><div class="d">What I need</div></div>
+    <div class="nodo" style="left:610px"><div class="m">Goal</div><div class="d">Written: NED</div></div>
+    <div class="nodo" style="left:960px"><div class="m">Polaris</div><div class="d">The experts</div></div>
+    <div class="nodo puerta" style="left:1310px"><div class="m">Human gate</div><div class="d">My sign-off</div></div>
+    <div class="nodo" style="left:1660px"><div class="m">Output</div><div class="d">Whatever fits</div></div>
+    <div class="flecha" style="left:412px;width:46px"></div><div class="flecha" style="left:762px;width:46px"></div>
+    <div class="flecha" style="left:1112px;width:46px"></div><div class="flecha" style="left:1462px;width:46px"></div>
+    <div id="raíl"></div><div id="pulso"></div>
+  </div>
+</section>
+
+<section class="capa" id="aprender">
+  <div class="marco" style="left:150px;top:250px;width:900px;height:300px;background:#f5efe6"><img src="assets/science.png" style="width:860px"></div>
+  <div class="marco" style="left:1150px;top:150px;width:620px;height:620px"><img id="aprender-hig" style="width:620px"></div>
+</section>
+
+<section class="capa" id="radar">
+  <svg id="globo" viewBox="-110 -110 220 220"></svg>
+  <div class="m centro" style="top:800px;font-size:30px;color:#c77dd2" id="radar-rot">Trials tracked daily · worldwide</div>
+</section>
+
+<section class="capa" id="tresd">
+  <div class="marco" style="left:400px;top:180px;width:400px;height:660px;background:#1d1127"><img src="assets/esqueleto.png" style="width:350px"></div>
+  <div class="m rotulo" style="left:400px;top:860px">Bone map</div>
+  <div class="marco" style="left:900px;top:180px;width:660px;height:660px"><img id="tresd-hig" style="width:660px"></div>
+  <div class="m rotulo" style="left:900px;top:860px">Lesions in 3D · from my own scans</div>
+</section>
+
+<section class="capa" id="carga">
+  <div class="chip c" style="top:200px">samples → labs</div>
+  <div class="chip c" style="top:370px">people who reach out</div>
+  <div class="chip c" style="top:540px">trips for treatment</div>
+</section>
+
+<section class="capa" id="web">
+  <div class="marco" style="left:260px;top:110px;width:1400px;height:720px;background:#faf6f0"><img src="assets/home.png" id="web-img" style="width:1360px"></div>
+</section>
+
+<section class="capa" id="cifras">
+  <div class="mapa" id="cif-mapa" style="top:190px;width:560px;height:560px;margin-left:-280px;font-size:11px"><img class="mapa-img" alt=""><div class="d centro-m">POLARIS</div></div>
+  <div class="fila izq" style="top:200px"><div class="d" data-n="comites">0</div><div class="m">agents</div></div>
+  <div class="fila izq" style="top:390px"><div class="d" data-n="tools">0</div><div class="m">tools</div></div>
+  <div class="fila izq" style="top:580px"><div class="d" data-n="rutinas">0</div><div class="m">routines running 24/7</div></div>
+  <div class="fila der" style="top:300px"><div class="d" data-n="guardas">0</div><div class="m">guardrails</div></div>
+  <div class="fila der" style="top:490px"><div class="d" data-n="tests">0</div><div class="m">test files</div></div>
+</section>
+
+<section class="capa" id="medicos"><div class="d centro" style="top:300px">It doesn't decide.</div><div class="d centro" id="med-b" style="top:450px;color:#c77dd2">My doctors do.</div></section>
+
+<section class="capa" id="cierre">
+  <svg viewBox="0 0 20 20"><use href="#star" fill="#ff6b47"/></svg>
+  <div class="d centro sigue">Still going for NED.</div>
+  <div class="c centro cta" id="cta">It's all explained at</div>
+  <div class="d centro url" id="url-final" style="top:540px;font-size:84px;color:#c77dd2;letter-spacing:-0.02em;text-transform:none">helptitular.com</div>
+</section>
+
+<div id="gancho"><div class="d a">Ultra-rare cancer.</div><div class="d b">So I built Polaris.</div></div>
+<div class="d" id="kw"></div><div id="kw-raya"></div>
+<div id="sub"></div>
+
+<script>
+const T = window.TIEMPOS, TR = T.tramos, FPS_H = 30, N_H = 240
+const $ = (s) => document.querySelector(s)
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const lin = (t, a, b) => cl((t - a) / (b - a))
+const suave = (x) => 1 - Math.pow(1 - x, 3)
+const mapa = (t) => `assets/mapa/${String(1 + (Math.floor(t * 30) % 120)).padStart(4, '0')}.jpg`
+const hig = (t) => `assets/higado/${String(1 + (Math.floor(t * FPS_H) % N_H)).padStart(4, '0')}.jpg`
+const fmt = (n) => n.toLocaleString('en-US')
+const rebote = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2) }  // easeOutBack
+// Palabras clave que entran con golpe, en el tercio de arriba (el subtítulo va abajo). Salen de SU guion.
+const KW = [['problema', 0.10, 'RARE.'], ['problema', 0.24, 'ULTRA-RARE.'], ['problema', 0.36, 'METASTATIC.'], ['problema', 0.55, 'TWO SIDES.'],
+            ['aprender', 0.05, 'LEARN.'], ['aprender', 0.55, 'UNDERSTAND.'], ['aprender', 0.78, 'SEE.'],
+            ['radar', 0.30, 'EVERY DAY.'], ['3d', 0.05, 'FROM MY OWN SCANS.'], ['olvido', 0.05, 'AND A LOT MORE.']]
+// Cielo: estrellas de marca que derivan despacio (posiciones fijas por semilla: el render es reproducible)
+const cielo = document.querySelector('#cielo'), ESTRELLAS = []
+let semilla = 7; const azar = () => (semilla = (semilla * 16807) % 2147483647) / 2147483647
+for (let k = 0; k < 70; k++) ESTRELLAS.push({ x: azar() * 1920, y: azar() * 1080, r: 3 + azar() * 9, v: 6 + azar() * 22, f: azar() * 6.28 })
+cielo.innerHTML = ESTRELLAS.map(() => '<use href="#star" fill="#c77dd2"/>').join('')
+const tramo = (id) => TR.find((x) => x.id === id)
+// Ventana de una escena: de un poco antes de su frase hasta que empieza la siguiente
+// Sin solape (diseño, 28-sep): la escena que sale termina justo donde empieza la que entra.
+const CORTE = 0.2
+const ventana = (id) => { const i = TR.findIndex((x) => x.id === id), a = i === 0 ? 0 : TR[i].t0 - CORTE
+                          const b = i + 1 < TR.length ? TR[i + 1].t0 - CORTE : T.total + 1; return [a, b] }
+const opac = (t, id, e = 0.35, s = 0.25) => { const [a, b] = ventana(id); return Math.min(suave(lin(t, a, a + e)), 1 - lin(t, b - s, b)) }
+// Punto relativo dentro de una frase (0..1), para sincronizar con una palabra sin medirla a mano
+const en = (id, f) => { const x = tramo(id); return x.t0 + f * (x.t1 - x.t0) }
+
+// Subtítulos: la frase se parte en oraciones; cada una dura en proporción a sus caracteres
+const trozos = (frase) => { const ws = frase.split(' '), out = []; let cur = []
+  for (const w of ws) { const largo = cur.concat(w).join(' ').length
+    if (cur.length && (cur.length >= 4 || largo > 24)) { out.push(cur.join(' ')); cur = [] }
+    cur.push(w); if (/[,.!?:]$/.test(w) && cur.length >= 2) { out.push(cur.join(' ')); cur = [] } }
+  if (cur.length) out.push(cur.join(' ')); return out }
+const SUBS = TR.flatMap((x) => {
+  const partes = x.texto.replace(/N-E-D/g, 'NED').match(/[^.!?]+[.!?]+/g).map((p) => p.trim()).flatMap(trozos)
+  const tot = partes.reduce((s, p) => s + p.length, 0); let t = x.t0
+  return partes.map((p) => { const d = (x.t1 - x.t0) * p.length / tot, r = { a: t, b: t + d, p }; t += d; return r })
+})
+
+// Globo de puntos: rejilla de latitud/longitud en proyección ortográfica, sin ningún país (diseño)
+const globo = $('#globo'), PUNTOS = []
+for (let la = -80; la <= 80; la += 10) for (let lo = 0; lo < 360; lo += 10) PUNTOS.push([la, lo])
+const PINGS = Array.from({ length: 14 }, (_, k) => [((k * 53) % 140) - 70, (k * 97) % 360, (k * 0.37) % 1])
+globo.innerHTML = '<circle r="100" fill="none" stroke="rgba(199,125,210,.35)" stroke-width="0.6"/>' +
+  PUNTOS.map(() => '<circle r="1.1" fill="#c77dd2"/>').join('') + PINGS.map(() => '<circle r="2" fill="#ff6b47"/>').join('') +
+  '<g id="arcos">' + PINGS.map(() => '<path fill="none" stroke="#c77dd2" stroke-width="0.8" stroke-linecap="round"/>').join('') + '</g>'
+const orto = (la, lo, rot) => { const f = la * Math.PI / 180, l = (lo + rot) * Math.PI / 180
+  return [100 * Math.cos(f) * Math.sin(l), -100 * Math.sin(f), Math.cos(f) * Math.cos(l)] }
+
+const ESCENAS = { pol: 'polaris', aprender: 'aprender', radar: 'radar', tresd: '3d', carga: 'carga',
+                  web: 'web', cifras: 'olvido', medicos: 'medicos' }
+const barrido = (t, id) => { const [a, b] = ventana(id), e = 1 - suave(lin(t, a, a + 0.45)), s = lin(t, b - 0.25, b)
+  return { x: 140 * e - 160 * s * s, blur: 14 * e + 16 * s, esc: 1.035 - 0.035 * suave(lin(t, a, b)) + 0.02 * e } }
+window.pinta = (t) => {
+  // problema: el render desde el fotograma 0 (redes), y la estrella se parte al llegar a «two sides»
+  const h = $('#higado'); h.src = hig(t)
+  const corte = en('problema', 0.62)
+  const encoge = suave(lin(t, corte - 0.7, corte - 0.1))
+  h.style.opacity = 1 - lin(t, corte - 0.35, corte - 0.1)
+  const ea = $('#estrella-a'), eb = $('#estrella-b'), ae = cl(lin(t, corte - 0.2, corte)) * (1 - lin(t, ventana('problema')[1] - 0.3, ventana('problema')[1]))
+  const sep = 70 * suave(lin(t, corte, corte + 0.5)) + 570 * suave(lin(t, corte + 0.45, corte + 1.1))
+  ea.style.opacity = eb.style.opacity = ae
+  { const llega = suave(lin(t, corte + 0.5, corte + 1.1)), fin = ventana('problema')[1], sale = Math.pow(lin(t, fin - 0.45, fin), 2)
+    const ci = $('#cara-izq'), cd = $('#cara-der'), o = cl(lin(t, corte + 0.45, corte + 0.7)) * (1 - sale)
+    ci.style.opacity = cd.style.opacity = o
+    ci.style.transform = `translateX(${-520 * (1 - llega)}px) scale(${0.9 + 0.1 * llega})`
+    cd.style.transform = `translateX(${520 * (1 - llega) + 1500 * sale}px) scale(${0.9 + 0.1 * llega})` }
+  const nace = 0.15 + 0.85 * rebote(lin(t, corte - 0.2, corte + 0.35)), vuela = 1500 * Math.pow(lin(t, ventana('problema')[1] - 0.45, ventana('problema')[1]), 2)
+  ea.style.transform = `translateX(${-sep}px) scale(${nace})`; eb.style.transform = `translateX(${sep + vuela}px) scale(${nace})`  // la mitad coral sale disparada y abre «Go further»
+
+  { const [a, b] = ventana('mas-alla'), ent = 100 * (1 - Math.pow(lin(t, a, a + 0.32), 0.6)), sal = 100 * Math.pow(lin(t, b - 0.3, b), 2)
+    const m = $('#masalla'); m.style.opacity = t >= a && t < b ? 1 : 0; m.style.clipPath = `inset(0 ${sal}% 0 ${ent}%)` }
+  $('#masalla .d').style.transform = `scale(${0.92 + 0.08 * suave(lin(t, ventana('mas-alla')[0], ventana('mas-alla')[1]))})`
+
+  // polaris: nombre → NED (en «one written goal») → diagrama con la puerta (en «nothing leaves»)
+  $('#pol').style.opacity = opac(t, 'polaris')
+  const kNed = en('polaris', 0.40), kPuerta = en('polaris', 0.72)
+  const a1 = 1 - lin(t, kNed - 0.3, kNed), a2 = suave(lin(t, kNed + 0.02, kNed + 0.4)) * (1 - lin(t, kPuerta - 0.3, kPuerta)), a3 = suave(lin(t, kPuerta, kPuerta + 0.4))
+  const pm = $('#pol-mapa'), zoomIn = rebote(lin(t, tramo('polaris').t0 - 0.1, tramo('polaris').t0 + 0.6)), zoomNed = Math.pow(lin(t, kNed - 0.45, kNed + 0.05), 2)
+  pm.querySelector('img').src = mapa(t)
+  pm.style.transform = `scale(${(0.6 + 0.4 * zoomIn) * (1 + 5 * zoomNed)})`; pm.style.opacity = cl(zoomIn * 1.3) * (1 - lin(t, kNed - 0.3, kNed - 0.05))
+  $('#pol-equipo').style.opacity = suave(lin(t, en('polaris', 0.22), en('polaris', 0.28))) * (1 - lin(t, kNed - 0.4, kNed - 0.2))
+  $('#pol-ned').style.opacity = a2; $('#pol-def').style.opacity = a2 * suave(lin(t, kNed + 0.25, kNed + 0.55))
+  $('#pol-diagrama').style.opacity = a3
+  document.querySelectorAll('#pol .nodo').forEach((n, i) => { const k = suave(lin(t, kPuerta + i * 0.25, kPuerta + 0.35 + i * 0.25)); n.style.opacity = k; n.style.transform = `translateY(${16 * (1 - k)}px) scale(${1 + 0.015 * Math.sin((t - kPuerta) * Math.PI + i * 0.9) * k})` })
+  document.querySelectorAll('#pol .flecha').forEach((n, i) => { n.style.transform = `scaleX(${suave(lin(t, kPuerta + 0.2 + i * 0.25, kPuerta + 0.5 + i * 0.25))})` })
+
+  $('#aprender').style.opacity = opac(t, 'aprender'); $('#aprender-hig').src = hig(t)
+
+  // radar: el globo gira y se encienden puntos sueltos (ningún país, ningún ensayo)
+  const aR = opac(t, 'radar'); $('#radar').style.opacity = aR
+  if (aR > 0) {
+    const rot = t * 18, cs = globo.querySelectorAll('circle')
+    PUNTOS.forEach(([la, lo], k) => { const [x, y, z] = orto(la, lo, rot), c = cs[k + 1]
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('opacity', z > 0 ? 0.25 + 0.6 * z : 0) })
+    PINGS.forEach(([la, lo, fase], k) => { const [x, y, z] = orto(la, lo, rot), c = cs[1 + PUNTOS.length + k], p = (t * 0.8 + fase) % 1
+      c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 1.5 + 4 * p); c.setAttribute('opacity', z > 0 ? (1 - p) : 0) })
+    // arco de cada ping al siguiente, dibujándose (solo si los dos están de cara)
+    const arcos = globo.querySelectorAll('#arcos path')
+    PINGS.forEach((pA, k) => { const pB = PINGS[(k + 1) % PINGS.length], [x1, y1, z1] = orto(pA[0], pA[1], rot), [x2, y2, z2] = orto(pB[0], pB[1], rot), a = arcos[k]
+      if (z1 > 0.1 && z2 > 0.1) { const mx = (x1 + x2) / 2 * 1.35, my = (y1 + y2) / 2 * 1.35, L = Math.hypot(x2 - x1, y2 - y1) * 1.3, p = (t * 0.6 + k * 0.29) % 1
+        a.setAttribute('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`); a.setAttribute('stroke-dasharray', L); a.setAttribute('stroke-dashoffset', L * (1 - p)); a.setAttribute('opacity', 0.8 * (1 - p))
+      } else a.setAttribute('opacity', 0) })
+    globo.style.transform = `scale(${0.9 + 0.1 * suave(lin(t, ...ventana('radar')))})`
+  }
+
+  $('#tresd').style.opacity = opac(t, '3d'); $('#tresd-hig').src = hig(t)
+
+  $('#carga').style.opacity = opac(t, 'carga')
+
+  $('#web').style.opacity = opac(t, 'web')
+  $('#web-img').style.transform = `translate(-50%,-50%) scale(${1 + 0.04 * lin(t, ...ventana('web'))})`
+
+  $('#cifras').style.opacity = opac(t, 'olvido')
+  const cm = $('#cif-mapa'); cm.querySelector('img').src = mapa(t); cm.style.transform = `scale(${0.7 + 0.3 * rebote(lin(t, tramo('olvido').t0 - 0.2, tramo('olvido').t0 + 0.5))})`
+  document.querySelectorAll('#cifras [data-n]').forEach((n, i) => { const t0 = tramo('olvido').t0
+    n.textContent = fmt(Math.round(window.CIFRAS[n.dataset.n] * suave(lin(t, t0 + i * 0.12, t0 + 1.6 + i * 0.12))))
+    n.parentElement.style.opacity = suave(lin(t, t0 + 0.1 + i * 0.12, t0 + 0.4 + i * 0.12))
+    n.parentElement.style.transform = `translateX(${(n.parentElement.classList.contains('izq') ? -1 : 1) * 60 * (1 - suave(lin(t, t0 + 0.1 + i * 0.12, t0 + 0.5 + i * 0.12)))}px)` })
+
+  $('#medicos').style.opacity = opac(t, 'medicos')
+  $('#med-b').style.opacity = suave(lin(t, en('medicos', 0.2), en('medicos', 0.3)))
+
+  const aC = suave(lin(t, ventana('ned')[0], ventana('ned')[0] + 0.45)); $('#cierre').style.opacity = aC
+  $('#cierre svg').style.transform = `scale(${0.6 + 0.4 * aC}) rotate(${45 * suave(lin(t, ventana('ned')[0], ventana('ned')[0] + 1.2))}deg)`  // gira 45° y se para
+
+  // barrido + cámara en cada escena (se suma a su opacidad)
+  for (const [el, id] of Object.entries(ESCENAS)) { const m = barrido(t, id), n = document.getElementById(el)
+    n.style.transform = `translateX(${m.x}px) scale(${m.esc})`; n.style.filter = m.blur > 0.3 ? `blur(${m.blur}px)` : '' }
+
+  // cielo
+  const cs = cielo.children
+  ESTRELLAS.forEach((e, k) => { const x = (e.x - e.v * t + 1940) % 1940 - 10, tw = 0.25 + 0.35 * (0.5 + 0.5 * Math.sin(t * 1.3 + e.f))
+    cs[k].setAttribute('transform', `translate(${x},${e.y}) scale(${e.r / 20})`)  // derivan, no giran
+    cs[k].setAttribute('opacity', tw * (1 - 0.8 * $('#masalla').style.opacity)) })
+
+  // anillos: al partirse la estrella y al llegar NED
+  const anillo = (el, t0, top) => { const p = lin(t, t0, t0 + 1.1), d = 80 + 900 * suave(p)
+    el.style.width = el.style.height = d + 'px'; el.style.marginLeft = -d / 2 + 'px'; el.style.top = `calc(${top} - ${d / 2}px)`
+    el.style.opacity = p > 0 && p < 1 ? (1 - p) * 0.9 : 0 }
+  anillo($('#anillo-a'), corte, '50%'); anillo($('#anillo-b'), kNed, '32%')
+
+  // hígado del arranque: se acerca despacio (punch-in)
+  h.style.transform = `scale(${(0.92 + 0.1 * suave(lin(t, 0, corte - 0.7))) * (1 - 0.88 * encoge)})`
+
+  // «Go further.»: palabras con rebote y una flecha que sale disparada
+  document.querySelectorAll('#masalla .palabra').forEach((w, i) => { const k = rebote(lin(t, tramo('mas-alla').t0 + i * 0.22, tramo('mas-alla').t0 + 0.5 + i * 0.22))
+    w.style.transform = `translateY(${60 * (1 - k)}px) scale(${0.8 + 0.2 * k})`; w.style.opacity = cl(k * 1.5) })
+  $('#flecha-larga').style.transform = `scaleX(${suave(lin(t, tramo('mas-alla').t0 + 0.5, tramo('mas-alla').t0 + 1.4))})`
+
+  // NED con rebote
+  $('#pol-ned').style.transform = `scale(${0.7 + 0.3 * rebote(lin(t, kNed, kNed + 0.55))})`
+  // pulso que recorre el diagrama y enciende cada nodo al pasar (la puerta, en coral)
+  const vuelta = 2.2, fase = t - kPuerta - 1.6, pulso = $('#pulso')
+  if (fase > 0) { const u = (fase % vuelta) / vuelta, xs = [260, 610, 960, 1310, 1660], pos = u * 4, i = Math.min(3, Math.floor(pos))
+    pulso.style.left = (xs[i] + (xs[i + 1] - xs[i]) * suave(pos - i)) + 'px'; pulso.style.opacity = 1
+    document.querySelectorAll('#pol .nodo').forEach((n, j) => { const cerca = Math.max(0, 1 - Math.abs(pos - j) * 1.6)
+      n.style.boxShadow = cerca > 0 ? `0 0 ${40 * cerca}px ${8 * cerca}px rgba(199,125,210,.45)` : '' })
+  } else pulso.style.opacity = 0
+
+  // chips: entran desde lados alternos con rebote
+  document.querySelectorAll('#carga .chip').forEach((c, i) => { const t0 = en('carga', [0.05, 0.35, 0.55][i]), k = rebote(lin(t, t0, t0 + 0.55))
+    c.style.opacity = cl(k * 1.4); c.style.transform = `translateX(calc(-50% + ${(i % 2 ? 1 : -1) * 420 * (1 - k)}px)) scale(${0.85 + 0.15 * k})` })
+
+  // cifras: cada una da un golpe de escala al terminar de contar
+  document.querySelectorAll('#cifras [data-n]').forEach((n, i) => { const t1 = tramo('olvido').t0 + 1.6 + i * 0.12
+    n.style.transform = `scale(${1 + 0.12 * Math.max(0, 1 - Math.abs(t - t1) * 5)})` })
+
+  // palabra clave activa
+  const kws = KW.filter(([id, f]) => t >= en(id, f) && t < ventana(id)[1] - 0.15), kw = kws[kws.length - 1], kwEl = $('#kw'), raya = $('#kw-raya')
+  if (kw) { const t0 = en(kw[0], kw[1]), k = rebote(lin(t, t0, t0 + 0.4))
+    kwEl.textContent = kw[2]; kwEl.style.opacity = cl(k * 1.5); kwEl.style.transform = `scale(${1.35 - 0.35 * k})`
+    raya.style.opacity = 1; raya.style.transform = `scaleX(${suave(lin(t, t0 + 0.1, t0 + 0.45))})`
+  } else { kwEl.style.opacity = 0; raya.style.opacity = 0 }
+
+  // gancho: lleno desde el fotograma 0; se abre en dos (golpe) justo cuando empieza a hablar
+  { const g = $('#gancho'), p = lin(t, 0.55, 0.95), a = g.querySelector('.a'), b = g.querySelector('.b')
+    g.style.opacity = 1 - suave(lin(t, 0.75, 0.95)); g.style.background = `rgba(45,27,61,${1 - suave(p)})`
+    a.style.transform = `translateY(${-260 * suave(p)}px)`; b.style.transform = `translateY(${260 * suave(p)}px)` }
+  { const t0 = tramo('web-final').t0 - 0.1, k = suave(lin(t, t0, t0 + 0.35)), u = rebote(lin(t, t0 + 0.35, t0 + 0.8))
+    $('#cta').style.opacity = k; $('#cta').style.transform = `translateY(${14 * (1 - k)}px)`
+    $('#url-final').style.opacity = cl(u * 1.3); $('#url-final').style.transform = `scale(${0.85 + 0.15 * u})` }
+
+  // subtítulo activo
+  const s = SUBS.find((x) => t >= x.a - 0.05 && t < x.b + 0.25), sub = $('#sub')
+  if (s) { const ws = s.p.split(' '), tot = ws.reduce((x, w) => x + w.length + 1, 0); let acc = 0
+    sub.innerHTML = ws.map((w) => { const on = s.a + (s.b - s.a) * acc / tot; acc += w.length + 1
+      const off = s.a + (s.b - s.a) * acc / tot, k = cl((t - on + 0.03) / 0.08), activa = t >= on && t < off
+      return `<span class="w${activa ? ' on' : ''}" style="opacity:${0.55 + 0.45 * k};transform:scale(${activa ? 1.06 : 1})">${w}</span>` }).join('')
+  } else sub.innerHTML = ''
+  sub.style.opacity = s ? 1 : 0
+  if (s) { const k = rebote(lin(t, s.a - 0.05, s.a + 0.12)); sub.style.transform = `translateY(${10 * (1 - k)}px) scale(${0.96 + 0.04 * k})` }
+}
+window.listo = Promise.all([document.fonts.ready, ...['science', 'home', 'esqueleto'].map((n) => new Promise((r) => { const i = new Image(); i.onload = r; i.src = `assets/${n}.png` }))])
+window.listo.then(() => window.pinta(Number(new URLSearchParams(location.search).get('t') || 0)))
+</script>
+</body></html>

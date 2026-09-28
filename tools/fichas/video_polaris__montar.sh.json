@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/montar.sh",
+ "estado_ficha": "completa",
+ "para": "Monta los fotogramas de grabar.mjs y el sonido en el mp4 final (H.264 8 Mbps objetivo + AAC, faststart).",
+ "cuando_si": "Último paso de tools/video_polaris, tras grabar.mjs.",
+ "cuando_no": "Para recodificar vídeos ajenos o de campaña: no es un conversor general.",
+ "reemplaza": "nada: no había herramienta de vídeo de sistema (visor_video_x graba solo los visores)",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-27, vídeo «Polaris, so far» (plan aprobado por {{TITULAR}})",
+ "origen": "encargo de {{TITULAR}} 27-sep-2026; referencia de estilo: vídeo de @contactoyuscula en X"
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/preparar.py",
+ "estado_ficha": "completa",
+ "para": "Prepara los recursos del vídeo de Polaris: recortes de capturas sin cifras clínicas, fotogramas del visor del hígado, tipografías y las cifras del día sacadas de anatomia.py.",
+ "cuando_si": "Antes de cada render de tools/video_polaris, para que las cifras sean las del día.",
+ "cuando_no": "Para vídeos de los visores sueltos (eso es tools/visor_video_x) o si la web cambió de maquetación sin revisar los recortes.",
+ "reemplaza": "nada: no había herramienta de vídeo de sistema (visor_video_x graba solo los visores)",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-27, vídeo «Polaris, so far» (plan aprobado por {{TITULAR}})",
+ "origen": "encargo de {{TITULAR}} 27-sep-2026; referencia de estilo: vídeo de @contactoyuscula en X"
+}

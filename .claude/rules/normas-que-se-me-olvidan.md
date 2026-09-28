@@ -37,7 +37,7 @@
 - **El equipo primero; {{TITULAR}}, el último recurso.** Agota comités, código y fuentes antes de preguntar. [[feedback-equipo-primero-titular-ultimo-recurso]]
 - **Mejorar el taller va EN PARALELO a lo clínico.** Priorizar no es descartar; nunca «no urgente» a una mejora de Polaris. [[feedback-mejorar-taller-en-paralelo-no-descartar]]
 - Tocar un hook del muro: normas en `.claude/rules/hooks-muro.md` (se cargan al tocarlo).
-- **Copiar y mejorar, sin preguntar. INSTALAR algo de terceros, se le pregunta siempre.** [[feedback-copiar-y-mejorar-sin-preguntar-instalar-si]]
+- **Copiar, mejorar e instalar lo que eleve el producto: sin preguntar** (28-sep, a fuego); audita y cuéntaselo. [[feedback-copiar-y-mejorar-sin-preguntar-instalar-si]]
 - **Si cambia la estructura o el funcionamiento de Polaris, el panel lo cuenta ANTES de cerrar.** Freno: `tests/test_anatomia_al_dia.py`; se cierra con `python3 tools/anatomia.py sellar`. [[feedback-panel-refleja-cada-cambio-de-polaris]]
 
 ## En `CLAUDE.md`, no aquí

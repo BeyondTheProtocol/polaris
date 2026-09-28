@@ -1,0 +1,220 @@
+<!doctype html>
+<!-- Vídeo «Polaris, so far» (EN). Línea de tiempo DETERMINISTA: grabar.mjs llama a
+     window.pinta(t) fotograma a fotograma; no hay ni una animación CSS ni un requestAnimationFrame.
+     Se abre desde <build>/ (preparar.py deja ahí assets/). Guion y porqués: LEEME.md. -->
+<html lang="en"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&display=block" rel="stylesheet">
+<script src="assets/cifras.js"></script>
+<style>
+  @font-face { font-family: 'Fraunces'; font-weight: 600; src: url(assets/Fraunces-600-normal.ttf); font-display: block }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 400; src: url(assets/JetBrains_Mono-400-normal.ttf); font-display: block }
+  @font-face { font-family: 'JetBrains Mono'; font-weight: 600; src: url(assets/JetBrains_Mono-600-normal.ttf); font-display: block }
+  :root { --berenjena: #2d1b3d; --crema: #faf6f0; --violeta: #a44db2; --violeta-osc: #c77dd2; --coral: #ff6b47;
+          --display: 'Fraunces', Georgia, serif; --cuerpo: 'Hanken Grotesk', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace }
+  * { box-sizing: border-box; margin: 0 }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--berenjena); color: var(--crema) }
+  .capa { position: absolute; inset: 0; opacity: 0 }
+  .d { font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; line-height: 1.05 }
+  .m { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.14em }
+  .c { font-family: var(--cuerpo) }
+  svg.estrella { position: absolute; overflow: visible }
+
+  /* 1 · anclaje */
+  #fondo-higado { position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 28px }
+  #fondo-higado.velado { -webkit-mask-image: radial-gradient(circle, #000 42%, transparent 70%) }
+  #s1 .t { position: absolute; left: 0; right: 0; top: 400px; text-align: center }
+  #s1 .nombre { font-size: 112px }
+  #s1 .sub { margin-top: 30px; font-size: 30px; color: var(--violeta-osc) }
+
+  /* 2 · el render */
+  #s2 .t { position: absolute; left: 150px; top: 330px; width: 760px }
+  #s2 .t .d { font-size: 72px }
+  #s2 .firma { margin-top: 44px; font-size: 40px; color: var(--violeta-osc); font-weight: 500 }
+
+  /* 3 · la cita, sobre crema */
+  #s3 { background: var(--crema); color: var(--berenjena) }
+  #s3 .cita { position: absolute; left: 260px; right: 260px; top: 330px; font-size: 76px; text-align: center }
+  #s3 .quien { position: absolute; left: 0; right: 0; top: 700px; text-align: center; font-size: 26px; color: var(--violeta) }
+
+  /* 4 · el goal */
+  #s4 .uno { position: absolute; left: 0; right: 0; top: 250px; text-align: center; font-size: 30px; color: var(--violeta-osc) }
+  #s4 .ned { position: absolute; left: 0; right: 0; top: 320px; text-align: center; font-size: 340px; letter-spacing: -0.04em; line-height: 1 }
+  #s4 .def { position: absolute; left: 0; right: 0; top: 720px; text-align: center; font-size: 46px }
+
+  /* 5 · cómo funciona */
+  #s5 .frase { position: absolute; left: 160px; right: 160px; top: 150px; font-size: 58px; text-align: center }
+  #s5 .nodo { position: absolute; top: 520px; width: 330px; height: 150px; margin-left: -165px; border-radius: 22px;
+              border: 2px solid rgba(199,125,210,.55); background: rgba(250,246,240,.05); text-align: center; padding-top: 30px }
+  #s5 .nodo .m { font-size: 28px; color: var(--violeta-osc) }
+  #s5 .nodo .d { font-size: 38px; white-space: nowrap; margin-top: 8px }
+  #s5 .flecha { position: absolute; top: 594px; height: 3px; background: var(--violeta-osc); transform-origin: left center }
+  #s5 .salidas { position: absolute; left: 0; right: 0; top: 800px; text-align: center; font-size: 40px }
+  #s5 .salidas .lead { color: var(--violeta-osc) }
+  #s5 .chip { display: inline-block; margin: 0 10px; padding: 12px 26px; border-radius: 999px; border: 2px solid rgba(250,246,240,.35) }
+
+  /* 6 · qué ha hecho */
+  #s6 .cifras { position: absolute; left: 90px; top: 170px; width: 660px }
+  #s6 .fila { display: flex; align-items: baseline; gap: 26px; margin-bottom: 30px }
+  #s6 .fila .d { font-size: 104px; width: 240px; text-align: right; letter-spacing: -0.04em; font-variant-numeric: tabular-nums }
+  #s6 .fila .m { font-size: 30px; color: var(--violeta-osc); line-height: 1.35 }
+  #s6 .marco { position: absolute; left: 790px; top: 170px; width: 1000px; height: 640px; border-radius: 26px; overflow: hidden;
+               background: #1d1127; box-shadow: 0 30px 80px rgba(0,0,0,.35) }
+  #s6 .marco img { position: absolute; left: 50%; top: 50%; transform-origin: center }
+  #s6 .marco img.lienzo { border-radius: 30px }  /* el lienzo trae las esquinas redondeadas con crema de la página */
+  #s6 .pie { position: absolute; left: 790px; top: 850px; width: 1000px; font-size: 42px }
+
+  /* 7 · cierre */
+  #s7 .sigue { position: absolute; left: 0; right: 0; top: 420px; text-align: center; font-size: 108px }
+  #s7 .url { position: absolute; left: 0; right: 0; top: 600px; text-align: center; font-size: 38px; color: var(--violeta-osc); text-transform: none; letter-spacing: 0.04em }
+  #s7 .aviso { position: absolute; left: 0; right: 0; top: 930px; text-align: center; font-size: 32px; color: rgba(250,246,240,.72) }
+</style></head><body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <!-- Estrella canónica de la marca (Constellation.vue, STAR_D), nunca un glifo -->
+  <path id="star" d="M10 1.6 C10.8 5,11.4 6.2,12.6 7.4 C14 8.8,16.4 9.4,18.4 10 C16.2 10.8,14.2 11.4,12.8 12.7 C11.5 13.9,10.9 15.7,10 18.4 C9.3 15.9,8.5 14.2,7.2 12.9 C5.8 11.6,3.4 10.7,1.6 10 C3.8 9.1,5.8 8.4,7.2 7.1 C8.4 6,9.2 4.2,10 1.6 Z"/>
+</defs></svg>
+
+<img id="fondo-higado" alt="">
+
+<section class="capa" id="s1"><div class="t">
+  <div class="d nombre">{{TITULAR}} {{APELLIDO}}</div>
+  <div class="m sub">engineer · metastatic breast cancer</div>
+</div></section>
+
+<section class="capa" id="s2"><div class="t">
+  <div class="d">A 3D render of her lesions, from her own scans.</div>
+  <div class="c firma" id="s2b">Built by Polaris.</div>
+</div></section>
+
+<section class="capa" id="s3">
+  <svg class="estrella" id="s3star" viewBox="0 0 20 20" style="left:930px;top:190px;width:60px;height:60px"><use href="#star" fill="#a44db2"/></svg>
+  <div class="d cita">“Polaris’s goal: the best agentic system for working with my diagnosis.”</div>
+  <div class="m quien">— {{TITULAR}}</div>
+</section>
+
+<section class="capa" id="s4">
+  <div class="m uno">One goal</div>
+  <div class="d ned">NED</div>
+  <div class="c def">no evidence of disease</div>
+  <svg class="estrella" id="s4star" viewBox="0 0 20 20" style="left:1400px;top:330px;width:90px;height:90px"><use href="#star" fill="#c77dd2"/></svg>
+</section>
+
+<section class="capa" id="s5">
+  <div class="d frase" id="s5a">She says what she needs. Polaris works out how, and which experts take it.</div>
+  <div class="nodo" style="left:360px"><div class="m">Input</div><div class="d">What she needs</div></div>
+  <div class="nodo" style="left:760px"><div class="m">Goal</div><div class="d">NED</div></div>
+  <div class="nodo" style="left:1160px"><div class="m">Polaris</div><div class="d">The experts</div></div>
+  <div class="nodo" style="left:1560px"><div class="m">Output</div><div class="d">Whatever fits</div></div>
+  <div class="flecha" style="left:527px;width:66px"></div>
+  <div class="flecha" style="left:927px;width:66px"></div>
+  <div class="flecha" style="left:1327px;width:66px"></div>
+  <div class="c salidas" id="s5b"><span class="chip">a report</span><span class="chip">a website</span><span class="chip">an app</span><span class="chip">the right questions</span></div>
+</section>
+
+<section class="capa" id="s6">
+  <div class="cifras">
+    <div class="fila"><div class="d" data-n="comites">0</div><div class="m">agents</div></div>
+    <div class="fila"><div class="d" data-n="tools">0</div><div class="m">tools</div></div>
+    <div class="fila"><div class="d" data-n="rutinas">0</div><div class="m">routines<br>running 24/7</div></div>
+    <div class="fila"><div class="d" data-n="llms">0</div><div class="m">AI backends</div></div>
+    <div class="fila"><div class="d" data-n="tests">0</div><div class="m">test files</div></div>
+  </div>
+  <div class="marco"><img id="corte" alt=""></div>
+  <div class="c pie" id="pie"></div>
+</section>
+
+<section class="capa" id="s7">
+  <svg class="estrella" id="s7star" viewBox="0 0 20 20" style="left:922px;top:290px;width:76px;height:76px"><use href="#star" fill="#ff6b47"/></svg>
+  <div class="d sigue">Still heading for NED.</div>
+  <div class="m url">helptitular.com/polaris</div>
+  <div class="c aviso">It supports decisions. Her doctors make them.</div>
+</section>
+
+<script>
+const DUR = 26, FPS_HIGADO = 30, N_HIGADO = 240
+const $ = (s) => document.querySelector(s)
+const cl = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+const lin = (t, a, b) => cl((t - a) / (b - a))
+const suave = (x) => 1 - Math.pow(1 - x, 3)                 // ease-out cúbica: entra rápido, se posa
+const dentro = (t, a, b, e = 0.35, s = 0.3) => Math.min(suave(lin(t, a, a + e)), 1 - lin(t, b - s, b))  // opacidad de una escena [a,b)
+const hig = (t) => `assets/higado/${String(1 + (Math.floor(t * FPS_HIGADO) % N_HIGADO)).padStart(4, '0')}.jpg`
+const CORTES = [  // bloque 6: 4 cortes de 1,2 s; el pie es la línea de voz, sin cifras
+  { src: null, pie: '3D viewers of her lesions', ancho: 660 },
+  { src: 'assets/biopsia.png', pie: 'A microscope viewer of her biopsy', ancho: 1180 },
+  { src: 'assets/datos-cielo.png', pie: 'Her case, as open data', ancho: 1500 },
+  { src: 'assets/repo.png', pie: 'The code, open source', ancho: 820 },
+]
+const fmt = (n) => n.toLocaleString('en-US')
+
+window.pinta = (t) => {
+  // 1 · anclaje: el hígado detrás, desenfocado; 2 · el mismo hígado, nítido, a la derecha
+  const f = $('#fondo-higado'); f.src = hig(t)
+  const a1 = dentro(t, 0, 2.15, 0.45, 0.35), a2 = dentro(t, 2.0, 5.1, 0.4, 0.35)
+  const nitido = suave(lin(t, 1.8, 2.5))
+  f.style.opacity = Math.max(0.32 * a1 * (1 - nitido), a2)
+  f.style.filter = `blur(${22 * (1 - nitido)}px)`
+  f.classList.toggle('velado', nitido < 0.5)
+  const x = 50 + 17 * nitido, s = 1 - 0.13 * nitido
+  f.style.left = x + '%'; f.style.transform = `scale(${s})`
+  $('#s1').style.opacity = a1
+  $('#s1 .t').style.transform = `translateY(${16 * (1 - suave(lin(t, 0, 0.5)))}px)`
+  $('#s2').style.opacity = a2
+  $('#s2b').style.opacity = suave(lin(t, 3.1, 3.5))
+
+  // 3 · la cita: la crema entra de abajo
+  const a3 = dentro(t, 5.0, 9.1, 0.45, 0.3)
+  $('#s3').style.opacity = a3
+  $('#s3').style.transform = `translateY(${60 * (1 - suave(lin(t, 5.0, 5.5)))}px)`
+  $('#s3star').style.transform = `rotate(${(t - 5) * 12}deg)`
+
+  // 4 · el goal
+  const a4 = dentro(t, 9.0, 12.1, 0.4, 0.3)
+  $('#s4').style.opacity = a4
+  $('#s4 .ned').style.transform = `scale(${0.94 + 0.06 * suave(lin(t, 9, 9.7))})`
+  $('#s4 .def').style.opacity = suave(lin(t, 9.6, 10.0))
+  const pulso = 1 + 0.12 * Math.sin((t - 9) * Math.PI * 1.4)
+  $('#s4star').style.transform = `scale(${pulso})`
+
+  // 5 · cómo funciona: la frase, los nodos se encienden, las flechas se dibujan, salen las salidas
+  const a5 = dentro(t, 12.0, 17.1, 0.4, 0.3)
+  $('#s5').style.opacity = a5
+  document.querySelectorAll('#s5 .nodo').forEach((n, i) => {
+    const k = suave(lin(t, 12.4 + i * 0.45, 12.8 + i * 0.45))
+    n.style.opacity = k; n.style.transform = `translateY(${20 * (1 - k)}px)`
+  })
+  document.querySelectorAll('#s5 .flecha').forEach((n, i) => {
+    n.style.transform = `scaleX(${suave(lin(t, 12.7 + i * 0.45, 13.1 + i * 0.45))})`
+  })
+  const k5 = suave(lin(t, 14.4, 14.9)); $('#s5b').style.opacity = k5
+  $('#s5b').style.transform = `translateY(${18 * (1 - k5)}px)`
+
+  // 6 · qué ha hecho: contadores (cifras de la Anatomía del día) + cortes
+  const a6 = dentro(t, 17.0, 23.1, 0.4, 0.3)
+  $('#s6').style.opacity = a6
+  document.querySelectorAll('#s6 [data-n]').forEach((n, i) => {
+    const k = suave(lin(t, 17.2 + i * 0.12, 18.9 + i * 0.12))
+    n.textContent = fmt(Math.round(window.CIFRAS[n.dataset.n] * k))
+    n.parentElement.style.opacity = suave(lin(t, 17.1 + i * 0.12, 17.5 + i * 0.12))
+  })
+  const ic = cl(Math.floor((t - 17.6) / 1.3), 0, 3), c = CORTES[ic]
+  const img = $('#corte'), tl = t - 17.6 - ic * 1.3
+  img.src = c.src || hig(t)
+  img.style.width = c.ancho + 'px'
+  img.classList.toggle('lienzo', !c.src)
+  img.style.transform = `translate(-50%,-50%) scale(${1 + 0.035 * cl(tl / 1.3)})`   // zoom lento, como el piloto de /datos (≤4 %)
+  $('#s6 .marco').style.opacity = suave(lin(t, 17.4, 17.8))
+  $('#pie').textContent = c.pie
+  $('#pie').style.opacity = suave(lin(t, 17.6 + ic * 1.3, 17.85 + ic * 1.3))
+
+  // 7 · cierre: no se funde a negro, se queda en la tarjeta
+  const a7 = suave(lin(t, 23.0, 23.45))
+  $('#s7').style.opacity = a7
+  $('#s7star').style.transform = `scale(${0.6 + 0.4 * suave(lin(t, 23.1, 23.7))}) rotate(${(t - 23) * 10}deg)`
+  $('#s7 .aviso').style.opacity = suave(lin(t, 23.8, 24.2))
+}
+const q = new URLSearchParams(location.search)
+window.listo = Promise.all([document.fonts.ready, ...[...CORTES.filter(c => c.src).map(c => c.src)].map(s => new Promise(r => { const i = new Image(); i.onload = r; i.src = s }))])
+window.listo.then(() => window.pinta(Number(q.get('t') || 0)))
+</script>
+</body></html>

@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/sonido.py",
+ "estado_ficha": "completa",
+ "para": "Sintetiza en local, con la stdlib, el fondo sonoro del vídeo de Polaris (pad, transiciones, tics del contador, campana), cuadrado con los tiempos de polaris.html.",
+ "cuando_si": "Cuando el vídeo necesita sonido sin licencias ni terceros.",
+ "cuando_no": "Si {{TITULAR}} graba su voz o elige una pista con licencia: entonces esa pista sustituye a esta.",
+ "reemplaza": "nada: no había herramienta de vídeo de sistema (visor_video_x graba solo los visores)",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-27, vídeo «Polaris, so far» (plan aprobado por {{TITULAR}})",
+ "origen": "encargo de {{TITULAR}} 27-sep-2026; referencia de estilo: vídeo de @contactoyuscula en X"
+}

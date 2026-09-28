@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/voz.py",
+ "estado_ficha": "completa",
+ "para": "Genera la voz del vídeo con historia frase a frase con el clon de {{TITULAR}} (ElevenLabs, solo se manda texto) y saca de ahí la línea de tiempo (tiempos.js) y la pista de voz.",
+ "cuando_si": "Cada vez que cambie una frase firmada de guion_voz.json; las frases sin cambios no se vuelven a pedir (hash de texto+voz).",
+ "cuando_no": "Para frases que {{TITULAR}} no ha firmado, o para cualquier audio que se haga pasar por ella sin decir que es un clon.",
+ "reemplaza": "nada: elevenlabs_voz.py genera una frase suelta; esto encadena frases y mide duraciones",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, vídeo «Polaris» con historia (plan aprobado por {{TITULAR}})",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: storytelling con su voz"
+}

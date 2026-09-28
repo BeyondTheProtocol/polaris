@@ -1,0 +1,24 @@
+{
+  "name": "polaris-video",
+  "private": true,
+  "description": "Vídeo «Polaris» con historia, en Remotion (28-sep-2026). Instalado con OK de {{TITULAR}}.",
+  "scripts": {
+    "render": "remotion render src/index.ts Polaris out/polaris.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.529",
+    "@remotion/effects": "^4.0.529",
+    "@remotion/google-fonts": "^4.0.529",
+    "@remotion/media-utils": "^4.0.529",
+    "@remotion/motion-blur": "^4.0.529",
+    "@remotion/noise": "^4.0.529",
+    "@remotion/rough-notation": "^4.0.529",
+    "@remotion/shapes": "^4.0.529",
+    "@remotion/transitions": "^4.0.529",
+    "@types/react": "^19.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.529",
+    "typescript": "^7.0.2"
+  }
+}

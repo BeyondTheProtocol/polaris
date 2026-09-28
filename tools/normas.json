@@ -922,7 +922,7 @@
   },
   {
    "slug": "feedback-copiar-y-mejorar-sin-preguntar-instalar-si",
-   "que": "Copiar una idea y mejorar lo nuestro va sin preguntar; INSTALAR algo de terceros se le pregunta siempre",
+   "que": "Copiar una idea y mejorar lo nuestro va sin preguntar; INSTALAR de terceros que eleve el producto tiene permiso permanente (28-sep-26, a fuego): se audita, se fija versión y se le cuenta",
    "clase": "contexto",
    "mecanismo": null,
    "fresca": true,

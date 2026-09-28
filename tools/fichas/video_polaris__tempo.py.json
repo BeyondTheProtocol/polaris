@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/tempo.py",
+ "estado_ficha": "completa",
+ "para": "Mide el tempo (BPM), la fase y el nivel por segundo de una pista, para montar el vídeo sobre su rejilla.",
+ "cuando_si": "Antes de montar sobre una música nueva.",
+ "cuando_no": "Para análisis de audio clínico o de voz: solo sirve para música.",
+ "reemplaza": "nada",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, vídeo «Polaris» en Remotion (OK de {{TITULAR}} para instalar Remotion)",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: el mejor vídeo promo 2026, como motion designer"
+}

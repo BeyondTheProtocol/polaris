@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/sfx.py",
+ "estado_ficha": "completa",
+ "para": "Sintetiza en local los efectos de sonido (barridos, golpes, clics, tics) y los coloca con el timeline.",
+ "cuando_si": "Después de montaje.py.",
+ "cuando_no": "Si se usan efectos con licencia de fuera: entonces sustituyen a estos.",
+ "reemplaza": "nada",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, vídeo «Polaris» en Remotion (OK de {{TITULAR}} para instalar Remotion)",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: el mejor vídeo promo 2026, como motion designer"
+}

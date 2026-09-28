@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/montaje.py",
+ "estado_ficha": "completa",
+ "para": "Monta «música primero»: coloca su voz en la rejilla, hace caer «Polaris» en el drop y reordena la música por compases (calma bajo los médicos, vuelta en NED).",
+ "cuando_si": "Cada vez que cambie la voz o la música del vídeo con historia.",
+ "cuando_no": "Para vídeos sin voz (el de 26 s usa sonido.py).",
+ "reemplaza": "la colocación fija de voz.py (sigue sirviendo para generar las frases)",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, vídeo «Polaris» en Remotion (OK de {{TITULAR}} para instalar Remotion)",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: el mejor vídeo promo 2026, como motion designer"
+}

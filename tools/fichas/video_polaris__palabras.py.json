@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/palabras.py",
+ "estado_ficha": "completa",
+ "para": "Saca el tiempo exacto de cada palabra de su voz con Whisper EN LOCAL (egress 0) y lo casa con las palabras del guion firmado.",
+ "cuando_si": "Tras regenerar su voz con voz.py.",
+ "cuando_no": "Para transcribir audio de terceros o cualquier cosa que no sea su guion ya firmado.",
+ "reemplaza": "el reparto proporcional por caracteres de historia.html",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, vídeo «Polaris» en Remotion (OK de {{TITULAR}} para instalar Remotion)",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: el mejor vídeo promo 2026, como motion designer"
+}

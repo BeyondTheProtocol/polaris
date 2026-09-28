@@ -464,6 +464,7 @@ runpy test_puertos_loopback.py
 runpy test_observatorio_movil.py
 runpy test_staging_loopback.py
 runpy test_rebuild_agents.py
+runpy test_video_polaris.py         # 27-sep · el vídeo público de Polaris: sin léxico vetado ni cifras clínicas
 
 # ── Hallazgos de impacto MEDIO de la auditoría del 25-jul-26 ─────────────────────
 # Cada uno cierra un hallazgo con ficha del informe. La regla es que «arreglado» solo
