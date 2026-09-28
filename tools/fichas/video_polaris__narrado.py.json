@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/narrado.py",
+ "estado_ficha": "completa",
+ "para": "De un guion por capítulos a un vídeo narrado con su voz: encadena voz.py, palabras.py y sfx.py y deja timeline, voz, música y efectos para la composición «Narrado» de Remotion.",
+ "cuando_si": "Para cualquier vídeo explicativo narrado por {{TITULAR}} (clase, presentación, explicación de 1-5 min), a partir de guiones/<slug>.<idioma>.json.",
+ "cuando_no": "Para el vídeo promo «Polaris» con montaje en la rejilla de la música (ese va con montaje.py). Nunca para publicar: produce borradores.",
+ "reemplaza": "nada: reutiliza voz.py, palabras.py y sfx.py en vez de duplicarlos",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, plan «vídeos narrados con calidad KAI» aprobado por {{TITULAR}}",
+ "origen": "{{TITULAR}} 28-sep-2026: «quiero que Polaris sea capaz de hacer ese tipo de vídeos narrados por mí con esa calidad» (tras ver los vídeos de {{CONTACTO}} / KAI)"
+}

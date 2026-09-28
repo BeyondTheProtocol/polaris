@@ -1,7 +1,7 @@
 """Tiempo exacto de cada palabra de su voz, con Whisper EN LOCAL (egress 0), frase a frase.
 
-Uso: ~/claudecode/.venv/bin/python palabras.py <build>
-Lee <build>/voz/<id>.mp3 (voz.py) y guion_voz.json; escribe <build>/palabras.json:
+Uso: ~/claudecode/.venv/bin/python palabras.py <build> [--idioma es]
+Lee <build>/voz/<id>.mp3 (voz.py) y el guion del idioma (guion.py); Whisper escucha en ese idioma; escribe <build>/palabras.json:
   {id: [{"w": palabra_del_guion, "a": s, "b": s}, ...]}  (tiempos relativos al inicio de la frase)
 En pantalla van SIEMPRE las palabras del guion firmado (campo «pantalla» si existe), nunca lo que
 Whisper crea oír: Whisper solo aporta los tiempos. Si una palabra no casa, hereda un tiempo
@@ -11,7 +11,9 @@ import json, os, re, sys
 import whisper
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower())
+sys.path.insert(0, AQUI)
+import guion  # noqa: E402
+norm = lambda s: guion.norm(s).replace("-", "")
 
 
 def alinea(guion, oidas, dur):
@@ -37,13 +39,14 @@ def alinea(guion, oidas, dur):
     return out
 
 
-def main(build):
-    g = json.load(open(os.path.join(AQUI, "guion_voz.json"), encoding="utf-8"))
+def main(build, idioma="en", ruta_guion=None):
+    g = json.load(open(ruta_guion, encoding="utf-8")) if ruta_guion else guion.cargar(idioma)
+    g.setdefault("anclas", {})
     m = whisper.load_model("small")
     res, fallos = {}, 0
     for f in g["frases"]:
         mp3 = os.path.join(build, "voz", f["id"] + ".mp3")
-        r = m.transcribe(mp3, language="en", word_timestamps=True, fp16=False)
+        r = m.transcribe(mp3, language=g.get("idioma", "en"), word_timestamps=True, fp16=False)
         oidas = [w for s in r["segments"] for w in s.get("words", [])]
         dur = r["segments"][-1]["end"] if r["segments"] else 1.0
         pal = (f.get("pantalla") or f["texto"]).replace("N-E-D", "NED").split()
@@ -55,4 +58,6 @@ def main(build):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    # palabras.py <build> [--idioma es] [--guion <ruta.json>]  (sin nada: el vídeo de Polaris en EN)
+    idioma, a = guion.idioma_de_args(sys.argv[1:])
+    main(a[0], idioma, a[a.index("--guion") + 1] if "--guion" in a else None)

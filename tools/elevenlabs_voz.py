@@ -74,7 +74,24 @@ def list_voices():
         print("%-32s %-13s %s" % (v.get("voice_id", "?"), (v.get("name") or "")[:13], v.get("category", "")))
 
 
-def speak(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0):
+def speak_con_tiempos(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0):
+    """Una sola toma con el tiempo de cada carácter (endpoint with-timestamps). Para narraciones largas:
+    todo el texto en una petición = entonación continua. Frase a frase, aunque vaya enlazada, cada toma trae su
+    propia energía y al juntarlas suena «a trompicones» ({{TITULAR}}, 28-sep). Devuelve la alineación por caracteres."""
+    import base64
+    body = {"text": text, "model_id": model,
+            "voice_settings": {"stability": stability, "similarity_boost": similarity, "style": style, "use_speaker_boost": True}}
+    raw, _ = _req(API + "/text-to-speech/%s/with-timestamps?output_format=mp3_44100_128" % voice_id, _key(), data=body)
+    j = json.loads(raw)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "wb") as f:
+        f.write(base64.b64decode(j["audio_base64"]))
+    return j.get("alignment") or j.get("normalized_alignment")
+
+
+def speak(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0, previous_text="", next_text=""):
+    """previous_text/next_text: el texto que va antes y después, para que la frase se entone enlazada
+    (como parte de un discurso) y no como una lectura suelta. No se leen en voz alta."""
     key = _key()
     if not voice_id:
         sys.exit("Falta voice_id. Pásalo con --voice <ID> o ponlo en tools/.elevenlabs.json. "
@@ -85,6 +102,10 @@ def speak(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0)
         "voice_settings": {"stability": stability, "similarity_boost": similarity,
                            "style": style, "use_speaker_boost": True},
     }
+    if previous_text:
+        body["previous_text"] = previous_text
+    if next_text:
+        body["next_text"] = next_text
     if model == "eleven_turbo_v2_5":
         body["language_code"] = "es"  # multilingual_v2 autodetecta; turbo admite forzar idioma
     audio, ctype = _req(API + "/text-to-speech/%s?output_format=mp3_44100_128" % voice_id, key,

@@ -6,6 +6,9 @@ clic suave cuando entra cada chip / nodo, y tics mientras cuentan las cifras. Na
 """
 import json, math, os, random, struct, sys, wave
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from guion import norm  # noqa: E402
+
 SR, TAU = 48000, 2 * math.pi
 rnd = random.Random(3)
 
@@ -33,12 +36,17 @@ def poner(buf, t, x, g):
         if 0 <= i + k < len(buf): buf[i + k] += g * v
 
 
+ANCLAS = {}  # clave EN → prefijo en el idioma del timeline (montaje.py las copia del guion)
+
+
 def palabra(tr, pref):
-    return next((w["a"] for w in tr["palabras"] if w["w"].lower().strip(",.").startswith(pref)), tr["t0"])
+    pref = ANCLAS.get(pref, pref)
+    return next((w["a"] for w in tr["palabras"] if norm(w["w"]).startswith(pref)), tr["t0"])
 
 
 def main(build):
     T = json.load(open(os.path.join(build, "timeline.json"), encoding="utf-8"))
+    ANCLAS.update(T.get("anclas", {}))
     n = int(T["total"] * SR); buf = [0.0] * n; tr = {x["id"]: x for x in T["tramos"]}
     for x in T["tramos"][1:]:
         poner(buf, x["t0"] - 0.35, whoosh(), 0.1)  # era 0,35: demasiado fuerte

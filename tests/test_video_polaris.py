@@ -92,7 +92,9 @@ class TestVideoPolaris(unittest.TestCase):
         # el render vigente es el ÚLTIMO «polaris-story-v*-remotion-*.mp4», con su timeline archivado al lado
         import glob
         carpeta = os.path.expanduser("~/claudecode/00_FUENTE-DE-VERDAD/07 · Marca/Videos-Polaris")
-        mp4s = sorted(glob.glob(os.path.join(carpeta, "polaris-story-v*-remotion-1920x1080-BORRADOR.mp4")))
+        # orden por número de versión: por texto, «v9» quedaba detrás de «v15» y se comprobaba un render viejo
+        mp4s = sorted(glob.glob(os.path.join(carpeta, "polaris-story-v*-remotion-1920x1080-BORRADOR.mp4")),
+                      key=lambda p: int(re.search(r"-v(\d+)-", os.path.basename(p)).group(1)))
         if not mp4s:
             self.skipTest("sin render de Remotion en esta máquina")
         mp4 = mp4s[-1]
@@ -104,6 +106,102 @@ class TestVideoPolaris(unittest.TestCase):
         self.assertLess(abs(d - tl["total"]), 0.5, f"el mp4 dura {d} y el timeline {tl['total']}")
         g = json.loads(leer("guion_voz.json"))
         self.assertEqual([x["id"] for x in tl["tramos"]], [f["id"] for f in g["frases"]], "el render no es del guion vigente")
+        # techo de audio: X recodifica al subir; con el pico a -1.3 dBTP el AAC puede recortar (onetake: ≤ -3)
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-i", mp4, "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+                           capture_output=True, text=True).stderr
+        tp = float(json.loads(r[r.rindex("{"):r.rindex("}") + 1])["input_tp"])
+        self.assertLessEqual(tp, -3.0, f"pico del render {tp} dBTP (> -3)")
+
+    def test_guiones_narrados(self):
+        # vídeos narrados (narrado.py + Narrado.tsx): cada guion es válido, sin léxico vetado, y cada escena existe
+        import glob
+        tsx = leer("remotion/src/Narrado.tsx")
+        tipos = set(re.findall(r"case '(\w+)':", tsx))
+        guiones = glob.glob(os.path.join(DIR, "guiones", "*.json"))
+        self.assertTrue(guiones, "no hay guiones narrados")
+        for p in guiones:
+            g = json.load(open(p, encoding="utf-8"))
+            texto = json.dumps(g, ensure_ascii=False).lower()
+            for mala in ("contacto", "ingeniera", "scientist", "pecho"):
+                self.assertNotIn(mala, texto, f"{os.path.basename(p)} contiene «{mala}»")
+            for k in ("slug", "idioma", "voice_id", "model", "capitulos"):
+                self.assertIn(k, g, f"{os.path.basename(p)}: falta «{k}»")
+            for c in g["capitulos"]:
+                self.assertTrue(c["frases"], f"capítulo {c['id']} sin frases")
+                e = c["escena"]
+                for x in [e] + e.get("pasos", []):
+                    self.assertIn(x["tipo"], tipos | {"portada", "cierre"}, f"escena desconocida «{x['tipo']}» en {c['id']}")
+        # lo que está escrito en pantalla no se subtitula: el filtro vive en el código, no a mano
+        self.assertIn("const enPantalla", tsx)
+        self.assertIn("< 0.6", tsx)
+
+    def test_master_y_subtitulos(self):
+        rs = leer("remotion/render.sh")
+        self.assertIn("TP=-4", rs)  # la receta de master vive en el repo, no en un historial
+        tsx = leer("remotion/src/Polaris.tsx")
+        # lo que ya está rotulado entero no se subtitula (launch-video-kit: nunca el mismo texto dos veces)
+        self.assertIn("const ROTULADO", tsx)
+        # las palabras rotuladas van por idioma en textos.ts (28-sep: en ES se colaban subtitulos duplicados)
+        textos = leer(os.path.join("remotion", "src", "textos.ts"))
+        bloques = re.findall(r"rotulado: \{(.*?)\},\n", textos)
+        self.assertEqual(len(bloques), 2, "falta el rotulado de EN o de ES")
+        for b in bloques:
+            for tramo in ("problema", "polaris", "medicos", "ned", "'web-final'"):
+                self.assertIn(tramo, b)
+
+
+class TestVideoPolarisES(unittest.TestCase):
+    """Versión ES (28-sep): guion_voz_es.json + textos.ts. Mismo componente, mismas escenas, sus anclas."""
+
+    def setUp(self):
+        self.en = json.loads(leer("guion_voz.json"))
+        self.es = json.loads(leer("guion_voz_es.json"))
+
+    def test_mismas_frases_y_escenas_que_el_en(self):
+        self.assertEqual([(f["id"], f["escena"]) for f in self.es["frases"]], [(f["id"], f["escena"]) for f in self.en["frases"]])
+        self.assertEqual(self.es["idioma"], "es")
+        self.assertEqual(self.es["voice_id"], "51aLNh96A9WJZODzYIyP", "su clon PVC entrenado con su podcast en español")
+
+    def test_guion_es_dice_lo_que_ella_firmo_en_en(self):
+        texto = " ".join(f["texto"] for f in self.es["frases"]).lower()
+        for mala in ("pecho", "ingeniera", "ingeniera", "contacto", "españoles", "espanoles", "explica polaris"):
+            self.assertNotIn(mala, texto)
+        for buena in ("{{DIAGNOSTICO}}", "estándar", "ingeniera", "sin mi firma", "ayudó a elegir", "biopsiar", "deciden mis médicos", "help titular"):
+            self.assertIn(buena, texto)
+
+    def test_su_voz_es_tampoco_se_acelera(self):
+        aj = self.es.get("ajustes", {})
+        self.assertEqual(aj.get("tempo", 1.0), 1.0)
+        self.assertLessEqual(aj.get("style", 0.0), 0.2)
+        self.assertGreaterEqual(aj.get("stability", 0.5), 0.45)
+
+    def test_cada_ancla_casa_con_una_palabra_de_su_frase(self):
+        # el montaje busca palabras por prefijo EN; en ES cada clave tiene que existir y casar, o la escena cae en t0 sin avisar
+        sys.path.insert(0, DIR)
+        import guion
+        tsx = leer(os.path.join("remotion", "src", "Polaris.tsx"))
+        usos = set(re.findall(r"dice\('([\w-]+)', '([\w-]+)'", tsx))
+        usos |= set(re.findall(r'palabra\(tr\["([\w-]+)"\], "([\w-]+)"\)', leer("sfx.py")))
+        usos |= {("problema", p) for p in ("rare", "breast", "ultra", "metastatic", "two")} | {("olvido", "lot")}
+        usos |= {("carga", p) for p in ("samples", "messages", "trips")} | {("polaris", "polaris")}
+        frases = {f["id"]: [guion.norm(w) for w in (f.get("pantalla") or f["texto"]).replace("N-E-D", "NED").split()] for f in self.es["frases"]}
+        for fid, clave in sorted(usos):
+            self.assertIn(clave, self.es["anclas"], f"falta el ancla ES de «{clave}»")
+            pref = self.es["anclas"][clave]
+            self.assertTrue(any(w.startswith(pref) for w in frases[fid]), f"«{pref}» ({clave}) no está en la frase {fid}")
+
+    def test_textos_de_pantalla_fuera_del_componente(self):
+        tsx = leer(os.path.join("remotion", "src", "Polaris.tsx"))
+        for fijo in ("TRIALS TRACKED", "It doesn't decide", "Still going for NED", ">DRAFT<", "HUMAN GATE", "no evidence of disease",
+                     "So I built Polaris", "a team of AI agents", "'en-US'"):
+            self.assertNotIn(fijo, tsx, f"texto de pantalla fijo en el componente: {fijo}")
+        textos = leer(os.path.join("remotion", "src", "textos.ts"))
+        self.assertIn("const ES: Textos", textos)
+        for mala in ("pecho", "ingeniera", "ingeniera", "contacto"):
+            self.assertNotIn(mala, textos.lower())
+
+    def test_whisper_escucha_en_el_idioma_del_guion(self):
+        self.assertNotIn('language="en"', leer("palabras.py"))
 
 
 if __name__ == "__main__":

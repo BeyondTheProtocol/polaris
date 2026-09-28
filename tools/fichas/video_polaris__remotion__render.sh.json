@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/remotion/render.sh",
+ "estado_ficha": "completa",
+ "para": "Renderiza el vídeo «Polaris» de Remotion y lo masteriza (-16 LUFS, techo -4 dBTP) en BORRADOR 1920×1080 + móvil en la carpeta de marca.",
+ "cuando_si": "Cada vez que haya una versión nueva del vídeo Remotion que enseñar a {{TITULAR}}.",
+ "cuando_no": "Para el vídeo antiguo de capturas «so far» (ese va con montar.sh). Nunca para publicar: solo produce borradores.",
+ "reemplaza": "la receta que hasta la v15 solo vivía en el historial de la sesión hopeful-mendel",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, v16 (margen de audio y sin subtítulos duplicados)",
+ "origen": "{{TITULAR}} 28-sep-2026, «dale mejóralo» tras el análisis de launch-video-kit y onetake"
+}

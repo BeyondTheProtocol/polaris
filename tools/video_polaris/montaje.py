@@ -1,6 +1,6 @@
 """Montaje «música primero»: coloca su voz sobre la rejilla del tema y reordena la música por compases.
 
-Uso: python3 montaje.py <build> <musica.mp3>
+Uso: python3 montaje.py <build> <musica.mp3> [--idioma es]
 Necesita <build>/voz/*.mp3 (voz.py), <build>/palabras.json (palabras.py) y tempo.py.
 Escribe:
   <build>/timeline.json   frases con inicio/fin reales en el vídeo + palabras + cortes en el compás
@@ -14,6 +14,8 @@ import json, math, os, subprocess, sys
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 import tempo as tempo_mod
+from voz import VOZ_LUFS, lufs  # cada frase igualada con ganancia fija (v16: iban de -16 a -28 LUFS)
+import guion
 
 HUECO, INTRO_TIEMPOS, COLA = 0.3, 2, 2.6  # cierre: 2,5 s de tarjeta con vida y fundido corto (director + diseño, 28-sep)
 
@@ -34,8 +36,8 @@ def drop_exacto(musica, aprox=16.0):
     return aprox - 2 + k * h / 8000
 
 
-def main(build, musica):
-    g = json.load(open(os.path.join(AQUI, "guion_voz.json"), encoding="utf-8"))
+def main(build, musica, idioma="en"):
+    g = guion.cargar(idioma)
     pal = json.load(open(os.path.join(build, "palabras.json"), encoding="utf-8"))
     tm = tempo_mod.main(musica)
     beat, medio = tm["beat"], tm["beat"] / 2
@@ -54,7 +56,7 @@ def main(build, musica):
     total = round(tramos[-1]["t1"] + COLA, 3)
     tr = {x["id"]: x for x in tramos}
     # 2. anclas de música: «Polaris» cae en el drop; la calma bajo «doctors»; la vuelta en «still going for NED»
-    w_pol = next(w for w in tr["polaris"]["palabras"] if w["w"].lower().startswith("polaris"))["a"]
+    w_pol = next(w for w in tr["polaris"]["palabras"] if guion.norm(w["w"]).startswith(guion.ancla(g, "polaris")))["a"]
     t_calma = tr["medicos"]["t0"] - 0.3
     t_vuelta = tr["ned"]["t0"] - 0.05
     # secciones del tema original (por nivel): calma = tramo tranquilo después del cuerpo; vuelta = el siguiente fuerte
@@ -87,13 +89,14 @@ def main(build, musica):
     subprocess.run(["ffmpeg", "-v", "error", "-y", *entradas, "-filter_complex", ";".join(filtros) + ";" + mezcla,
                     "-map", "[mus]", "-t", str(total), os.path.join(build, "musica.wav")], check=True)
     ent = sum((["-i", x["mp3"]] for x in tramos), [])
-    fil = ";".join(f"[{k}:a]aresample=48000,aformat=channel_layouts=stereo,adelay={int(x['t0'] * 1000)}|{int(x['t0'] * 1000)}[v{k}]" for k, x in enumerate(tramos))
+    fil = ";".join(f"[{k}:a]aresample=48000,aformat=channel_layouts=stereo,volume={VOZ_LUFS - lufs(x['mp3']):.2f}dB,"
+                   f"adelay={int(x['t0'] * 1000)}|{int(x['t0'] * 1000)}[v{k}]" for k, x in enumerate(tramos))
     mez = "".join(f"[v{k}]" for k in range(len(tramos))) + f"amix=inputs={len(tramos)}:normalize=0,apad=whole_dur={total}[v]"
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ent, "-filter_complex", fil + ";" + mez, "-map", "[v]", "-t", str(total),
                     os.path.join(build, "voz.wav")], check=True)
     for x in tramos:
         x.pop("mp3")
-    json.dump({"total": total, "fps": 30, "beat": beat, "drop": round(w_pol, 3), "calma": round(t_calma, 3), "vuelta": round(t_vuelta, 3),
+    json.dump({"idioma": g["idioma"], "anclas": g["anclas"], "total": total, "fps": 30, "beat": beat, "drop": round(w_pol, 3), "calma": round(t_calma, 3), "vuelta": round(t_vuelta, 3),
                "piezas_musica": [[round(a, 3), round(b, 3), round(c, 3)] for a, b, c in piezas], "tramos": tramos},
               open(os.path.join(build, "timeline.json"), "w"), ensure_ascii=False, indent=1)
     print(f"✓ total {total} s · beat {beat} · drop del tema {drop:.2f}s → en vídeo {w_pol:.2f}s («Polaris»)")
@@ -104,4 +107,5 @@ def main(build, musica):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    idioma, args = guion.idioma_de_args(sys.argv[1:])
+    main(args[0], args[1], idioma)

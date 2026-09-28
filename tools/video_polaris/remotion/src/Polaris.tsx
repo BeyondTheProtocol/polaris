@@ -1,4 +1,4 @@
-// Vídeo «Polaris» con historia (EN), en Remotion. 28-sep-2026, con el OK de {{TITULAR}} para Remotion.
+// Vídeo «Polaris» con historia (EN y ES: textos en textos.ts, idioma y anclas en timeline.json), en Remotion. 28-sep-2026, con el OK de {{TITULAR}} para Remotion.
 // Todo se sincroniza con timeline.json (montaje.py): cada frase y CADA PALABRA de su voz tienen su tiempo real
 // (Whisper en local), y los cortes caen en la rejilla del tema. Los materiales son los verificados:
 // capturas reales de helptitular.com (sin cifras clínicas salvo el esquema del tumor, captura exacta, decisión suya),
@@ -11,6 +11,7 @@ import {loadFont as fHanken} from '@remotion/google-fonts/HankenGrotesk';
 import {loadFont as fMono} from '@remotion/google-fonts/JetBrainsMono';
 import T from '../public/timeline.json';
 import CIFRAS from '../public/cifras.json';
+import {TEXTOS} from './textos';
 
 const {fontFamily: FRAUNCES} = fFraunces('normal', {weights: ['600'], subsets: ['latin']});
 const {fontFamily: HANKEN} = fHanken('normal', {weights: ['500', '700'], subsets: ['latin']});
@@ -23,6 +24,9 @@ const STAR_D = 'M10 1.6 C10.8 5,11.4 6.2,12.6 7.4 C14 8.8,16.4 9.4,18.4 10 C16.2
 type Palabra = {w: string; a: number; b: number};
 type Tramo = {id: string; escena: string; t0: number; t1: number; texto: string; palabras: Palabra[]};
 const TR = T.tramos as Tramo[];
+const X = TEXTOS[(T as any).idioma || 'en'];
+const ANCLAS: Record<string, string> = (T as any).anclas || {};  // clave EN → prefijo en su idioma
+const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9-]/g, '');
 const tramo = (id: string) => TR.find((x) => x.id === id)!;
 const CORTE = 0.2;
 const ventana = (id: string): [number, number] => {
@@ -33,7 +37,8 @@ const ventana = (id: string): [number, number] => {
 };
 // instante en que dice una palabra (por prefijo), dentro de una frase
 const dice = (id: string, pref: string, n = 0) => {
-  const ws = tramo(id).palabras.filter((w) => w.w.toLowerCase().replace(/[^a-z0-9-]/g, '').startsWith(pref.toLowerCase()));
+  const p = ANCLAS[pref] ?? norm(pref);
+  const ws = tramo(id).palabras.filter((w) => norm(w.w).startsWith(p));
   return (ws[n] || ws[0] || {a: tramo(id).t0}).a;
 };
 const cl = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -49,10 +54,11 @@ const useMuelle = () => {
 };
 
 // opacidad + barrido de entrada/salida de una escena (entra desde la derecha, sale hacia la izquierda)
-const useEscena = (id: string) => {
+// entra/sale = false: sin barrido, porque esa costura es una transformación (algo sobrevive y se convierte en lo siguiente)
+const useEscena = (id: string, {entra = true, sale = true} = {}) => {
   const t = useT(); const [a, b] = ventana(id);
-  const e = 1 - suave(lin(t, a, a + 0.45)), s = lin(t, b - 0.25, b);
-  const op = t < a || t >= b ? 0 : Math.min(suave(lin(t, a, a + 0.35)), 1 - s);
+  const e = entra ? 1 - suave(lin(t, a, a + 0.45)) : 0, s = sale ? lin(t, b - 0.25, b) : 0;
+  const op = t < a || t >= b ? 0 : Math.min(entra ? suave(lin(t, a, a + 0.35)) : 1, 1 - s);
   return {op, style: {opacity: op, transform: `translateX(${140 * e - 160 * s * s}px) scale(${1.035 - 0.035 * suave(lin(t, a, b)) + 0.02 * e})`,
     filter: 14 * e + 16 * s > 0.3 ? `blur(${14 * e + 16 * s}px)` : undefined} as React.CSSProperties, t, a, b};
 };
@@ -89,7 +95,7 @@ const Cielo: React.FC = () => {
 };
 
 // palabra clave con golpe arriba y subrayado violeta que se dibuja
-const KW: [string, string, string][] = [['problema', 'two', 'TWO SIDES.'], ['olvido', 'lot', 'AND A LOT MORE.']];  // en el resto manda la casilla OUTPUT de la barra
+const KW: [string, string, string][] = [['problema', 'two', X.dosCaras], ['olvido', 'lot', X.muchoMas]];  // en el resto manda la casilla OUTPUT de la barra
 const PalabraClave: React.FC = () => {
   const t = useT();
   const vivas = KW.map(([id, p, txt]) => ({t0: dice(id, p) - 0.05, fin: ventana(id)[1] - 0.15, txt})).filter((k) => t >= k.t0 && t < k.fin);
@@ -104,9 +110,21 @@ const PalabraClave: React.FC = () => {
 };
 
 // subtítulos: trozos de 2-4 palabras con los tiempos REALES de su voz; la palabra que dice, en pastilla violeta
+// Lo que ya está escrito entero en un rótulo grande no se subtitula: sería el mismo texto dos veces a la vez
+// (launch-video-kit, 28-sep). Tramo → [primera, última] palabra rotulada (null = desde el principio, '*' = hasta el final).
+// Las palabras clave sueltas (TWO SIDES., Go further., AND A LOT MORE.) sí llevan subtítulo: la frase dice más que el rótulo.
+// {{TITULAR}}, 28-sep: los golpes del principio también salían dos veces.
+const ROTULADO: Record<string, [string | null, string]> = X.rotulado;  // por idioma: las palabras van en textos.ts
+// se quitan las PALABRAS rotuladas antes de trocear (si no, «disease.» se colaba pegada a «And nothing»)
+const visibles = (x: Tramo) => {
+  const r = ROTULADO[x.id]; if (!r) return x.palabras;
+  const ini = r[0] ? x.palabras.find((p) => p.w === r[0]) : x.palabras[0];
+  const fin = r[1] === '*' ? x.palabras[x.palabras.length - 1] : x.palabras.find((p) => p.w === r[1]);
+  return ini && fin ? x.palabras.filter((p) => p.a < ini.a || p.a > fin.a) : x.palabras;
+};
 const TROZOS = TR.flatMap((x) => {
   const out: Palabra[][] = []; let cur: Palabra[] = [];
-  for (const w of x.palabras) {
+  for (const w of visibles(x)) {
     const largo = [...cur, w].map((p) => p.w).join(' ').length;
     if (cur.length && (cur.length >= 4 || largo > 24)) {out.push(cur); cur = [];}
     cur.push(w); if (/[,.!?:]$/.test(w.w) && cur.length >= 2) {out.push(cur); cur = [];}
@@ -119,9 +137,11 @@ const Subtitulos: React.FC = () => {
   const i = TROZOS.findIndex((c, k) => t >= c[0].a - 0.05 && t < (TROZOS[k + 1] ? Math.min(TROZOS[k + 1][0].a - 0.05, c[c.length - 1].b + 0.6) : c[c.length - 1].b + 0.6));
   if (i < 0) return null;
   const c = TROZOS[i], g = rebote(lin(t, c[0].a - 0.05, c[0].a + 0.12));
+  const [ca, cb] = ventana('mas-alla'), claro = t >= ca - 0.1 && t < cb - 0.2;  // fondo crema
   return (
     <div style={{position: 'absolute', left: 0, right: 0, bottom: 70, textAlign: 'center', fontFamily: HANKEN, fontWeight: 700, fontSize: 64, lineHeight: 1.1,
-      color: C.crema, letterSpacing: '-0.01em', textShadow: '0 2px 0 rgba(29,17,39,.9), 0 0 18px rgba(29,17,39,.85), 0 0 4px rgba(29,17,39,1)',
+      color: claro ? C.berenjena : C.crema, letterSpacing: '-0.01em',
+      textShadow: claro ? 'none' : '0 2px 0 rgba(29,17,39,.9), 0 0 18px rgba(29,17,39,.85), 0 0 4px rgba(29,17,39,1)',
       transform: `translateY(${10 * (1 - g)}px) scale(${0.96 + 0.04 * g})`}}>
       {c.map((w, k) => {const activa = t >= w.a && t < (c[k + 1] ? c[k + 1].a : w.b + 0.3);
         return <span key={k} style={{display: 'inline-block', padding: '2px 12px', borderRadius: 12, background: activa ? C.violeta : 'transparent',
@@ -147,11 +167,11 @@ const Gancho: React.FC = () => {
   if (p >= 1) return null;
   return (
     <AbsoluteFill style={{background: `rgba(45,27,61,${1 - p})`, alignItems: 'center', justifyContent: 'center', opacity: 1 - lin(t, t0 - 0.1, t0 + 0.1)}}>
-      <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, color: C.crema, letterSpacing: '-0.03em', lineHeight: 0.95, transform: `translateY(${-260 * p}px)`}}>Ultra-rare cancer.</div>
-      <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, color: C.violetaOsc, letterSpacing: '-0.03em', lineHeight: 0.95, transform: `translateY(${260 * p}px)`}}>So I built Polaris.</div>
+      <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, color: C.crema, letterSpacing: '-0.03em', lineHeight: 0.95, transform: `translateY(${-260 * p}px)`}}>{X.gancho[0]}</div>
+      <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, color: C.violetaOsc, letterSpacing: '-0.03em', lineHeight: 0.95, transform: `translateY(${260 * p}px)`}}>{X.gancho[1]}</div>
       {/* tres destellos de producto: el mapa 3D, el radar y la puerta con su firma (visibles ya en el fotograma 0: miniatura) */}
       <div style={{display: 'flex', gap: 28, marginTop: 50, opacity: 1 - suave(lin(t, t0 - 0.4, t0 - 0.1)), transform: `translateY(${120 * p}px)`}}>
-        {[['esqueleto.png', '3D maps'], ['', 'Trial radar'], ['', 'My sign-off']].map(([img, lbl], i) => (
+        {[['esqueleto.png', X.ganchoChips[0]], ['', X.ganchoChips[1]], ['', X.ganchoChips[2]]].map(([img, lbl], i) => (
           <div key={lbl} style={{width: 220, height: 130, borderRadius: 18, overflow: 'hidden', position: 'relative', background: C.lienzo,
             border: `2px solid ${i === 2 ? C.coral : 'rgba(199,125,210,.5)'}`, boxShadow: `0 0 ${16 + 10 * Math.sin(t * 8 + i)}px rgba(199,125,210,.35)`}}>
             {img ? <Img src={staticFile(img)} style={{position: 'absolute', left: 50, top: -40, width: 120}} /> : i === 1 ?
@@ -160,7 +180,7 @@ const Gancho: React.FC = () => {
                 {Array.from({length: 24}, (_, k) => <circle key={k} cx={40 * Math.cos(k * 0.9 + t)} cy={40 * Math.sin(k * 1.7)} r={2} fill={C.violetaOsc} />)}
               </svg> :
               <div style={{position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MONO, fontSize: 20,
-                letterSpacing: '0.14em', color: C.coral}}>HUMAN GATE</div>}
+                letterSpacing: '0.14em', color: C.coral}}>{X.puertaHumana}</div>}
             <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, padding: '18px 0 6px', textAlign: 'center', fontFamily: MONO, fontSize: 15, letterSpacing: '0.12em',
               textTransform: 'uppercase', color: C.crema, background: 'linear-gradient(transparent, rgba(29,17,39,.95) 55%)'}}>{lbl}</div>
           </div>))}
@@ -169,7 +189,7 @@ const Gancho: React.FC = () => {
   );
 };
 
-const GOLPES: [string, string, string][] = [['rare', 'A RARE', C.crema], ['breast', 'BREAST CANCER.', C.crema], ['ultra', 'ULTRA-RARE.', C.violetaOsc], ['metastatic', 'METASTATIC.', C.crema]];
+const GOLPES: [string, string, string][] = X.golpes.map(([p, txt, violeta]) => [p, txt, violeta ? C.violetaOsc : C.crema]);
 const Apertura: React.FC = () => {
   const t = useT(); const m = useMuelle();
   const tSale = dice('problema', 'tumor') - 0.1;
@@ -204,7 +224,7 @@ const Problema: React.FC = () => {
   const sep = 70 * suave(lin(t, tDos, tDos + 0.5)) + 570 * suave(lin(t, tLados + 0.1, tLados + 0.7));
   const vuela = 1500 * Math.pow(lin(t, fin - 0.45, fin), 2);
   const estOp = cl(lin(t, tDos - 0.45, tDos - 0.2));
-  const llega = m(tLados + 0.1, 16), sale = Math.pow(lin(t, fin - 0.45, fin), 2);
+  const llega = m(tLados + 0.1, 16), sale = 0;  // costura 1: la tarjeta se queda y crece hasta ser la página de «Go further»
   const anillo = lin(t, tDos, tDos + 1.1);
   if (t >= fin) return null;
   return (
@@ -225,15 +245,26 @@ const Problema: React.FC = () => {
   );
 };
 
+// Costura 1: la tarjeta de las dos caras (460,256 · 1000×529) crece hasta ser esta página.
+// Costura 2: la página se pliega en su subrayado y esa línea se abre en horizonte, de donde sube su foto.
+const TARJETA = {x: 460, y: 256, w: 1000, h: 529}, LINEA_Y = 651;
 const MasAlla: React.FC = () => {
   const t = useT(); const m = useMuelle(); const [a, b] = ventana('mas-alla');
-  if (t < a || t >= b) return null;
-  const ent = 100 * (1 - Math.pow(lin(t, a, a + 0.32), 0.6)), sal = 100 * Math.pow(lin(t, b - 0.3, b), 2);
+  if (t < a - 0.35 || t >= b + 0.45) return null;
+  const g = suave(lin(t, a - 0.3, a + 0.25)), pliega = suave(lin(t, b - 0.4, b));
+  const ins = (d: number) => d * (1 - g);
+  const top = ins(TARJETA.y) + pliega * (LINEA_Y - 3), bot = ins(1080 - TARJETA.y - TARJETA.h) + pliega * (1080 - LINEA_Y - 3);
   const tGo = dice('mas-alla', 'go'), tFur = dice('mas-alla', 'further');
+  if (t >= b) {  // solo queda la línea: se abre a lo ancho y se apaga mientras sube la foto
+    const h = lin(t, b, b + 0.45);
+    return <div style={{position: 'absolute', left: 960 - 410 - 550 * suave(h), width: 820 + 1100 * suave(h), top: LINEA_Y - 3, height: 6, borderRadius: 3,
+      background: C.crema, opacity: 1 - h}} />;
+  }
   return (
-    <AbsoluteFill style={{background: C.crema, clipPath: `inset(0 ${sal}% 0 ${ent}%)`, alignItems: 'center', justifyContent: 'center'}}>
+    <AbsoluteFill style={{background: C.crema, opacity: cl(lin(t, a - 0.35, a - 0.22)), alignItems: 'center', justifyContent: 'center',
+      clipPath: `inset(${top}px ${ins(TARJETA.x)}px ${bot}px ${ins(1920 - TARJETA.x - TARJETA.w)}px round ${22 * (1 - g)}px)`}}>
       <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 170, color: C.berenjena, letterSpacing: '-0.03em'}}>
-        {[['Go', tGo], ['further.', tFur]].map(([w, tw]) => {const k = m(tw as number - 0.05, 10);
+        {[[X.masAlla[0], tGo], [X.masAlla[1], tFur]].map(([w, tw]) => {const k = m(tw as number - 0.05, 10);
           return <span key={w as string} style={{display: 'inline-block', margin: '0 18px', opacity: cl(k * 1.5), transform: `translateY(${60 * (1 - k)}px) scale(${0.8 + 0.2 * k})`}}>{w}</span>;})}
       </div>
       <div style={{width: 820, height: 6, marginTop: 24, background: C.berenjena, borderRadius: 3, transformOrigin: 'left center',
@@ -252,14 +283,12 @@ const Mapa: React.FC<{size: number; t: number; style?: React.CSSProperties}> = (
 );
 
 const PolarisEsc: React.FC = () => {
-  const e = useEscena('polaris'); const m = useMuelle(); const t = e.t;
+  const e = useEscena('polaris', {entra: false}); const m = useMuelle(); const t = e.t;  // costura 2: su foto sube desde la línea, sin barrido
   if (e.op <= 0) return null;
   const drop = T.drop, tTeam = dice('polaris', 'team'), tNed = dice('polaris', 'ned'), tPuerta = dice('polaris', 'nothing');
   const zin = m(drop - 0.08, 11), zNed = Math.pow(lin(t, tNed - 0.45, tNed + 0.05), 2);
   const mapaOp = cl(zin * 1.3) * (1 - lin(t, tNed - 0.3, tNed - 0.05));
   const ned = m(tNed + 0.02, 10) * (1 - lin(t, tPuerta - 0.3, tPuerta));
-  const nodos = [['Input', 'What I need'], ['Goal', 'Written: NED'], ['Polaris', 'The experts'], ['Human gate', 'My sign-off'], ['Output', 'Whatever fits']];
-  const xs = [260, 610, 960, 1310, 1660];
   const vuelta = 2.2, fase = t - tPuerta - 1.6, u = fase > 0 ? (fase % vuelta) / vuelta : -1, pos = u * 4, ip = Math.min(3, Math.floor(Math.max(0, pos)));
   return (
     <AbsoluteFill style={e.style}>
@@ -271,25 +300,44 @@ const PolarisEsc: React.FC = () => {
             WebkitMaskImage: 'linear-gradient(#000 70%, transparent 92%)'}} />
           <div style={{position: 'absolute', left: 1330, top: 430, fontFamily: MONO, fontSize: 30, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.violetaOsc,
             opacity: suave(lin(t, t0 + 0.2, t0 + 0.5)) * (1 - sale), transform: `translateX(${40 * (1 - suave(lin(t, t0 + 0.2, t0 + 0.6)))}px)`}}>
-            <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 56, letterSpacing: '-0.02em', textTransform: 'none', color: C.crema}}>{{TITULAR}} {{APELLIDO}}</div>engineer</div>
+            <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 56, letterSpacing: '-0.02em', textTransform: 'none', color: C.crema}}>{X.nombre}</div>{X.rol}</div>
         </>;})()}
       <Mapa size={620} t={t} style={{left: 960 - 310, top: 100, opacity: mapaOp, transform: `scale(${(0.6 + 0.4 * zin) * (1 + 5 * zNed)})`}} />
       <div style={{position: 'absolute', left: 0, right: 0, top: 800, textAlign: 'center', fontFamily: MONO, fontSize: 32, letterSpacing: '0.14em', textTransform: 'uppercase',
-        color: C.violetaOsc, opacity: suave(lin(t, tTeam, tTeam + 0.3)) * (1 - lin(t, tNed - 0.4, tNed - 0.2))}}>a team of AI agents</div>
+        color: C.violetaOsc, opacity: suave(lin(t, tTeam, tTeam + 0.3)) * (1 - lin(t, tNed - 0.4, tNed - 0.2))}}>{X.equipo}</div>
+      {!X.nedDespliega ? <>
       <div style={{position: 'absolute', left: 0, right: 0, top: 200, textAlign: 'center', opacity: cl(ned * 1.4), transform: `scale(${0.7 + 0.3 * ned})`}}>
         <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 300, color: C.crema, letterSpacing: '-0.04em', lineHeight: 1}}>NED</div>
-        <div style={{fontFamily: HANKEN, fontWeight: 500, fontSize: 44, color: C.crema, marginTop: 10}}>no evidence of disease</div>
+        <div style={{fontFamily: HANKEN, fontWeight: 500, fontSize: 44, color: C.crema, marginTop: 10}}>{X.nedSub}</div>
       </div>
+      </> : null}
+      {/* {{TITULAR}}, 28-sep: las palabras de NED salen de cada inicial. N·E·D se abren y cada una se despliega en su palabra
+          justo cuando ella la dice; «of» aparece entre medias. En ES las iniciales no casan (sin evidencia de enfermedad):
+          ahí va NED con su subtítulo, como en la v16. */}
+      {X.nedDespliega ? (() => {const tNo = dice('polaris', 'no'), tEv = dice('polaris', 'evidence'), tOf = dice('polaris', 'of', 1), tDis = dice('polaris', 'disease');
+        const abre = suave(lin(t, tNo - 0.35, tNo + 0.1));
+        const trozo = (txt: string, t0: number, dur: number) => txt.slice(0, Math.round(txt.length * suave(lin(t, t0, t0 + dur))));
+        const ini = {color: C.crema}, resto = {color: C.violetaOsc};
+        return <div style={{position: 'absolute', left: 0, right: 0, top: 330 - 130 * (1 - abre), textAlign: 'center', whiteSpace: 'nowrap', opacity: cl(ned * 1.4),
+          transform: `scale(${0.7 + 0.3 * ned})`, fontFamily: FRAUNCES, fontWeight: 600, fontSize: 300 - 180 * abre, letterSpacing: `${-0.04 + 0.03 * abre}em`, lineHeight: 1}}>
+          <span style={ini}>N</span><span style={resto}>{trozo('o', tNo - 0.05, 0.15)}</span>
+          <span style={{display: 'inline-block', width: `${0.3 * abre}em`}} />
+          <span style={ini}>E</span><span style={resto}>{trozo('vidence', tEv - 0.05, 0.3)}</span>
+          <span style={{display: 'inline-block', width: `${0.3 * abre}em`}} />
+          <span style={{...resto, opacity: suave(lin(t, tOf - 0.05, tOf + 0.15))}}>{abre > 0.5 ? 'of' : ''}</span>
+          <span style={{display: 'inline-block', width: `${0.3 * abre}em`}} />
+          <span style={ini}>D</span><span style={resto}>{trozo('isease', tDis - 0.05, 0.3)}</span>
+        </div>;})() : null}
     </AbsoluteFill>
   );
 };
 
 
 // La columna vertebral (director creativo, 28-sep): el mismo sistema produce cada cosa que se ve después.
-const NODOS = [['Input', 'What I need'], ['Goal', 'Written: NED'], ['Polaris', 'The experts'], ['Human gate', 'My sign-off'], ['Output', 'Whatever fits']];
+const NODOS = X.nodos;
 const XS = [260, 610, 960, 1310, 1660];
 const XB = XS.map((x) => 960 + (x - 960) * 0.92);
-const SALIDA: [string, string][] = [['aprender', 'Knowing my tumor'], ['3d', '3D maps'], ['radar', 'Trials, daily'], ['carga', 'Drafts to sign'], ['web', 'The website']];
+const SALIDA: [string, string][] = X.salida;
 const Cadena: React.FC = () => {
   const t = useT(); const m = useMuelle();
   const tPuerta = dice('polaris', 'nothing'), tFirma = dice('polaris', 'sign-off');
@@ -356,7 +404,7 @@ const Galeria: React.FC = () => {
     : i === 1 ? <Secuencia dir="higado" n={240} t={t} style={{width: '100%', height: '100%'}} />
     : i === 2 ? <Img src={staticFile('esqueleto.png')} style={{height: '96%', margin: '2% auto', display: 'block'}} />
     : <Img src={staticFile('vertebra.png')} style={{height: '92%', margin: '4% auto', display: 'block'}} />;
-  const nombres = ['Breast', 'Liver', 'Skeleton', 'Bone'];
+  const nombres = X.galeria;
   // fase grande (mama / hígado): un visor a pantalla, con empuje lento de cámara
   const grande = t < t3 ? (t < t2 ? 0 : 1) : -1;
   const kIn = m(grande === 0 ? t1 : t2, 13);
@@ -368,7 +416,7 @@ const Galeria: React.FC = () => {
       {grande >= 0 && <div style={{position: 'absolute', left: 960 - 350, top: 150, width: 700, height: 700, borderRadius: 30, overflow: 'hidden', background: C.lienzo,
         boxShadow: '0 30px 80px rgba(0,0,0,.45)', opacity: cl(kIn * 1.3), transform: `scale(${(0.85 + 0.15 * kIn) * (1 + 0.1 * lin(t, grande === 0 ? t1 : t2, grande === 0 ? t2 : t3))})`}}>
         <Pieza i={grande} />
-        <div style={{...rot, position: 'absolute', left: 24, bottom: 18}}>{nombres[grande]} · 3D</div>
+        <div style={{...rot, position: 'absolute', left: 24, bottom: 18}}>{nombres[grande]} {X.sufijo3d}</div>
       </div>}
       {t >= t3 && [0, 1, 2, 3].map((i) => {
         const g = m(t3 + i * 0.12, 12), esq = false;
@@ -412,7 +460,7 @@ const Radar: React.FC = () => {
           return <path key={'a' + k} d={`M${x1},${y1} Q${(x1 + x2) / 2 * 1.35},${(y1 + y2) / 2 * 1.35} ${x2},${y2}`} fill="none" stroke={C.violetaOsc} strokeWidth={0.8}
             strokeLinecap="round" strokeDasharray={L} strokeDashoffset={L * (1 - p)} opacity={0.8 * (1 - p)} />;})}
       </svg>
-      <div style={{position: 'absolute', left: 0, right: 0, top: 800, textAlign: 'center', fontFamily: MONO, fontSize: 30, letterSpacing: '0.14em', color: C.violetaOsc}}>TRIALS TRACKED DAILY · WORLDWIDE</div>
+      <div style={{position: 'absolute', left: 0, right: 0, top: 800, textAlign: 'center', fontFamily: MONO, fontSize: 30, letterSpacing: '0.14em', color: C.violetaOsc}}>{X.radar}</div>
     </AbsoluteFill>
   );
 };
@@ -420,7 +468,7 @@ const Radar: React.FC = () => {
 const Carga: React.FC = () => {
   // Todo nace en borrador y sale solo con su firma: los tres borradores vuelan a la casilla «My sign-off» de la barra
   const e = useEscena('carga'); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t;
-  const chips: [string, string][] = [['samples → labs', 'samples'], ['messages people send', 'messages'], ['trips for treatment', 'trips']];
+  const chips = X.chips;
   const puertaX = XB[3], puertaY = 66;
   return (
     <AbsoluteFill style={{opacity: e.op}}>
@@ -432,21 +480,23 @@ const Carga: React.FC = () => {
           fontSize: 50, color: C.crema, border: '2px solid rgba(250,246,240,.35)', background: 'rgba(45,27,61,.9)', whiteSpace: 'nowrap',
           opacity: cl(k * 1.4) * (1 - lin(t, tv + 0.4, tv + 0.55)),
           transform: `translate(-50%,-50%) translateX(${(i % 2 ? 1 : -1) * 420 * (1 - k)}px) scale(${(0.85 + 0.15 * k) * (1 - 0.8 * vuela)})`}}>
-          <span style={{fontFamily: MONO, fontSize: 20, letterSpacing: '0.14em', color: C.violetaOsc, marginRight: 18}}>DRAFT</span>{txt}</div>;})}
+          <span style={{fontFamily: MONO, fontSize: 20, letterSpacing: '0.14em', color: C.violetaOsc, marginRight: 18}}>{X.borrador}</span>{txt}</div>;})}
     </AbsoluteFill>
   );
 };
 
 const Web: React.FC = () => {
   // {{CONTACTO}}: la home con «Support {{TITULAR}}» se leía como una campaña de donaciones. Aquí, tres páginas donde comparte el caso.
-  const e = useEscena('web'); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t;
+  const e = useEscena('web', {sale: false}); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t;
+  const entra = suave(lin(t, e.b - 0.45, e.b));  // costura 3: las páginas caen al centro del anillo que viene
   const pags: [string, string, number][] = [['science.png', 'helptitular.com/science', 0], ['datos-cielo.png', 'helptitular.com/data', 1], ['esqueleto.png', 'helptitular.com/mapa-metastasis', 2]];
   return (
     <AbsoluteFill style={e.style}>
       {pags.map(([img, url, i]) => {const k = m(e.a + 0.15 + i * 0.35, 13);
+        const cx = 250 + i * 330 + 380, cy = 190 + i * 60 + 260;
         return <div key={url} style={{position: 'absolute', left: 250 + i * 330, top: 190 + i * 60, width: 760, height: 520, borderRadius: 18, overflow: 'hidden',
-          background: C.crema, boxShadow: '0 30px 80px rgba(0,0,0,.45)', opacity: cl(k * 1.3),
-          transform: `perspective(1600px) rotateY(${-14 + 14 * k}deg) translateY(${60 * (1 - k)}px) scale(${0.9 + 0.1 * k})`}}>
+          background: C.crema, boxShadow: '0 30px 80px rgba(0,0,0,.45)', opacity: cl(k * 1.3) * (1 - lin(t, e.b - 0.15, e.b)),
+          transform: `translate(${(960 - cx) * entra}px, ${(470 - cy) * entra}px) perspective(1600px) rotateY(${-14 + 14 * k}deg) translateY(${60 * (1 - k)}px) scale(${(0.9 + 0.1 * k) * (1 - 0.9 * entra)})`}}>
           <div style={{height: 44, background: '#ece4d8', display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px'}}>
             {[0, 1, 2].map((d) => <div key={d} style={{width: 12, height: 12, borderRadius: 6, background: 'rgba(45,27,61,.25)'}} />)}
             <div style={{marginLeft: 14, fontFamily: MONO, fontSize: 18, color: C.berenjena}}>{url}</div>
@@ -461,18 +511,19 @@ const Web: React.FC = () => {
 };
 
 const Cifras: React.FC = () => {
-  const e = useEscena('olvido'); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t, t0 = tramo('olvido').t0;
-  const filas: [string, string, 'izq' | 'der', number][] = [['comites', 'agents', 'izq', 200], ['tools', 'tools', 'izq', 390], ['rutinas', 'routines running 24/7', 'izq', 580],
-    ['guardas', 'guardrails', 'der', 300], ['tests', 'test files', 'der', 490]];
+  const e = useEscena('olvido', {entra: false, sale: false}); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t, t0 = tramo('olvido').t0;
+  const cierra = suave(lin(t, e.b - 0.45, e.b));  // costura 4: todo se recoge en un punto, del que nace la frase de los médicos
+  const pos: ['izq' | 'der', number][] = [['izq', 200], ['izq', 390], ['izq', 580], ['der', 300], ['der', 490]];
+  const filas: [string, string, 'izq' | 'der', number][] = X.cifras.map(([k, lbl], i) => [k, lbl, ...pos[i]]);
   return (
-    <AbsoluteFill style={e.style}>
-      <Mapa size={560} t={t} style={{left: 960 - 280, top: 190, transform: `scale(${0.7 + 0.3 * m(t0 - 0.2, 12)})`}} />
+    <AbsoluteFill style={{...e.style, opacity: e.op * (1 - lin(t, e.b - 0.12, e.b)), transformOrigin: '960px 470px', transform: `scale(${1 - 0.97 * cierra})`}}>
+      <Mapa size={560} t={t} style={{left: 960 - 280, top: 190, transform: `scale(${(0.15 + 0.85 * m(e.a, 12)) * (0.7 + 0.3 * m(t0 - 0.2, 12))})`}} />
       {filas.map(([k, lbl, lado, top], i) => {const cuenta = Math.min(1, Math.floor(Math.max(0, t - t0 - i * 0.12) / (T.beat / 2)) / 8), ent = suave(lin(t, t0 + 0.1 + i * 0.12, t0 + 0.5 + i * 0.12));
         const golpe = 1 + 0.12 * Math.max(0, 1 - Math.abs(t - (t0 + i * 0.12 + 8 * T.beat / 2)) * 5);
         return <div key={k} style={{position: 'absolute', top, left: lado === 'izq' ? 120 : 1280, width: 520, textAlign: lado === 'izq' ? 'right' : 'left', opacity: ent,
           transform: `translateX(${(lado === 'izq' ? -1 : 1) * 60 * (1 - ent)}px)`}}>
           <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 96, color: C.crema, letterSpacing: '-0.04em', lineHeight: 1, display: 'inline-block', transform: `scale(${golpe})`}}>
-            {Math.round((CIFRAS as any)[k] * cuenta).toLocaleString('en-US')}</div>
+            {Math.round((CIFRAS as any)[k] * cuenta).toLocaleString(X.locale)}</div>
           <div style={{fontFamily: MONO, fontSize: 26, letterSpacing: '0.14em', textTransform: 'uppercase', color: C.violetaOsc, marginTop: 6}}>{lbl}</div>
         </div>;})}
     </AbsoluteFill>
@@ -480,13 +531,16 @@ const Cifras: React.FC = () => {
 };
 
 const Medicos: React.FC = () => {
-  const e = useEscena('medicos'); const m = useMuelle(); if (e.op <= 0) return null;
-  const a = m(dice('medicos', 'decide') - 0.1, 14), b = m(dice('medicos', 'doctors') - 0.05, 12);
+  const e = useEscena('medicos', {entra: false, sale: false}); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t;
+  const a = m(ventana('medicos')[0], 14), b = m(dice('medicos', 'doctors') - 0.05, 12);  // la primera frase nace del punto, sin hueco vacío
+  const nace = m(e.a, 12), sube = suave(lin(t, e.b - 0.45, e.b + 0.05));  // costura 5: la línea violeta sube al sitio del titular final
   const f = {fontFamily: FRAUNCES, fontWeight: 600, fontSize: 110, letterSpacing: '-0.02em', position: 'absolute' as const, left: 0, right: 0, textAlign: 'center' as const};
   return (
     <AbsoluteFill style={e.style}>
-      <div style={{...f, top: 300, color: C.crema, opacity: cl(a * 1.3), transform: `translateY(${30 * (1 - a)}px)`}}>It doesn't decide.</div>
-      <div style={{...f, top: 450, color: C.violetaOsc, opacity: cl(b * 1.3), transform: `translateY(${30 * (1 - b)}px)`}}>My doctors do.</div>
+      <div style={{...f, top: 300, color: C.crema, opacity: cl(a * 1.3) * (1 - sube), transformOrigin: '960px 170px',
+        transform: `translateY(${30 * (1 - a) - 80 * sube}px) scale(${0.2 + 0.8 * nace})`}}>{X.medicos[0]}</div>
+      <div style={{...f, top: 450, color: sube > 0.5 ? C.crema : C.violetaOsc, opacity: cl(b * 1.3) * (1 - lin(t, e.b - 0.1, e.b + 0.05)),
+        transform: `translateY(${30 * (1 - b) - 120 * sube}px) scale(${1 + 0.07 * sube})`}}>{X.medicos[1]}</div>
     </AbsoluteFill>
   );
 };
@@ -496,15 +550,15 @@ const Cierre: React.FC = () => {
   const e1 = m(dice('ned', 'still') - 0.1, 12), e2 = m(dice('web-final', 'whole') - 0.1, 14), e3 = m(dice('web-final', 'helptitular') - 0.05, 9);
   const f = {position: 'absolute' as const, left: 0, right: 0, textAlign: 'center' as const};
   return (
-    <AbsoluteFill style={{opacity: suave(lin(t, a, a + 0.45))}}>
+    <AbsoluteFill style={{opacity: 1}}>
       <div style={{position: 'absolute', left: 960 - 45, top: 220, width: 90, height: 90, transform: `scale(${0.6 + 0.4 * e1}) rotate(${45 * suave(lin(t, a, a + 1.2))}deg)`}}>
         <Estrella size={90} color={C.coral} /></div>
-      <div style={{...f, top: 330, fontFamily: FRAUNCES, fontWeight: 600, fontSize: 118, color: C.crema, opacity: cl(e1 * 1.3), transform: `translateY(${24 * (1 - e1)}px)`}}>Still going for NED.</div>
-      <div style={{...f, top: 480, fontFamily: HANKEN, fontWeight: 500, fontSize: 46, color: C.crema, opacity: cl(e2 * 1.3)}}>My whole case is explained at</div>
+      <div style={{...f, top: 330, fontFamily: FRAUNCES, fontWeight: 600, fontSize: X.cierre[0].length > 24 ? 80 : 118, whiteSpace: 'nowrap', color: C.crema, opacity: cl(lin(t, a - 0.05, a + 0.1))}}>{X.cierre[0]}</div>
+      <div style={{...f, top: 480, fontFamily: HANKEN, fontWeight: 500, fontSize: 46, color: C.crema, opacity: cl(e2 * 1.3)}}>{X.cierre[1]}</div>
       <div style={{...f, top: 545, fontFamily: FRAUNCES, fontWeight: 600, fontSize: 96, color: C.violetaOsc, letterSpacing: '-0.02em', opacity: cl(e3 * 1.3),
         transform: `scale(${(0.85 + 0.15 * e3) * (1 + 0.02 * Math.sin((t - dice('web-final', 'helptitular')) * Math.PI * 1.6) * e3)})`}}>helptitular.com</div>
       <div style={{...f, top: 680, fontFamily: MONO, fontSize: 26, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(250,246,240,.8)',
-        opacity: suave(lin(t, dice('web-final', 'helptitular') + 0.5, dice('web-final', 'helptitular') + 0.9))}}>Built with Polaris, my AI agent system.</div>
+        opacity: suave(lin(t, dice('web-final', 'helptitular') + 0.5, dice('web-final', 'helptitular') + 0.9))}}>{X.cierre[2]}</div>
       {/* fundido final corto: la tarjeta vive 2,5 s y solo el último instante funde (director + diseño, 28-sep) */}
       <AbsoluteFill style={{background: C.berenjena, opacity: lin(t, T.total - 0.3, T.total - 0.03)}} />
     </AbsoluteFill>
@@ -516,7 +570,8 @@ const hablando = (t: number) => TR.some((x) => t >= x.t0 - 0.15 && t < x.t1 + 0.
 const volMusica = (f: number) => {
   const t = f / 30; let v = 0;
   for (let k = -6; k <= 6; k++) v += hablando(t + k * 0.03) ? 1 : 0;  // rampa suave de ~0,4 s
-  return 0.9 - 0.62 * (v / 13);
+  const tNed = tramo('ned').t0, hueco = lin(t, tNed - 0.9, tNed - 0.6) * (1 - lin(t, tNed - 0.1, tNed + 0.15));  // un respiro antes del clímax
+  return (0.9 - 0.62 * (v / 13)) * (1 - 0.92 * hueco);
 };
 
 export const Polaris: React.FC = () => (

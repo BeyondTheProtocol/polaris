@@ -1,0 +1,366 @@
+{
+ "_nota": "BORRADOR del piloto de vídeo narrado (28-sep-2026). Pendiente de su firma: no se publica ni cambia una frase sin su OK. Las afirmaciones clínicas son las mismas que firmó en la v18 (EN), traducidas; las del sistema salen de cifras.json y del repo (AGPL-3.0). Estilo de presentación inspirado en los vídeos de {{CONTACTO}} (KAI): crédito suyo si se publica. Pase de voz-titular aplicado (28-sep); «Un beso» al cierre pendiente de su sí.",
+ "slug": "polaris-pieza-a-pieza",
+ "idioma": "es",
+ "voice_id": "51aLNh96A9WJZODzYIyP",
+ "model": "eleven_multilingual_v2",
+ "ajustes": {
+  "stability": 0.45,
+  "similarity": 0.85,
+  "style": 0.2,
+  "tempo": 1.0
+ },
+ "enlazado": true,
+ "n_tomas": 3,
+ "tomas": {},
+ "pausa_entre_frases": 0.35,
+ "pausa_entre_capitulos": 0.9,
+ "entrada": 1.2,
+ "salida": 3.0,
+ "musica": "musica-elevenlabs-tech-65s.mp3",
+ "capitulos": [
+  {
+   "id": "portada",
+   "kicker": "",
+   "titulo": "Polaris",
+   "escena": {
+    "tipo": "portada",
+    "sub": "el sistema que me he construido",
+    "video": "narrado/flow/portada.mp4"
+   },
+   "frases": [
+    {
+     "texto": "Os presento a Polaris, el sistema que me he construido para no ir a ciegas con mi cáncer."
+    }
+   ]
+  },
+  {
+   "id": "porque",
+   "kicker": "01 · El porqué",
+   "titulo": "Un cáncer raro, *sin protocolo*",
+   "escena": {
+    "tipo": "pasos",
+    "etiqueta": "el caso",
+    "pasos": [
+     {
+      "tipo": "golpes",
+      "palabras": [
+       {
+        "txt": "RARO",
+        "en": "raro"
+       },
+       {
+        "txt": "ULTRA RARO",
+        "en": "ultra",
+        "acento": true
+       },
+       {
+        "txt": "METASTÁSICO",
+        "en": "metast"
+       }
+      ]
+     },
+     {
+      "tipo": "dosCaras",
+      "desde": "tumor",
+      "izq": "una cara",
+      "der": "la otra",
+      "en": "dos"
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Tengo un {{DIAGNOSTICO}} raro, ultra raro, y metastásico."
+    },
+    {
+     "texto": "Mi tumor tiene dos caras, y los protocolos estándar no están pensados para eso."
+    },
+    {
+     "texto": "Así que me tocó ir más allá y averiguar qué opciones tenía de verdad."
+    }
+   ]
+  },
+  {
+   "id": "que-es",
+   "kicker": "02 · Qué es",
+   "titulo": "Un equipo, *en un Mac mini*",
+   "escena": {
+    "tipo": "pasos",
+    "etiqueta": "polaris / hoy",
+    "pasos": [
+     {
+      "tipo": "foto",
+      "src": "titular-ingeniera.png",
+      "nombre": "{{TITULAR}} {{APELLIDO}}",
+      "rol": "ingeniera"
+     },
+     {
+      "tipo": "anillo",
+      "desde": "equipo",
+      "items": [
+       {
+        "k": "comites",
+        "lbl": "agentes"
+       },
+       {
+        "k": "tools",
+        "lbl": "herramientas"
+       },
+       {
+        "k": "rutinas",
+        "lbl": "rutinas 24/7"
+       },
+       {
+        "k": "tests",
+        "lbl": "tests"
+       }
+      ]
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Soy ingeniera, y al final construí Polaris porque lo necesitaba yo."
+    },
+    {
+     "texto": "Es un equipo de agentes de inteligencia artificial que trabaja día y noche en un Mac mini."
+    }
+   ]
+  },
+  {
+   "id": "estrella",
+   "kicker": "03 · La estrella",
+   "titulo": "Un objetivo, *por escrito*",
+   "escena": {
+    "tipo": "pasos",
+    "etiqueta": "polaris / goal",
+    "pasos": [
+     {
+      "tipo": "ned",
+      "sub": "sin evidencia de enfermedad",
+      "en_abre": "sin"
+     },
+     {
+      "tipo": "estrella",
+      "desde": "todo",
+      "meta": "NED",
+      "sub": "sin evidencia de enfermedad",
+      "pregunta": "¿Esto nos acerca a NED?"
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Tiene un único objetivo escrito: N-E-D. Sin evidencia de enfermedad.",
+     "pantalla": "Tiene un único objetivo escrito: NED. Sin evidencia de enfermedad."
+    },
+    {
+     "texto": "Y todo lo que hace pasa por la misma pregunta: ¿esto nos acerca a N-E-D?",
+     "pantalla": "Y todo lo que hace pasa por la misma pregunta: ¿esto nos acerca a NED?"
+    }
+   ]
+  },
+  {
+   "id": "trabaja",
+   "kicker": "04 · Cómo trabaja",
+   "titulo": "Todo nace *como borrador*",
+   "escena": {
+    "tipo": "diagrama",
+    "etiqueta": "polaris / flujo",
+    "nodos": [
+     {
+      "t": "Entrada",
+      "s": "lo que necesito",
+      "en": "cuento"
+     },
+     {
+      "t": "Expertos",
+      "s": "el equipo",
+      "en": "expertos"
+     },
+     {
+      "t": "Mi firma",
+      "s": "la puerta",
+      "en": "firme",
+      "puerta": true
+     },
+     {
+      "t": "Salida",
+      "s": "lo que encaje",
+      "en": "borrador"
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Yo le cuento lo que necesito, y el equipo de expertos se pone a ello."
+    },
+    {
+     "texto": "Pero todo sale como borrador, y no se mueve nada sin que yo lo firme."
+    }
+   ]
+  },
+  {
+   "id": "muro",
+   "kicker": "05 · El muro",
+   "titulo": "Ante la duda, *no sale*",
+   "escena": {
+    "tipo": "lista",
+    "etiqueta": "polaris / muro",
+    "items": [
+     {
+      "icono": "firma",
+      "texto": "Nada sale sin mi firma",
+      "en": "muro"
+     },
+     {
+      "icono": "candado",
+      "texto": "Mis datos no salen a cualquier sitio",
+      "en": "datos"
+     },
+     {
+      "icono": "alerta",
+      "texto": "Si algo amenaza el objetivo, se para todo",
+      "en": "peligro"
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Y para protegerlo todo está lo que yo llamo el muro."
+    },
+    {
+     "texto": "Mis datos médicos no salen a cualquier sitio, y si algo pone en peligro el objetivo, se para todo y me avisa."
+    }
+   ]
+  },
+  {
+   "id": "aporta",
+   "kicker": "06 · Lo que me da",
+   "titulo": "Entender *mi propio caso*",
+   "escena": {
+    "tipo": "pasos",
+    "etiqueta": "polaris / salida",
+    "pasos": [
+     {
+      "tipo": "visores",
+      "en_zoom": "lesiones",
+      "piezas": [
+       {
+        "dir": "mama",
+        "n": 240,
+        "nombre": "Mama"
+       },
+       {
+        "dir": "higado",
+        "n": 240,
+        "nombre": "Hígado"
+       },
+       {
+        "src": "esqueleto.png",
+        "nombre": "Esqueleto"
+       },
+       {
+        "dir": "vertebra3",
+        "n": 150,
+        "nombre": "Hueso"
+       }
+      ]
+     },
+     {
+      "tipo": "lista",
+      "desde": "cada",
+      "items": [
+       {
+        "icono": "radar",
+        "texto": "Ensayos, cada día",
+        "en": "ensayos"
+       },
+       {
+        "icono": "caja",
+        "texto": "La logística de las muestras",
+        "en": "muestras"
+       },
+       {
+        "icono": "web",
+        "texto": "La web donde lo cuento",
+        "en": "web"
+       }
+      ]
+     }
+    ]
+   },
+   "frases": [
+    {
+     "texto": "Me ha ayudado a conocer mi propio tumor, y a convertir mis escáneres en mapas 3D de mis lesiones."
+    },
+    {
+     "texto": "Cada día busca ensayos por todo el mundo, me ayuda con la logística de las muestras, y hasta con la web donde lo comparto todo."
+    }
+   ]
+  },
+  {
+   "id": "medicos",
+   "kicker": "07 · Lo importante",
+   "titulo": "Polaris no decide. *Mis médicos, sí*",
+   "escena": {
+    "tipo": "cita",
+    "etiqueta": "polaris / límites",
+    "texto": "Entro a las consultas entendiendo mi caso."
+   },
+   "frases": [
+    {
+     "texto": "Y esto es lo más importante: Polaris no decide nada. Eso lo deciden mis médicos."
+    },
+    {
+     "texto": "Lo que sí consigo es entrar a consulta entendiendo mi caso."
+    }
+   ]
+  },
+  {
+   "id": "abierto",
+   "kicker": "08 · En abierto",
+   "titulo": "El código, *en abierto*",
+   "escena": {
+    "tipo": "repo",
+    "etiqueta": "github.com/BeyondTheProtocol/polaris",
+    "lineas": [
+     "Licencia AGPL-3.0",
+     "Cualquiera puede leerlo",
+     "Y aportar"
+    ]
+   },
+   "frases": [
+    {
+     "texto": "El código está en abierto, en GitHub."
+    },
+    {
+     "texto": "Si sabes de inteligencia artificial y quieres ayudarme, la mejor manera es aportando al repo."
+    }
+   ]
+  },
+  {
+   "id": "cierre",
+   "kicker": "",
+   "titulo": "",
+   "escena": {
+    "tipo": "cierre",
+    "titular": "Seguimos a por NED.",
+    "url": "helptitular.com",
+    "pie": "Hecho con Polaris",
+    "video": "narrado/flow/cierre.mp4"
+   },
+   "frases": [
+    {
+     "texto": "Seguimos a por N-E-D.",
+     "pantalla": "Seguimos a por NED."
+    },
+    {
+     "texto": "Y si queréis saber más, todo mi caso está en help titular punto com.",
+     "pantalla": "Y si queréis saber más, todo mi caso está en helptitular.com."
+    }
+   ]
+  }
+ ]
+}

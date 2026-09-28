@@ -31,3 +31,45 @@ bash tools/video_polaris/montar.sh $B/build "<salida>.mp4"
 
 Los recortes (`preparar.py`) están medidos sobre capturas a 1920×1080 del 27-sep-2026: si la web
 cambia de maquetación, mira la hoja de contactos antes de dar el vídeo por bueno.
+
+## El vídeo con historia (Remotion), en orden — lo aprendido de v15 a v18 (28-sep-2026)
+
+La v15 tardó 15 versiones; esto es lo que hay que hacer a la primera la próxima vez.
+
+| # | Paso | Comando | Lo que costó aprenderlo |
+|---|---|---|---|
+| 1 | Guion firmado por ella | `guion_voz.json` | No se toca una frase sin su OK |
+| 2 | Voz **enlazada**, 3 tomas por frase | `~/claudecode/.venv/bin/python voz.py <build>` | Frase a frase y sin contexto suena a «leer una lista» ({{TITULAR}}: «sobre todo es el tono de hablar»). Se queda la toma más viva; `tomas` en el guion fija una a mano |
+| 3 | Tiempos de palabra (Whisper local) | `~/claudecode/.venv/bin/python palabras.py <build>` | — |
+| 4 | Montaje sobre la música + voz nivelada | `python3 montaje.py <build> <musica.mp3>` | ElevenLabs entrega cada frase a su volumen: de -16 a -28 LUFS. Se iguala cada una a -18 con ganancia fija |
+| 5 | Efectos **después** del montaje | `python3 sfx.py <build>` | Si cambia la línea de tiempo y no se regeneran, los barridos caen fuera de sitio |
+| 6 | Copiar `voz.wav`, `musica.wav`, `sfx.wav`, `timeline.json` a `remotion/public/` | — | — |
+| 7 | Render + master | `bash remotion/render.sh vN` | Techo -4 dBTP: X recodifica al subir y el AAC sube ~0,5 dB |
+| 8 | Mirar, no suponer | hoja de contactos de las costuras + `verify_promo.py` de onetake (ritmo y pico) | — |
+
+Reglas de pantalla que {{TITULAR}} tuvo que corregir:
+- **Nunca el mismo texto dos veces a la vez**: si está escrito en grande, no se subtitula (`ROTULADO` en `Polaris.tsx`, con test). Pasó en el cierre, en los golpes del principio y en NED.
+- **Subtítulo legible sobre cualquier fondo**: sobre la página crema va oscuro.
+- **Las escenas no se reemplazan, se transforman**: en cada costura algo que ya está en pantalla se convierte en lo siguiente (onetake). Solo el cierre y las ráfagas pueden cortar.
+- Una palabra clave con peso (NED) merece su propia animación: cada inicial se despliega cuando ella dice la palabra.
+
+## Vídeo NARRADO con su voz (clase / presentación), 28-sep-2026
+
+Mezcla del estilo de {{CONTACTO}} / KAI con lo mejor de la v18 ({{TITULAR}}: «coge lo mejor de ambos mundos»).
+
+1. Guion por capítulos en `guiones/<slug>.<idioma>.json`, con kicker, titular (`*acento*`), escena y frases. Recorrido: `voz-titular` → `verificacion` → **su firma**. El español se escribe desde cero, no se traduce.
+2. `~/claudecode/.venv/bin/python narrado.py guiones/<slug>.json <build>` genera **toda la narración en UNA toma** (pausas entre capítulos con `<break>`; los tiempos de cada palabra salen de la propia toma), la música y los efectos, y lo deja en `remotion/public/narrado/`. Frase a frase sonaba «a trompicones» ({{TITULAR}}, 28-sep): nunca se pegan tomas sueltas en un narrado.
+3. `bash remotion/render.sh vN Narrado <nombre>` saca el borrador de 16:9 y el móvil.
+4. Hay que mirarlo: hoja de contactos de cada capítulo.
+
+Escenas (`Narrado.tsx`):
+- Estilo KAI: `imagen`, `dosCaras`, `contadores`, `estrella`, `diagrama`, `lista`, `cita`, `repo`.
+- De la v18: `golpes`, `foto`, `anillo`, `visores` (con `en_zoom`), `ned`.
+- `pasos` encadena varias escenas en un capítulo; cada paso entra con `desde`, la palabra que la dice.
+- **A pantalla completa, sin marco de ventana** ({{TITULAR}}: «el otro era más visual que tenerlo todo metido en una pantalla de navegador»). Cada elemento entra al decir su palabra (`en`).
+
+**Google Flow** ({{TITULAR}}: «úsalo, es lo que queremos»):
+- Solo para planos de ambiente **sin datos, sin texto y sin biología inventada** (portada, cierre). Regla del 25-sep: en planos con cifras inventa y recorta.
+- Se usa en su cuenta desde Chrome, con 16:9 y Omni 1.1 Flash. Cuesta 15 puntos el clip de 10 s a 720p, y cada generación se aprueba de una en una.
+- Se descarga a `07 · Marca/Videos-Polaris/flow/`, se revisa fotograma a fotograma y se copia sin audio a `remotion/public/narrado/flow/`.
+- En el guion va como `"video"` en la escena `portada` o `cierre`.

@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/guion.py",
+ "estado_ficha": "completa",
+ "para": "Carga el guion del vídeo por idioma (guion_voz.json EN, guion_voz_<idioma>.json) y resuelve las anclas de palabra por idioma; lo comparten voz, palabras, montaje y sfx.",
+ "cuando_si": "Al generar una versión del vídeo en otro idioma, o al buscar una palabra de su voz por prefijo.",
+ "cuando_no": "Para textos de pantalla: esos van en remotion/src/textos.ts.",
+ "reemplaza": "la carga de guion_voz.json repetida en cada script y los prefijos EN fijos",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-28, versión ES del vídeo «Polaris»",
+ "origen": "encargo de {{TITULAR}} 28-sep-2026: «necesitaré la versión en español»"
+}

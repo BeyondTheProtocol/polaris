@@ -1,0 +1,118 @@
+{
+ "_nota": "28-sep-2026 · Borrador escrito DESDE CERO en castellano de España por voz-titular, a partir de una ficha de hechos por escena (sin partir del guion EN ni de versiones ES anteriores). Tono de vídeo de producto tech. Pendiente de firma de {{TITULAR}}. Anclas sin actualizar: las rehace el orquestador.",
+ "_tono": "28-sep: se probó tono «promo» (stability 0.32, style 0.55, tempo 1.06) y a {{TITULAR}} le sonó «super raro, muy acelerada, no natural». Vuelta a los ajustes de la v1 (naturales). La energía de promo va en la música y el movimiento, NO en su voz. No acelerar su voz con atempo. 28-sep, más tarde: pidió «un punto más de ventas»; se sube SOLO un punto dentro de los márgenes naturales (stability 0.45, style 0.2), sin tocar el tempo.",
+ "idioma": "es",
+ "voice_id": "51aLNh96A9WJZODzYIyP",
+ "model": "eleven_multilingual_v2",
+ "ajustes": {
+  "stability": 0.45,
+  "similarity": 0.85,
+  "style": 0.2,
+  "tempo": 1.0
+ },
+ "pausa_entre_frases": 0.4,
+ "entrada": 0.5,
+ "salida": 2.2,
+ "frases": [
+  {
+   "id": "problema",
+   "escena": "problema",
+   "texto": "Tengo {{DIAGNOSTICO}}. Raro. Bueno, ultrarraro. Y metastásico. Con un tumor de dos caras que los protocolos estándar no contemplan."
+  },
+  {
+   "id": "mas-alla",
+   "escena": "mas-alla",
+   "texto": "Así que tocaba ir más allá y buscar mis propias opciones."
+  },
+  {
+   "id": "polaris",
+   "escena": "polaris",
+   "texto": "Soy ingeniera, y lo que necesitaba, lo construí. Se llama Polaris. Un equipo de agentes de IA con un solo objetivo: NED. Sin evidencia de enfermedad. Y nada sale de aquí sin mi firma.",
+   "pausa_despues": 0.9
+  },
+  {
+   "id": "aprender",
+   "escena": "aprender",
+   "texto": "Para mí, lo mejor ha sido conocer mi tumor de verdad. Entenderlo. Y hasta verlo."
+  },
+  {
+   "id": "3d",
+   "escena": "3d",
+   "texto": "Convirtió mis pruebas de imagen en mapas 3D de mis lesiones. Y el de los huesos me ayudó a elegir qué lesión biopsiar."
+  },
+  {
+   "id": "radar",
+   "escena": "radar",
+   "texto": "Cada día rastrea ensayos clínicos en todo el mundo. Y me trae opciones que yo sola no habría encontrado."
+  },
+  {
+   "id": "carga",
+   "escena": "carga",
+   "texto": "En el día a día me echa un cable: gestionar el envío de mis muestras a los laboratorios, responder emails, contactar con profesionales y organizar los viajes del tratamiento. Todo sale en borrador y lo firmo yo. Me quita muchísima carga."
+  },
+  {
+   "id": "web",
+   "escena": "web",
+   "texto": "Hasta me ayudó a montar la web donde lo comparto todo."
+  },
+  {
+   "id": "olvido",
+   "escena": "cifras",
+   "texto": "Y hace muchas cosas más. Tantas, que ahora mismo ni me acuerdo.",
+   "pausa_despues": 0.7
+  },
+  {
+   "id": "medicos",
+   "escena": "medicos",
+   "texto": "Polaris no decide. Deciden mis médicos. Pero yo llego a consulta entendiendo mi caso."
+  },
+  {
+   "id": "ned",
+   "escena": "cierre",
+   "texto": "Y sigo investigando hasta llegar a NED."
+  },
+  {
+   "id": "web-final",
+   "escena": "cierre",
+   "texto": "Todo mi caso está explicado en help titular punto com.",
+   "pantalla": "Todo mi caso está explicado en helptitular.com."
+  }
+ ],
+ "anclas": {
+  "rare": "raro",
+  "breast": "cancer",
+  "ultra": "ultra",
+  "metastatic": "metast",
+  "tumor": "tumor",
+  "two": "dos",
+  "sides": "caras",
+  "go": "ir",
+  "further": "mas",
+  "polaris": "polaris",
+  "team": "equipo",
+  "ned": "ned",
+  "nothing": "nada",
+  "sign-off": "firma",
+  "seeing": "verlo",
+  "turned": "convirtio",
+  "3d": "3d",
+  "bone": "huesos",
+  "samples": "muestras",
+  "messages": "emails",
+  "trips": "viajes",
+  "takes": "quita",
+  "lot": "muchas",
+  "decide": "decide",
+  "doctors": "deciden",
+  "still": "sigo",
+  "whole": "caso",
+  "helptitular": "helptitular",
+  "no": "sin",
+  "evidence": "evidencia",
+  "of": "de",
+  "disease": "enfermedad"
+ },
+ "enlazado": true,
+ "n_tomas": 3,
+ "tomas": {}
+}

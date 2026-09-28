@@ -3382,6 +3382,42 @@
    "auditable": true,
    "repetida": false,
    "nota": "Nace de @aiteamdigital en X (26-sep-26) y de esta misma sesión (estimé «2-3 h» para el permiso por sesión y llevó bastante menos). Cuánto tarda algo es criterio: un lint que cazara «horas» en un plan daría falsos positivos con esperas reales (rodaje de 24 h)."
+  },
+  {
+   "slug": "feedback-video-voz-enlazada-y-texto-no-duplicado",
+   "que": "En sus vídeos: voz clonada enlazada con varias tomas, y nunca subtitular lo que ya está escrito en pantalla",
+   "clase": "lint-doc",
+   "mecanismo": "tests/test_video_polaris.py::test_master_y_subtitulos",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": true,
+   "nota": "28-sep-2026, v15→v18: lo corrigió en el cierre y luego «al principio también»."
+  },
+  {
+   "slug": "feedback-version-idioma-adaptar-no-traducir",
+   "que": "Una versión en otro idioma de una pieza de marca se escribe DESDE CERO en ese idioma (ES = España) con el tono de la pieza; a voz-titular se le pasa una ficha de hechos, nunca el texto original",
+   "clase": "contexto",
+   "mecanismo": "ninguno: la memoria, por recall, al encargar a voz-titular una versión en otro idioma",
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": true,
+   "nota": "28-sep-26, vídeo Polaris ES: el primer guion salió traducción fiel y {{TITULAR}} pidió «adaptado… como si fuera un video de venta pero en español». Qué es buena adaptación es criterio; un lint no lo distingue. 2ª corrección el mismo día: la adaptación desde el EN también se notaba («construirlo desde cero en español de España como si fuera un producto tech»)."
+  },
+  {
+   "slug": "feedback-voz-clonada-natural-no-acelerar",
+   "que": "Su voz clonada solo con ajustes naturales (stability ≥0,45, style ≤0,2, sin atempo); la energía de promo va en música y movimiento",
+   "clase": "bloqueo",
+   "mecanismo": "tests/test_video_polaris.py::TestVideoPolaris::test_su_voz_no_se_acelera_ni_se_exagera",
+   "fresca": true,
+   "heredada": true,
+   "aplicable": true,
+   "auditable": true,
+   "repetida": false,
+   "nota": "28-sep-26: con tempo 1,06 y style 0,55 le sonó «super raro, muy acelerada». El test frena los dos guiones (EN y ES)."
   }
  ]
 }
