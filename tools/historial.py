@@ -684,6 +684,30 @@ def _candidatos(rutas, excluir):
     return out, no_doc
 
 
+def _identidad(txt, ruta):
+    """Veredicto de identidad_paciente, o "error" si la ventanilla no está (fail-open: no se
+    deja de archivar por un fallo del verificador; lo que se para es el «otro_paciente»)."""
+    try:
+        import identidad_paciente
+        return identidad_paciente.verificar(txt or "", ruta)[0]
+    except Exception:
+        return "error"
+
+
+def _evento_informe(doc):
+    """Una línea por informe nuevo en `_eventos.jsonl` del historial (zona clínica). Solo
+    metadatos: el estado vivo del caso la lee para saber qué ha llegado y cuándo."""
+    try:
+        from datetime import datetime
+        rec = {"ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "tipo": "informe",
+               "carpeta": doc["carpeta"], "fichero": doc["fichero"], "fecha": doc["fecha"],
+               "centro": doc["centro"], "sha": doc["sha"][:16], "identidad": doc.get("identidad")}
+        with open(os.path.join(RAIZ, "_eventos.jsonl"), "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
 def ingerir(rutas, apply=False, excluir=None, carpeta_forzada=None, descripcion=None):
     """Clasifica, renombra y COPIA al historial PDFs que ya vienen sueltos.
 
@@ -693,7 +717,7 @@ def ingerir(rutas, apply=False, excluir=None, carpeta_forzada=None, descripcion=
     vistos = dict(ya)                      # sha → dónde está (lo de antes + lo de esta corrida)
     pdfs, no_doc = _candidatos(rutas, excluir)
     res = {"vistos": len(pdfs), "no_documento": no_doc, "duplicados": [],
-           "documentos": [], "dudosos": [], "escritos": 0, "ocr": 0}
+           "documentos": [], "dudosos": [], "escritos": 0, "ocr": 0, "rechazados_identidad": []}
 
     for p in pdfs:
         h = sha256(p)
@@ -706,6 +730,16 @@ def ingerir(rutas, apply=False, excluir=None, carpeta_forzada=None, descripcion=
         txt, con_ocr = _texto_de(p)
         if con_ocr:
             res["ocr"] += 1
+
+        # IDENTIDAD AL ENTRAR (29-sep-26, plan «Vega al mando» Fase 2). Hasta hoy la filiación
+        # solo se comprobaba al LEER (lector_clinico/fuente_clinica): un informe de otra paciente
+        # entraba en su historial y el RAG lo servía como suyo. Regla dura del sistema: estar en
+        # su carpeta no prueba que sea suyo. «otro_paciente» (el documento no la nombra en
+        # ninguna parte) no entra; «ambiguo» entra marcado para que lo confirme una persona.
+        veredicto = _identidad(txt, p)
+        if veredicto == "otro_paciente":
+            res["rechazados_identidad"].append({"origen": p, "sha": h})
+            continue
 
         clave = carpeta_forzada or clasificar(txt)
         carpeta = CLAVE_A_CARPETA.get(clave, CLAVE_A_CARPETA["tramite"])
@@ -727,8 +761,10 @@ def ingerir(rutas, apply=False, excluir=None, carpeta_forzada=None, descripcion=
 
         doc = {"origen": p, "carpeta": carpeta, "fichero": os.path.basename(destino),
                "destino_abs": destino, "fecha": fecha, "centro": centro, "sha": h,
-               "ocr": con_ocr}
+               "ocr": con_ocr, "identidad": veredicto}
         motivos = []
+        if veredicto == "ambiguo":
+            motivos.append("identidad ambigua: el encabezado no es el suyo, confirmar")
         if not fecha:
             motivos.append("sin fecha")
         if centro == "?":
@@ -748,6 +784,7 @@ def ingerir(rutas, apply=False, excluir=None, carpeta_forzada=None, descripcion=
                 with open(destino[:-4] + ".ocr.txt", "w", encoding="utf-8") as fh:
                     fh.write(txt)
             res["escritos"] += 1
+            _evento_informe(doc)
         vistos[h] = os.path.join(carpeta, os.path.basename(destino))
         res["documentos"].append(doc)
 

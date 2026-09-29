@@ -303,9 +303,10 @@ def sync(apply=False, con_correo=False):
 def avisar(res):
     """Solo cuando entra documento nuevo, y en llano. Sin novedad no se dice nada."""
     docs = res["ingerido"]["documentos"]
-    if not docs:
+    rechazados = res["ingerido"].get("rechazados_identidad") or []
+    if not docs and not rechazados:
         return None
-    lineas = ["📄 Han entrado %d documento(s) nuevo(s) en tu historial:" % len(docs)]
+    lineas = ["📄 Han entrado %d documento(s) nuevo(s) en tu historial:" % len(docs)] if docs else []
     for d in docs[:6]:
         lineas.append("   · %s" % d["fichero"][:78])
     if len(docs) > 6:
@@ -315,6 +316,12 @@ def avisar(res):
         lineas.append("")
         lineas.append("⚠️ %d sin fecha o sin centro: los he archivado igual, pero convendría "
                       "mirarlos." % len(dudosos))
+    if rechazados:
+        if lineas:
+            lineas.append("")
+        lineas.append("🛑 %d documento(s) NO entran en tu historial: su nombre y fecha de "
+                      "nacimiento no son los tuyos y no te nombran en ninguna parte. Siguen "
+                      "en su origen, sin tocar." % len(rechazados))
     if res["drive"].get("saltado"):
         lineas.append("")
         lineas.append("(Drive no consultado: %s)" % res["drive"]["saltado"])

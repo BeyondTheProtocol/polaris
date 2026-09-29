@@ -285,6 +285,7 @@ runpy test_run_agent_f2.py
 runpy test_run_agent_reserva_max.py
 runpy test_continuidad_auto.py
 runpy test_continuidad_contexto.py
+runpy test_historial_identidad.py
 runpy test_canario_muro.py
 runpy test_claude_lazo.py
 runpy test_xurl.py
