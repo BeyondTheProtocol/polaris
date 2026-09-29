@@ -31,6 +31,7 @@ Uso:
   python3 tools/historial.py partir <pdf> --cortes <json> [--apply]
   python3 tools/historial.py ingerir <carpeta|pdf> … [--apply]   # PDFs ya sueltos
   python3 tools/historial.py indice [--apply]            # regenera el índice (CSV)
+  python3 tools/historial.py trazadores                  # nombres que afirman un trazador que el texto no dice
   python3 tools/historial.py estado                      # qué hay en cada carpeta
 """
 import csv
@@ -220,6 +221,51 @@ def texto_paginas(pdf, desde, hasta):
         return out.stdout.decode("utf-8", "replace")
     except Exception:
         return ""
+
+
+# ─────────────────── trazador del nombre frente al texto ───────────────────
+# El 29-sep-2026 salió que «2024-03-18 · PET-CT de cuerpo completo con 68Ga - {{TRAZADOR}}» era una
+# copia del PET-FDG de ese día con el título del portal cambiado: ni una mención a galio ni a
+# somatostatina. El nombre venía del portal y el índice lo repetía, así que tres comités y la web
+# llegaron a hablar de un «{{TRAZADOR}} de 2024» que nunca existió. El nombre de un informe de medicina
+# nuclear afirma un trazador; si el texto no lo nombra ni una vez, el nombre miente.
+_TRAZADORES = (
+    ("68Ga-{{TRAZADOR}}/DOTATATE",
+     re.compile(r"{{TRAZADOR}}|dotatate|68\s*-?\s*ga\b|galio", re.I),
+     re.compile(r"{{TRAZADOR}}|dotatate|68\s*-?\s*ga|galio|gallium|somatostat", re.I)),
+    ("18F-FDG",
+     re.compile(r"\bfdg\b", re.I),
+     re.compile(r"fdg|fluorodesoxiglucosa|fluorodeoxyglucose", re.I)),
+)
+
+
+def trazador_incoherente(nombre, texto):
+    """Trazador que el NOMBRE afirma y el TEXTO no menciona nunca, o None.
+
+    Sin texto suficiente (escaneo sin capa, página en blanco) no se juzga: callar ahí es mejor
+    que acusar a un fichero bueno.
+    """
+    if not texto or len(texto.strip()) < 120:
+        return None
+    for traz, en_nombre, en_texto in _TRAZADORES:
+        if en_nombre.search(nombre or "") and not en_texto.search(texto):
+            return traz
+    return None
+
+
+def trazadores(carpeta=None):
+    """[(fichero, trazador)] de los PDF de imagen cuyo nombre afirma un trazador ausente del texto."""
+    d = carpeta or os.path.join(RAIZ, CLAVE_A_CARPETA["imagen"])
+    malos = []
+    if not os.path.isdir(d):
+        return malos
+    for f in sorted(os.listdir(d)):
+        if not f.lower().endswith(".pdf"):
+            continue
+        t = trazador_incoherente(f, texto_paginas(os.path.join(d, f), 1, 3))
+        if t:
+            malos.append((f, t))
+    return malos
 
 
 def n_paginas(pdf):
@@ -954,6 +1000,13 @@ def main(argv):
         else:
             print("\nDRY-RUN: no se ha escrito un byte. Repite con --apply.")
         return 0
+
+    if cmd == "trazadores":
+        malos = trazadores()
+        for f, t in malos:
+            print("⚠️  %s → el nombre dice %s y el texto no lo menciona" % (f, t))
+        print("%d fichero(s) con trazador incoherente" % len(malos))
+        return 1 if malos else 0
 
     if cmd == "indice":
         r = indice(apply=apply)

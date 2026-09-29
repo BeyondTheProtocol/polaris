@@ -241,6 +241,7 @@ runpy test_correo_imap.py
 # (no publicado: cubre un detector de PHI que vive solo en local)
 # (no publicado: cubre un detector de PHI que vive solo en local)
 runpy test_historial_sync.py
+runpy test_historial_trazador.py
 runpy test_healthcheck_drive.py
 runpy test_healthcheck_cerebro.py
 runpy test_healthcheck_ci_publico.py
