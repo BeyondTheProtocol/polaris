@@ -3482,14 +3482,15 @@
     {
       "slug": "feedback-no-esperar-siguiente-ejecutar-lo-recomendado",
       "que": "Si el paso recomendado está dentro de lo aprobado, ejecutarlo sin esperar su «siguiente»",
-      "clase": "contexto",
-      "mecanismo": "",
+      "clase": "salida",
+      "mecanismo": ".claude/hooks/gate_salida.py::espera_siguiente",
       "fresca": true,
       "heredada": false,
       "aplicable": true,
-      "auditable": false,
+      "auditable": true,
       "repetida": false,
-      "nota": "29-sep: {{TITULAR}} tuvo que decir «siguiente» otra vez tras escribirla. Check gate_salida::espera_siguiente en rodaje en rama (hooks-muro: 24 h antes de fusionar)."
+      "nota": "29-sep: {{TITULAR}} tuvo que decir «siguiente» otra vez tras escribirla. PARCIAL: detecta el cierre con «Siguiente: opción N» o «¿sigo?» sin gate real; NO detecta «Siguiente: <paso>» al final de un turno. Replay 14 días: 122 de 3.363 turnos (3,6 %), 7 de 8 ejemplos eran su queja real. En aviso.",
+      "modo": "aviso"
     },
     {
       "slug": "feedback-tarea-aceptada-se-fusiona-sin-preguntar",

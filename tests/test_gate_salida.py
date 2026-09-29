@@ -618,6 +618,23 @@ class SemillasChecksRuidosos(unittest.TestCase):
              "## Dónde quedó archivado\n- La nota del plan en la fuente de verdad.")
         self.assertIsNone(g.pendientes_sin_verificar(t, self.SIN_MIRAR))
 
+    # ── espera_siguiente (29-sep-26): «quiero dejar de decirte siguiente para todo» ──
+    def test_espera_siguiente_opcion_sin_gate_salta(self):
+        t = "Hecho: el recall medido.\n**Siguiente:** opción 1."
+        self.assertIsNotNone(g.espera_siguiente(t, self.SIN_MIRAR))
+
+    def test_espera_siguiente_pregunta_si_sigo_salta(self):
+        t = "Tests en verde y commit hecho.\n¿Sigo con la fase 2?"
+        self.assertIsNotNone(g.espera_siguiente(t, self.SIN_MIRAR))
+
+    def test_espera_siguiente_con_gate_real_no_salta(self):
+        t = "Qué espera tu OK: recargar el prepago en la consola.\nSiguiente: opción 1."
+        self.assertIsNone(g.espera_siguiente(t, self.SIN_MIRAR))
+
+    def test_espera_siguiente_con_paso_descrito_no_salta(self):
+        t = "Hecho: fusión 65bd324.\nSiguiente: la Fase 1.5, reglas como mecanismo."
+        self.assertIsNone(g.espera_siguiente(t, self.SIN_MIRAR))
+
     def test_cierre_que_espera_tu_ok_lo_sigue_vigilando_gestion(self):
         t = "Qué espera tu OK: fusionar la rama a casa base con cerrar_sesion.py y podar el worktree."
         self.assertIsNotNone(g.gestion_pide_ok(t, self.SIN_MIRAR))

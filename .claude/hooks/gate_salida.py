@@ -1014,6 +1014,28 @@ def gestion_pide_ok(t, tools=None):
     return None
 
 
+
+def espera_siguiente(t, tools=None):
+    """feedback-no-esperar-siguiente-ejecutar-lo-recomendado (29-sep-26): «quiero dejar de decirte
+    siguiente para todo». Canta si cierro con «Siguiente: opción N» (o preguntando si sigo) sin que
+    en la respuesta haya un gate real que justifique parar. Si el paso recomendado cabe en lo
+    aprobado, se hace en el mismo turno. En modo aviso: el rodaje dirá cuánto acierta."""
+    lineas = [l.strip() for l in _sin_fences(t).splitlines() if l.strip()]
+    cola = " ".join(lineas[-3:])
+    espera = re.search(r"(siguiente:?\**\s*(la\s+)?opci[óo]n\s*\d|¿\s*(sigo|contin[úu]o|lo hago|"
+                       r"procedo|te parece)\b)", cola, re.I)
+    if not espera:
+        return None
+    # Gates reales: lo que sí es suyo parar (dinero, fuera, clínico, irreversible, alcance nuevo).
+    gate = (r"(pag(ar|o)|recarg|compr(a|ar)|envi(ar|o)\b|mand(ar|o) (el|un|a)|publica|contact|"
+            r"cl[íi]nic|m[ée]dic|irreversible|borrar|destru|c[óo]digo rojo|plan[- ]primero|"
+            r"alcance|presupuesto|firma|tu decisi[óo]n|decides t[úu]|/login|inicia(r)? sesi[óo]n)")
+    if re.search(gate, t, re.I):
+        return None
+    return ("Cierras esperando su «siguiente» («%s») sin un gate real en la respuesta. Si el paso "
+            "recomendado cabe en lo aprobado, hazlo en este mismo turno y cuéntalo después."
+            % cola[-120:])
+
 # ── checks del punto de rotura 08 (25-sep-26): normas de salida que no tenían mecanismo ─────────
 # Idea de {{CONTACTO}} (https://contacto), con su agente KAI, revisión del 25-sep-2026.
 # Su hallazgo: 28 de 53 normas de salida vivían solo como contexto (recontado ese día). Estas
@@ -1458,6 +1480,7 @@ CHECKS = {
     "china_omitida": china_omitida,
     "geografia_como_filtro": geografia_como_filtro,
     "gestion_pide_ok": gestion_pide_ok,
+    "espera_siguiente": espera_siguiente,
     "muro_en_borrador": muro_en_borrador,
     "importes_recaudacion": importes_recaudacion,
     "cita_ia_buscador": cita_ia_buscador,
