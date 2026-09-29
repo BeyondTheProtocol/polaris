@@ -1,0 +1,11 @@
+{
+ "pieza": "estado_caso.py",
+ "estado_ficha": "completa",
+ "para": "Estado vivo del caso, determinista y sin LLM: cruza los informes nuevos (_eventos.jsonl del historial) con las esperas abiertas del Tablero, propone cerrar la espera que un informe cumple y regenera un fichero único del estado en la zona clínica (informes recientes, esperas con su retraso, próximos plazos).",
+ "cuando_si": "Automático al final de cada historial_sync (cada 6 h). A mano: python3 tools/estado_caso.py [--avisar].",
+ "cuando_no": "No cierra tarjetas (solo propone). No interpreta contenido clínico ni aconseja: describe qué ha llegado y qué se espera. Los avisos de plazo vencido ya los da centinela_ned.py; no los duplica.",
+ "reemplaza": "Nada. Complementa ESTADO-ACTUAL.md (manual) con una vista que se mantiene sola.",
+ "test": "tests/test_estado_caso.py",
+ "alta": "2026-09-29",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 2: que Vega sepa todo lo que pasa con la enfermedad y esté al día."
+}

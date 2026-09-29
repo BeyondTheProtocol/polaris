@@ -297,6 +297,14 @@ def sync(apply=False, con_correo=False):
                                       if not b.get("error")})
         d["corridas"] = (d.get("corridas", []) + [{"cuando": d["ultima"], "nuevos": nuevos}])[-40:]
         _escribir_diario(d)
+    # Estado vivo del caso (29-sep-26): cruza lo que acaba de entrar con lo que se esperaba y
+    # regenera el fichero de estado. Fail-soft: si falla, el sync ya hizo su trabajo.
+    if apply:
+        try:
+            import estado_caso
+            res["estado_caso"] = estado_caso.actualizar(avisar=True)
+        except Exception as e:                              # noqa: BLE001
+            res["estado_caso"] = {"error": repr(e)}
     return res
 
 
