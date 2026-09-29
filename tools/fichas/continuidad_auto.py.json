@@ -1,0 +1,11 @@
+{
+ "pieza": "continuidad_auto.py",
+ "estado_ficha": "completa",
+ "para": "Escribir la continuidad SOLA al cerrar (SessionEnd) o compactar (PreCompact) una sesión: Haiku por Max resume lo nuevo (decidido, reglas nuevas, hecho, pendiente) a partir de los mensajes de {{TITULAR}} y los textos del asistente, lo desidentifica con deid.py y lo apunta con continuity.record.",
+ "cuando_si": "Automático como hook. A mano: echo '{\"session_id\":..,\"transcript_path\":..}' | python3 tools/continuidad_auto.py",
+ "cuando_no": "No sustituye a precompact_traspaso.py (traspaso determinista del estado técnico) ni a continuity.py record para decisiones que haya que apuntar en el momento. No guarda nada clínico ni PII: si deid no lo deja limpio, no escribe.",
+ "reemplaza": "Nada. Cubre el hueco que precompact_traspaso.py documenta: las decisiones en texto libre del chat, que sin LLM no se detectan.",
+ "test": "tests/test_continuidad_auto.py",
+ "alta": "2026-09-29",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 1.1: continuidad manual, 192 entradas a ráfagas y semanas sin ninguna."
+}
