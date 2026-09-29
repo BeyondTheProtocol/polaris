@@ -282,6 +282,7 @@ runpy test_evidencia_no_cuelga.py
 runpy test_oauth_refresh.py
 runpy test_freno_criticidad.py
 runpy test_run_agent_f2.py
+runpy test_run_agent_reserva_max.py
 runpy test_canario_muro.py
 runpy test_claude_lazo.py
 runpy test_xurl.py

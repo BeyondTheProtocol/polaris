@@ -157,6 +157,20 @@ _ALIAS = {
     "coste": ["gasto", "tokens", "presupuesto", "tier"],
     "seguridad": ["muro", "egress", "privacidad", "secreto"],
     "instalar": ["herramienta", "auditoria", "dependencia"],
+    # 29-sep-26: su vocabulario de a diario, medido en los 5 fallos del eval. Ella dice
+    # «chapa», «agotada», «que no se te olvide»; las memorias dicen «sobreexplicar»,
+    # «energía», «auto-mejora». Sin estos puentes la regla existe y no llega.
+    "olvide": ["memoria", "leccion", "regla", "auto", "mejora", "correccion"],
+    "olvides": ["memoria", "leccion", "regla", "auto", "mejora", "correccion"],
+    "guarda": ["memoria", "archivar", "entregable", "leccion"],
+    "guardar": ["memoria", "archivar", "entregable", "leccion"],
+    "chapa": ["sobreexplicar", "tokens", "terso", "largo", "parsimonia"],
+    "rollo": ["sobreexplicar", "terso", "largo", "parsimonia"],
+    "agotada": ["energia", "cansancio", "humano", "cuidado", "coach"],
+    "cansada": ["energia", "cansancio", "humano", "cuidado", "coach"],
+    "mutaciones": ["molecular", "perfil", "clinico", "dianas", "genomico", "variantes"],
+    "mutacion": ["molecular", "perfil", "clinico", "dianas", "variantes"],
+    "persona": ["dossier", "contacto", "osint", "perfil", "investigador"],
 }
 
 

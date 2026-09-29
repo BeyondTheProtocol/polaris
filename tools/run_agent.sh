@@ -671,6 +671,22 @@ print(1 if (d.get("total_cost_usd") or 0) > 0 or (u.get("output_tokens") or 0) >
   # el OUT del límite y el manejador de abajo la bloquea (exit 75, se reencola, aviso fuerte).
   # Decisión de {{TITULAR}} (25-sep): límite → esperar; rechazo → responder el siguiente, MARCADO.
   if is_limit "$OUT" && [ -n "$CRITICO" ]; then
+    # 🟠 RESERVA API (29-sep-26, decisión de {{TITULAR}}: «tirar de la cuenta Max en vez de la API»).
+    # Lo crítico va por Max. Si Max da límite, se prueba UNA vez el MISMO modelo por la API medida,
+    # solo si hay clave y cost_guard deja gastar dinero. No es degradar: es el mismo cerebro pagado
+    # de otro cubo. Si la reserva tampoco puede, la tarea espera como siempre (abajo).
+    if [ "$VIA" = "suscripcion" ] && [ -z "${RESERVA_API:-}" ]; then
+      RESERVA_API=1
+      _KR="${BTP_API_KEY_OVERRIDE:-$(security find-generic-password -s btp-anthropic-api -w 2>/dev/null || true)}"
+      if [ -n "$_KR" ] && "$PY" "$REPO/tools/cost_guard.py" check --via api >/dev/null 2>&1; then
+        echo "run_agent: 🟠 cuota Max al límite en tarea CRÍTICA → reserva: $M por la API medida (1 intento)." >&2
+        unset CLAUDE_CODE_OAUTH_TOKEN; export ANTHROPIC_API_KEY="$_KR"; VIA="api"
+        set +e
+        OUT="$("${BTP_CLAUDE_BIN:-$CMD}" "${ARGS[@]}" --model "$M")"; rc=$?
+        set -e
+        if ! is_limit "$OUT" && ! is_credit_out "$OUT"; then break; fi
+      fi
+    fi
     echo "run_agent: 🔴 límite en $M y tarea CRÍTICA → no degrado: espera a que vuelva $M." >&2
     break
   fi

@@ -23,9 +23,9 @@
       "auth_env": "CLAUDE_CODE_OAUTH_TOKEN",
       "trusted": true,
       "capability": 9,
-      "nivel_min": "rutina",
+      "nivel_min": "critico",
       "enabled": true,
-      "_nota": "MISMO binario Claude Code, pero auth por SUSCRIPCION Max (token largo de 'claude setup-token', ~1 ano) en vez de la API MEDIDA. Fin: gastar de la cuota del plan y no del tope mensual de API. SOLO rutinario (nivel_min=rutina) — NUNCA clinico/critico (esos siguen en 'claude'/API por el muro clinico de run_agent.sh:170). Secreto en el Llavero: btp-claude-oauth-token. SALVAGUARDA en run_agent.sh: si ese secreto falta/caduca, el daemon NO se rompe -> cae a 'claude' (API) y avisa. Consumer-first: anadir esto NO lo autodespliega; un plist lo elige con BTP_ORQUESTADOR=claude-suscripcion tras fusionar+recargar desde casa base.",
+      "_nota": "MISMO binario Claude Code, auth por SUSCRIPCION Max (token largo de 'claude setup-token', ~1 ano). Desde 29-sep-2026 (decision de {{TITULAR}}: 'tirar de la cuenta Max en vez de la API') es la via POR DEFECTO de todo, clinico/critico incluido (nivel_min=critico). La API medida ('claude') queda solo como RESERVA: run_agent.sh la usa una vez si Max devuelve limite en una tarea critica y cost_guard lo permite. Motivo: la API tambien se agota (26-sep: prepago a 0, comite medico bloqueado 3 dias). Secreto: btp-claude-oauth-token. Si falta, cae a la API y avisa.",
       "medido": false
     },
     {
