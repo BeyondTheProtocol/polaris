@@ -6,6 +6,7 @@
   <key>EnvironmentVariables</key><dict>
     <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>BTP_ORQUESTADOR</key><string>claude-suscripcion</string>
+    <key>BTP_LAZO</key><string>com.btp.dispatcher</string>
   </dict>
   <key>ProgramArguments</key><array>
     <string>/bin/bash</string>

@@ -497,6 +497,12 @@ def _origen():
     que dejar pasar uno falso."""
     xpc = os.environ.get("XPC_SERVICE_NAME") or ""
     agente = os.environ.get("BTP_AGENT") or ""
+    # 29-sep-26: el dispatcher (plist `/bin/bash btp_dispatcher.sh`) NO recibe XPC_SERVICE_NAME de
+    # launchd — comprobado con `ps eww` (el bot y el Observatorio sí la tienen). Sus avisos críticos
+    # del 26-29 sep («He PARADO una tarea…», saldo a 0) salieron sellados como «probablemente un
+    # diagnóstico manual» y se leían como ruido. Segunda señal: el plist declara BTP_LAZO=com.btp.*.
+    if not xpc.startswith("com.btp."):
+        xpc = os.environ.get("BTP_LAZO") or xpc
     if xpc.startswith("com.btp."):
         return (xpc + (" · " + agente if agente else ""), True)
     if agente:

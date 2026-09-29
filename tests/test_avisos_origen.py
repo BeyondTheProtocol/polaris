@@ -64,6 +64,9 @@ def _fake_deliver(chat_id, text, reply_to=None):
 
 salida._DELIVERERS = {"telegram": _fake_deliver}
 salida._self_chatid = lambda: "123456"
+# Este test mide el SELLO DE ORIGEN, no el cupo diario de avisos (que llegó después y, con los
+# casos de arriba, agotaba el cupo y mandaba el report normal al parte: fallo ajeno a lo que mide).
+salida.TOPE_AVISOS_DIA = 10 ** 6
 
 CLAUDE = {"name": "claude", "kind": "claude", "destino": "cleared:claude", "trusted": True,
           "free": False, "enabled": True, "capability": 9}
@@ -134,6 +137,17 @@ salida.report_to_titular("hola desde el lazo", fuente="test")
 limpio = ENTREGADOS[0] if ENTREGADOS else ""
 ok("origen:" not in limpio and "hola desde el lazo" in limpio,
    "dentro del lazo el report normal va LIMPIO e íntegro (la boca no está muda)")
+# 4b. El dispatcher no recibe XPC_SERVICE_NAME (29-sep-26): su plist declara BTP_LAZO y con eso
+# sus avisos no salen sellados como «diagnóstico manual».
+ENTREGADOS.clear()
+os.environ.pop("XPC_SERVICE_NAME", None)
+os.environ["BTP_LAZO"] = "com.btp.dispatcher"
+salida.report_to_titular("aviso de prueba del lazo", fuente="test")
+disp = ENTREGADOS[0] if ENTREGADOS else ""
+ok("origen:" not in disp and "aviso de prueba del lazo" in disp,
+   "⭐ un aviso del dispatcher (sin XPC, con BTP_LAZO) va LIMPIO, no como diagnóstico manual")
+os.environ.pop("BTP_LAZO", None)
+os.environ["XPC_SERVICE_NAME"] = "com.btp.asistente"
 
 # ── 5. alerta_critica: lista de llamantes CERRADA ────────────────────────────────────────────
 # Atraviesa el HALT, el silencio nocturno y la casa de estilo. Es el canal de SOCORRO: si se usa
