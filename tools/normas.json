@@ -897,6 +897,18 @@
    "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: no. Propuesta: —"
   },
   {
+   "slug": "feedback-reservas-web-directa-y-en-su-chrome",
+   "que": "En reservas de hotel: comparar SIEMPRE la web directa con la OTA antes de proponer, y dejar la reserva rellenada en el Chrome de {{TITULAR}} (no en el panel oculto de la app) hasta la pantalla de pago",
+   "clase": "contexto",
+   "mecanismo": null,
+   "fresca": true,
+   "heredada": false,
+   "aplicable": true,
+   "auditable": false,
+   "repetida": true,
+   "nota": "29-sep-26: clasificada, SIN mecanizar. Mecanizable: no (criterio de compra y elección de navegador). Hermana de feedback-compras-opcion-optima-coste-proactiva."
+  },
+  {
    "slug": "feedback-control-gasto-tarjetas-ia",
    "que": "CRUCIAL para {{TITULAR}}: que no se le escape el dinero con tantas tarjetas conectadas a servicios de IA; blindar el gasto siempre (auto-recarga OFF + topes + tarjeta virtual)",
    "clase": "contexto",
