@@ -43,6 +43,32 @@ MIN_CARACTERES = 400
 MAX_EXTRACTO = 40000         # cola de la conversación que ve Haiku
 MAX_RESUMEN = 1200
 
+# Archivo de la conversación (Fase 1.3). Las transcripciones crudas de Claude Code se borran a los
+# 30 días y no se pueden guardar más: ~430 MB/día medidos el 29-sep, un año no cabe en el disco.
+# Solo la conversación ({{TITULAR}} + textos del asistente) son ~10 MB/día: esa sí se guarda, en la
+# zona privada, donde kb.py la indexa como `private` y nunca sale de la máquina.
+def _dir_sesiones():
+    return os.environ.get("BTP_SESIONES_DIR") or os.path.join(
+        continuity.REPO, "00_FUENTE-DE-VERDAD", "_PRIVADO_SESIONES", "conversaciones")
+
+
+def archivar(session_id, turnos):
+    """Anexa los turnos nuevos al archivo de la sesión. Devuelve la ruta o None."""
+    if not turnos:
+        return None
+    from datetime import datetime
+    carpeta = os.path.join(_dir_sesiones(), datetime.now().strftime("%Y-%m"))
+    os.makedirs(carpeta, mode=0o700, exist_ok=True)
+    ruta = os.path.join(carpeta, "%s.md" % "".join(c for c in session_id if c.isalnum() or c == "-"))
+    nueva = not os.path.exists(ruta)
+    with open(ruta, "a", encoding="utf-8") as fh:
+        if nueva:
+            fh.write("# Sesión %s\n" % session_id)
+        fh.write("\n## %s\n\n%s\n" % (datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                                      "\n\n".join(turnos)))
+    os.chmod(ruta, 0o600)
+    return ruta
+
 PROMPT = """Eres el cronista interno de un asistente de IA. Abajo va un tramo de conversación entre
 {{TITULAR}} (la usuaria) y el asistente. Escribe en español, máximo 900 caracteres, SOLO con estas
 secciones (omite las vacías):
@@ -165,6 +191,17 @@ def procesar(evento):
     desde = int(_leer_offsets().get(sid, 0))
     turnos, n_titular, offset = extraer(ruta, desde)
     extracto = "\n\n".join(turnos)
+    # El archivo lleva SU PROPIO offset: el del resumen no avanza cuando Haiku falla (se reintenta),
+    # y reusarlo duplicaría la conversación archivada en cada reintento.
+    clave_arch = sid + "#archivo"
+    desde_arch = int(_leer_offsets().get(clave_arch, 0))
+    try:
+        turnos_arch, n_arch, off_arch = extraer(ruta, desde_arch)
+        if n_arch:
+            archivar(sid, turnos_arch)
+        _guardar_offset(clave_arch, off_arch)
+    except Exception:
+        pass
     if n_titular < MIN_MENSAJES_TITULAR or len(extracto) < MIN_CARACTERES:
         _guardar_offset(sid, offset)
         return "sesión demasiado corta"
