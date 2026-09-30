@@ -116,6 +116,39 @@ def main():
     check("RCT en preprint -> tier rct pero avisa del preprint",
           r["tier"] == "rct" and "PREPRINT" in r["motivo"])
 
+    # ── Issue #13: fase/control no acreditan aleatorización; humano no borra banco ──
+    for pt in ("Controlled Clinical Trial", "Clinical Trial, Phase III"):
+        r = t.clasifica_pmid("12", fetch=fake([pt], ["Humans"]))
+        check("%s sin aleatorización -> ensayo, no RCT" % pt,
+              r["tier"] == "ensayo_clinico" and "rct" not in r["senales"])
+        check("%s no afirma ausencia de aleatorización" % pt,
+              "no acreditada" in r["etiqueta"] and "no acreditada" in r["motivo"])
+        # El orden del registro no cambia el resultado cuando SÍ hay señal explícita.
+        for pts in ([pt, "Randomized Controlled Trial"],
+                    ["Randomized Controlled Trial", pt]):
+            r = t.clasifica_pmid("13", fetch=fake(pts, ["Humans"]))
+            check("RCT explícito con %s -> rct" % pts,
+                  r["tier"] == "rct" and not r["preclinico"])
+
+    for pts in (["Journal Article"], ["Controlled Clinical Trial"],
+                ["Clinical Trial, Phase III"], ["Randomized Controlled Trial"]):
+        r = t.clasifica_pmid("14", fetch=fake(pts, ["Humans", "In Vitro Techniques"]))
+        check("muestras humanas in vitro conservan banco con %s" % pts,
+              r["tier"] == "in_vitro" and r["preclinico"] is True
+              and r["senales"]["humanos"] is True
+              and "muestras humanas" in r["motivo"])
+
+    r = t.teje({"humanos": True, "in_vitro": True})
+    check("cuestionario humano + in vitro -> preclínico",
+          r["tier"] == "in_vitro" and r["preclinico"])
+    r = t.teje(t.senales_desde_texto("In vitro cell lines from patients"))
+    check("léxico de muestras humanas no borra in vitro",
+          r["tier"] == "in_vitro" and r["preclinico"])
+    for valor in (False, None):
+        r = t.teje({"humanos": True, "in_vitro": valor, "rct": True})
+        check("in vitro %r no degrada un RCT explícito" % valor,
+              r["tier"] == "rct" and not r["preclinico"])
+
     # ── 7. Cada tier tiene su texto (si no, el consumidor imprime un KeyError) ──────
     check("todos los tiers tienen etiqueta", all(k in t.TIER_TXT for k in t.TIERS))
     check("todas las señales tienen pregunta sí/no", all(isinstance(q, str) and q.endswith("?")
