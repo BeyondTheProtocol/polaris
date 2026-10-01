@@ -308,6 +308,13 @@ def sync(apply=False, con_correo=False):
             res["promesas_caso"] = {"nuevas": len(r["nuevas"]), "sin_modelo": r["sin_modelo"]}
         except Exception as e:                              # noqa: BLE001
             res["promesas_caso"] = {"error": repr(e)}
+        # Incongruencias entre fuentes (1-oct-26, Fase 2b): se recalcula con lo que acaba de entrar.
+        try:
+            import incongruencias_caso
+            ri = incongruencias_caso.actualizar()
+            res["incongruencias"] = {"n": len(ri["incongruencias"]), "copias": len(ri["copias"])}
+        except Exception as e:                              # noqa: BLE001
+            res["incongruencias"] = {"error": repr(e)}
         try:
             import estado_caso
             res["estado_caso"] = estado_caso.actualizar(avisar=True)

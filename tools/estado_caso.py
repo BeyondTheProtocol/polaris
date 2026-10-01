@@ -134,6 +134,8 @@ def render(eventos, hilos, hoy=None):
                                                              p.get("vence", ""), retraso))
     else:
         lin.append("Nada abierto.")
+    lin += ["", "## Lo que no cuadra entre informes", "",
+            "Ver INCONGRUENCIAS-DEL-CASO.md (se regenera solo con cada informe nuevo)."]
     return "\n".join(lin) + "\n"
 
 

@@ -102,7 +102,7 @@ ok("Respuesta del laboratorio" not in tit, "lo que espera por un tercero no")
 ok("Decidir cosa reciente" not in tit, "lo de ayer todavía no")
 prop = atascos.propuestas_de_proceso(esp)
 ok(len(prop) == 1 and "«Web»" in prop[0], "propone delegar lo repetido no clínico: %r" % prop)
-vacio = {"esperas": [], "proceso": [], "propuestas": 0, "promesas_vencidas": [], "sistema": [], "fallos": []}
+vacio = {"incongruencias": [], "esperas": [], "proceso": [], "propuestas": 0, "promesas_vencidas": [], "sistema": [], "fallos": []}
 ok(atascos.bloque(vacio) == "", "sin atascos, bloque vacío")
 d = atascos.recopilar()      # estado temporal sin healthcheck: una fuente rota no tumba nada
 ok(isinstance(atascos.bloque(d), str) and any("healthcheck" in x for x in d["fallos"]),

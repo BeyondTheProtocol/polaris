@@ -1,0 +1,11 @@
+{
+ "pieza": "incongruencias_caso.py",
+ "estado_ficha": "completa",
+ "para": "Detecta cuándo dos fuentes del caso dicen cosas distintas sobre el mismo dato: extrae del TEXTO ORIGINAL de los PDF de anatomía patológica y molecular (no de traducciones ni resúmenes) RE, RP, Ki-67, HER2 (con null/ultralow), cromogranina, sinaptofisina e {{DIANA3}}, por muestra y fecha. Misma muestra + valores distintos = incongruencia; muestras distintas = heterogeneidad (se lista, no se avisa); copias (traducciones, resúmenes, consultas) con una cifra que no casa con ningún informe original = copia que no cuadra; y fechas imposibles en el historial.",
+ "cuando_si": "Automático tras cada historial_sync (cada 6 h). El bloque de novedades sale en el parte de la mañana (atascos.py). A mano: python3 tools/incongruencias_caso.py [--json].",
+ "cuando_no": "No juzga cuál de los dos valores es el bueno ni qué significa: describe y deja el juicio a sus médicos. No lee consultas ni imagen todavía (fase siguiente). No escribe en el perfil maestro.",
+ "reemplaza": "Nada. Era la Fase 2b del plan Vega al mando, apoyada en un perfil_maestro.json que nunca existió.",
+ "test": "tests/test_incongruencias_caso.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega al mando» (29-sep-26) Fase 2b; plan propio del 1-oct (04 · IA/Notas/plan-fase-2b-…), autorizado por {{TITULAR}} el 1-oct."
+}

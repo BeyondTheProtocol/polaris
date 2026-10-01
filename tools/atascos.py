@@ -17,6 +17,7 @@ QUÉ LEE (solo lectura, sin red, sin LLM)
 · Buzón de propuestas de Vega sin resolver (aprobaciones.propuestas_abiertas).
 · Promesas del caso vencidas (promesas_caso.abiertas).
 · La foto de healthcheck (`state/healthcheck/last_check.json`): cola fallida y daemons en rojo.
+· Incongruencias NUEVAS entre informes del caso (incongruencias_caso.nuevas), en N1.
 · Crédito (cost_guard.credito_ok) y deuda escalada. Los borradores de outbox no: ya van en el parte.
 Cada fuente falla por su cuenta: si una no se puede leer, el resumen lo dice y sigue.
 
@@ -134,8 +135,14 @@ def recopilar(hoy=None):
         vencidas = [p for p, d in promesas_caso.abiertas(hoy) if d > 0]
     except Exception as e:  # noqa: BLE001
         vencidas, fallos = [], fallos + ["promesas (%s)" % type(e).__name__]
+    try:
+        import incongruencias_caso
+        from datetime import timedelta
+        incong = incongruencias_caso.nuevas((hoy - timedelta(days=1)).isoformat())
+    except Exception as e:  # noqa: BLE001
+        incong, fallos = [], fallos + ["incongruencias (%s)" % type(e).__name__]
     sistema, f2 = _sistema()
-    return {"esperas": esperas, "proceso": propuestas_de_proceso(esperas), "propuestas": propuestas,
+    return {"incongruencias": incong, "esperas": esperas, "proceso": propuestas_de_proceso(esperas), "propuestas": propuestas,
             "promesas_vencidas": vencidas, "sistema": sistema, "fallos": fallos + f2}
 
 
@@ -143,6 +150,11 @@ def bloque(datos=None):
     """Texto para el parte. Vacío si no hay ningún atasco (sin novedad no se dice nada)."""
     d = datos or recopilar()
     lin = []
+    # Nivel B (decisión del 29-sep): lo que no cuadra entre fuentes del caso es de {{TITULAR}}. Solo lo
+    # NUEVO (visto desde ayer); el listado completo vive en INCONGRUENCIAS-DEL-CASO.md.
+    if d.get("incongruencias"):
+        lin.append("🔀 Datos de tu caso que no cuadran entre informes (nuevo; el juicio es de tus médicos):")
+        lin += ["   · " + f for f in d["incongruencias"][:5]]
     if d["esperas"]:
         lin.append("⏳ Esperan por ti (%d, de más de %d días):" % (len(d["esperas"]), ESPERA_DIAS))
         for h, dias in d["esperas"][:5]:
