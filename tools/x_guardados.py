@@ -28,7 +28,7 @@ Uso:
   python3 tools/x_guardados.py listar --since 7  # guardados de los últimos 7 días
   python3 tools/x_guardados.py --digest          # alias de `listar` (para auto-mejora)
 """
-import json, os, sys, datetime
+import json, os, re, sys, datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -47,7 +47,7 @@ KW_NED = [
     "ensayo", "trial", "vacuna", "vaccine", "neoantig", "neoantíg", "inmun",
     "immun", "laborator", "investiga", "research", "científic", "scientist",
     "biopsia", "biopsy", "genóm", "genom", "secuenc", "sequenc",
-    "immunotherap", "inmunoterap", "ned ", " ned", "terapia", "therapy",
+    "immunotherap", "inmunoterap", "ned", "terapia", "therapy",
     "protocolo", "clinical", "clínic",
 ]
 KW_SISTEMA = [
@@ -59,12 +59,28 @@ KW_SISTEMA = [
 ]
 
 
+# Las raíces casan solo al INICIO de palabra, y las siglas cortas solo como palabra entera: con
+# `k in t` «rag» saltaba en «testigos de cargo», «nim» en «animal» y «ned » en «designed », y una
+# reseña de cine salía como [sistema] en el análisis de guardados (1-oct-26).
+KW_PALABRA_ENTERA = {"rag", "nim", "llm", "mcp", "ned", "evals", "mama"}
+_LETRA = "a-z0-9áéíóúüñ"
+
+
+def _patron(kws):
+    alt = "|".join(re.escape(k.strip()) + ("(?![%s])" % _LETRA if k.strip() in KW_PALABRA_ENTERA else "")
+                   for k in kws)
+    return re.compile("(?<![%s])(?:%s)" % (_LETRA, alt))
+
+
+_RE_NED, _RE_SISTEMA = _patron(KW_NED), _patron(KW_SISTEMA)
+
+
 def _flag(text):
     t = (text or "").lower()
     tags = []
-    if any(k in t for k in KW_NED):
+    if _RE_NED.search(t):
         tags.append("NED")
-    if any(k in t for k in KW_SISTEMA):
+    if _RE_SISTEMA.search(t):
         tags.append("sistema")
     return tags
 
