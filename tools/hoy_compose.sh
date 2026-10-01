@@ -36,6 +36,9 @@ rc=0
 # «claude» (API medida): con el prepago a cero, la rutina fallaba cada día con «Credit balance is too
 # low» (deudas api_sin_saldo y daemon_fallando). La API queda solo como reserva de lo crítico.
 export BTP_ORQUESTADOR="${BTP_ORQUESTADOR:-claude-suscripcion}"
+# Turnos: componer el parte lleva ~33 (pasada buena registrada); el tope de rutina (25) lo cortaba
+# a medias sin escribir HOY.md (fallo_max_turns, 1-oct 15:41).
+export BTP_MAX_TURNS="${BTP_MAX_TURNS:-50}"
 "$REPO/tools/run_agent.sh" "$PROMPT" 2>&1 | tee "$salida" || rc=$?
 
 despues="$(stat -f %m "$HOY_ABS" 2>/dev/null || echo 0)"
