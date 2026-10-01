@@ -36,18 +36,22 @@ def alelos_no_perdidos(todos: list[str], perdidos: list[str]) -> list[str]:
     return [a for a in todos if a not in perd]
 
 
-def leer_expresion(ruta: str | Path) -> dict[str, float]:
-    out: dict[str, float] = {}
+def leer_expresion(ruta: str | Path) -> dict[str, float | str]:
+    """Conserva el texto numérico ilegible para que el filtro lo descarte como inválido.
+    Omitirlo aquí lo convertiría en un dato ausente, o conservaría un valor previo del gen.
+    Una fila sin segundo campo, o con él vacío, sigue sin aportar una medición.
+    """
+    out: dict[str, float | str] = {}
     for ln in Path(ruta).read_text().splitlines():
         ln = ln.split("#", 1)[0].strip()
         if not ln or ln.lower().startswith("gene"):
             continue
         parts = ln.split("\t")
-        if len(parts) >= 2:
+        if len(parts) >= 2 and parts[1].strip():
             try:
                 out[parts[0].strip()] = float(parts[1])
             except ValueError:
-                pass
+                out[parts[0].strip()] = parts[1].strip()
     return out
 
 
