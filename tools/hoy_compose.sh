@@ -32,6 +32,10 @@ antes="$(stat -f %m "$HOY_ABS" 2>/dev/null || echo 0)"
 
 salida="$(mktemp -t hoy-compose)"
 rc=0
+# Por la cuenta Max, no por la API de pago (1-oct-26). Sin esto run_agent cogía el orquestador
+# «claude» (API medida): con el prepago a cero, la rutina fallaba cada día con «Credit balance is too
+# low» (deudas api_sin_saldo y daemon_fallando). La API queda solo como reserva de lo crítico.
+export BTP_ORQUESTADOR="${BTP_ORQUESTADOR:-claude-suscripcion}"
 "$REPO/tools/run_agent.sh" "$PROMPT" 2>&1 | tee "$salida" || rc=$?
 
 despues="$(stat -f %m "$HOY_ABS" 2>/dev/null || echo 0)"
