@@ -34,9 +34,10 @@ def _es_auto(bloque):
 
 
 def _es_vega(bloque):
-    """Lo hablado por Telegram: con Vega (sesión) o con el respondedor rápido."""
+    """Lo del lazo: lo hablado por Telegram (Vega o respondedor rápido) y los partes de los
+    trabajos de la cola (1-oct-26). Cupo propio: no echa a lo que escribe una persona."""
     cab = bloque.split("\n", 1)[0]
-    return "(vega " in cab or "(telegram " in cab
+    return "(vega " in cab or "(telegram " in cab or "(job " in cab
 
 
 def _edad_horas(bloque):

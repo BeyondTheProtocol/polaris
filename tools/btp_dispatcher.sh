@@ -203,6 +203,12 @@ while true; do
   [ -z "$via" ] && [ "${BTP_ORQUESTADOR:-}" = "claude-suscripcion" ] && via="suscripcion"
   usd="$(printf '%s' "$OUT" | "$PY" "$TOOLS/cost_guard.py" add --stdin --job "$id" --via "${via:-api}" ${topejob:+--tope-job "$topejob"} 2>>"$LOG/dispatcher.err")" || usd="?"
   spent="$("$PY" "$TOOLS/cost_guard.py" today 2>/dev/null | jq -r '.gastado_usd // "?"')"
+  # Parte a la memoria común (1-oct-26): los trabajos exec que NO son de Vega (ella ya apunta lo
+  # suyo) dejan qué se pidió y qué salió, para que Vega y las sesiones lo vean. Fail-soft.
+  if [ "$tipo" = "exec" ] && [ -z "$vega" ] && [ "$rc" != 75 ]; then
+    printf '%s' "$OUT" | "$PY" "$TOOLS/vega_sesion.py" parte-job "${agente:-orquestador}" \
+      "$([ "$rc" = 0 ] && echo ok || echo fallo)" "$intencion" >/dev/null 2>&1 || true
+  fi
 
   # 7a. APLAZADO (rc 75 = EX_TEMPFAIL): Claude no disponible (sin saldo / límite). NO marcar done,
   # NO entregar resultado: devolver el job a la cola SIN gastar intento (requeue) → se reintenta

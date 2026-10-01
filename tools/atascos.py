@@ -104,7 +104,10 @@ def _sistema():
     try:
         import cost_guard
         if cost_guard.credito_ok() is False:
-            out.append("Crédito de la API agotado: lo que va por API está parado.")
+            # 1-oct-26: todo el trabajo de Claude va por la cuenta Max; la API de pago solo es la
+            # reserva de lo crítico cuando Max llega al límite.
+            out.append("Crédito de la API de pago agotado: no hay reserva si Max llega al límite "
+                       "en una tarea crítica (lo demás va por Max).")
     except Exception as e:  # noqa: BLE001
         fallos.append("crédito (%s)" % type(e).__name__)
     try:

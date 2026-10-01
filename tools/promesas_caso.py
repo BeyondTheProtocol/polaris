@@ -395,10 +395,10 @@ def _proponer(nuevas):
 
 
 def texto_sin_pii(p):
-    """«qué (quién)» sin identificadores, para lo que sale del estado privado (aviso, buzón de
-    Vega). Sin de-id disponible, solo «qué», sin nombre."""
-    crudo = "%s (%s)" % (p.get("que", ""), p.get("quien", ""))
-    return _deid(crudo) or "%s (remitente omitido)" % p.get("que", "")[:60]
+    """Solo el «qué», de-identificado, para lo que sale del estado privado (aviso, buzón y visión
+    de Vega). El «quién» se queda en el estado privado: el de-id no reconoce todos los nombres
+    (1-oct-26: dejó pasar el de una persona de logística) y para N1 basta con qué se espera."""
+    return _deid(p.get("que", "")) or "algo prometido (texto omitido: sin de-id)"
 
 
 def abiertas(hoy=None):

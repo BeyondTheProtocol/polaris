@@ -78,6 +78,31 @@ vs.despues(json.dumps({"session_id": "s-dos", "is_error": True,
                        "result": "No conversation found with session ID: s-dos"}))
 ok(vs.vigente() is None, "sesión perdida → se olvida")
 
+# ── visión N1 y partes de trabajos (1-oct-26: una cabeza que lo ve todo, sin una sola sesión) ──
+import vega_vision  # noqa: E402
+_vis = ["VISION-A"]
+vega_vision.bloque = lambda hoy=None: _vis[0]
+vs._guardar({})
+ok("VISION-A" in vs.contexto(), "sesión nueva: contexto del lazo + visión")
+vs.despues(json.dumps({"session_id": "s-tres", "is_error": False, "result": "ok"}), PROMPT)
+ok("VISION-A" not in vs.contexto(), "sesión vigente: la visión no se repite si no cambia")
+_vis[0] = "VISION-B"
+ok("VISION-B" in vs.contexto(), "…y vuelve cuando cambia")
+ok(vs.parte_job(json.dumps({"result": "Hecho el resumen de ensayos."}),
+                "ctx Resumen (dato no confiable): <<<busca ensayos de ADC>>> y", "comite-medico", True),
+   "parte de un trabajo")
+idx = open(continuity.INDEX, encoding="utf-8").read()
+ok("(job comite-medico)" in idx and "busca ensayos de ADC" in idx and "resumen de ensayos" in idx,
+   "el parte queda en la memoria común con encargo y resultado")
+ok("ensayos de ADC" in vs.contexto(), "Vega lo recibe como novedad en su siguiente turno")
+
+# ── vigilancia de entradas: lo roto se ve (1-oct-26: «tienes que ir viéndolo tú») ──
+import importlib  # noqa: E402
+vv = importlib.reload(vega_vision)
+ok(vv._entrada_rota("x-falso", {}, 0) == "no está cargado", "entrada: daemon no cargado")
+ok("falló" in (vv._entrada_rota("x-falso", {"x-falso": ("-", "1")}, 0) or ""), "entrada: última pasada fallida")
+ok(vv._entrada_rota("x-falso", {"x-falso": ("-", "0")}, 0) is None, "entrada: bien → nada que decir")
+
 # ── contexto_lazo: cupo propio ──
 for i in range(4):
     continuity.record("charla %d" % i, procedencia="derivado", fuente="vega s-dos")
