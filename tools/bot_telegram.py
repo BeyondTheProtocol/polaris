@@ -241,6 +241,16 @@ def _transcribir_voz(voice):
     return (txt or "").strip() or None
 
 
+def _vega_puerta_unica():
+    if os.environ.get("BTP_VEGA_OFF"):
+        return False
+    try:
+        import seguimiento
+        return not os.path.exists(os.path.join(seguimiento.STATE, "vega", "OFF"))
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def _apunta_charla(pregunta, respuesta):
     """Lo hablado con el respondedor rápido también entra en continuity (1-oct-26, plan «Vega al
     mando» F3): así Vega lo recibe en su siguiente turno y las sesiones lo ven al arrancar. De-id
@@ -408,7 +418,11 @@ def handle_message(msg):
     # gaste o no gaste Claude. Ya NO te quedas muda ni te responde un cerebro pelado. Lo SENSIBLE lo
     # enruta el borde a un cerebro de CONFIANZA (Claude/local); si el cerebro principal de la tarea no
     # está, te da lo OBJETIVO de tus notas. NO ejecuta acciones (para eso está el agente, abajo).
-    if not _es_accion(text) and not _es_hostil(text):
+    # VEGA, PUERTA ÚNICA (1-oct-26, plan «Vega al mando» F3): con Vega encendida, la charla y las
+    # preguntas también van a ella (triaje en cuarentena → su sesión con memoria), no al
+    # respondedor rápido, que no recuerda nada. Es más lento, pero es la misma Vega que recuerda.
+    # Apagado: BTP_VEGA_OFF=1 o el fichero state/vega/OFF → vuelve el respondedor rápido.
+    if not _es_accion(text) and not _es_hostil(text) and not _vega_puerta_unica():
         try:
             r = responder_con_datos.responder(text[:3000])
         except Exception as e:
@@ -435,7 +449,8 @@ def handle_message(msg):
     mañana = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() + 86400))
     jid = q.enqueue(TRIAGE_FRAME % text[:3000], prioridad="alta", perfil="quarantine",
                     tipo="triage", procedencia="telegram", expira=mañana, max_intentos=1)
-    aviso = "🟢 Recibido. Lo hago con tus datos y herramientas en cuanto pueda. (ref %s)" % jid
+    aviso = ("🟢 Recibido. Te contesta Vega en un momento. (ref %s)" % jid if _vega_puerta_unica()
+             else "🟢 Recibido. Lo hago con tus datos y herramientas en cuanto pueda. (ref %s)" % jid)
     if similares:
         aviso += "\n↺ Quizá ya lo tienes: «%s». Si era eso, ciérralo con «hecho N» o sigue y lo trato aparte." % similares[0]["titulo"]
     responder(aviso)

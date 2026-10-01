@@ -22,6 +22,7 @@ os.environ["BTP_STATE_DIR"] = _TMP
 os.environ["BTP_HALT_FILES"] = os.path.join(_TMP, "nh_a") + ":" + os.path.join(_TMP, "nh_b")
 os.environ["BTP_PERIPHERIES"] = os.path.join(_TMP, "peripheries.json")
 os.environ["BTP_IA_FAKE"] = "RESPUESTA-GRATIS"
+os.environ["BTP_VEGA_OFF"] = "1"   # la ruta antigua (respondedor rápido); Vega encendida, en el caso 4b
 json.dump({"cerebros": [
     # incluye un cerebro local GRATIS y de CONFIANZA (como el real): el caso clínico NO debe
     # irse a él (regla del muro: clínico = Claude por calidad), aunque sea trusted+free.
@@ -115,6 +116,17 @@ def main():
     ok(len(ENQUEUED) == 0 and st.startswith("respondido")
        and not any("RESPUESTA-GRATIS" in r for r in REPLIES),
        "pregunta clínica → respondedor read-only (el borde gobierna dentro), sin encolar")
+
+    # 4b) VEGA, PUERTA ÚNICA (1-oct-26): encendida, la pregunta va a Vega por la cuarentena (con
+    #     memoria), no al respondedor rápido. Los casos 1b y 4 de arriba corren con Vega apagada.
+    del os.environ["BTP_VEGA_OFF"]
+    st = envia("¿qué tareas tengo hoy?")
+    ok(len(ENQUEUED) == 1 and st.startswith("triage") and ENQUEUED[0][1].get("perfil") == "quarantine"
+       and any("Vega" in r for r in REPLIES) and not any("RESPUESTA-RESPONDER" in r for r in REPLIES),
+       "Vega encendida: la pregunta va a Vega por cuarentena, no al respondedor")
+    st = envia("hola, gracias")
+    ok(len(ENQUEUED) == 0, "Vega encendida: el saludo sigue por el carril gratis")
+    os.environ["BTP_VEGA_OFF"] = "1"
 
     # 5) «aprobar …» sigue igual (no router)
     st = envia("aprobar borrador-1 nonce123")
