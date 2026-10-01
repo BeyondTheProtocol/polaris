@@ -1,0 +1,21 @@
+{
+ "_comment": "Lo descartado se revisa (directo de Society {{CONTACTO}} del 28-sep, recomendación 5 de {{CONTACTO}}; 1-oct-26). radar_ned_diario.py reabre en la cola de verificación un descarte (1) cerrado ANTES de un cambio del perfil de {{TITULAR}} y cuyo veredicto citaba justo ese criterio, o (2) un ensayo cerrado hace más de dias_revision días. Reabrir no concluye nada: vuelve a la cola que revisa el comité, con el veredicto anterior al lado. Añadir un cambio de perfil = una entrada nueva aquí, con su fuente.",
+ "dias_revision": 180,
+ "tipos_por_tiempo": ["ensayo", "trial"],
+ "cambios_perfil": [
+  {
+   "clave": "visceral-ago-2026",
+   "desde": "2026-08-18",
+   "patron": "solo hueso|[oó]se[ao]s? exclusiv|exclusivamente [oó]se|sin (afectaci[oó]n|enfermedad|met[aá]stasis) visceral|oligometast",
+   "motivo": "Metástasis hepática desde la BAG del 18-ago-2026: ya no es enfermedad ósea exclusiva.",
+   "fuente": "memoria reference-enfermedad-visceral-desde-ago-2026 (informe de radiología HUVH en Drive)"
+  },
+  {
+   "clave": "medible-sep-2026",
+   "desde": "2026-09-08",
+   "patron": "no medible|sin enfermedad medible|sin lesi[oó]n(es)? medible|enfermedad medible|lesi[oó]n medible|RECIST",
+   "motivo": "Enfermedad medible por RECIST 1.1 desde el 8-sep-2026 (hoja CETIR, 4 dianas).",
+   "fuente": "Tablero, hilo «Puerta de ensayo / fabricante de la vacuna» (gate medible cumplido desde 8-sep)"
+  }
+ ]
+}

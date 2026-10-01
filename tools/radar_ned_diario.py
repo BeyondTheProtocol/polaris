@@ -1094,6 +1094,68 @@ def guarda_cola(c):
     os.replace(tmp, COLA)
 
 
+REVISION_CONF = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "radar_revision.json")
+REVISADOS = os.path.join(DIR_ESTADO, "revisados.json")
+
+
+def revisar_descartes(hoy=None, conf_path=None):
+    """Lo descartado se revisa (recomendación de {{CONTACTO}} en el directo del 28-sep; 1-oct-26).
+
+    Reabre en la cola un descarte que (1) se cerró ANTES de un cambio del perfil y cuyo veredicto
+    citaba ese criterio, o (2) es un ensayo cerrado hace más de `dias_revision` días. Cada uid se
+    reabre una sola vez por motivo (state/radar_ned/revisados.json). Reabrir no concluye: el lead
+    vuelve con su veredicto anterior al lado y lo juzga quien cierra la cola.
+    → nº de reabiertos."""
+    hoy = hoy or datetime.now().date()
+    try:
+        with open(conf_path or REVISION_CONF, encoding="utf-8") as f:
+            conf = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return 0
+    try:
+        with open(REVISADOS, encoding="utf-8") as f:
+            hechos = set(json.load(f))
+    except (OSError, json.JSONDecodeError):
+        hechos = set()
+    c = lee_cola()
+    pend = {p["uid"] for p in c["pendientes"]}
+    archivados = []
+    try:
+        with open(ARCHIVO_CERRADOS, encoding="utf-8") as f:
+            archivados = [json.loads(l) for l in f if l.strip()]
+    except (OSError, json.JSONDecodeError):
+        pass
+    cambios = [(x, re.compile(x["patron"], re.I)) for x in conf.get("cambios_perfil", [])]
+    limite = (hoy - timedelta(days=int(conf.get("dias_revision", 180)))).isoformat()
+    n = 0
+    for x in c.get("cerrados", []) + archivados:
+        uid, cerrado, ver = x.get("uid"), str(x.get("cerrado") or "")[:10], x.get("veredicto") or ""
+        if not uid or uid in pend or not cerrado:
+            continue
+        motivo = None
+        for cp, rx in cambios:
+            if cerrado < cp["desde"] and rx.search(ver):
+                motivo = (cp["clave"], cp["motivo"])
+                break
+        if not motivo and x.get("tipo") in conf.get("tipos_por_tiempo", []) and cerrado < limite:
+            motivo = ("tiempo", "Descartado hace más de %s días: se mira otra vez." % conf.get("dias_revision"))
+        if not motivo or "%s|%s" % (uid, motivo[0]) in hechos:
+            continue
+        nuevo = {k: v for k, v in x.items() if k not in ("veredicto", "cerrado", "veredicto_truncado")}
+        nuevo.update(encolado=hoy.isoformat(), revision=motivo[1],
+                     veredicto_anterior=ver[:600], cerrado_antes=cerrado)
+        c["pendientes"].append(nuevo)
+        pend.add(uid)
+        hechos.add("%s|%s" % (uid, motivo[0]))
+        n += 1
+    if n:
+        guarda_cola(c)
+        os.makedirs(DIR_ESTADO, exist_ok=True)
+        with open(REVISADOS, "w", encoding="utf-8") as f:
+            json.dump(sorted(hechos), f, ensure_ascii=False, indent=0)
+    return n
+
+
 def encola(res):
     """Mete en la cola los leads de diana ALTA que aun no estan ni pendientes ni cerrados.
     Las patentes NO entran (el indice no da fecha fiable; son contexto, no lead que verificar)."""
@@ -1862,6 +1924,9 @@ def cmd_run(a):
     guarda_visto(carga_visto() | nuevos)
     guarda_ultimo(res)
     n_cola, total_cola, fuera = encola(res)
+    n_rev = revisar_descartes()
+    if n_rev:
+        print(f"revisión de descartes: {n_rev} reabiertos (cambio de perfil o >180 días)")
     desperto, por_que = despierta_comite(lee_cola())
     print("comité médico: %s (%s)" % ("job encolado" if desperto else "no se despierta", por_que))
     print(f"digest → {ruta}")
