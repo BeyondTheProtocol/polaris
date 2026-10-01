@@ -194,6 +194,9 @@ def _serve_json():
     return None
 
 
+_viva_sin_mirar = False
+
+
 def parte_viva(exc):
     if sys.platform != "darwin":
         print("  (parte viva saltada: no es macOS)")
@@ -207,9 +210,15 @@ def parte_viva(exc):
     esc = parse_netstat(texto)
     # macOS 27 (26-sep-2026): un proceso que cuelga de un Python sin firmar de Apple (Homebrew)
     # recibe la tabla de sockets VACÍA, sin error. Eso no es «nada escucha»: es no poder mirar.
-    # Se queda en rojo, con el porqué; test_all.sh usa /usr/bin/python3 y sí la ve.
-    check("netstat devuelve algún LISTEN (vacío = este intérprete no puede leer los sockets; "
-          "córrelo con /usr/bin/python3, no con %s)" % sys.executable, len(esc) > 0)
+    # 1-oct-26: tampoco desde una sesión de agente aislada, con ningún intérprete. En este Mac
+    # siempre escucha algo, así que vacío = sin verificar. NO es verde: el test sale SALTADO (77)
+    # con el porqué, y la lógica de arriba sí se ha comprobado.
+    if not esc:
+        global _viva_sin_mirar
+        _viva_sin_mirar = True
+        print("  ⏭️  parte viva SIN VERIFICAR: netstat vacío desde %s (sesión aislada o Python sin "
+              "firmar). Córrelo desde tu terminal o deja que lo haga el lazo." % sys.executable)
+        return
     inf, usadas = evaluar(esc, exc, _argv)
     for proceso, pid, host, puerto, alc in inf:
         check("escucha fuera de loopback SIN excepción: %s:%d en %s:%d (%s)"
@@ -234,6 +243,8 @@ def main():
     parte_fija(exc)
     parte_viva(exc)
     print("%s puertos_loopback: %d ok, %d fallos" % ("✅" if _fail == 0 else "❌", _pass, _fail))
+    if not _fail and _viva_sin_mirar:
+        sys.exit(77)            # la lógica en verde, pero los puertos reales sin mirar: SALTADO
     sys.exit(1 if _fail else 0)
 
 

@@ -105,6 +105,10 @@ DEFAULT_PRECIOS = {
                           "cache_write_1h": 10.0},
     "claude-opus-4-8":   {"input": 5.0,  "output": 25.0, "cache_read": 0.5,  "cache_write": 6.25,
                           "cache_write_1h": 10.0},
+    # 1-oct-2026: Sonnet 5.5 (el CLI ya lo usa: 8.401 apariciones en los transcripts). Cifras
+    # LEÍDAS hoy en platform.claude.com/docs/en/about-claude/pricing (no inferidas): las cinco.
+    "claude-sonnet-5-5": {"input": 2.0,  "output": 10.0, "cache_read": 0.2,  "cache_write": 2.5,
+                          "cache_write_1h": 4.0},
     "claude-sonnet-5":   {"input": 2.0,  "output": 10.0, "cache_read": 0.2,  "cache_write": 2.5,
                           "cache_write_1h": 4.0},
     "claude-sonnet-4-6": {"input": 3.0,  "output": 15.0, "cache_read": 0.3,  "cache_write": 3.75,

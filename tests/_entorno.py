@@ -91,7 +91,38 @@ def es_espejo():
     return os.path.exists(os.path.join(codigo, ".espejo-publico"))
 
 
+def _llavero_escribible():
+    """¿Este proceso puede escribir y leer el Llavero? Desde una sesión de agente aislada no
+    (rc 36 «no visible desde aquí», que no es «roto»: los daemons sí lo leen)."""
+    import subprocess
+    srv = "btp-test-llavero-%d" % os.getpid()
+    try:
+        r = subprocess.run(["security", "add-generic-password", "-U", "-a", "test", "-s", srv,
+                            "-w", "x"], capture_output=True, timeout=10)
+        subprocess.run(["security", "delete-generic-password", "-s", srv], capture_output=True, timeout=10)
+        return r.returncode == 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _sockets_visibles():
+    """¿netstat enseña la tabla de sockets? En este Mac siempre escucha algo (ollama, el
+    Observatorio), así que una tabla vacía es «no puedo mirar» (Python sin firmar, sesión aislada),
+    nunca «nada escucha»."""
+    import subprocess
+    try:
+        out = subprocess.run(["netstat", "-anv", "-p", "tcp"], capture_output=True, text=True,
+                             timeout=20).stdout
+    except Exception:  # noqa: BLE001
+        return False
+    return "LISTEN" in out
+
+
 REQUISITOS = {
+    "llavero": (_llavero_escribible, "poder escribir en el Llavero (desde una sesión de agente aislada "
+                                     "no se puede: rc 36; en launchd y en tu terminal, sí)"),
+    "sockets": (_sockets_visibles, "ver la tabla de sockets (netstat vacío = este proceso no puede "
+                                   "mirar: Python sin firmar o sesión aislada)"),
     "sin-halt": (_sin_halt, "el lazo en marcha: hay un HALT activo y el sistema está en pausa total"),
     "contenido": (_hay_contenido, "la fuente de verdad (`00_FUENTE-DE-VERDAD/`), que no se publica"),
     "estado": (_hay_estado, "el estado vivo del lazo (`tools/state/`), que no se publica"),

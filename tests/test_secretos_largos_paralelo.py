@@ -23,6 +23,9 @@ for p in procs:
     if p.returncode:
         print(out[-800:])
 
+if rcs and all(rc == 77 for rc in rcs):      # el hijo saltó: aquí no hay Llavero escribible
+    print("⏭️  SKIP: los tres hijos saltaron (sin Llavero escribible en este entorno)")
+    sys.exit(77)
 ok = all(rc == 0 for rc in rcs)
 print("  %s tres test_secretos_largos a la vez: rc=%s" % ("✅" if ok else "❌", rcs))
 print("\nVEREDICTO: %s" % ("TODO CORRECTO" if ok else "FALLOS"))

@@ -36,6 +36,10 @@ def limpia():
         pass
 
 
+if sys.platform == "darwin":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from _entorno import exige
+    exige("llavero")
 if sys.platform != "darwin":
     print("SKIP: el Llavero es de macOS")
     sys.exit(77)
