@@ -156,6 +156,8 @@ git config core.hooksPath tools/githooks
 bash tests/test_all.sh          # en Linux o CI: BTP_PORTABLE=1 bash tests/test_all.sh
 ```
 
+Guía para forks: [ejecutar los tests e interpretar los SKIP](docs/tests.md).
+
 > ⚠️ **Nada arranca solo.** Los `launchd` de `tools/launchd/` se instalan a mano, y
 > `~/.btp.HALT` o un `.HALT` en la raíz frenan el lazo entero.
 
