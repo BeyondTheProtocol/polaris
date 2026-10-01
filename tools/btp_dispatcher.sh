@@ -135,9 +135,12 @@ while true; do
   # turnos a la vez sobre ella.
   procedencia="$(printf '%s' "$JOB" | jq -r '.procedencia // empty')"
   vega=""
-  if [ "$tipo" = "exec" ] && [ "$procedencia" = "telegram:triado" ] && [ -z "$agente" ] \
-     && [ -z "${BTP_VEGA_OFF:-}" ]; then
-    vega=1; agente="asistente"; [ -z "$modelo" ] && modelo="opus"
+  # Puerta única (1-oct-26, 2.ª vuelta): también cuando el enrutador sugiere un comité NO clínico
+  # (técnico, marca…). Su sugerencia ya va en la intención («Quién responde»), así que Vega la
+  # recibe y decide. Lo CLÍNICO (criticidad=critico) sigue yendo a su comité: fiabilidad > memoria.
+  if [ "$tipo" = "exec" ] && [ "$procedencia" = "telegram:triado" ] && [ "$criticidad" != "critico" ] \
+     && [ -z "${BTP_VEGA_OFF:-}" ] && [ ! -e "$STATE/vega/OFF" ]; then
+    vega=1; agente="asistente"; modelo="opus"
   fi
   heartbeat "$id"
 

@@ -130,13 +130,16 @@ EOF
 chmod +x "$MOCK"
 q enqueue --procedencia telegram:triado "hola vega" >/dev/null
 run_once
-q enqueue --procedencia telegram:triado --agente comite-medico "pregunta clinica" >/dev/null
+q enqueue --procedencia telegram:triado --agente comite-medico --criticidad critico "pregunta clinica" >/dev/null
+run_once
+q enqueue --procedencia telegram:triado --agente tecnico "arregla el bot" >/dev/null
 run_once
 q enqueue --procedencia t "otra cosa" >/dev/null
 run_once
 [ "$(sed -n 1p "$TMP/env")" = "asistente|opus|1" ] && ok || no "vega: telegram sin comité → asistente|opus|1 (vi «$(sed -n 1p "$TMP/env")»)"
-[ "$(sed -n 2p "$TMP/env")" = "comite-medico||" ] && ok || no "vega: con comité no entra Vega (vi «$(sed -n 2p "$TMP/env")»)"
-[ "$(sed -n 3p "$TMP/env")" = "||" ] && ok || no "vega: otra procedencia no entra Vega (vi «$(sed -n 3p "$TMP/env")»)"
+[ "$(sed -n 2p "$TMP/env")" = "comite-medico||" ] && ok || no "vega: comité clínico no entra Vega (vi «$(sed -n 2p "$TMP/env")»)"
+[ "$(sed -n 3p "$TMP/env")" = "asistente|opus|1" ] && ok || no "vega: comité NO clínico → también Vega (vi «$(sed -n 3p "$TMP/env")»)"
+[ "$(sed -n 4p "$TMP/env")" = "||" ] && ok || no "vega: otra procedencia no entra Vega (vi «$(sed -n 4p "$TMP/env")»)"
 rm -rf "$TMP"
 
 # 8. APLAZADO (rc 75): Claude no disponible → requeue (vuelve a pending), NO done, NO gasta intento.
