@@ -1,0 +1,11 @@
+{
+ "pieza": "vega_vision.py",
+ "estado_ficha": "completa",
+ "para": "La visión de Vega en N1: informes del caso llegados en 14 días (tipo, fecha, descripción de-identificada), lo prometido con plazo y lo vencido (sin PII), lo que no cuadra entre informes y los atascos del sistema. Se calcula fuera del agente, determinista, para que Vega lo vea todo sin abrirle la zona clínica cruda.",
+ "cuando_si": "Automático: vega_sesion.contexto() la añade al abrir sesión y cuando cambia. A mano: python3 tools/vega_vision.py.",
+ "cuando_no": "No da informes crudos, centros ni nombres. No sustituye al comité médico para el detalle clínico.",
+ "reemplaza": "Nada. Cierra el hueco de que Vega no veía el estado del caso (zona clínica vetada por el muro).",
+ "test": "tests/test_vega_sesion.py",
+ "alta": "2026-10-01",
+ "origen": "Petición de {{TITULAR}} del 1-oct: el concepto de {{CONTACTO}} (una cabeza que lo ve todo) sin una única sesión."
+}
