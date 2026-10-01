@@ -2370,6 +2370,21 @@ def _ci_rojos_de_run(run_id, run, gh):
     return out
 
 
+def _check_telegram(salida_mod):
+    """(ok, alertas) del canal de Telegram, probado en SECO.
+
+    1-oct-2026: `telegram_no_disponible` llevaba 1.250 detecciones en 55 días y su motivo era
+    «HALT activo: salida en pausa total». Con un HALT el canal está cerrado A PROPÓSITO y el código
+    rojo ya avisa por su vía (que atraviesa el HALT): contarlo como avería es fatiga de alarma, la
+    misma clase que test_healthcheck_halt_inactividad ya cerró para «daemon inactivo»."""
+    seco = salida_mod.report_to_titular("healthcheck", dry=True)
+    ok = not seco.get("blocked", True)
+    if ok or salida_mod.halted():
+        return ok, []
+    return ok, [("telegram_no_disponible",
+                 "El canal de Telegram no está disponible: %s" % seco.get("reason"))]
+
+
 def _check_ci_publico(run=subprocess.run, state_dir=None, gh=None):
     """¿Está en verde el CI del repo público? (22-sep-2026)
 
@@ -3936,11 +3951,8 @@ def run():
         chk["ci_publico_error"] = "%r" % e         # log técnico, nunca para {{TITULAR}}
 
     # 4. Telegram configurado (en SECO, sin enviar nada)
-    seco = salida.report_to_titular("healthcheck", dry=True)
-    chk["telegram_ok"] = not seco.get("blocked", True)
-    if seco.get("blocked"):
-        alertas.append(("telegram_no_disponible",
-                        "El canal de Telegram no está disponible: %s" % seco.get("reason")))
+    chk["telegram_ok"], tg_alertas = _check_telegram(salida)
+    alertas.extend(tg_alertas)
 
     # 4b. FRESCURA DE FUENTES (dead-man de contenido): HOY.md por su fecha DECLARADA (no
     #     mtime) + heartbeats de los agentes diarios. Reutiliza el vigía seguimiento.py.

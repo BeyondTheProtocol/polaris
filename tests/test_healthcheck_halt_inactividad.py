@@ -172,8 +172,27 @@ def main():
         salida.halted = orig
 
     print("test_healthcheck_halt_inactividad: %d OK, %d fallos" % (_pass, _fail))
+    # Telegram con HALT: pausa deliberada, no avería (1-oct-26: 1.250 detecciones en 55 días)
+    ok(hc._check_telegram(_SalidaFalsa(True, True)) == (False, []), "telegram con HALT: sin alerta")
+    _ok_tg, _al = hc._check_telegram(_SalidaFalsa(False, True))
+    ok(not _ok_tg and _al and _al[0][0] == "telegram_no_disponible", "telegram caído SIN HALT: alerta")
+    ok(hc._check_telegram(_SalidaFalsa(False, False)) == (True, []), "telegram bien: sin alerta")
     return 1 if _fail else 0
 
+
+
+class _SalidaFalsa:
+    """`salida` mínima para probar _check_telegram sin tocar el canal real."""
+
+    def __init__(self, halt, blocked):
+        self._h, self._b = halt, blocked
+
+    def halted(self):
+        return self._h
+
+    def report_to_titular(self, *a, **k):
+        return {"blocked": self._b,
+                "reason": "HALT activo: salida en pausa total" if self._h else "sin chat_id"}
 
 if __name__ == "__main__":
     sys.exit(main())
