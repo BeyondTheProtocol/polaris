@@ -298,6 +298,7 @@ runpy test_xurl.py
 runpy test_x_mcp_puente.py   # el MCP de X relanza su puente en vez de quedarse ciego (14-sep-26)
 runpy test_x_daemons.py
 runpy test_x_guardados_enriquecido.py
+runpy test_x_guardados_analisis.py   # 1-oct · los guardados de X se analizan cada 3 días (cola → parte a Vega)
 runpy test_ramas_detached.py
 runpy test_poda_no_se_lleva_ignorados.py
 runpy test_git_mutex_poda.py
