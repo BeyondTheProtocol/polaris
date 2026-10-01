@@ -142,6 +142,26 @@ run_once
 [ "$(sed -n 4p "$TMP/env")" = "||" ] && ok || no "vega: otra procedencia no entra Vega (vi «$(sed -n 4p "$TMP/env")»)"
 rm -rf "$TMP"
 
+# 7c. VÍA REAL DEL GASTO (1-oct-26): lo que corre por Max se apunta como «suscripcion», no como
+#     dinero de la API (antes todo era «api» y el tope de dinero se llenaba con trabajo de 0 €).
+fresh
+cat >"$MOCK" <<EOF
+#!/bin/bash
+printf 'suscripcion' > "\$BTP_VIA_FILE"
+echo '{"total_cost_usd": 1.50, "is_error": false}'
+EOF
+chmod +x "$MOCK"
+q enqueue --procedencia t "por max" >/dev/null
+run_once
+via="$(BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cost_guard.py" today | "$PY" -c 'import json,sys;e=json.load(sys.stdin)["eventos"];print(e[-1].get("via") if e else "")')"
+[ "$via" = "suscripcion" ] && ok || no "vía: un job por Max se apunta como suscripcion (vi «$via»)"
+mkmock 0 0.20 false
+q enqueue --procedencia t "sin via" >/dev/null
+run_once
+via="$(BTP_STATE_DIR="$ST" "$PY" "$ROOT/tools/cost_guard.py" today | "$PY" -c 'import json,sys;e=json.load(sys.stdin)["eventos"];print(e[-1].get("via") if e else "")')"
+[ "$via" = "api" ] && ok || no "vía: sin dato, ante la duda «api» (vi «$via»)"
+rm -rf "$TMP"
+
 # 8. APLAZADO (rc 75): Claude no disponible → requeue (vuelve a pending), NO done, NO gasta intento.
 fresh; mkmock 75 0 false
 q enqueue --procedencia t --max-intentos 2 "trabajo agéntico" >/dev/null

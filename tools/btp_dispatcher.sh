@@ -190,13 +190,18 @@ while true; do
   # intento 1 corría bien y el bug parecía intermitente. Estaba detrás de jobs_caidos:rc=127,
   # frescura_agente_fallo:tecnico y frescura_agente_fallo:calendar-sync. `env` recibe las
   # asignaciones como argumentos y las aplica DESPUÉS de expandir, que es lo que hacía falta.
-  OUT="$(env MURO_PROFILE="$perfil" BTP_AGENT="$agente" BTP_MODEL="$modelo" BTP_CRITICIDAD="$criticidad" BTP_COST_GUARDED=1 ${turnos_job:+BTP_MAX_TURNS="$turnos_job"} ${vega:+BTP_VEGA_SESION=1} "$RUN_AGENT" "$prompt" 2>>"$LOG/dispatcher.err")"
+  mkdir -p "$STATE/cost" 2>/dev/null; VIA_FILE="$STATE/cost/via.$id"; rm -f "$VIA_FILE"
+  OUT="$(env BTP_VIA_FILE="$VIA_FILE" MURO_PROFILE="$perfil" BTP_AGENT="$agente" BTP_MODEL="$modelo" BTP_CRITICIDAD="$criticidad" BTP_COST_GUARDED=1 ${turnos_job:+BTP_MAX_TURNS="$turnos_job"} ${vega:+BTP_VEGA_SESION=1} "$RUN_AGENT" "$prompt" 2>>"$LOG/dispatcher.err")"
   rc=$?
   kill "$_hb_pid" 2>/dev/null || true; wait "$_hb_pid" 2>/dev/null || true
   heartbeat ""   # job terminado: el latido deja de nombrarlo (reap_stuck vuelve a poder rescatarlo)
 
   # 6. CONTABILIZAR coste SIEMPRE (aun si falló: los tokens ya se gastaron) → pesimista si no hay JSON
-  usd="$(printf '%s' "$OUT" | "$PY" "$TOOLS/cost_guard.py" add --stdin --job "$id" ${topejob:+--tope-job "$topejob"} 2>>"$LOG/dispatcher.err")" || usd="?"
+  # La vía la dice run_agent (Max o reserva API). Si no la dejó (run viejo, fallo temprano), la
+  # del orquestador del plist; y si tampoco, «api»: ante la duda se cuenta como dinero.
+  via="$(cat "$VIA_FILE" 2>/dev/null)"; rm -f "$VIA_FILE"
+  [ -z "$via" ] && [ "${BTP_ORQUESTADOR:-}" = "claude-suscripcion" ] && via="suscripcion"
+  usd="$(printf '%s' "$OUT" | "$PY" "$TOOLS/cost_guard.py" add --stdin --job "$id" --via "${via:-api}" ${topejob:+--tope-job "$topejob"} 2>>"$LOG/dispatcher.err")" || usd="?"
   spent="$("$PY" "$TOOLS/cost_guard.py" today 2>/dev/null | jq -r '.gastado_usd // "?"')"
 
   # 7a. APLAZADO (rc 75 = EX_TEMPFAIL): Claude no disponible (sin saldo / límite). NO marcar done,

@@ -725,6 +725,13 @@ if [ "${BTP_VEGA_SESION:-}" = 1 ]; then
   printf '%s' "$OUT" | "$PY" "$REPO/tools/vega_sesion.py" despues "$PROMPT" >/dev/null 2>&1 || true
 fi
 
+# Vía REAL por la que corrió (1-oct-26): con BTP_COST_GUARDED el coste lo apunta el dispatcher, que
+# no sabe si fue Max o la reserva API. Sin esto apuntaba todo como «api»: trabajo de la cuota Max
+# (0 € marginal) llenaba el tope de DINERO y el lazo se aplazaba por un gasto que no existía.
+if [ -n "$GUARDED" ] && [ -n "${BTP_VIA_FILE:-}" ]; then
+  printf '%s' "$VIA" > "$BTP_VIA_FILE" 2>/dev/null || true
+fi
+
 # Coste: registra lo que Claude consumió (sobre OUT; en error ≈ 0). ANTES de decidir la salida —
 # OJO: aún NO imprimimos OUT, para no mezclar un JSON de error con el del respaldo de la centralita.
 if [ -z "$GUARDED" ]; then
