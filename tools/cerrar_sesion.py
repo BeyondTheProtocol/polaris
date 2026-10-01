@@ -221,6 +221,29 @@ def plan():
     }
 
 
+def _registrar_en_vega(rama, base, rojas_base):
+    """Cada fusión de sesión queda en el registro de aprobaciones de Vega (1-oct-26, {{TITULAR}}: «quiero
+    que Vega sea la orquestadora de todo»). Hasta hoy las sesiones fusionaban a casa base y Vega no
+    se enteraba. `codigo_fusion` es nivel A en la política (Vega aprueba sola la fontanería), así que
+    el registro lleva la prueba (merge + baterías) y cómo deshacerlo; Vega lo ve en su resumen y
+    `verificacion` lo muestrea cada semana. Fail-soft: un fallo del registro no deshace la fusión,
+    pero se dice en el resumen del cierre."""
+    try:
+        sha = _git(["rev-parse", "HEAD"], BASE)[1].strip()
+        asuntos = _git(["log", "--format=%s", "--no-merges", "%s^1..%s^2" % (sha, sha)], BASE)[1]
+        que = "; ".join(l for l in asuntos.splitlines() if l.strip())[:600] or rama
+        prueba = "merge %s en %s · baterías de casa base: %s" % (
+            sha[:9], base, ("ROJAS: " + ", ".join(rojas_base)) if rojas_base else
+            ("en verde" if rojas_base is not None else "sin verificar (BTP_CIERRE_SIN_VERIFICAR)"))
+        import aprobaciones
+        aprobaciones.registrar("codigo_fusion", que, "cierre de sesión de %s" % rama, prueba,
+                               "git -C %s revert -m 1 %s" % (BASE, sha[:9]),
+                               quien="sesion:%s" % rama)
+        return "vega: fusión apuntada en su registro de aprobaciones (%s)" % sha[:9]
+    except Exception as e:  # noqa: BLE001
+        return "vega: ‼️ NO se pudo apuntar la fusión en su registro (%s: %s)" % (type(e).__name__, e)
+
+
 def cerrar(apply=False, scope=None, podar=True):
     """Ejecuta (o simula) el cierre. Devuelve el dict de resultado."""
     p = plan()
@@ -351,6 +374,8 @@ def cerrar(apply=False, scope=None, podar=True):
         rojas_base, corridas = _verificar_en_casa_base()
         acciones.append("casa base: %d batería(s) que en el worktree se saltan, corridas allí → %s"
                         % (corridas, ("ROJAS: " + ", ".join(rojas_base)) if rojas_base else "en verde"))
+    if apply and fusionado:
+        acciones.append(_registrar_en_vega(rama, base, rojas_base))
 
     # (b+d) DOCS + RAG — la fuente de verdad está GITIGNORED, así que los docs NUEVOS no viajan por la
     # fusión: se COPIAN a mano a casa base y se reindexa el RAG desde allí. Solo .md, nunca privados.

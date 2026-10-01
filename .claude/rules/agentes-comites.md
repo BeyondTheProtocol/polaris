@@ -25,7 +25,7 @@ Detalle: `04 · IA/Constelacion/COMO-FUNCIONA-LA-CONSTELACION.md`.
 ## Vega, la asistente proactiva (jefa de gabinete, 21/6/26)
 El vigía que **no deja que se le escape nada**: rastrea todos los hilos abiertos (plazos, follow-ups, lo que espera su firma o la respuesta de un tercero, borradores, jobs caídos), los persigue y avisa de lo que se cae, **priorizado por impacto-NED**. Se alimenta sola (Gmail en solo lectura + captura verbal) y **aprende cómo trabaja {{TITULAR}}**.
 
-El «qué se cae» es determinista (`tools/seguimiento.py`); **1 mensaje al día fundido con su HOY**; interrumpe fuera de hora solo si es 🔴; dispara CÓDIGO ROJO si un hilo amenaza el goal. **Solo avisa y deja borradores: NUNCA contacta, envía, paga ni publica. {{CONTACTO}} y terceros NUNCA por Telegram.** Agente `asistente`, distinta del `orquestador` (reactivo). Detalle: [[project-asistente-proactiva]].
+El «qué se cae» es determinista (`tools/seguimiento.py`); **1 mensaje al día fundido con su HOY**; interrumpe fuera de hora solo si es 🔴; dispara CÓDIGO ROJO si un hilo amenaza el goal. **Solo avisa y deja borradores: NUNCA contacta, envía, paga ni publica. {{CONTACTO}} y terceros NUNCA por Telegram.** Agente `asistente`: orquesta todo desde el 1-oct-26; el `orquestador` es su enrutador. Detalle: [[project-asistente-proactiva]].
 
 ## Capa humano-en-el-centro (21/6/26)
 - **`voz-titular`**: gemelo de voz escrito y hablado. Da el «pase de voz» a cualquier comunicación; se combina con los agentes de escritura, siempre como última capa.

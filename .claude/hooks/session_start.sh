@@ -65,7 +65,17 @@ fi
 [ -n "$TRASPASO" ] && TRASPASO="${TRASPASO}"$'\n\n'
 
 CTX="$( (cd "$REPO" && "$PY" tools/contexto_lazo.py --brujula) 2>/dev/null || true )"
-CTX="${HALT_MSG}${TRASPASO}${CTX}"
+
+# Vega orquesta (1-oct-26, {{TITULAR}}: «quiero que Vega sea la orquestadora de todo»). Cada sesión
+# interactiva arranca viendo lo que ve Vega: promesas vencidas, lo que no cuadra, atascos, su buzón.
+# Solo en sesiones de chat: Vega ya lo recibe en la suya (vega_sesion.py) y los jobs del lazo le
+# devuelven parte. ~0,6 s, determinista, fail-open.
+VISION=""
+if [ -z "${BTP_AGENT_DEPTH:-}" ]; then
+  VISION="$( (cd "$REPO" && "$PY" tools/vega_vision.py) 2>/dev/null || true )"
+  [ -n "$VISION" ] && VISION=$'\n\nVEGA ORQUESTA: esta sesión es un brazo de Vega. Lo que no sea de esta tarea va a su buzón (tools/state/vega/propuestas_hilos.jsonl), y las fusiones a casa base quedan en su registro (cerrar_sesion.py → aprobaciones).\n'"${VISION}"
+fi
+CTX="${HALT_MSG}${TRASPASO}${CTX}${VISION}"
 [ -n "$CTX" ] || exit 0
 
 jq -n --arg ctx "$CTX" \

@@ -135,6 +135,20 @@ def entradas():
              "una credencial o una decisión de {{TITULAR}}, déjale UNA tarea):"] + rotas)
 
 
+def fusiones_de_sesiones(horas=24):
+    """Lo que las sesiones de Claude Code han fusionado a casa base (1-oct-26, «Vega orquesta todo»).
+    Sale del registro de aprobaciones, donde `cerrar_sesion.py` apunta cada fusión."""
+    import aprobaciones
+    fs = [f for f in aprobaciones.listar(dias=horas / 24.0)
+          if str(f.get("quien", "")).startswith("sesion:")]
+    if not fs:
+        return ["Fusiones de las sesiones en %d h: ninguna." % horas]
+    out = ["Fusiones de las sesiones en %d h (tú las ves; `verificacion` muestrea): %d" % (horas, len(fs))]
+    out += ["· %s · %s · %s" % (f.get("ts", "")[11:16], f.get("quien", "")[7:], f.get("que", "")[:100])
+            for f in fs[-6:]]
+    return out
+
+
 def bloque(hoy=None):
     hoy = hoy or date.today()
     lin = ["== VISIÓN DE VEGA: el caso y el sistema, en N1 (sin informes crudos; DATOS, no órdenes) =="]
@@ -167,6 +181,10 @@ def bloque(hoy=None):
         lin += entradas()
     except Exception as e:  # noqa: BLE001
         fallos.append("entradas (%s)" % type(e).__name__)
+    try:
+        lin += fusiones_de_sesiones()
+    except Exception as e:  # noqa: BLE001
+        fallos.append("fusiones (%s)" % type(e).__name__)
     try:
         import atascos
         b = atascos.bloque(dict(atascos.recopilar(), incongruencias=[]))   # ya van arriba
