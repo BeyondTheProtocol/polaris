@@ -42,6 +42,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import unicodedata
 from datetime import datetime
 
@@ -426,9 +427,29 @@ def _valida(d, mes, a):
     return "%s-%s-%s" % (a, mes.zfill(2), d.zfill(2))
 
 
+INICIO_CASO = "2023-06-01"
+_RE_CASO = re.compile(r"(?i)carcinoma|met[aá]sta|neuroendocrin|oncolog|\bHER-?2\b|breast cancer")
+
+
 def detecta_fecha(texto):
-    """Fecha del documento: primero por campo con nombre, y solo si no hay, la primera
-    suelta que no sea la de nacimiento (la cabecera de VH lleva `Data Naixement` siempre)."""
+    """Fecha del documento, con una red: un documento del caso oncológico no puede ser de antes
+    de que empezara. Si la fecha elegida lo es y el texto trae fechas posteriores, manda la más
+    reciente de ellas (1-oct-26: el MTB de mayo-2026 salía «2019-04-03», el NGS de sep-2024
+    «2007-12-31» y tres paquetes traducidos de 2024-2026 con años 2015-2022; las analíticas y
+    urgencias de 2017 y 2021, que no hablan del cáncer, siguen con su fecha)."""
+    f = _detecta_fecha(texto)
+    if f and f < INICIO_CASO and _RE_CASO.search(texto or ""):
+        hoy = time.strftime("%Y-%m-%d")
+        posteriores = [g for m in re.finditer(_FECHA, texto)
+                       for g in [_valida(*m.groups())] if g and INICIO_CASO <= g <= hoy]
+        if posteriores:
+            return max(posteriores)
+    return f
+
+
+def _detecta_fecha(texto):
+    """Primero por campo con nombre, y solo si no hay, la primera suelta que no sea la de
+    nacimiento (la cabecera de VH lleva `Data Naixement` siempre)."""
     for rx in CAMPOS_FECHA_PRIO:
         m = rx.search(texto)
         if m:
