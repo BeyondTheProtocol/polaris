@@ -327,15 +327,29 @@ def enqueue(intencion, *, prioridad="normal", agente=None, modelo=None,
     return job["id"]
 
 
+def _orden(pend):
+    """Orden de salida: lo que escribe {{TITULAR}} por Telegram primero, y dentro de cada grupo el de
+    siempre (prioridad del nombre, luego antigüedad). 1-oct-26: un mensaje suyo a Vega esperó 14
+    min en cola detrás de un encargo del healthcheck con la misma prioridad. Sin campo nuevo: lee
+    `procedencia`, que ya existe; si un fichero no se lee, va a su sitio de siempre y dequeue lo
+    aparta a failed/ como hasta ahora."""
+    nombres = sorted(f for f in os.listdir(pend) if f.endswith(".json"))
+
+    def suyo(f):
+        try:
+            return str(_load(os.path.join(pend, f)).get("procedencia", "")).startswith("telegram")
+        except Exception:
+            return False
+    return sorted(nombres, key=lambda f: 0 if suyo(f) else 1)   # sorted es estable
+
+
 def dequeue():
     """Toma el job de mayor prioridad NO caducado, lo mueve pending→processing de forma
     atómica, y lo devuelve (con la clave interna '_path'). None si no hay ninguno.
     Los caducados o con schema inválido se apartan a failed/ por el camino."""
     _ensure_dirs()
     pend = os.path.join(QUEUE, "pending")
-    for f in sorted(os.listdir(pend)):
-        if not f.endswith(".json"):
-            continue
+    for f in _orden(pend):
         src = os.path.join(pend, f)
         try:
             job = _load(src)

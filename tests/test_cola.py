@@ -51,6 +51,16 @@ def main():
     check("prioridad+FIFO", orden == ["alta-1", "alta-2", "normal-1", "baja-1"])
     check("cola vacia → dequeue None", q.dequeue() is None)
 
+    # 1b. lo que escribe {{TITULAR}} por Telegram sale antes que el trabajo de fondo (1-oct-26: un
+    #     mensaje a Vega esperó 14 min detrás de un encargo del healthcheck con la misma prioridad).
+    q.enqueue("fondo-alta", prioridad="alta", procedencia="healthcheck:x")
+    time.sleep(0.01)
+    q.enqueue("suyo-normal", prioridad="normal", procedencia="telegram:triado")
+    time.sleep(0.01)
+    q.enqueue("fondo-normal", prioridad="normal", procedencia="t")
+    orden = [q.dequeue()["intencion"] for _ in range(3)]
+    check("Telegram primero, el resto en su orden", orden == ["suyo-normal", "fondo-alta", "fondo-normal"])
+
     # 2. caducidad: un job expirado no se ejecuta, va a failed/.
     ayer = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
     q.enqueue("caduco", procedencia="t", expira=ayer)
