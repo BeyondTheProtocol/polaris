@@ -284,6 +284,13 @@ if [ -n "$CRITICO" ]; then TURNOS_DEF=60; else TURNOS_DEF=25; fi
 ARGS=(-p "$PROMPT" --settings "$SETTINGS" --permission-mode acceptEdits --output-format json
       --max-turns "${BTP_MAX_TURNS:-$TURNOS_DEF}")
 if [ -n "${BTP_AGENT:-}" ]; then ARGS+=(--agent "$BTP_AGENT"); fi
+# VEGA AL MANDO (1-oct-26, Fase 3): el dispatcher marca BTP_VEGA_SESION=1 en los mensajes de
+# Telegram que contesta Vega → se reanuda su sesión (si está vigente; si toca rotar, sesión nueva).
+VEGA_SID=""
+if [ "${BTP_VEGA_SESION:-}" = 1 ]; then
+  VEGA_SID="$("$PY" "$REPO/tools/vega_sesion.py" id 2>/dev/null || true)"
+  if [ -n "$VEGA_SID" ]; then ARGS+=(--resume "$VEGA_SID"); fi
+fi
 
 # --- Coste + prueba de vida (asistente, Fase 0) --------------------------------
 # ($PY ya se definió arriba, antes del gate.)
@@ -712,6 +719,11 @@ print(1 if (d.get("total_cost_usd") or 0) > 0 or (u.get("output_tokens") or 0) >
   fi
   break                                            # éxito / fallo no degradable / último modelo
 done
+
+# Vega: guarda el id de su sesión, cuenta el turno y lo apunta en continuity (fail-soft).
+if [ "${BTP_VEGA_SESION:-}" = 1 ]; then
+  printf '%s' "$OUT" | "$PY" "$REPO/tools/vega_sesion.py" despues "$PROMPT" >/dev/null 2>&1 || true
+fi
 
 # Coste: registra lo que Claude consumió (sobre OUT; en error ≈ 0). ANTES de decidir la salida —
 # OJO: aún NO imprimimos OUT, para no mezclar un JSON de error con el del respaldo de la centralita.

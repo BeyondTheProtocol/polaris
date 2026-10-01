@@ -119,6 +119,26 @@ run_once
 grep -q "CONTEXTO DEL LAZO" "$TMP/captured" && no "triage: NO debe recibir el contexto del lazo (cuarentena)" || ok
 rm -rf "$TMP"
 
+# 7b. VEGA AL MANDO (1-oct-26): lo de Telegram sin comité lo contesta Vega (asistente, opus) en
+#     su sesión (BTP_VEGA_SESION=1); con comité, o de otra procedencia, todo sigue como antes.
+fresh
+cat >"$MOCK" <<EOF
+#!/bin/bash
+printf '%s|%s|%s\n' "\$BTP_AGENT" "\$BTP_MODEL" "\${BTP_VEGA_SESION:-}" >>"$TMP/env"
+echo '{"total_cost_usd": 0.01, "is_error": false}'
+EOF
+chmod +x "$MOCK"
+q enqueue --procedencia telegram:triado "hola vega" >/dev/null
+run_once
+q enqueue --procedencia telegram:triado --agente comite-medico "pregunta clinica" >/dev/null
+run_once
+q enqueue --procedencia t "otra cosa" >/dev/null
+run_once
+[ "$(sed -n 1p "$TMP/env")" = "asistente|opus|1" ] && ok || no "vega: telegram sin comité → asistente|opus|1 (vi «$(sed -n 1p "$TMP/env")»)"
+[ "$(sed -n 2p "$TMP/env")" = "comite-medico||" ] && ok || no "vega: con comité no entra Vega (vi «$(sed -n 2p "$TMP/env")»)"
+[ "$(sed -n 3p "$TMP/env")" = "||" ] && ok || no "vega: otra procedencia no entra Vega (vi «$(sed -n 3p "$TMP/env")»)"
+rm -rf "$TMP"
+
 # 8. APLAZADO (rc 75): Claude no disponible → requeue (vuelve a pending), NO done, NO gasta intento.
 fresh; mkmock 75 0 false
 q enqueue --procedencia t --max-intentos 2 "trabajo agéntico" >/dev/null

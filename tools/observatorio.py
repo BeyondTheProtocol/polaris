@@ -498,6 +498,20 @@ def estado_sesiones():
     }
 
 
+def estado_vega():
+    """Lo que aprueba Vega y cómo va su sesión (plan «Vega al mando» F3-F4, 1-oct-26). Solo lectura."""
+    import aprobaciones
+    import vega_sesion
+    r = aprobaciones.resumen(7)
+    ult = aprobaciones.listar(7)[-5:]
+    s = vega_sesion.cargar()
+    return {"semana": r["total"], "por_nivel": r["por_nivel"], "buzon": r["propuestas_sin_resolver"],
+            "ultimas": [{"ts": f["ts"][:16], "nivel": f["nivel"], "que": f["que"][:80],
+                         "prueba": f["prueba"][:80]} for f in reversed(ult)],
+            "sesion_turnos": s.get("turnos"), "sesion_viva": bool(vega_sesion.vigente(s)),
+            "sesion_ultimo": s.get("ultimo_turno")}
+
+
 def estado_deuda():
     """El número de una ojeada: ¿el sistema CIERRA o acumula? (plan «que quede arreglado», 25-jul-26).
 
@@ -923,6 +937,7 @@ def recopilar_todo():
         "config": _safe(estado_config),
         "sesiones": _safe(estado_sesiones),
         "deuda": _safe(estado_deuda),          # ¿el sistema cierra o acumula? (25-jul-26)
+        "vega": _safe(estado_vega),            # qué aprueba Vega y su sesión (1-oct-26)
         "gasto": _safe(estado_gasto),
         "rutinas": _safe(estado_rutinas),
         "cajas": _safe(estado_cajas),
@@ -1287,6 +1302,20 @@ function hilos(h){
     c.appendChild(ul);
   }
   if(h.avisos && h.avisos.length){ c.appendChild($('div','small err','Avisos: '+h.avisos.join(' · '))); }
+  return c;
+}
+
+function vega(s){
+  const c=card('Vega: aprobaciones y memoria', false);
+  if(s._error){ c.appendChild(errBox(s)); return c; }
+  const ul=$('ul','clean');
+  const li=(k,v)=>{ const x=$('li'); x.appendChild($('span',null,k)); x.appendChild($('span','right small muted', v)); ul.appendChild(x); };
+  const pn=s.por_nivel||{};
+  li('Aprobadas esta semana', (s.semana||0)+' (A '+(pn.A||0)+' · B '+(pn.B||0)+')');
+  li('Buzón sin resolver', String(s.buzon||0));
+  li('Sesión de Telegram', s.sesion_viva? ((s.sesion_turnos||0)+' turnos · último '+(s.sesion_ultimo||'—')) : 'nueva en el próximo mensaje');
+  (s.ultimas||[]).forEach(f=>li(f.ts+' · '+f.nivel, f.que+' — prueba: '+f.prueba));
+  c.appendChild(ul);
   return c;
 }
 
@@ -1783,6 +1812,7 @@ function render(d){
     g.appendChild(gauge(d.config));
     g.appendChild(gasto(d.gasto));
     g.appendChild(salud(d.salud));
+    g.appendChild(vega(d.vega));
     g.appendChild(biomarcadores(d.biomarcadores));
     g.appendChild(ritmo(d.ritmo));
     g.appendChild(erroresCard(d.errores||{}));

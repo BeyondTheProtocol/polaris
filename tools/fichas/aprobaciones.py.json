@@ -1,0 +1,11 @@
+{
+ "pieza": "aprobaciones.py",
+ "estado_ficha": "completa",
+ "para": "Quién aprueba qué (política A/B/C versionada en tools/config/politica_aprobacion.json) y registro append-only de lo que aprueba Vega, con la prueba del efecto y cómo deshacerlo. Rechaza C siempre, B sin OK de {{TITULAR}} y cualquier aprobación sin prueba. Lee y resuelve el buzón propuestas_hilos.jsonl, que nadie leía. Da la muestra semanal para verificacion.",
+ "cuando_si": "Vega, cada vez que aprueba fontanería (registrar) o resuelve su buzón (propuestas/resolver). auto-mejora, una vez por semana (muestra). atascos.py lo consulta para el parte.",
+ "cuando_no": "No ejecuta nada: solo clasifica y apunta. No sustituye a los hooks del muro (salida_guard, clinico_guard, copy_web_guard), que siguen bloqueando lo de nivel C por su cuenta.",
+ "reemplaza": "Nada. Antes no había registro de aprobaciones.",
+ "test": "tests/test_aprobaciones_atascos.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 4: Vega aprueba la fontanería, con registro."
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "atascos.py",
+ "estado_ficha": "completa",
+ "para": "Resumen diario de atascos dentro del parte de la mañana: lo que espera por {{TITULAR}} con sus días, propuestas de cambio de proceso cuando lo no clínico se repite, promesas del caso vencidas, buzón de Vega sin resolver, y atascos del sistema (cola fallida, rutinas en rojo, crédito, deuda escalada). Solo lectura.",
+ "cuando_si": "Automático: enviar_hoy.py lo añade al parte (08:12). A mano: python3 tools/atascos.py [--json].",
+ "cuando_no": "No avisa al momento: lo urgente sigue por su camino. No cuenta los borradores de outbox (ya van en el parte). No arregla nada.",
+ "reemplaza": "Nada. Junta en un bloque detectores que ya existían sueltos (healthcheck, cost_guard, deuda).",
+ "test": "tests/test_aprobaciones_atascos.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 5: un resumen diario de atascos con propuesta de solución."
+}

@@ -19,6 +19,8 @@ QUÉ HACE (determinista, sin LLM, sin salir de la máquina)
 3. Regenera `ESTADO-VIVO-DEL-CASO.md` junto al historial, en la zona clínica: informes de los
    últimos 14 días, esperas abiertas con quién, plazo y días de retraso, y próximos plazos.
    Describe; no interpreta ni aconseja.
+4. (1-oct-26) Lista lo prometido con plazo en los chats del caso (promesas_caso.py) y avisa UNA vez
+   de cada promesa vencida: es el «informe que falta» de la Fase 2.
 
 Ganchos de test: BTP_HISTORIAL (raíz del historial), BTP_STATE_DIR.
 """
@@ -121,7 +123,27 @@ def render(eventos, hilos, hoy=None):
                       key=lambda x: x[0])   # dos esperas con el mismo plazo no se comparan entre sí
     lin += ["", "## Plazos de los próximos 7 días", ""]
     lin += ["- %s · %s" % (p.isoformat(), h.get("titulo", "")) for p, h in proximos] or ["Ninguno."]
+    lin += ["", "## Prometido en los chats del caso", ""]
+    prom = _promesas(hoy)
+    if prom:
+        lin += ["| Qué | Quién | Dicho | Vence | Retraso |", "|---|---|---|---|---|"]
+        for p, dias in prom:
+            retraso = "%d días" % dias if dias > 0 else ("vence hoy" if dias == 0 else "—")
+            lin.append("| %s | %s | %s · «%s» | %s | %s |" % (p.get("que", ""), p.get("quien", ""),
+                                                             p.get("dicho", "")[:10], p.get("expresion", ""),
+                                                             p.get("vence", ""), retraso))
+    else:
+        lin.append("Nada abierto.")
     return "\n".join(lin) + "\n"
+
+
+def _promesas(hoy):
+    """Promesas abiertas de promesas_caso.py. Fail-soft: sin ellas, el estado sigue saliendo."""
+    try:
+        import promesas_caso
+        return promesas_caso.abiertas(hoy)
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def actualizar(avisar=False):
@@ -150,8 +172,25 @@ def actualizar(avisar=False):
             salida.report_to_titular("\n".join(lineas), voz="sobria")
         except Exception:
             pass
-    if nuevos:
-        marca["ultimo_ts"] = max(str(e.get("ts", "")) for e in nuevos)
+    # Promesa vencida sin cumplir = «informe que falta» (Fase 2). Un aviso por promesa, nunca más.
+    avisadas = set(marca.get("promesas_avisadas", []))
+    vencidas = [p for p, dias in _promesas(date.today()) if dias > 0 and not p.get("sin_aviso")
+                and p.get("id") not in avisadas]
+    if avisar and vencidas:
+        lineas = ["⏰ Prometido y no ha llegado (chats del caso):"]
+        for p in vencidas[:5]:
+            import promesas_caso
+            lineas.append("   · %s, vencía el %s" % (promesas_caso.texto_sin_pii(p)[:90], p.get("vence", "")))
+        lineas.append("Si ya llegó: python3 tools/promesas_caso.py --cumplida <id>")
+        try:
+            import salida
+            salida.report_to_titular("\n".join(lineas), voz="sobria")
+            marca["promesas_avisadas"] = sorted(avisadas | {p["id"] for p in vencidas})
+        except Exception:
+            pass
+    if nuevos or marca.get("promesas_avisadas", []) != sorted(avisadas):
+        if nuevos:
+            marca["ultimo_ts"] = max(str(e.get("ts", "")) for e in nuevos)
         os.makedirs(os.path.dirname(_marca_path()), exist_ok=True)
         with open(_marca_path(), "w", encoding="utf-8") as fh:
             json.dump(marca, fh)

@@ -26,6 +26,13 @@ Si ninguna comprobación confirma el cambio, **no lo des por aterrizado**: regí
 
 **MURO (innegociable):** no publiques, no contactes a nadie, no envíes nada, no muevas dinero. Datos clínicos/PII y genómicos crudos (VCF/HLA): solo local. Código → rama, nunca `main` directo. Cambios **seguros** (wording de prompts/instrucciones, memorias): aplícalos. **Estructurales/arriesgados:** déjalos como PROPUESTA → `00_FUENTE-DE-VERDAD/Gestion/HOY.md` → "⏸️ NECESITO DE TI".
 
+**Revisión semanal de lo que aprueba Vega (plan «Vega al mando» F4, 1-oct-26).** Una vez por
+semana (la primera pasada desde el lunes): `python3 tools/aprobaciones.py muestra --n 5` y pásala a
+`Agent(subagent_type="verificacion")` con esta pregunta: «¿la prueba que cita cada aprobación
+existe y demuestra el efecto?». Comprueba tú lo comprobable (commit con `git log`, hilo con
+`seguimiento.py revisar --json`, test en verde). Si una aprobación no se sostiene: regístralo en
+este log como hallazgo y déjalo en HOY.md → «⏸️ NECESITO DE TI». Las B van siempre en la muestra.
+
 == MESA DEL BUCLE · a quién consulto (roster fijado por {{TITULAR}}, 5-jul-26) ==
 El bucle NO opera solo. Antes de dar por bueno un cambio, consulta a los expertos que correspondan (registro: `04 · IA/Comites-Registro.md`). Su criterio **pesa por experiencia pero NO decide** (muro = ley, decide {{TITULAR}} informada).
 - **Mesa FIJA (en cada ciclo que produzca un cambio):**

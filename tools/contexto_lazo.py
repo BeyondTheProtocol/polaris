@@ -24,10 +24,19 @@ CONTINUIDAD_MAX_CHARS = 900
 CONTINUIDAD_AUTO_BLOQUES = 2
 CONTINUIDAD_AUTO_MAX_CHARS = 600
 CONTINUIDAD_AUTO_HORAS = 24
+# Lo hablado con Vega por Telegram (1-oct-26, tools/vega_sesion.py): cupo propio, mismas 24 h.
+CONTINUIDAD_VEGA_BLOQUES = 2
 
 
 def _es_auto(bloque):
-    return "(auto " in bloque.split("\n", 1)[0]
+    cab = bloque.split("\n", 1)[0]
+    return "(auto " in cab or _es_vega(bloque)
+
+
+def _es_vega(bloque):
+    """Lo hablado por Telegram: con Vega (sesión) o con el respondedor rápido."""
+    cab = bloque.split("\n", 1)[0]
+    return "(vega " in cab or "(telegram " in cab
 
 
 def _edad_horas(bloque):
@@ -42,9 +51,11 @@ def _edad_horas(bloque):
 def seleccionar_continuidad(bloques):
     """Los últimos humanos + los automáticos recientes, en orden cronológico."""
     humanos = [b for b in bloques if not _es_auto(b)][-CONTINUIDAD_BLOQUES:]
-    autos = [b for b in bloques if _es_auto(b)
+    autos = [b for b in bloques if _es_auto(b) and not _es_vega(b)
              and _edad_horas(b) <= CONTINUIDAD_AUTO_HORAS][-CONTINUIDAD_AUTO_BLOQUES:]
-    elegidos = set(humanos) | set(autos)
+    vega = [b for b in bloques if _es_vega(b)
+            and _edad_horas(b) <= CONTINUIDAD_AUTO_HORAS][-CONTINUIDAD_VEGA_BLOQUES:]
+    elegidos = set(humanos) | set(autos) | set(vega)
     return [b for b in bloques if b in elegidos]
 
 

@@ -300,6 +300,14 @@ def sync(apply=False, con_correo=False):
     # Estado vivo del caso (29-sep-26): cruza lo que acaba de entrar con lo que se esperaba y
     # regenera el fichero de estado. Fail-soft: si falla, el sync ya hizo su trabajo.
     if apply:
+        # Promesas con plazo de los chats del caso (1-oct-26, Fase 2): antes del estado, para que
+        # lo prometido salga en él. Modelo local, egress 0; sin modelo no avanza y reintenta.
+        try:
+            import promesas_caso
+            r = promesas_caso.pasar()
+            res["promesas_caso"] = {"nuevas": len(r["nuevas"]), "sin_modelo": r["sin_modelo"]}
+        except Exception as e:                              # noqa: BLE001
+            res["promesas_caso"] = {"error": repr(e)}
         try:
             import estado_caso
             res["estado_caso"] = estado_caso.actualizar(avisar=True)

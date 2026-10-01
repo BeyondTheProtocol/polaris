@@ -1,0 +1,19 @@
+{
+ "_comment": "Plan «Vega al mando» (decisión de {{TITULAR}}, 29-sep-26), Fase 4. Quién aprueba qué. A = Vega sola, con registro y prueba del efecto. B = Vega pregunta a {{TITULAR}}. C = nunca sin firma de {{TITULAR}}; además lo imponen los hooks (salida_guard, clinico_guard, copy_web_guard). Ante la duda, el nivel más alto. Lo usa tools/aprobaciones.py.",
+ "version": 1,
+ "decidido": "2026-09-29",
+ "niveles": {
+  "A": {
+   "quien": "Vega sola",
+   "tipos": ["bug", "tarea", "memoria", "agente", "rutina", "codigo_fusion", "instalar_herramienta_auditada", "propuesta_hilo", "tablero_curar", "poda"]
+  },
+  "B": {
+   "quien": "Vega pregunta a {{TITULAR}}",
+   "tipos": ["clinico", "incongruencia", "informe_que_falta"]
+  },
+  "C": {
+   "quien": "nunca sin firma de {{TITULAR}}",
+   "tipos": ["enviar", "publicar", "pagar", "contactar", "egress_n2", "levantar_codigo_rojo", "copy_publicado"]
+  }
+ }
+}

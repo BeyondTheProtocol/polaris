@@ -1,0 +1,11 @@
+{
+ "pieza": "vega_sesion.py",
+ "estado_ficha": "completa",
+ "para": "Una sola memoria para Vega en Telegram: guarda el id de su sesión de Claude Code, la reanuda en cada mensaje (claude -p --resume), la rota a los 30 turnos o 3 días, le inyecta solo lo nuevo de continuity desde su último turno y apunta cada intercambio en continuity para que las sesiones lo vean.",
+ "cuando_si": "Automático: btp_dispatcher.sh (contexto) y run_agent.sh (id, despues) cuando el job es de Telegram y no va a un comité (BTP_VEGA_SESION=1). A mano: python3 tools/vega_sesion.py estado.",
+ "cuando_no": "No lo usan los plists que corren asistente por su cuenta (correo, recordatorio): reanudar desde dos procesos a la vez corrompería la sesión. Apagado de emergencia: BTP_VEGA_OFF=1 en el dispatcher.",
+ "reemplaza": "Nada. Antes cada mensaje de Telegram era un claude -p nuevo y sin agente.",
+ "test": "tests/test_vega_sesion.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 3: Vega, una sola memoria en Telegram y en las sesiones."
+}

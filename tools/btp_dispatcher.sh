@@ -129,6 +129,16 @@ while true; do
   turnos_job="$(printf '%s' "$JOB" | jq -r '.turnos // empty')"
   # Qué tiene que existir para poder cerrar el job (20-sep-26). Vacío = comportamiento de siempre.
   prueba="$(printf '%s' "$JOB" | jq -c '.prueba // empty' 2>/dev/null)"
+  # VEGA AL MANDO (1-oct-26, Fase 3): lo que llega por Telegram y no va a un comité lo contesta
+  # Vega, en Opus, en SU sesión persistente (tools/vega_sesion.py). Antes salía sin agente y
+  # amnésico. Solo este camino reanuda la sesión: el dispatcher va en serie, así que no hay dos
+  # turnos a la vez sobre ella.
+  procedencia="$(printf '%s' "$JOB" | jq -r '.procedencia // empty')"
+  vega=""
+  if [ "$tipo" = "exec" ] && [ "$procedencia" = "telegram:triado" ] && [ -z "$agente" ] \
+     && [ -z "${BTP_VEGA_OFF:-}" ]; then
+    vega=1; agente="asistente"; [ -z "$modelo" ] && modelo="opus"
+  fi
   heartbeat "$id"
 
   # 4. RE-chequeo HALT justo antes de lanzar (ventana mínima) → si aparece, devuelvo el job
@@ -140,7 +150,11 @@ while true; do
   #    Y si el job YA falló antes, va con su DIARIO de intentos: un reintento amnésico repite el
   #    mismo camino que ya falló y quema intentos hasta el dead-letter (25-jul-26).
   diario="$(printf '%s' "$JOB" | "$PY" "$TOOLS/cola.py" diario 2>/dev/null)" || diario=""
-  if [ "$tipo" = "exec" ]; then
+  if [ "$tipo" = "exec" ] && [ -n "$vega" ]; then
+    # Sesión nueva → contexto completo; sesión que se reanuda → solo lo nuevo de las sesiones.
+    ctx="$("$PY" "$TOOLS/vega_sesion.py" contexto 2>/dev/null)"
+    prompt="${ctx}"$'\n\n'"${intencion}"
+  elif [ "$tipo" = "exec" ]; then
     ctx="$("$PY" "$TOOLS/contexto_lazo.py" 2>/dev/null)"
     prompt="${ctx}"$'\n\n'"${intencion}"
   else
@@ -173,7 +187,7 @@ while true; do
   # intento 1 corría bien y el bug parecía intermitente. Estaba detrás de jobs_caidos:rc=127,
   # frescura_agente_fallo:tecnico y frescura_agente_fallo:calendar-sync. `env` recibe las
   # asignaciones como argumentos y las aplica DESPUÉS de expandir, que es lo que hacía falta.
-  OUT="$(env MURO_PROFILE="$perfil" BTP_AGENT="$agente" BTP_MODEL="$modelo" BTP_CRITICIDAD="$criticidad" BTP_COST_GUARDED=1 ${turnos_job:+BTP_MAX_TURNS="$turnos_job"} "$RUN_AGENT" "$prompt" 2>>"$LOG/dispatcher.err")"
+  OUT="$(env MURO_PROFILE="$perfil" BTP_AGENT="$agente" BTP_MODEL="$modelo" BTP_CRITICIDAD="$criticidad" BTP_COST_GUARDED=1 ${turnos_job:+BTP_MAX_TURNS="$turnos_job"} ${vega:+BTP_VEGA_SESION=1} "$RUN_AGENT" "$prompt" 2>>"$LOG/dispatcher.err")"
   rc=$?
   kill "$_hb_pid" 2>/dev/null || true; wait "$_hb_pid" 2>/dev/null || true
   heartbeat ""   # job terminado: el latido deja de nombrarlo (reap_stuck vuelve a poder rescatarlo)

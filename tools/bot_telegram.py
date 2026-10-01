@@ -241,6 +241,22 @@ def _transcribir_voz(voice):
     return (txt or "").strip() or None
 
 
+def _apunta_charla(pregunta, respuesta):
+    """Lo hablado con el respondedor rápido también entra en continuity (1-oct-26, plan «Vega al
+    mando» F3): así Vega lo recibe en su siguiente turno y las sesiones lo ven al arrancar. De-id
+    fail-closed: si no se puede limpiar, no se apunta el texto."""
+    try:
+        import continuity
+        import vega_sesion
+        p = vega_sesion._deid(vega_sesion._corto(pregunta, 300))
+        r = vega_sesion._deid(vega_sesion._corto(respuesta, 400))
+        if p and r:
+            continuity.record("Telegram (respuesta rápida). Preguntó: %s\nSe le respondió: %s" % (p, r),
+                              procedencia="derivado", fuente="telegram charla")
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write("bot: no apunté la charla en continuity: %r\n" % (e,))
+
+
 def handle_message(msg):
     """Procesa UN mensaje ya filtrado al chat de {{TITULAR}}. Devuelve un string de estado."""
     healthcheck.mark_seen("telegram")           # presencia (dead-man A3)
@@ -400,6 +416,7 @@ def handle_message(msg):
             sys.stderr.write("bot: responder_con_datos falló: %r\n" % (e,))
         if r and r.get("mensaje"):
             responder(r["mensaje"])
+            _apunta_charla(text, r["mensaje"])
             return "respondido:%s" % (r.get("brain") or "fallback")
         # si falla del todo → cae al agente (cuarentena), como último recurso
 

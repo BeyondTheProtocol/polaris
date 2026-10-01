@@ -379,6 +379,15 @@ def main():
     except Exception as e:
         lote = {"avisos": [], "leidos": {}}
         text = base + "\n\n⚠️ No pude añadir los avisos agrupados (%s). Siguen guardados." % type(e).__name__
+    # Resumen diario de atascos (1-oct-26, plan «Vega al mando» F5): va DENTRO del parte, no es
+    # un mensaje más. Sin atascos no añade nada. Si falla, el parte sale igual.
+    try:
+        import atascos
+        bloque_atascos = atascos.bloque()
+        if bloque_atascos:
+            text = text.rstrip() + "\n\n" + bloque_atascos
+    except Exception as e:
+        text += "\n\n(no pude componer los atascos: %s)" % type(e).__name__
     if dry:
         print("── Lo que se enviaría a Telegram (%s · determinista, GRATIS) ──\n%s" % (franja, text))
         return 0

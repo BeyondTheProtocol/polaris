@@ -1,0 +1,11 @@
+{
+ "pieza": "promesas_caso.py",
+ "estado_ficha": "completa",
+ "para": "Saca de los chats de WhatsApp DEL CASO lo que un tercero ha prometido con plazo («te mando el informe el viernes»): pre-filtro determinista (compromiso + cuándo), el modelo LOCAL dice qué y de quién, y la FECHA la calcula Python a partir de la expresión literal del mensaje. Guarda la promesa en state/caso/promesas.json y la propone a Vega; estado_caso.py la lista y avisa cuando vence sin haber llegado.",
+ "cuando_si": "Automático tras cada historial_sync / estado_caso (cada 6 h). A mano: python3 tools/promesas_caso.py [--dry] [--since N].",
+ "cuando_no": "No lee los chats personales (eso es cosecha_whatsapp.py, que justo excluye los del caso). No crea tarjetas del Tablero (propone). No interpreta lo clínico. Sin modelo local levantado no inventa: no avanza la marca y reintenta en la siguiente pasada.",
+ "reemplaza": "Nada. Completa la Fase 2 del plan Vega al mando: los chats del caso se volcaban y nadie los leía.",
+ "test": "tests/test_promesas_caso.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega al mando» (29-sep-26), Fase 2 punto 1 (diseño decidido el 29-sep: la fecha la calcula Python, no el modelo)."
+}
