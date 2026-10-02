@@ -1148,6 +1148,44 @@ def _write_offset(offset):
     os.replace(tmp, TG_OFFSET)
 
 
+# ── Reacciones de {{TITULAR}} (2-oct-26, plan «Vega aprende y se adelanta», eslabón 4) ────────────
+# Antes no había señal de «este aviso me sobra»: el bot no pedía `message_reaction`. Ahora sus
+# reacciones a mensajes del bot se apuntan (solo emoji, id del mensaje y hora: nada de texto) en
+# state/vega/reacciones.jsonl, y tools/perfil_vega.py las cuenta en el perfil de Vega. ENTRADA
+# pura: no se responde ni se envía nada. Allowlist: solo el chat de {{TITULAR}}.
+ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "message_reaction"]
+_REAC_POSITIVA = {"👍", "❤", "❤️", "👌", "🔥", "🙏", "👏", "🥰", "😍", "💯", "🤝", "⚡", "🏆", "😁"}
+_REAC_NEGATIVA = {"👎", "💩", "🤬", "😴", "🥱", "🤮", "😡", "😐"}
+
+
+def _senal_de(emoji):
+    if emoji in _REAC_POSITIVA:
+        return "positiva"
+    if emoji in _REAC_NEGATIVA:
+        return "negativa"
+    return "otra"
+
+
+def _anotar_reaccion(reac, self_cid):
+    """Apunta una reacción de {{TITULAR}}. Fail-soft: nunca rompe el poll."""
+    try:
+        if str((reac.get("chat") or {}).get("id", "")) != str(self_cid):
+            return False
+        nuevas = [r.get("emoji") for r in (reac.get("new_reaction") or [])
+                  if isinstance(r, dict) and r.get("type") == "emoji"]
+        if not nuevas:
+            return False        # quitó la reacción: no es señal nueva
+        ruta = os.path.join(STATE, "vega", "reacciones.jsonl")
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "a", encoding="utf-8") as fh:
+            for e in nuevas:
+                fh.write(json.dumps({"ts": _now_iso(), "message_id": reac.get("message_id"),
+                                     "emoji": e, "senal": _senal_de(e)}, ensure_ascii=False) + "\n")
+        return True
+    except Exception:
+        return False
+
+
 def poll_updates(*, timeout=0, limit=20, estado_out=None):
     """Lee mensajes nuevos del chat allowlistado de {{TITULAR}} vía getUpdates. Devuelve una
     lista de dicts {update_id, chat_id, text, date, message_id, kind, voice}; SOLO del
@@ -1170,7 +1208,10 @@ def poll_updates(*, timeout=0, limit=20, estado_out=None):
         _marcar(False, "sin token/chat_id")
         return []
     offset = _read_offset()
-    params = {"timeout": int(timeout), "limit": int(limit)}
+    params = {"timeout": int(timeout), "limit": int(limit),
+              # message_reaction NO llega si no se pide (2-oct-26, eslabón 4 del plan «Vega aprende y
+              # se adelanta»). Pedir una lista sustituye al defecto: van también los que ya llegaban.
+              "allowed_updates": json.dumps(ALLOWED_UPDATES)}
     if offset is not None:
         params["offset"] = offset
     url = "https://api.telegram.org/bot%s/getUpdates?%s" % (token, urllib.parse.urlencode(params))
@@ -1190,6 +1231,9 @@ def poll_updates(*, timeout=0, limit=20, estado_out=None):
         uid = upd.get("update_id")
         if isinstance(uid, int):
             max_uid = uid + 1 if max_uid is None else max(max_uid, uid + 1)
+        if upd.get("message_reaction"):
+            _anotar_reaccion(upd["message_reaction"], self_cid)
+            continue                   # una reacción no es un mensaje: el bot no la procesa
         msg = upd.get("message") or upd.get("edited_message") or {}
         chat = str((msg.get("chat") or {}).get("id", ""))
         if chat != self_cid:           # allowlist: solo el chat de {{TITULAR}}

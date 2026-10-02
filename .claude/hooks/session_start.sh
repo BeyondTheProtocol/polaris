@@ -30,6 +30,15 @@ elif [ ! -f "$DRAIN_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$DRAIN_STAMP" +%
   [ -f "$REPO/tools/reel_digest.py" ] && ( "$PY" "$REPO/tools/reel_digest.py" --drain --remote polaris --max 5 >/dev/null 2>&1 & )
 fi
 
+# Barrido de continuidad (1-oct-26, plan «Vega aprende y se adelanta», eslabón 1): resume las
+# sesiones que el hook SessionEnd no ve (las abiertas en /Users/polaris y las que nunca terminan).
+# Solo en sesiones interactivas, detachado, 1 cada 30 min; el propio script lleva candado y tope.
+BARRIDO_STAMP="${TMPDIR:-/tmp}/.btp_continuidad_barrido.stamp"
+if [ -z "${BTP_AGENT_DEPTH:-}" ] && { [ ! -f "$BARRIDO_STAMP" ] || [ "$(( $(date +%s) - $(date -r "$BARRIDO_STAMP" +%s 2>/dev/null || echo 0) ))" -gt 1800 ]; }; then
+  touch "$BARRIDO_STAMP" 2>/dev/null
+  [ -f "$REPO/tools/continuidad_auto.py" ] && ( "$PY" "$REPO/tools/continuidad_auto.py" --barrer >/dev/null 2>&1 & )
+fi
+
 # Guardarraíl de topología (12-jul): el Air lleva .HALT a propósito (cliente congelado). Recuérdalo
 # para no escribir en la copia equivocada — el trabajo real va en el mini.
 # 24-sep: el HALT NO identifica la máquina. El CÓDIGO ROJO también lo pone, y en el mini con código

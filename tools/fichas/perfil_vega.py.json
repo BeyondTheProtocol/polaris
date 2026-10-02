@@ -1,0 +1,11 @@
+{
+ "pieza": "perfil_vega.py",
+ "estado_ficha": "completa",
+ "para": "Escribe cada mañana la sección automática del perfil de trabajo de {{TITULAR}} que lee Vega: las memorias feedback-* que tocan a Vega (enlazadas, no copiadas), las «Reglas nuevas» de la continuidad que aún no tienen memoria y las señales de la semana (avisos entregados/aplazados, hilos cerrados por origen, reacciones). Determinista, sin LLM.",
+ "cuando_si": "Automático: hoy_compose.sh lo lanza antes del parte; vega_sesion.contexto() inyecta bloque() al abrir sesión y cuando cambia. A mano: python3 tools/perfil_vega.py destilar [--seco].",
+ "cuando_no": "No toca lo que {{TITULAR}} escribió fuera de las marcas. No crea memorias (eso es auto-mejora). Lo que ella borra no vuelve; si borra la sección entera, no se reescribe.",
+ "reemplaza": "Nada: el perfil existía pero nadie lo escribía desde el 21-jun.",
+ "test": "tests/test_perfil_vega.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «Vega aprende y se adelanta», eslabón 2, aprobado por {{TITULAR}} el 1-oct-2026 tras preguntar si Vega aprende de sus conversaciones."
+}

@@ -106,21 +106,39 @@ def _vision(d):
         return "", ""
 
 
+def _perfil():
+    """(texto, hash) del perfil vivo de cómo trabaja {{TITULAR}} (perfil_vega, 1-oct-26). Fail-soft."""
+    try:
+        import hashlib
+        import perfil_vega
+        t = perfil_vega.bloque()
+        return t, (hashlib.sha1(t.encode("utf-8")).hexdigest()[:12] if t else "")
+    except Exception:  # noqa: BLE001
+        return "", ""
+
+
 def contexto():
-    """Sesión nueva → contexto del lazo + visión N1. Sesión vigente → lo nuevo de continuity, y la
-    visión solo si ha cambiado desde la última vez que se le dio (no se repite en cada mensaje)."""
+    """Sesión nueva → contexto del lazo + visión N1 + perfil. Sesión vigente → lo nuevo de
+    continuity, y la visión o el perfil solo si han cambiado desde la última vez que se le dieron
+    (no se repiten en cada mensaje)."""
     d = cargar()
     vision, h = _vision(d)
+    perfil, hp = _perfil()
     if not vigente(d):
         import contexto_lazo
-        if h:
-            d["vision_hash"] = h
+        if h or hp:
+            d["vision_hash"], d["perfil_hash"] = h, hp
             _guardar(d)
-        return contexto_lazo.bloque() + ("\n\n" + vision if vision else "")
+        return (contexto_lazo.bloque() + ("\n\n" + vision if vision else "")
+                + ("\n\n" + perfil if perfil else ""))
     extra = ""
     if h and h != d.get("vision_hash"):
         extra = "\n\n" + vision
         d["vision_hash"] = h
+        _guardar(d)
+    if hp and hp != d.get("perfil_hash"):
+        extra += "\n\n" + perfil
+        d["perfil_hash"] = hp
         _guardar(d)
     nuevos = _bloques_desde(d.get("ultimo_turno", ""))
     if not nuevos:

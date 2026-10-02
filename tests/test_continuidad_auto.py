@@ -142,6 +142,51 @@ ca.procesar({"session_id": "s-nada", "transcript_path": r4})
 n_bloques = open(arch_nada[0]).read().count("\n## ") if arch_nada else -1
 ok(n_bloques == 1, "9: ⭐ un reintento sin resumen no duplica lo archivado (%d)" % n_bloques)
 
+# 10. barrido (1-oct-2026): las sesiones que el hook no ve (abiertas en el home, o que no terminan)
+PROJ = os.path.join(_TMP, "projects")
+os.environ["BTP_PROJECTS_DIR"] = PROJ
+os.environ["BTP_CONTINUIDAD_CARPETAS"] = "-Users-x,-Users-x-claudecode*"
+
+
+def sesion_en(carpeta, sid, quieta=True, entrypoint="claude-desktop"):
+    d = os.path.join(PROJ, carpeta)
+    os.makedirs(d, exist_ok=True)
+    ruta = os.path.join(d, sid + ".jsonl")
+    with open(ruta, "w") as fh:
+        for tipo, c in [("user", LARGO), ("assistant", "Hecho."), ("user", LARGO + " y otra")]:
+            fh.write(json.dumps({"type": tipo, "entrypoint": entrypoint,
+                                 "message": {"content": c}}) + "\n")
+    if quieta:
+        t = time.time() - 3 * 3600
+        os.utime(ruta, (t, t))
+    return ruta
+
+
+responde(RESUMEN)
+sesion_en("-Users-x", "s-home")
+sesion_en("-Users-x-claudecode--claude-worktrees-w1", "s-worktree")
+sesion_en("-Users-x", "s-viva", quieta=False)
+sesion_en("-private-tmp", "s-hijo-haiku")
+sesion_en("-Users-x-claudecode", "s-job-lazo", entrypoint="sdk-cli")
+antes = entradas()
+res = ca.barrer()
+ok("s-job-lazo" not in res, "10: ⭐ los `claude -p` del lazo (sdk-cli) no entran como confiable")
+ok(res.get("s-home") == "apuntado", "10: ⭐ una sesión abierta en el home se apunta (%s)" % res)
+ok(res.get("s-worktree") == "apuntado", "10: ⭐ la de un worktree también")
+ok("s-viva" not in res, "10: la que sigue activa (menos de 2 h quieta) espera")
+ok("s-hijo-haiku" not in res, "10: ⭐ fuera de las carpetas permitidas no se toca")
+ok(entradas() == antes + 2, "10: dos entradas nuevas en continuity")
+ok(ca.barrer() == {}, "10: ⭐ segunda pasada sin nada nuevo = 0 (idempotente con el hook)")
+viejo = ca.MAX_RESUMENES_BARRIDO
+ca.MAX_RESUMENES_BARRIDO = 1
+for i in range(3):
+    sesion_en("-Users-x", "s-tope-%d" % i)
+ok(len(ca.barrer()) == 1, "10: el tope de llamadas a Haiku por pasada se respeta")
+ca.MAX_RESUMENES_BARRIDO = viejo
+ok(len(ca.barrer()) == 2, "10: lo que no cupo entra en la pasada siguiente")
+hook_ini = open(os.path.join(ROOT, ".claude", "hooks", "session_start.sh")).read()
+ok("continuidad_auto.py\" --barrer" in hook_ini, "10: ⭐ el arranque de sesión lanza el barrido")
+
 # 8. cableado: sin el hook en settings, todo lo anterior no corre nunca
 cfg = json.load(open(os.path.join(ROOT, ".claude", "settings.json")))["hooks"]
 for ev in ("SessionEnd", "PreCompact"):

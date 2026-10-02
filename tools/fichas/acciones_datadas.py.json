@@ -1,0 +1,11 @@
+{
+ "pieza": "acciones_datadas.py",
+ "estado_ficha": "completa",
+ "para": "Deriva de tools/state/reservas.json las acciones con fecha que Vega tiene que proponer antes de que {{TITULAR}} las pida (cambio de alojamiento, entrada, fin de cancelación gratis, check-in online y asistencia en vuelos/trenes) y las crea como hilos con plazo ISO y origen «derivado» (silenciosos al nacer, escalan por plazo). Además lista los hilos abiertos con fecha en el título y sin plazo. Determinista, sin LLM.",
+ "cuando_si": "Automático: hoy_compose.sh antes del parte. A mano: python3 tools/acciones_datadas.py [--write]. Modo sombra por defecto (escribe candidatas en state/vega/acciones_sombra.jsonl); se activa con {\"modo\": \"activo\"} en state/vega/acciones_datadas.json.",
+ "cuando_no": "No reserva, cancela ni contacta. No toca hilos existentes (aunque {{TITULAR}} los cerrase). No deriva recordatorios de citas: eso ya lo hace la pasada follonera.",
+ "reemplaza": "La instrucción en prompt de asistente.md (reservas → acciones datadas), que no se cumplía (el 2-oct el cambio de alojamiento estaba sin plazo).",
+ "test": "tests/test_acciones_datadas.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «Vega aprende y se adelanta», eslabón 3, aprobado por {{TITULAR}} el 1-oct-2026; corrección suya del 3-jul («esto debería haberlo propuesto Vega antes de decirlo yo»)."
+}

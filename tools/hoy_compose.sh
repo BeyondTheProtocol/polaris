@@ -28,6 +28,15 @@ FECHA="$(date +%Y-%m-%d)"   # fiable: reloj del sistema, NO cumbre.json
 
 PROMPT="Hoy es ${FECHA} (dato fiable del reloj del sistema; formatéalo en español en la cabecera del parte, p. ej. «🌅 HOY · <día de la semana> <DD> <mes>»). Compón el parte de HOY de {{TITULAR}} siguiendo tu rutina diaria de regenerar Gestion/HOY.md. **MUY IMPORTANTE: ESCRÍBELO con la herramienta Write en ${HOY_REL}** (sobrescribe el fichero entero con el parte nuevo). NO te limites a devolver el texto en tu respuesta: si no lo escribes a disco con Write, NO cuenta. NO derives la fecha de cumbre.json ni copies el HOY.md viejo."
 
+# Lo que Vega aprende (1-oct-26, plan «Vega aprende y se adelanta», eslabones 1 y 2): antes del
+# parte, la continuidad recoge las sesiones que el hook no vio y el destilador reescribe la sección
+# automática del perfil de trabajo. Deterministas y fail-open: si fallan, el parte sale igual.
+PY_CA="$(command -v python3 || echo /usr/bin/python3)"
+"$PY_CA" "$REPO/tools/continuidad_auto.py" --barrer >/dev/null 2>&1 || true
+"$PY_CA" "$REPO/tools/perfil_vega.py" destilar >/dev/null 2>&1 || true
+# Eslabón 3 (2-oct): acciones con fecha derivadas de las reservas (modo sombra por defecto).
+"$PY_CA" "$REPO/tools/acciones_datadas.py" --write >/dev/null 2>&1 || true
+
 antes="$(stat -f %m "$HOY_ABS" 2>/dev/null || echo 0)"
 
 salida="$(mktemp -t hoy-compose)"

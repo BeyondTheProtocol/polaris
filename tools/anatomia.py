@@ -290,7 +290,9 @@ FAMILIAS = [
                       "org_wrap", "cuidado", "etiquetar_",
                       # ordena la bandeja de WhatsApp para Vega, no decide (P5, 25-sep-26): es
                       # triaje de producción como `triage` y `vega_`, no una medida del sistema
-                      "presorteo")),
+                      "presorteo",
+                      # Vega aprende y se adelanta (1/2-oct-26): perfil de trabajo y acciones con fecha
+                      "perfil_vega", "acciones_datadas")),
     ("dinero", ("coste", "cost_guard", "finanzas", "presupuesto", "pago",
                 "gasto")),
     ("git y ramas", ("git", "ramas", "deploy", "release", "worktree",

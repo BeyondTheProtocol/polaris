@@ -26,14 +26,20 @@ GARANTÍAS
   BTP_CONTINUIDAD_AUTO_HIJO=1, que hace salir a este script si llegara a dispararse.
 · Fail-open hacia el cierre, fail-closed hacia la escritura: cualquier error → exit 0 sin escribir.
 
+BARRIDO (`--barrer [--seco]`, 1-oct-2026): para las sesiones que el hook no ve (las abiertas
+fuera de ~/claudecode y las que nunca terminan). Lo lanza el arranque de sesión en segundo plano.
+
 Bypass: BTP_CONTINUIDAD_AUTO_OFF=1. Ganchos de test: BTP_CLAUDE_BIN, BTP_STATE_DIR,
 BTP_CONTINUIDAD_TOKEN (evita el Llavero).
 """
+import fcntl
+import glob
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import continuity  # noqa: E402
@@ -96,13 +102,17 @@ def _leer_offsets():
 
 
 def _guardar_offset(session_id, offset):
-    d = _leer_offsets()
-    d[session_id] = offset
+    # Con candado: el hook y el barrido pueden escribir a la vez, y un leer-cambiar-escribir sin
+    # bloqueo pierde el offset del otro (Haiku resumiría dos veces la misma sesión).
     os.makedirs(continuity.CONT, mode=0o700, exist_ok=True)
-    tmp = _estado_offsets() + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(d, fh)
-    os.replace(tmp, _estado_offsets())
+    with open(_estado_offsets() + ".lock", "w") as candado:
+        fcntl.flock(candado, fcntl.LOCK_EX)
+        d = _leer_offsets()
+        d[session_id] = offset
+        tmp = _estado_offsets() + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(d, fh)
+        os.replace(tmp, _estado_offsets())
 
 
 def _texto_de(contenido):
@@ -218,8 +228,121 @@ def procesar(evento):
     return "apuntado"
 
 
+# ─── Barrido (1-oct-2026, plan «Vega aprende y se adelanta», eslabón 1) ─────────────────────
+# El hook es de proyecto: las sesiones abiertas en /Users/polaris no lo cargan (medido el 1-oct:
+# 0 de 2.190 sesiones procesadas venían de ahí) y en la app de escritorio una sesión puede no
+# terminar nunca. El barrido pasa `procesar()` por las transcripciones quietas de las carpetas
+# permitidas. Es idempotente con el hook: los dos avanzan el mismo offset por sesión.
+INACTIVA_SEG = 2 * 3600          # más quieta que esto = la conversación ha parado (por ahora)
+VENTANA_DIAS = 3
+MAX_RESUMENES_BARRIDO = 10       # tope de llamadas a Haiku por pasada; lo demás, a la siguiente
+_SIN_HAIKU = ("sesión demasiado corta", "sin transcripción")
+
+
+def _projects_dir():
+    return os.environ.get("BTP_PROJECTS_DIR") or os.path.expanduser("~/.claude/projects")
+
+
+def _permitidas():
+    """Carpetas de ~/.claude/projects que se barren. Una entrada con «*» final es prefijo.
+    Por defecto, las sesiones abiertas en el home y en ~/claudecode (worktrees incluidos): así
+    quedan fuera las del `claude -p` hijo de este script (cwd = tmp) y las de otros proyectos."""
+    crudo = os.environ.get("BTP_CONTINUIDAD_CARPETAS")
+    if crudo:
+        return [c.strip() for c in crudo.split(",") if c.strip()]
+    home = os.path.expanduser("~").replace("/", "-")
+    return [home, home + "-claudecode*"]
+
+
+def _carpeta_permitida(nombre, permitidas):
+    for p in permitidas:
+        if p.endswith("*") and nombre.startswith(p[:-1]):
+            return True
+        if nombre == p:
+            return True
+    return False
+
+
+def _es_interactiva(ruta, lineas=60):
+    """True si la transcripción es de una persona (app de escritorio o terminal). Los `claude -p`
+    del lazo llevan entrypoint «sdk-…»: su contenido es de jobs (dato derivado, no confiable) y
+    Vega ya recibe sus partes por otra vía. Sin entrypoint, fuera (fail-closed)."""
+    try:
+        with open(ruta, encoding="utf-8", errors="replace") as fh:
+            for i, linea in enumerate(fh):
+                if i >= lineas:
+                    break
+                try:
+                    ep = json.loads(linea).get("entrypoint")
+                except Exception:
+                    continue
+                if ep:
+                    return not str(ep).startswith("sdk")
+    except OSError:
+        pass
+    return False
+
+
+def candidatas_barrido(ahora=None):
+    """Transcripciones quietas, recientes, de carpetas permitidas y con algo sin procesar.
+    De la más vieja a la más nueva, para que continuity quede en orden."""
+    ahora = ahora or time.time()
+    permitidas = _permitidas()
+    offsets = _leer_offsets()
+    out = []
+    for ruta in glob.glob(os.path.join(_projects_dir(), "*", "*.jsonl")):
+        if not _carpeta_permitida(os.path.basename(os.path.dirname(ruta)), permitidas):
+            continue
+        try:
+            st = os.stat(ruta)
+        except OSError:
+            continue
+        if ahora - st.st_mtime < INACTIVA_SEG or ahora - st.st_mtime > VENTANA_DIAS * 86400:
+            continue
+        sid = os.path.basename(ruta)[:-len(".jsonl")]
+        if (int(offsets.get(sid, 0)) >= st.st_size
+                and int(offsets.get(sid + "#archivo", 0)) >= st.st_size):
+            continue
+        if not _es_interactiva(ruta):
+            continue
+        out.append((st.st_mtime, sid, ruta))
+    return [(sid, ruta) for _m, sid, ruta in sorted(out)]
+
+
+def barrer(seco=False):
+    """Una pasada. Devuelve {sid: resultado}. Un candado evita dos barridos a la vez."""
+    os.makedirs(continuity.CONT, mode=0o700, exist_ok=True)
+    with open(os.path.join(continuity.CONT, "barrido.lock"), "w") as candado:
+        try:
+            fcntl.flock(candado, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            return {"_": "otro barrido en curso"}
+        res, con_haiku = {}, 0
+        for sid, ruta in candidatas_barrido():
+            if seco:
+                res[sid] = "candidata"
+                continue
+            if con_haiku >= MAX_RESUMENES_BARRIDO:
+                break
+            try:
+                r = procesar({"session_id": sid, "transcript_path": ruta,
+                              "hook_event_name": "Barrido"})
+            except Exception as e:  # una transcripción rota no para el barrido
+                r = "error: %s" % type(e).__name__
+            res[sid] = r
+            if r not in _SIN_HAIKU:
+                con_haiku += 1
+        return res
+
+
 def main(argv):
     if os.environ.get("BTP_CONTINUIDAD_AUTO_OFF") or os.environ.get("BTP_CONTINUIDAD_AUTO_HIJO"):
+        return 0
+    if argv and argv[0] == "--barrer":
+        res = barrer(seco="--seco" in argv)
+        for sid, r in res.items():
+            print("%s  %s" % (sid[:8], r))
+        print("barrido: %d sesiones" % len(res))
         return 0
     try:
         if argv and argv[0] == "--sync":

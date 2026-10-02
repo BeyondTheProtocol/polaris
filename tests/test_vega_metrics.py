@@ -58,6 +58,21 @@ def main():
     ok(m["daemons"]["asistente"]["vivo"] is False, "asistente stale (48h) → caído")
     ok("Vega" in vm._texto(m) and "cerrados hoy" in vm._texto(m), "resumen legible")
 
+    # Proactividad (2-oct-26, eslabón 5 del plan «Vega aprende y se adelanta»)
+    os.makedirs(os.path.join(_TMP, "vega"), exist_ok=True)
+    with open(os.path.join(_TMP, "vega", "acciones_sombra.jsonl"), "w") as fh:
+        fh.write(json.dumps({"id": "derivado-a", "plazo": "2026-10-10", "ts": "2026-10-05T09:00:00"}) + "\n")
+        fh.write(json.dumps({"id": "derivado-b", "plazo": "2026-10-03", "ts": "2026-10-02T09:00:00"}) + "\n")
+    with open(os.path.join(_TMP, "vega", "reacciones.jsonl"), "w") as fh:
+        fh.write(json.dumps({"ts": datetime.datetime.now().isoformat(), "senal": "negativa"}) + "\n")
+    seguimiento.add_hilo({"id": "pedido-ella", "titulo": "Recordar el 3-oct lo del hotel",
+                          "origen": "manual", "objetivo_ned": "x"})
+    p = vm.proactividad()
+    ok(p["derivadas"] == 2 and p["anticipacion_pct"] == 50, "⭐ anticipación: 1 de 2 con ≥48 h (%s)" % p)
+    ok(p["ya_pedidas"] == 1, "⭐ cuenta lo que ya había pedido ella")
+    ok(p["reacciones_7d"]["negativa"] == 1, "cuenta las reacciones")
+    ok("se adelanta" in vm._texto(vm.metricas()), "la línea de proactividad sale en el resumen")
+
     print("RESULTADO métricas de Vega (F4.4): %d OK, %d fallos" % (_pass, _fail))
     print("✅ VEGA-METRICS EN VERDE" if _fail == 0 else "❌ revisar fallos")
     return _fail

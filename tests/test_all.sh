@@ -291,6 +291,9 @@ runpy test_estado_caso.py
 runpy test_promesas_caso.py   # 1-oct · F2.1 Vega al mando: promesas con plazo de los chats del caso (fecha en Python)
 runpy test_incongruencias_caso.py   # 1-oct · F2b Vega al mando: misma muestra con cifras distintas entre informes (N1 al parte)
 runpy test_vega_sesion.py   # 1-oct · F3 Vega al mando: una sesión persistente de Vega en Telegram (--resume, rotación, delta)
+runpy test_perfil_vega.py   # 1-oct · plan «Vega aprende y se adelanta», eslabón 2: el perfil de Vega tiene quien lo escriba
+runpy test_acciones_datadas.py   # 2-oct · plan «Vega aprende y se adelanta», eslabón 3: lo que tiene fecha se propone solo
+runpy test_reacciones_vega.py   # 2-oct · plan «Vega aprende y se adelanta», eslabón 4: las reacciones de {{TITULAR}} son señal para Vega
 runpy test_aprobaciones_atascos.py   # 1-oct · F4+F5 Vega al mando: política A/B/C con registro y atascos en el parte
 runpy test_canario_muro.py
 runpy test_claude_lazo.py
