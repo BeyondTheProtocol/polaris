@@ -532,6 +532,8 @@ is_respuesta_vacia() {  # $1 = OUT — defensivo: JSON "éxito" (is_error:false,
 # Best-effort: nunca cambia el código de salida del agente.
 CASA_GIT="${BTP_CASA_GIT:-$REPO}"
 _RAMA_CASA_INI="$(git -C "$CASA_GIT" branch --show-current 2>/dev/null || true)"
+# ¿Casa base empezó LIMPIA? Solo entonces lo que quede sucio al salir es de este agente (2-oct-26).
+_CASA_LIMPIA_INI="$( [ -z "$(git -C "$CASA_GIT" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo 1 || true)"
 _otros_agentes() {  # ¿hay otro run_agent.sh vivo que no sea este ni un hijo suyo?
   # `return` SIEMPRE con número: se llama desde la trampa EXIT, y en bash >= 4.4 un `return` a
   # secas dentro de una trampa devuelve el estado de ANTES de la trampa, no el del test previo
@@ -552,6 +554,31 @@ _devolver_casa_a_master() {
   local rama sucio
   case "$_RAMA_CASA_INI" in master|main) ;; *) return 0 ;; esac
   rama="$(git -C "$CASA_GIT" branch --show-current 2>/dev/null || true)"
+  # SUCIO EN MASTER (2-oct-26). La auto-mejora de las 05:08 editó tools/normas.json sin cambiar de
+  # rama y salió: casa base quedó en master sucia 3 h 24 min, y `cerrar_sesion.py` la vio «ocupada»
+  # y bloqueó las fusiones de TODAS las sesiones. Este caso no lo cubría nada. Si casa base empezó
+  # limpia y no hay otro agente vivo, lo que queda es de este agente: se lleva a una rama propia
+  # con su commit (master no se mueve: su freno sigue intacto) y casa base vuelve limpia. Nada se
+  # pierde; la rama queda para revisar y fusionar, y se apunta.
+  if [ "$rama" = "$_RAMA_CASA_INI" ] && [ -n "$_CASA_LIMPIA_INI" ] \
+     && [ -n "$(git -C "$CASA_GIT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    if _otros_agentes; then
+      echo "run_agent[$AGENT_NAME]: casa base queda sucia en $rama, pero hay otro agente vivo: no la toco." >&2
+      return 0
+    fi
+    local apartada="lazo/${AGENT_NAME}-$(date +%Y%m%d-%H%M%S)"
+    if git -C "$CASA_GIT" checkout -q -b "$apartada" 2>/dev/null \
+       && git -C "$CASA_GIT" commit -q -a -m "chore(lazo): cambios de $AGENT_NAME que quedaron sin commitear en casa base" 2>/dev/null \
+       && git -C "$CASA_GIT" checkout -q "$_RAMA_CASA_INI" 2>/dev/null; then
+      echo "run_agent[$AGENT_NAME]: dejó cambios sin commitear en $rama; apartados en la rama $apartada y casa base vuelve limpia." >&2
+      if [ -z "${BTP_DEUDA_OFF:-}" ]; then
+        "$PY" "$REPO/tools/deuda.py" abrir lazo-cambios-apartados "El agente $AGENT_NAME dejó cambios versionados sin commitear en casa base; se apartaron a la rama $apartada. Revisar y fusionar (o descartar)." >/dev/null 2>&1 || true
+      fi
+    else
+      echo "run_agent[$AGENT_NAME]: dejó cambios sin commitear en $rama y NO pude apartarlos a una rama." >&2
+    fi
+    return 0
+  fi
   [ -n "$rama" ] && [ "$rama" != "$_RAMA_CASA_INI" ] || return 0
   sucio="$(git -C "$CASA_GIT" status --porcelain --untracked-files=no 2>/dev/null || true)"
   if [ -n "$sucio" ]; then

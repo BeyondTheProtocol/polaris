@@ -126,6 +126,33 @@ def main():
     correr(c, b)
     check(git(c, "branch", "--show-current") == "de-antes", "no mueve una rama que ya estaba")
 
+    print("── sucio EN master (2-oct-26): se aparta a una rama y casa base queda limpia ──")
+    c = casa_nueva("sucia_en_master")
+    b = claude_falso("edita_master", 'echo norma >> "$BTP_CASA_GIT/f.txt"')
+    p = correr(c, b)
+    check(git(c, "branch", "--show-current") == "master", "casa base sigue en master")
+    check(git(c, "status", "--porcelain", "--untracked-files=no") == "", "y queda LIMPIA")
+    apartadas = [r for r in git(c, "branch", "--format=%(refname:short)").split() if r.startswith("lazo/")]
+    check(len(apartadas) == 1 and "norma" in git(c, "show", apartadas[0] + ":f.txt"),
+          "el cambio no se pierde: está en una rama lazo/* (%r)" % apartadas)
+    check(git(c, "log", "-1", "--format=%s", "master") == "inicio", "master no se mueve")
+    check(p.returncode == 0, "el código de salida del agente no cambia")
+
+    print("── sucio en master pero YA estaba sucia al empezar: no es suyo, no lo toca ──")
+    c = casa_nueva("sucia_de_antes")
+    open(os.path.join(c, "f.txt"), "a").write("de otro\n")
+    b = claude_falso("nada2", "true")
+    correr(c, b)
+    check("de otro" in open(os.path.join(c, "f.txt")).read()
+          and not [r for r in git(c, "branch", "--format=%(refname:short)").split() if r.startswith("lazo/")],
+          "lo sucio de antes sigue en su sitio, sin rama apartada")
+
+    print("── sucio en master con otro agente vivo: no toca nada ──")
+    c = casa_nueva("sucia_concurrente")
+    b = claude_falso("edita_master2", 'echo x >> "$BTP_CASA_GIT/f.txt"')
+    correr(c, b, {"BTP_OTROS_AGENTES": "1"})
+    check(git(c, "status", "--porcelain", "--untracked-files=no") != "", "lo deja: puede ser del otro")
+
     print("── rc del agente intacto aunque falle ──")
     c = casa_nueva("falla")
     b = claude_falso("falla", 'git -C "$BTP_CASA_GIT" checkout -q -b rota', rc=3)
