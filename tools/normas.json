@@ -221,6 +221,17 @@
       "repetida": true
     },
     {
+      "slug": "feedback-antes-de-crear-un-freno-mira-si-ya-grita",
+      "que": "Antes de proponer un freno nuevo, comprueba si el que ya hay está en rojo",
+      "clase": "lint-doc",
+      "mecanismo": "tests/test_all.sh",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": false
+    },
+    {
       "slug": "feedback-correr-test-all-no-solo-py",
       "que": "Verificar con tests/test_all.sh, no con un bucle propio",
       "clase": "lint-doc",
