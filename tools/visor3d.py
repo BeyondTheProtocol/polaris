@@ -1544,6 +1544,12 @@ def realce(raices, pre, post, registro="rigido"):
             "dice_cuerpo_antes": antes, "dice_cuerpo_despues": despues,
             "retraso_contraste_s": m_post.get("retraso_contraste_s"),
             "espaciado_mm": m_post["espaciado_mm"]}
+    if registro == "rigido":
+        # La transformada rígida pre→post se guarda con su sha256, como el cruce PET (2-oct-26,
+        # propuesta del buzón de Vega): sin ella la resta no se puede rehacer ni auditar.
+        info["transformada"] = guarda_transformada(
+            tx, destino.replace(".nii.gz", ".tfm.h5"),
+            sentido="fijo (post) → móvil (pre), para sitk.Resample")
     json.dump(info, open(info_p, "w"), ensure_ascii=False, indent=1)
     return destino, info
 
@@ -5832,7 +5838,7 @@ def _registra_higado(mask_fijo_ruta, mask_movil_ruta, label_fijo, label_movil):
     return comp, d_rig, dice(comp), fijo_img
 
 
-def guarda_transformada(t, ruta):
+def guarda_transformada(t, ruta, sentido="fijo (TC del PET) → móvil (TC diagnóstico), para sitk.Resample"):
     """sitk.WriteTransform a .h5 (el campo de Demons necesita HDF5) → {fichero, sha256, sentido}."""
     import SimpleITK as sitk
     exige_zona_clinica(os.path.dirname(ruta))
@@ -5844,8 +5850,7 @@ def guarda_transformada(t, ruta):
         t = sitk.CompositeTransform(t)
         t.FlattenTransform()
     sitk.WriteTransform(t, ruta)
-    return {"fichero": os.path.basename(ruta), "sha256": _sha256(ruta),
-            "sentido": "fijo (TC del PET) → móvil (TC diagnóstico), para sitk.Resample"}
+    return {"fichero": os.path.basename(ruta), "sha256": _sha256(ruta), "sentido": sentido}
 
 
 def pet_vigente(pet, info):

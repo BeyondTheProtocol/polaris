@@ -147,6 +147,9 @@ VEGA_DAEMONS = (
     # de convertirse en alerta humana — los otros VEGA_DAEMONS no son KeepAlive, así que no aplica.
     {"agente": "bot-telegram", "label": "el bot de Telegram (recepción de tus mensajes)",
      "cadencia_h": 4 / 60.0, "agentico": False, "daemon_label": "com.btp.bot-telegram"},
+    # 2-oct-26: la copia de seguridad (04:30). backup.sh solo late con copia hecha; dos noches sin
+    # copia (disco sin montar, permiso, restic roto) y el latido envejece → aviso.
+    {"agente": "backup", "label": "la copia de seguridad (04:30)", "cadencia_h": 49, "agentico": False},
 )
 # Estados de heartbeat que NO son problema: ok + el salto frugal de la centralita/gate + la pausa
 # nocturna (todos normales, no gastan ni indican fallo).

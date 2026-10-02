@@ -51,6 +51,17 @@ fi
 
 log(){ echo "$(date '+%Y-%m-%dT%H:%M:%S') backup: $*" | tee -a "$LOG"; }
 
+# Latido (2-oct-26, propuesta del buzón de Vega): nadie vigilaba el daemon de las 04:30 y ya falló
+# 13 días en silencio. Se escribe SOLO con copia hecha («ok») o con error real; un día sin disco no
+# escribe nada, así que si pasan dos noches sin copia el latido envejece y healthcheck lo canta
+# (VEGA_DAEMONS, agente «backup»). BTP_HB_DIR es solo para el test.
+hb(){
+  local d="${BTP_HB_DIR:-$SRC_REPO/tools/state/heartbeat}"
+  mkdir -p "$d" 2>/dev/null || return 0
+  printf '{"agente":"backup","ts":"%s","estado":"%s","modelo":"-"}\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" > "$d/backup.json.tmp" && mv "$d/backup.json.tmp" "$d/backup.json"
+}
+
 # Guard 1: disco montado y escribible
 if ! mount | grep -q " on $REPO_DRIVE "; then
   log "POLARIS-BACKUP no montado → salto (no es error)."; exit 0
@@ -81,7 +92,7 @@ restic backup "${SRC[@]}" \
 rc=$?
 # 0 = ok · 3 = backup hecho pero algún fichero no se pudo leer (warning, no fatal)
 if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
-  log "ERROR: restic backup salió con rc=$rc"; exit "$rc"
+  log "ERROR: restic backup salió con rc=$rc"; hb "error_rc_$rc"; exit "$rc"
 fi
 [ "$rc" -eq 3 ] && log "aviso: algunos ficheros no se pudieron leer (rc=3), copia hecha igual."
 
@@ -95,4 +106,5 @@ restic check --password-command "$PASS_CMD" >>"$LOG" 2>&1 \
   && log "check OK" || log "AVISO: check reportó problemas (revisar $LOG)"
 
 log "=== fin (rc backup=$rc) ==="
+hb ok
 exit 0

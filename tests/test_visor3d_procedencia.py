@@ -232,6 +232,12 @@ ok("guarda_transformada(" in fuente_suv and '"procedencia": sello' in fuente_suv
    and '"transformada": tfm' in fuente_suv,
    "suv_lesiones() ya no guarda la transformada o no sella el cruce PET")
 ok("pet_vigente(" in inspect.getsource(V.ficha), "ficha() usa PET sin comprobar su sello")
+fuente_realce = inspect.getsource(V.realce)
+ok("guarda_transformada(" in fuente_realce and 'info["transformada"]' in fuente_realce,
+   "realce() ya no guarda la transformada rígida pre→post con su sha256")
+t2 = V.guarda_transformada(rig, os.path.join(V._dir("pet"), "pre_post.tfm.h5"), sentido="fijo (post) → móvil (pre)")
+ok(t2["sentido"] == "fijo (post) → móvil (pre)" and len(t2["sha256"]) == 16,
+   "guarda_transformada no respeta el sentido pedido: %s" % t2)
 
 if fallos:
     print("FALLOS:\n  " + "\n  ".join(fallos))
