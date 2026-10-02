@@ -43,6 +43,8 @@ def main():
     cr.ROJO_MD = os.path.join(tmp, "CODIGO-ROJO.md")
     cr.salida.alerta_critica = lambda t: (_alertas.append(t) or {"delivered": True, "reason": "stub"})
     cr._stop_launchd = lambda: None     # no tocar launchd en el test
+    _encendidos = []
+    cr._start_launchd = lambda: _encendidos.append(1)   # ni encenderlo (2-oct-26)
 
     # trigger: para todo + explica + avisa
     cr.trigger("la biopsia se borró por un fallo mío", "detalle técnico del incidente")
@@ -63,6 +65,7 @@ def main():
     os.environ["BTP_PRESENCE_OK"] = "1"
     check("clear con presencia → levanta", cr.clear() is True)
     check("HALT retirado tras clear humano", not any(os.path.exists(h) for h in cr.HALT_FILES))
+    check("clear humano vuelve a encender el lazo (y el bloqueado no)", _encendidos == [1])
     os.environ.pop("BTP_PRESENCE_OK", None)
 
     print("RESULTADO código rojo: %d OK, %d fallos" % (_pass, _fail))

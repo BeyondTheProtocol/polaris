@@ -272,8 +272,22 @@ def clear(motivo="resuelto por {{TITULAR}}"):
             os.remove(HUELLAS)
     except Exception as e:
         sys.stderr.write("codigo_rojo.clear: no pude limpiar las huellas (%r)\n" % e)
+    # Vuelve a ENCENDER el lazo (2-oct-26). `trigger` lo apaga (`btp_run stop`) y levantar el HALT
+    # no lo encendía: tras el código rojo de esa mañana, {{TITULAR}} lo levantó y el dispatcher y el bot
+    # de Telegram siguieron descargados, así que Vega no la oía ni corría la cola. `start` es gate
+    # de {{TITULAR}}, y esto ya es su acto humano (BTP_PRESENCE_OK).
+    _start_launchd()
     print("código rojo levantado:", motivo)
     return True
+
+
+def _start_launchd():
+    try:
+        subprocess.run(["bash", BTP_RUN, "start"], timeout=60,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as e:
+        sys.stderr.write("codigo_rojo: btp_run start falló (%r): enciéndelo con "
+                         "`bash tools/btp_run.sh start`\n" % e)
 
 
 def main(argv):

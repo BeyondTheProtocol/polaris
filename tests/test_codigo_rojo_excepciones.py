@@ -26,6 +26,7 @@ llamadas = []
 codigo_rojo._halt_all = lambda *a, **k: llamadas.append("halt")
 codigo_rojo._write_report = lambda *a, **k: llamadas.append("informe")
 codigo_rojo._stop_launchd = lambda *a, **k: llamadas.append("stop")
+codigo_rojo._start_launchd = lambda *a, **k: llamadas.append("start")
 codigo_rojo._debe_avisar = lambda *a, **k: (True, "test")
 codigo_rojo.salida.alerta_critica = lambda *a, **k: llamadas.append("alerta") or {"reason": "espia"}
 

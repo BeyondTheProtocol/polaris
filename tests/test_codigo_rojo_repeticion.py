@@ -33,6 +33,7 @@ cr.ROJO_MD = os.path.join(_TMP, "CODIGO-ROJO.md")
 cr.HUELLAS = os.path.join(_TMP, "huellas.json")
 cr.BTP_RUN = os.path.join(_TMP, "no-existe.sh")
 cr._stop_launchd = lambda: None
+cr._start_launchd = lambda: None   # clear() ya no puede encender el lazo de verdad
 
 _alertas = []
 cr.salida.alerta_critica = lambda t: (_alertas.append(t) or {"delivered": True, "reason": "stub"})
