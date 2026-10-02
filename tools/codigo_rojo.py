@@ -175,9 +175,60 @@ def _stop_launchd():
         sys.stderr.write("codigo_rojo: btp_run stop falló (%r)\n" % e)
 
 
+EXCEPCIONES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config",
+                           "codigo_rojo_excepciones.json")
+
+
+def excepcion(motivo, detalle=""):
+    """La excepción de {{TITULAR}} que cubre este motivo, o None (2-oct-26).
+
+    El 25-sep {{TITULAR}} pidió que su pauta metabólica con Lola no disparara el código rojo, y quedó
+    solo en una memoria. El 2-oct un job del comité médico, que no la ve, lo volvió a disparar por
+    lo mismo y paró todo el sistema (también el parte de la mañana). Su decisión, repetida:
+    «es algo paralelo que probaré, sin dejar la medicación con evidencia». Por eso vive aquí,
+    determinista, y no en una memoria. Nunca cubre una señal de daño real (`salvo`)."""
+    try:
+        with open(os.environ.get("BTP_CR_EXCEPCIONES") or EXCEPCIONES, encoding="utf-8") as fh:
+            exc = json.load(fh).get("excepciones", [])
+    except Exception:  # noqa: BLE001  sin fichero o roto → sin excepciones (fail-closed: dispara)
+        return None
+    texto = ("%s\n%s" % (motivo or "", detalle or "")).lower()
+    for e in exc:
+        if any(re.search(p, texto) for p in e.get("salvo", [])):
+            continue
+        if any(re.search(p, texto) for p in e.get("si", [])):
+            return e
+    return None
+
+
+def _apuntar_excepcion(e, motivo):
+    """Sin parar nada, que Vega lo vea: una línea en su buzón."""
+    try:
+        import seguimiento
+        p = os.path.join(seguimiento.STATE, "vega", "propuestas_hilos.jsonl")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                                 "titulo": "Código rojo NO disparado (excepción «%s» decidida por "
+                                           "{{TITULAR}}): %s" % (e.get("id"), str(motivo)[:200]),
+                                 "origen": "codigo_rojo", "clinico": True,
+                                 "nota": "no repetirle el sermón; solo enseñarle el semáforo si "
+                                         "cambia algo"}, ensure_ascii=False) + "\n")
+    except Exception as ex:  # noqa: BLE001
+        sys.stderr.write("codigo_rojo: no pude apuntar la excepción (%r)\n" % ex)
+
+
 def trigger(motivo, detalle=""):
     """Activa el código rojo: para todo, explica, avisa fuerte. Idempotente y best-effort
-    en cada paso (un fallo no impide los demás)."""
+    en cada paso (un fallo no impide los demás). Salvo una decisión deliberada de {{TITULAR}}
+    registrada en `config/codigo_rojo_excepciones.json` (y sin señal de daño real)."""
+    e = excepcion(motivo, detalle)
+    if e:
+        _apuntar_excepcion(e, motivo)
+        sys.stderr.write("🟡 código rojo NO disparado: excepción «%s» decidida por {{TITULAR}} (%s)\n"
+                         % (e.get("id"), ", ".join(e.get("decidido", []))))
+        return {"delivered": False, "blocked": False, "excepcion": e.get("id"),
+                "reason": "excepción de {{TITULAR}}: %s" % e.get("id")}
     # Se mira ANTES de parar: una vez puesto el HALT ya no se puede saber si venía de antes, y
     # esa diferencia es la que distingue «esta condición sigue sin resolverse» de «volvió».
     habia_halt = any(os.path.exists(h) for h in HALT_FILES)
