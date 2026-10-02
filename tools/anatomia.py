@@ -238,7 +238,11 @@ FAMILIAS = [
                           "reescribe_consulta", "eval_reescritura",
                           # reinicia el historial del espejo si algo privado ya salió (25-sep-26);
                           # sin esto caía en «el caso clínico» por llevar «historial» en el nombre
-                          "espejo_reiniciar")),
+                          "espejo_reiniciar",
+                          # laminillas DFCI (2-oct-26): jaulas SBPL, ventanilla enjaulada y la
+                          # Puerta de N1 (única boca de N1); van ANTES que «laminillas_» del caso
+                          "laminillas_jaulas", "laminillas_ventanilla", "laminillas_exporta",
+                          "puerta_n1", "exporta_n1")),
     ("el caso clínico", ("cascada", "contexto_caso", "elegibilidad", "nct",
                          "estado_actual",   # fecha de §1 de ESTADO-ACTUAL: candado del perfil N1 del radar
                          "invariante", "dosier", "ocr_informes", "postdicom",
@@ -248,6 +252,9 @@ FAMILIAS = [
                          "historial",
                          # mapa y vídeo 3D del hígado desde DICOM (19-sep-26)
                          "visor3d",
+                         # análisis de las laminillas DFCI: ingesta, congelación, segmentación,
+                         # registro, métricas, F3, H&E, capas del panel (2-oct-26)
+                         "laminillas_",
                          "clinico", "centinela_ned")),
     ("la boca (avisos)", ("salida", "avisos", "notif", "enviar", "telegram",
                           "bot_", "report", "=digest")),
@@ -315,7 +322,10 @@ FAMILIAS = [
                        "openrouter",
                        "enruta",     # enruta.py es quien ELIGE el modelo: aqui, no en «otras»
                        "local",      # local.py es el LLM que corre en casa (ollama), egress 0
-                       "modelo_mlx")),  # el otro LLM de casa (MLX, egress 0) con sus frenos de memoria
+                       "modelo_mlx",    # el otro LLM de casa (MLX, egress 0) con sus frenos de memoria
+                       # adaptadores de salida de las laminillas: Gemini sobre N1 y CellViT++ en
+                       # GPU de Scaleway, enjaulados y tras trust-cloud (2-oct-26)
+                       "vision_n1", "nube_n1")),
     ("documentos", ("md_to_pdf", "drive", "_pdf", "pdf_")),
     ("la casa (infra)", ("_lock", "_net", "_xurl", "_casa", "activar_daemon", "backup",
                          "borde", "preview_remoto", "staging", "mcp_server",

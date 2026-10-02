@@ -1,0 +1,393 @@
+{
+ "actualizado": "2026-10-02T09:47:43",
+ "modelos": {
+  "histoplus": {
+   "commit": "cde2eee81af9e39b03802fc33d4f284733b5ee5e",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:50:02",
+   "ficheros": {
+    "README.md": {
+     "bytes": 7715,
+     "sha256": "be768d133fa23279bc51d00a45c86b470bf564d9e9cefb3b3479da6a7ba909e2"
+    },
+    "config.json": {
+     "bytes": 46,
+     "sha256": "b0947528bccaab382f7fc37f6df6364ca40875b6408011b58e307a7c2ae472c4"
+    },
+    "histoplus_cellvit_segmentor_40x.pt": {
+     "bytes": 285687206,
+     "sha256": "9cccb30d3d73535535bcec0e6d7f322a8ee1be1584bde13a558cf0a5d352ea5c"
+    }
+   },
+   "patrones": [
+    "config.json",
+    "histoplus_cellvit_segmentor_40x.pt",
+    "README.md"
+   ],
+   "repo": "Owkin-Bioptimus/histoplus",
+   "sello": "sellado-hoy"
+  },
+  "hoptimus1": {
+   "commit": "3592cb220dec7a150c5d7813fb56e68bd57473b9",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:50:01",
+   "ficheros": {
+    "README.md": {
+     "bytes": 6039,
+     "sha256": "43e14486f058782912d63d22ce27e2f1252eaf9e55ae8e2fd8ed416444dbc45e"
+    },
+    "config.json": {
+     "bytes": 452,
+     "sha256": "b10c4f37ce804ff58bec7f2ffd35cc29ecbfdb2b96ac81f3c1b3e37e2b27616e"
+    },
+    "model.safetensors": {
+     "bytes": 4539151464,
+     "sha256": "c4f1e5b457ddf00679626053b0bf2899be6a19c3a04ad191c87ad1cdfd1abfe1"
+    }
+   },
+   "patrones": [
+    "config.json",
+    "model.safetensors",
+    "README.md"
+   ],
+   "repo": "bioptimus/H-optimus-1",
+   "sello": "plan"
+  },
+  "instanseg": {
+   "estado": "OK",
+   "fecha": "2026-10-01T18:50:12",
+   "ficheros": {
+    "brightfield_nuclei/0.1.1/brightfield_nuclei_README.md": {
+     "bytes": 1406,
+     "sha256": "5882cdd33e76c5bea040d8ccb699a62539c32e6b3c66b39cd9634ca0a0f2fd23"
+    },
+    "brightfield_nuclei/0.1.1/cover.png": {
+     "bytes": 197014,
+     "sha256": "48ee7f4ccf6580b00de3820aa210a9a74431a4f1449b0b59661136716ec96d22"
+    },
+    "brightfield_nuclei/0.1.1/instanseg.pt": {
+     "bytes": 15792317,
+     "sha256": "0c724da169d507d8dd2e206ad3675a0b1566824eee6e20ad9a0ba916311d9dd0"
+    },
+    "brightfield_nuclei/0.1.1/instanseg_postprocess.ijm": {
+     "bytes": 2293,
+     "sha256": "0886f52737326dba0c6d53528909d746e75e0dce7a0cb41e855a648f8133ba88"
+    },
+    "brightfield_nuclei/0.1.1/instanseg_preprocess.ijm": {
+     "bytes": 799,
+     "sha256": "53376aec6738fb19eab1ace9308c383ee04e46af2a3acf7e70b5862919dca86c"
+    },
+    "brightfield_nuclei/0.1.1/rdf.yaml": {
+     "bytes": 2623,
+     "sha256": "57a28f865983f05b874dc2ad2c93570abaa53194e79aef63cfc5f9b4a88fd42a"
+    },
+    "brightfield_nuclei/0.1.1/test-input.npy": {
+     "bytes": 786560,
+     "sha256": "7249485eca44eefcaf9c8fcd9ce7f8ab5257082c49ecd0e9f62a818e8d4096db"
+    },
+    "brightfield_nuclei/0.1.1/test-output_instance_segmentation.npy": {
+     "bytes": 262272,
+     "sha256": "5dc0f7ed283f786ea4edc88714f6c2d4ae38e9eec2d00bb24b7f3c46060a7c6e"
+    }
+   },
+   "version": "0.1.1"
+  },
+  "kornia": {
+   "carpeta": "~/.polaris-venvs/cache/torch/hub/checkpoints",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:44:11",
+   "ficheros": {
+    "depth-save.pth": {
+     "bytes": 4375832,
+     "sha256": "9c2ee4ded238892dfa51569941372601e35e4a74aa6f84ea80053d2ab1c07abe"
+    },
+    "disk_lightglue_v0-1_arxiv-pth": {
+     "bytes": 47631405,
+     "sha256": "b5b21d47ea24f2c5e501aec9c91b9716e4c8c3429a4dc1e615c133c4c9378335"
+    }
+   },
+   "kornia": "0.8.1",
+   "torch": "2.7.1"
+  },
+  "lazyslide_models": {
+   "commit": "4d4b7bb3195870d2869fd9d9bd77c65235145819",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:50:05",
+   "ficheros": {
+    "GrandQC/GrandQC_MPP15_exported.pt2": {
+     "bytes": 32956302,
+     "sha256": "e89af014cc8183941712f55dc934b91fa1a9e112d94466dd4453fca180c74d5d"
+    },
+    "GrandQC/GrandQC_MPP15_jit.pt": {
+     "bytes": 25786112,
+     "sha256": "e7ead3b5f1e6af41decceb99ec4832d03acc4ee192bbcabc84c2f90d12a5feb3"
+    },
+    "GrandQC/GrandQC_MPP1_exported.pt2": {
+     "bytes": 32955873,
+     "sha256": "5e835313f1a5fb9f30189cf316094feb3f0244e37875c31f260d98d1dddd52a4"
+    },
+    "GrandQC/GrandQC_MPP1_jit.pt": {
+     "bytes": 25773515,
+     "sha256": "64a0ffd046c5f9d738ea46a7a1fab70606215246209c45ed8d6da7f83b0ec52e"
+    },
+    "GrandQC/GrandQC_MPP2_exported.pt2": {
+     "bytes": 32955873,
+     "sha256": "a8a4bd0d679d26e7d753fc6d7666c87120adb607beb5f859ae8cdb24744d05d8"
+    },
+    "GrandQC/GrandQC_MPP2_jit.pt": {
+     "bytes": 25783981,
+     "sha256": "0b8c387a276a54379a97da2192d6858b8369b57407458887b2a1d96acf7d4d24"
+    },
+    "GrandQC/GrandQC_tissue_seg_config.json": {
+     "bytes": 978,
+     "sha256": "7fd9df65fcf42d9acbc43714bbc413cc9bed5ecfaee16cc00b84f6e8ea87932a"
+    },
+    "GrandQC/GrandQC_tissue_seg_exported.pt2": {
+     "bytes": 29457527,
+     "sha256": "98cdc4b448c3fae6095e6afafd24481fa7254f45d5c7348fc037a1ef1478009a"
+    },
+    "GrandQC/GrandQC_tissue_seg_jit.pt": {
+     "bytes": 27260580,
+     "sha256": "dc868f605da37b47483ed886f1f999b52a8f1937da59826c03772d8df371f1ae"
+    },
+    "NuLite/NuLite_H_exported.pt2": {
+     "bytes": 198965185,
+     "sha256": "43d6c8288778345febbbea81f68902746415e1845eedd1a2d706cd545c77942b"
+    },
+    "NuLite/NuLite_M_exported.pt2": {
+     "bytes": 143605825,
+     "sha256": "cdde3e6002473f876695b21d0cb04c7e509b51e886a52bd7e5430c4d963ffa49"
+    },
+    "NuLite/NuLite_T_exported.pt2": {
+     "bytes": 52116858,
+     "sha256": "1ebbda02b924936dec1c701d91b3b4e5f1f98bb4523d41dfcaa246b86b705cfd"
+    },
+    "instanseg/instanseg_v0_1_0.pt": {
+     "bytes": 15799131,
+     "sha256": "6dee75ac3d09c7e44d4549a61fe7a3ee058ca489d141c1f9a94bf0c6f039b382"
+    }
+   },
+   "patrones": [
+    "instanseg/instanseg_v0_1_0.pt",
+    "NuLite/*_exported.pt2",
+    "GrandQC/*"
+   ],
+   "repo": "RendeiroLab/LazySlide-models",
+   "sello": "sellado-hoy"
+  },
+  "medgemma": {
+   "commit": "290cda5eeccbee130f987c4ad74a59ae6f196408",
+   "estado": "OK",
+   "fecha": "2026-10-02T09:47:43",
+   "ficheros": {
+    "README.md": {
+     "bytes": 35060,
+     "sha256": "3717e58eac9c9957c8f80e58d8f3e4854759da9f7abe76862aa100ce8b5d3aab"
+    },
+    "added_tokens.json": {
+     "bytes": 35,
+     "sha256": "50b2f405ba56a26d4913fd772089992252d7f942123cc0a034d96424221ba946"
+    },
+    "chat_template.jinja": {
+     "bytes": 1532,
+     "sha256": "7de1c58e208eda46e9c7f86397df37ec49883aeece39fb961e0a6b24088dd3c4"
+    },
+    "config.json": {
+     "bytes": 2469,
+     "sha256": "d718c800cdb5f40322010f57c6489944ab202b4622dc5f63e61b2a57d5df3b8e"
+    },
+    "generation_config.json": {
+     "bytes": 156,
+     "sha256": "3fd266fac5b39a46ddeb721536ed699ef10d8fac86301af7bc3eaef31f46c195"
+    },
+    "model-00001-of-00002.safetensors": {
+     "bytes": 4961251752,
+     "sha256": "acd1c5fbeda43edbd93f164edc23844da1cb6136d0af5120c7ece561be8fbd01"
+    },
+    "model-00002-of-00002.safetensors": {
+     "bytes": 3639026128,
+     "sha256": "1bed82e64597da81b1e663c59c4dae77df93edf8af95221054b541225d4f0313"
+    },
+    "model.safetensors.index.json": {
+     "bytes": 90558,
+     "sha256": "77f4b67de084c31c7bcd373b039908108eee6c6181607e6d53da730e5f0bc659"
+    },
+    "preprocessor_config.json": {
+     "bytes": 570,
+     "sha256": "f688d6bb20c5017601c4011de7ca656da8485b540b05013efdaf986c0fcc918d"
+    },
+    "processor_config.json": {
+     "bytes": 70,
+     "sha256": "3ffd5f11778dc73e2b69b3c00535e4121e1badf7018136263cd17b5b34fbaa53"
+    },
+    "special_tokens_map.json": {
+     "bytes": 662,
+     "sha256": "2f7b0adf4fb469770bb1490e3e35df87b1dc578246c5e7e6fc76ecf33213a397"
+    },
+    "tokenizer.json": {
+     "bytes": 33384570,
+     "sha256": "7d4046bf0505a327dd5a0abbb427ecd4fc82f99c2ceaa170bc61ecde12809b0c"
+    },
+    "tokenizer.model": {
+     "bytes": 4689074,
+     "sha256": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c"
+    },
+    "tokenizer_config.json": {
+     "bytes": 1157001,
+     "sha256": "31e860fdfa360fa5aa58fe93252799facde5a52d1352f77d45978ab2a7e9eeb1"
+    }
+   },
+   "patrones": [
+    "*.json",
+    "*.safetensors",
+    "chat_template.jinja",
+    "tokenizer.model",
+    "README.md"
+   ],
+   "repo": "google/medgemma-4b-it",
+   "sello": "sellado-hoy"
+  },
+  "titan": {
+   "commit": "dac6773d9961cfc75503440676ff157a2c6e8d2e",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:49:53",
+   "ficheros": {
+    "README.md": {
+     "bytes": 9394,
+     "sha256": "e08c9475dcb8a130b71bd3a5b0224d103d884700feab0257a2177f6e26b5e715"
+    },
+    "conch_tokenizer.py": {
+     "bytes": 1647,
+     "sha256": "c5b6fea53a338e08d0994eb73f70cda28c1382776f3d1479ff4702ce3569b2bd"
+    },
+    "conch_v1_5.py": {
+     "bytes": 26073,
+     "sha256": "a195b9a985e54cfbedd875952518b3caeb96831420e2bcfa117c9cb6700930dd"
+    },
+    "conch_v1_5_pytorch_model.bin": {
+     "bytes": 1224549846,
+     "sha256": "09daf1912a016512e084636f9c76eee7c42f5c1f09b0461bb76082a3e0fecfa5"
+    },
+    "config.json": {
+     "bytes": 6372,
+     "sha256": "2a8f8a4f325d471ee1ba0f719a4832ddbfe5b14fd5987c86ebb9f6cab5d064a6"
+    },
+    "configuration_titan.py": {
+     "bytes": 4149,
+     "sha256": "6a9140b9ba5bbd2a7ee558666bd1bdf9179710f5185d4eabadce0428e01f6f70"
+    },
+    "model.safetensors": {
+     "bytes": 635494504,
+     "sha256": "4e92128317dca5c9e47d8173467105c21e4095f88d3bde9077e7f1e784b195fe"
+    },
+    "modeling_titan.py": {
+     "bytes": 3711,
+     "sha256": "6434f78bca94f6c17223ef323aa1ac733f4c36a7473e8c7eed7d9e0348327c62"
+    },
+    "special_tokens_map.json": {
+     "bytes": 93,
+     "sha256": "0085bc156594799b15ed6a988131086190468d3d966a9e2f978cc1217176743a"
+    },
+    "text_transformer.py": {
+     "bytes": 19005,
+     "sha256": "8f44027925799cb1289d7ef0c8adaf60555d841e22292f2e8003149f2141d90a"
+    },
+    "tokenizer.json": {
+     "bytes": 1644583,
+     "sha256": "d5005e3ff6e9fb47e1fc2ec594a4549c571ab7c080c29a1809dd228c60d1eb64"
+    },
+    "tokenizer_config.json": {
+     "bytes": 1476,
+     "sha256": "ed79658c85a6ffb63070ca81df16c80eb826b7b5c56a57387bbb368b6b46dd14"
+    },
+    "vision_transformer.py": {
+     "bytes": 25134,
+     "sha256": "6d5479b832f5bc70f028a74e4e813e8f28abf017604429201a1b728168330895"
+    }
+   },
+   "patrones": [
+    "*.py",
+    "*.json",
+    "model.safetensors",
+    "conch_v1_5_pytorch_model.bin",
+    "README.md"
+   ],
+   "repo": "MahmoodLab/TITAN",
+   "sello": "plan"
+  },
+  "uni2h": {
+   "commit": "d517a8dd47902dd7c308b3c36f63bce47e7b9a43",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:49:48",
+   "ficheros": {
+    "README.md": {
+     "bytes": 12253,
+     "sha256": "d0c283892c0fddc0b5571c02d37ff7c923647b6381c3f2fcd970a3484322b244"
+    },
+    "config.json": {
+     "bytes": 587,
+     "sha256": "8b207fbff3e34884fd225b2d52e8ff51b728a1d0ac2fe8bb2b8db8011308ac98"
+    },
+    "pytorch_model.bin": {
+     "bytes": 2725669217,
+     "sha256": "6e077eda234bebc595868d918d3458d9dd32a050199b0ff04443b2f46a0a3b1e"
+    }
+   },
+   "patrones": [
+    "config.json",
+    "pytorch_model.bin",
+    "README.md"
+   ],
+   "repo": "MahmoodLab/UNI2-h",
+   "sello": "plan"
+  },
+  "wsinfer_brca": {
+   "commit": "c5ec40082ddb51c46c6362665faa0eb6e8c21a44",
+   "estado": "OK",
+   "fecha": "2026-10-01T18:50:03",
+   "ficheros": {
+    "README.md": {
+     "bytes": 928,
+     "sha256": "3f3d9a1d1f57232377b8b58018b58d6498eda51b980b80268119a5ec2aaa76e5"
+    },
+    "config.json": {
+     "bytes": 554,
+     "sha256": "49e0455c9424440348f13f962c936c2fdaf84e76be2bd4d1c9987189716d77b2"
+    },
+    "torchscript_model.pt": {
+     "bytes": 85337454,
+     "sha256": "663d25424a7ef7390a260c48c741e516893983dd203824f5844279fa8811c941"
+    }
+   },
+   "patrones": [
+    "config.json",
+    "torchscript_model.pt",
+    "README.md"
+   ],
+   "repo": "kaczmarj/breast-tumor-resnet34.tcga-brca",
+   "sello": "sellado-hoy"
+  },
+  "wsinfer_zoo": {
+   "commit": "main",
+   "estado": "OK",
+   "fecha": "2026-10-01T19:03:15",
+   "ficheros": {
+    "config.json": {
+     "bytes": 554,
+     "sha256": "49e0455c9424440348f13f962c936c2fdaf84e76be2bd4d1c9987189716d77b2"
+    },
+    "torchscript_model.pt": {
+     "bytes": 85337454,
+     "sha256": "663d25424a7ef7390a260c48c741e516893983dd203824f5844279fa8811c941"
+    },
+    "wsinfer-zoo-registry.json": {
+     "bytes": 1613,
+     "sha256": "ff2a62cdddab194c160a41d8718560918b015e1c6a2a5f49490d83790240ca11"
+    }
+   },
+   "main_hoy": "c5ec40082ddb51c46c6362665faa0eb6e8c21a44",
+   "repo": "kaczmarj/breast-tumor-resnet34.tcga-brca",
+   "sello": "registro-wsinfer-zoo"
+  }
+ }
+}

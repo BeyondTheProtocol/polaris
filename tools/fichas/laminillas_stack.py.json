@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_stack.py",
+ "estado_ficha": "completa",
+ "para": "Instala y sella los venvs ~/.polaris-venvs/patologia y valis DENTRO de red-sin-zona.sb (entorno fregado, sin zona clínica ni Llavero) y versiona su pip freeze con sha256 en tools/laminillas_stack/.",
+ "cuando_si": "Para crear, ampliar o sellar los venvs de laminillas, o correr pip en la jaula.",
+ "cuando_no": "No instalar fuera de la jaula; si pip falla por TLS se arregla la regla mach del perfil.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

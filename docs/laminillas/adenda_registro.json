@@ -1,0 +1,1170 @@
+{
+ "autoriza": "plan eventual-puzzling-chipmunk, actualizacion 20 (mandato de {{TITULAR}} ~11:45 UTC) y su clausula de integridad",
+ "campos_que_rellena_el_implementador": [
+  "sello_base.sha256",
+  "fecha_sellado_utc",
+  "estado",
+  "sha256"
+ ],
+ "clasificacion": "desviacion declarada por error de especificacion (validez del modelo, de la topologia y del instrumento), autorizada por la patrocinadora tras la exposicion del orquestador; no es error de ejecucion ni recongelacion",
+ "criticos": {
+  "metodologo": {
+   "aceptadas": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    15,
+    16,
+    17,
+    18,
+    19
+   ],
+   "aceptadas_con_matiz": {
+    "12": "E4 reescrita; la medida v1 en HER2NEG-HER2 va a anexo_desarrollo",
+    "14": "egress: necesita OK de {{TITULAR}}; por defecto internal only",
+    "5": "cambios de codigo antes de la primera confirmacion no cuentan"
+   },
+   "rechazadas": {},
+   "veredicto": "apto con cambios (7 bloqueantes)"
+  },
+  "posteriores_sin_critico": {
+   "estado": "YA REVISADOS: segunda revision del metodologo sobre 74acc82 (no apto, 6 bloqueantes; 1.3, 1.4 y 2.1 cambiaron la estadistica) y revision final sobre a760cd9 (un bloqueante de redaccion, B1); todo corregido en esta version",
+   "incorporados": [
+    "cadena por vecinos con orden por persistencia de textura y propagacion con Lambda",
+    "dos rutas al 97.5 %",
+    "VALIS en modo serie como sensibilidad",
+    "centinela del desplazamiento 0",
+    "escala de arquitectura como analisis secundario de ultimo recurso con lista cerrada"
+   ],
+   "origen": "datos de 995fb22, llegados despues de las dos criticas",
+   "rechazados": {
+    "marco_central": "choca con la lista blanca (regla_L ancla a P-CK19)"
+   }
+  },
+  "registro": {
+   "aceptadas": [
+    2,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    20
+   ],
+   "aceptadas_con_matiz": {
+    "1": "RANSAC de scikit-image para similitud y afin (no cv2.UsacParams)",
+    "15": "resuelta al retirar R3b",
+    "4": "e_final aceptado; SyN retirado en vez de reparametrizado"
+   },
+   "rechazadas": {
+    "3_bloques_800um": "con FC de 1.4-3.0 mm2 ninguno llegaria a 10 bloques; se usan 600 um con franja de 100 um y 5 origenes (aceptados)"
+   },
+   "veredicto": "no apto tal cual (6 bloqueantes corregibles)"
+  },
+  "revision_final_metodologo": {
+   "aceptadas": {
+    "B1": "97.5 % nominal; eleccion de peldano no corregida por multiplicidad (falso pase hasta K x 2.5 %); cobertura del procedimiento medida por V12; alternativa 1-0.025/(K*m) declarada y no adoptada",
+    "I1": "origenes +34...+38; sorteo en +33; test de semillas distintas; el sorteo con +13 no se ejecuto",
+    "I2": "'RE, con DAB saturado' venia del reconocimiento del plan; pasa a 'si su DAB satura'; sensibilidad por mecanismo (solo intermedias de SUELO)",
+    "I3": "veto de vecindad solo al certificar a escala de vecindad, en las dos rutas; en arquitectura solo el veto de los extremos de arquitectura",
+    "menores": [
+     "V9.referencia corregida",
+     "'de redaccion' corregido",
+     "formula y tabla n_min hasta m=10",
+     "estadistico del veto con < 10 ventanas = maximo; fraccion sin veto informada",
+     "V3a-c y V3a-s",
+     "Held-Karp siempre en el maximo",
+     "(a): sensibilidad definida por mecanismo (SUELO)"
+    ]
+   },
+   "rechazadas": {},
+   "sobre": "a760cd9",
+   "veredicto": "no apto por un solo bloqueante de redaccion (B1); las seis anteriores, resueltas"
+  },
+  "segunda_revision_metodologo": {
+   "aceptadas": [
+    "1.1",
+    "1.2",
+    "1.3",
+    "1.4",
+    "2.1",
+    "2.2",
+    "1.5",
+    "1.6",
+    "1.7a",
+    "2.3",
+    "2.4",
+    "3.1",
+    "3.2",
+    "4.2",
+    "menores"
+   ],
+   "aceptadas_con_cambio": {
+    "1.4": "n minimo recalculado 36/86/142 (yo habia escrito 147)",
+    "1.7b": "detector ampliado a toda diana intermedia; NO se excluyen solo las NE (rompe la simetria luminal/NE de {{TITULAR}}; el mismo riesgo valdria para una luminal si su DAB satura); excluir por DAB usaria datos de diana; sensibilidad redefinida por mecanismo en la revision final: solo intermedias de SUELO",
+    "2.1": "anado >= 2 ventanas sin solape en arquitectura (inferencia)",
+    "2.2": "anado a V12 una serie con p90 60 um por salto",
+    "3.2": "sorteo con semilla +33 (no +13, que choca con V12); resultado P-P63"
+   },
+   "rechazadas": {},
+   "veredicto": "no apto (6 bloqueantes; 1.3, 1.4 y 2.1 cambiaron la estadistica, no solo la redaccion)"
+  },
+  "via": "los informes llegaron al orquestador, que los reenvio en resumen fiel y sin cifras de diana"
+ },
+ "cronologia_utc": [
+  {
+   "cuando": "07:54-08:36",
+   "que": "primera pasada: (ii) < 50 % por protocolo"
+  },
+  {
+   "cuando": "antes de 10:59",
+   "que": "tercera pasada: VALIS rechazado por valis_escala_tol antes de TRE"
+  },
+  {
+   "cuando": "10:59:12",
+   "que": "el orquestador ve el % de Ki67 de la escalera"
+  },
+  {
+   "cuando": "11:14:24",
+   "que": "lo ve un subagente de diagnostico"
+  },
+  {
+   "cuando": "~11:45",
+   "que": "mandato de {{TITULAR}} (actualizacion 20)"
+  },
+  {
+   "cuando": "~11:53 y 11:58",
+   "que": "diagnosticos de geometria KI67-CK19 y HER2NEG-CK19"
+  },
+  {
+   "cuando": "12:26",
+   "que": "primer borrador de esta adenda"
+  },
+  {
+   "cuando": "~12:45-13:10",
+   "que": "revision de dos criticos; diagnostico numerico commiteado (995fb22) con el control HER2NEG-HER2; la adenda incorpora ambos"
+  },
+  {
+   "cuando": "~13:20-13:40",
+   "que": "commit 74acc82; segunda revision del metodologo (no apto, 6 bloqueantes; 1.3, 1.4 y 2.1 cambiaron la estadistica); corregidos"
+  },
+  {
+   "cuando": "~13:40-14:00",
+   "que": "commit a760cd9; revision final del metodologo (no apto por un bloqueante de redaccion, B1); corregido aqui"
+  }
+ ],
+ "efectos_aguas_abajo": {
+  "L": "L >= 2x tre_p90_um exportado (= U95)",
+  "camino_minimo": "composicion por el camino minimo A...B sin rodeo por CK19 (test +-2 um)",
+  "consenso_fc": "mascara provisional; piezas",
+  "densidad_lista_3": "con transformada v2",
+  "dilatacion_fondo_f3": "1x TRE v2",
+  "erosion_ck19": "1x U95",
+  "escala_arquitectura": "solo Spearman regional de (a) a L en {300, 400} y el mapa, como ultimo recurso; nunca sustituye a (ii), (a), (a-bis) ni al denominador CK19",
+  "fragmento_pequeno": "puntos, no picos",
+  "geojson_visor": "inversas v2",
+  "mapa_a": "2x p90 <= L con TRE v2",
+  "orden_cortes": "pasa de informativo a operativo (cadena)",
+  "puerta_iii": "mismo modelo",
+  "puerta_p63": "registro v2",
+  "test": "cada consumidor lee el valor v2 y el sha de la adenda",
+  "trazabilidad": "todo producto lleva adenda_registro_sha256 y anexo_validacion_sha256; cache de _valor_L se invalida si cambian",
+  "veto_ib": "un unico campo: veto_ib_por_escala",
+  "vuelta_valis": "paso (i) y (ii)"
+ },
+ "entorno": {
+  "ants": "fuera (R3b retirado)",
+  "fuente_hashes": "JSON de PyPI descargados en esta sesion (registro_inv/pypi_*.json); sin instalar",
+  "procesador": {
+   "mem_gb": 6,
+   "nombre": "laminillas_registro2",
+   "perfil": "analisis",
+   "venv": "registro"
+  },
+  "venv_registro": {
+   "fijos": {
+    "itk": "5.4.7",
+    "itk-elastix": "0.25.4",
+    "kornia": "0.8.1",
+    "torch": "2.7.1"
+   },
+   "python": "3.12",
+   "resto": "scikit-image, scipy, shapely, numpy, opencv: resolucion en seco y --require-hashes en red-sin-zona.sb; hashes en anexo_entorno",
+   "ruedas_sha256": {
+    "itk-5.4.7-cp311-abi3-macosx_11_0_arm64.whl": "c7c254419071b178bdf3b50b5542aaef5de3b54bc524b1f6fea72c62f531e590",
+    "itk_elastix-0.25.4-cp311-abi3-macosx_15_0_arm64.whl": "dbd05b6afeee6b25b3988bffcf92330d679a0e32195df8c430f87e231ea6ce3b",
+    "kornia-0.8.1-py2.py3-none-any.whl": "5dcb00faa795dfb45a3630d771387290bc4f40473451352ca250e5bcc81af3d1"
+   },
+   "ruta": "~/.polaris-venvs/registro"
+  }
+ },
+ "estado": "borrador-sellable",
+ "evidencia_geometrica": [
+  {
+   "estado": "verificado (Read)",
+   "hecho": "sello: 'euclidea, escala 1; no rigido despues'; plan: 'Escala 1 [inferido]'",
+   "id": "E1"
+  },
+  {
+   "estado": "verificado (resumen PMID 8168406); rata; solo resumen; validez externa limitada",
+   "hecho": "Jones 1994: cambio por corte -0.5 a 10.5 % segun tejido y direccion; DE 1.2-2.4 % sin musculo; hasta 4.2 puntos entre direcciones",
+   "id": "E2"
+  },
+  {
+   "estado": "verificado (PMC10704256)",
+   "hecho": "Lotz 2023: deformable supera a afin salvo > 16 um/px; HyReCo consecutivos afin 20.2 -> deformable 5.3 um mediana",
+   "id": "E3"
+  },
+  {
+   "estado": "verificado (diag_ki67.log, diag_her2neg.log, registration.py:71)",
+   "hecho": "VALIS similitud rechazada antes de TRE por valis_escala_tol 0.01: escala 1.0127, anisotropia 1.0003 (KI67-CK19); HER2NEG-CK19 1.0173; KI67 espejo 1.0077. Las cotas se eligieron conociendo esas escalas; las apoya Jones 1994 (rata, solo resumen)",
+   "id": "E4"
+  },
+  {
+   "estado": "verificado (diagnosticos, solo geometria)",
+   "hecho": "entre laminas lejanas (b)/(b') no pasa con ninguna de 7 transformadas: KI67 FC1 <= 14/135 (b), <= 10/135 (b'); FC2 <= 2/100; FC3 <= 2/59; HER2NEG FC1 <= 7/135 (b), <= 11/135 (b'); razon mediana 1.05-1.15 (umbral 1.5); pico NCC 0.11-0.14; contra si misma 135/135, razon 8.9",
+   "id": "E5"
+  },
+  {
+   "estado": "verificado",
+   "hecho": "ACROBAT (frase completa: cell-level no asumible, vecindades si; correspondencia celular imposible de determinar segun espaciado); Lotz: saturacion 15.5-7.8 um/px por correspondencias ausentes",
+   "id": "E6"
+  },
+  {
+   "estado": "verificado (diag_ki67.log)",
+   "hecho": "SIFT x8 ODsum: 91 putativas, 10 a < 100 um de VALIS; filtro init 500 um deja 2 (init a 634-750 um de VALIS); 3 inliers por FC; variantes no arreglan",
+   "id": "E7"
+  },
+  {
+   "estado": "verificado; piezas independientes = inferencia",
+   "hecho": "IoU de tejido x8 tras similitud global de VALIS 0.60 (KI67) y 0.58 (HER2NEG); FC1-3 = 6.64 de 7.00 mm2",
+   "id": "E8"
+  },
+  {
+   "estado": "31 sin verificar; grep verificado",
+   "hecho": "~31 sitios asumen euclidea 3x3; grep registro.py: 43 matriz_um, 23 _aplica, 18 linalg.inv, 3 EuclideanTransform, 12 angulo(",
+   "id": "E9"
+  },
+  {
+   "estado": "sin verificar",
+   "hecho": "control positivo HER2NEG-HER2 del diagnostico murio por memoria (19.7 GB)",
+   "id": "E10"
+  },
+  {
+   "estado": "113 inliers y 91/93 p90 5 um verificados en el mensaje del commit 995fb22 (git show); el resto, reenviado por el orquestador, no recotejado; el implementador no expuesto recoteja estas cifras desde el producto del diagnostico, salvo 113 inliers y 91/93",
+   "hecho": "control HER2NEG-HER2: SIFT 209 putativas, 113 inliers (por FC 131/22/47); (b) 91/93 (p90 5 um), 33/43, 44/48; NCC p50 0.44; razon 3.4. Frente a CK19: KI67 91/5/6, HER2NEG 86/3/3, HER2 112/1/3 (putativas/coherentes <50 um/inliers); (b) con VALIS 0-9 de 59-135; NCC 0.13; razon 1.10-1.13; KI67-HER2NEG 3 inliers",
+   "id": "E11"
+  },
+  {
+   "estado": "inferencia (agente de diagnostico y autor) sobre E11 y E6",
+   "hecho": "la textura a escala celular solo se conserva entre cortes cercanos; HER2NEG y HER2 contiguas o casi; CK19, KI67 y HER2NEG lejos entre si; error de especificacion tambien de topologia",
+   "id": "E12"
+  },
+  {
+   "estado": "reenviado por el orquestador, no recotejado; ruido = inferencia",
+   "hecho": "escala VALIS frente a CK19: 1.0127 (KI67), 1.0173 (HER2NEG), 1.0301 (HER2) con HER2NEG~HER2 -> ruido >= ~1 %; mapa de densidad v1 cae a ~100 um (p90 104-124) en FC2-3 del control donde SIFT y fase dan 8-15 um; desde VALIS da desplazamiento exactamente 0 en 6 de 9 FC (causa sin investigar)",
+   "id": "E13"
+  }
+ ],
+ "exposicion": {
+  "comprobacion_ciega_preespecificada": "tras congelar el registro, % de Ki67 sin registro dentro de los FC verificados frente a fuera; proceso no expuesto; sellado; solo tribunal",
+  "medidas": [
+   "autor, decisores e implementador no expuestos",
+   "todo sellado antes de KI67",
+   "validez solo en controles y sinteticos, desarrollo y confirmacion separados",
+   "canal que reduce el DAB y piezas desde mascara independiente de la tincion",
+   "gancho de auditoria y test: el registro no abre productos con cifras de diana",
+   "metricas sin cifras en el log (49ceffa); el orquestador no las lee antes del tribunal",
+   "el % de la escalera no se borra ni se usa: 'unregistered fallback computed before the re-specification', con la misma prominencia"
+  ],
+  "registro": [
+   {
+    "cuando_utc": "2026-10-02T10:59:12Z",
+    "estado": "notas de integridad (regex, valor nunca impreso)",
+    "que": "% global de Ki67 de la escalera (cola de piloto3.log)",
+    "quien": "orquestador principal"
+   },
+   {
+    "cuando_utc": "2026-10-02T11:14:24Z",
+    "estado": "notas de integridad",
+    "que": "idem",
+    "quien": "subagente 'Diagnosticar SIFT del registro real'"
+   },
+   {
+    "cuando_utc": "2026-10-02T03:06:39Z",
+    "estado": "sintetica = inferencia",
+    "que": "cifra con ese formato antes de la primera pasada real",
+    "quien": "subagente 'Orquestador del piloto por la ventanilla'"
+   },
+   {
+    "cuando_utc": null,
+    "estado": "lo cuenta el agente de integridad",
+    "que": "no lo se: no se le comunico en mensajes; pudo verla en la salida de una herramienta",
+    "quien": "{{TITULAR}}"
+   },
+   {
+    "cuando_utc": null,
+    "estado": "a completar por el agente de integridad",
+    "que": "quien la vio",
+    "quien": "informacion espacial de P-KI67 (hotspot, heterogeneidad, GeoJSON, visor, capas)"
+   },
+   {
+    "cuando_utc": null,
+    "estado": "a completar por el agente de integridad",
+    "que": "cifras de diana (recuento por regex sin imprimir)",
+    "quien": "piloto4.log y demas piloto*.log; transcripts posteriores a 07:54Z"
+   },
+   {
+    "cuando_utc": "2026-10-02",
+    "estado": "declarado",
+    "que": "no vio el % de Ki67; vio el reconocimiento DAB por pixel de 1-oct (con la fila de P-KI67) y agregados de CK19 y P-HER2; no uso ninguno",
+    "quien": "autor de esta adenda"
+   },
+   {
+    "cuando_utc": "2026-10-02",
+    "estado": "declarado",
+    "que": "instruidos para no abrir nada con cifras de diana",
+    "quien": "criticos adversariales"
+   },
+   {
+    "cuando_utc": null,
+    "estado": "solo geometria; la decision de diseno la tomo el autor no expuesto; declarado",
+    "que": "produjo la geometria que motiva la cadena; casi seguro el mismo subagente que vio la cifra a las 11:14:24 (lo confirma el agente de integridad, segun el orquestador)",
+    "quien": "agente del diagnostico numerico (995fb22), fuente de E11-E13"
+   },
+   {
+    "cuando_utc": "~13:10",
+    "estado": "declarado; el autor acepto la cadena, rechazo el marco central (lista blanca) y acepto la escala de arquitectura solo como analisis secundario de ultimo recurso con las restricciones del metodologo",
+    "que": "propuso la cadena por vecinos, el marco elegido por geometria y 'fijar la escala por la precision medida' (plan, actualizacion 20; mensaje tras 995fb22)",
+    "quien": "orquestador expuesto, como proponente"
+   }
+  ]
+ },
+ "fecha_borrador_utc": "2026-10-02T12:26:19Z",
+ "fecha_sellado_utc": null,
+ "libro_adendas": {
+  "regla": "cuarta adenda -> rechazo",
+  "ruta": "SESION/registro_adendas.jsonl",
+  "tipo": "solo se anade, encadenado por hash"
+ },
+ "lista_blanca_superposicion": [
+  "modulo_b.registro"
+ ],
+ "md": "docs/laminillas/adenda_registro.md",
+ "md_sha256": "7b0a2b54d401cd77d79ed34b9881b7524b2af899e1687e11ff5a3613a96cdcd5",
+ "metodos_en": "Per protocol, the pre-specified registration of the Ki67 slide directly to the CK19 reference (Euclidean, unit scale; accuracy check by nucleus-scale haematoxylin phase correlation requiring ≥15 valid peaks) verified <50% of the consensus area, and the pre-specified unregistered fallback was run; its slide-level Ki67 percentage was computed and seen by the orchestrating agent (2 Oct 2026, 10:59 UTC). Geometric diagnostics, run by an agent that had also seen that percentage, then showed that nucleus-scale texture is preserved only between near sections: the accuracy check passed on an adjacent control pair (the two HER2-labelled slides) and on self-registration, but failed for every non-adjacent pair under every candidate transform, including VALIS. At the sponsor's request (≈11:45 UTC), registration was re-specified ⟨k⟩ time(s) in sealed addenda (first draft 12:26 UTC; sha256 ⟨…⟩; internal timestamps only unless stated). The addenda were written by an author without access to that percentage (who had seen pixel-level DAB reconnaissance of all slides) and sealed before any registered target measurement. The chained design was proposed by the exposed orchestrating agent and adopted with restrictions after adversarial review. Slides are ordered by texture persistence, registered to their neighbours along the shortest path, and composed to the CK19 frame. Each hop fits per-fragment similarity, affine and constrained B-spline (elastix) models to DISK+LightGlue features of the smoothed haematoxylin channel, with VALIS as a fallback and, in serial mode, as a sensitivity analysis. Accuracy is an upper bound of the 90th-percentile error of the final transform, at a nominal 97.5% per candidate and route (chain or direct); the choice among model rungs within a route is not corrected for multiplicity, and the coverage of the whole procedure is measured on synthetic section stacks (Clopper-Pearson lower bound ≥ 0.90). It is estimated per hop by buffered spatial cross-validation on held-out feature landmarks, propagated along the chain with Lipschitz amplification and a union bound, and vetoed at the endpoints by nuclear-density architecture. Validity was established before use on control slide pairs (two inspected in the diagnostics and one randomly drawn, uninspected pair), negative controls, an independent structure-based reference, and synthetic deformations including at least 20 synthetic section stacks. Pairs whose bound is below 50 µm are reported at neighbourhood scale, as pre-specified. A secondary analysis at architecture scale (bound 50-200 µm; regional Spearman at L of 300 or 400 µm and the map only) was specified after the per-protocol registration failure and before any registered target measurement. It relaxes the protocol 50 µm gate, is used only as a declared last resort and never replaces the pre-specified analyses. Both the per-protocol (unregistered) and the re-specified (registered) results are reported.",
+ "numero": 1,
+ "parada": {
+  "P1": "valido false en confirmacion: KI67 no se toca; el decisor no expuesto abre adenda con causa geometrica de desarrollo o confirmacion, sellada antes de confirmar otra vez",
+  "P2": "valido true y (ii) < 50 %: P2 se abre siempre (la escala de arquitectura no exime); una sola adenda motivada por el TRE de KI67, decidida por un agente no expuesto que solo ve motivos agregados; se desarrolla en controles; cuenta para el tope",
+  "P3": "con el candado de una diana su registro se congela; cambios posteriores = post hoc, dos versiones, tribunal",
+  "agotamiento": "libro con 3 adendas, o tras la adenda de P2 R1-R4 siguen dejando el area verificada a escala de vecindad < 50 %",
+  "certifica": "agente de integridad, contando en transcripts sin imprimir cifras",
+  "roles_no_expuestos": [
+   "implementador",
+   "decisor de P1/P2",
+   "declarante del agotamiento"
+  ],
+  "ultimo_recurso": [
+   "analisis secundario a escala de arquitectura (lista cerrada), solo en los pares que la certifiquen",
+   "para todo lo demas, escalera sin registro con la lista completa de lo intentado",
+   "nada de esto se presenta como resultado equivalente"
+  ]
+ },
+ "procedencia": {
+  "diag_her2neg.log": "8d45eea4258b03e6cf34a060eaf393c97a82640ece096d0f0bf4ed6a67052eb1",
+  "diag_ki67.log": "39e7ffb8ada42d9a9fb84ed601eac60eb231ae32721877d6329740baf6ddcb17",
+  "head_worktree": "49ceffa40847d7a836e7f53a3809be213ce76207",
+  "laminillas_congela.py": "a03aea0b45263d271fc7fb2a43b41cfa3afebcb99fd40c6e71ee6f15c9afb67d",
+  "laminillas_metricas.py": "25e6d5e132451a86e94c8133322f5c93952952982ddec3933e024989fa192865",
+  "laminillas_proc.py": "83a0d1e30dc8198f0d43b3cc589db45f9e4885cb5f53ed0b3de01a144ec85692",
+  "laminillas_registro.py": "a099384b1943698b0977e0377753407f262220eb5606da3e86188f0d33b7f742",
+  "laminillas_sello.py": "3169cba809092076fd8326255b9c20e8ce782f2af9aff0448185542374cb6da4",
+  "plan": "3be8d77d5c189f81f1315a9229fa301eb3c220e8f010e654cd780a0317ea00ab",
+  "revisado_1312Z": {
+   "head": "28c7d85f55d5b9e25b9556b5490edf01f9a549b4",
+   "laminillas_proc.py_sin_commitear_de_otro_agente": "cfcc49fa72eac0c7471ae58720dea2ed540e5159edc90d41f075b68dc9847191",
+   "laminillas_registro.py": "a099384b... (commiteado en 995fb22)",
+   "plan": "dddb619beb4d3b438ffc483a80f49a227273e33e6f78e5dffeeff1cfdd0246bb"
+  },
+  "revisado_1338Z": {
+   "head": "74acc82d2fd2a3f2190c34fc4898cba99b06e455",
+   "laminillas_proc.py": "ba5bd22f2b14c0b4ee08808f88265580b17ec28f04609790e3f1a8f0cdf9c3a3 (sin cambios sin commitear)",
+   "laminillas_registro.py": "a099384b1943698b0977e0377753407f262220eb5606da3e86188f0d33b7f742",
+   "verificado_en_codigo": [
+    "IHQ_CON_TEJIDO laminillas_congela.py:80 (11)",
+    "SERIE_IHQ laminillas_f3.py:71 (11)",
+    "REGLA_L rejilla_anclada='P-CK19' laminillas_congela.py:156"
+   ]
+  }
+ },
+ "regla_hash": "sha256 del JSON canonico (sort_keys, separadores ',' ':', UTF-8, sin NaN) sin el campo sha256 (= laminillas_sello.sha256_de)",
+ "resultado_por_protocolo": "(ii) KI67-CK19 < 50 % del area de consenso; rigio la escalera sin registro; se informa con la misma prominencia que el resultado re-especificado",
+ "sello_base": {
+  "como": "python3 tools/lector_clinico.py procesa laminillas_congela -- verifica (2-oct-2026); solo imprime 16 caracteres: los 64 los rellena el implementador al sellar",
+  "recongelado": true,
+  "sha256": null,
+  "sha256_prefijo_verificado": "d014ff7df6e4016e",
+  "tipo": "congelacion-tanda"
+ },
+ "sello_mecanismo": {
+  "activacion": "orden adenda-activa: SESION/adenda_registro.activa.json {sha256 adenda, sello base, fecha UTC}; sin activacion no corre v2; con ella v1 no corre (ii), (ii-bis), (iii)",
+  "anexos": [
+   {
+    "contenido": "pip freeze con hashes; sha256 de pesos DISK/LightGlue incluido el fichero en cache de torch.hub; versiones",
+    "nombre": "anexo_entorno"
+   },
+   {
+    "contenido": "tau, (w_p, w_b), orden de la cadena con su estabilidad, E11",
+    "nombre": "anexo_desarrollo"
+   },
+   {
+    "contenido": "commit y sha256 de cada tools/laminillas_*.py y sus tests en valida-registro",
+    "nombre": "anexo_codigo"
+   },
+   {
+    "contenido": "V1-V12 y valido",
+    "nombre": "anexo_validacion"
+   }
+  ],
+  "anexos_regla": "misma regla de hash; cada anexo cita al anterior; todos antes de la primera corrida con P-KI67",
+  "candado": "SESION/registro_congelado/<diana>.json, solo se anade, UTC; lo escribe ANTES toda orden que lea positividad (metricas, geojson, visor, capas-piloto, exporta, F3, tribunal); con candado el registro v2 de esa diana se niega salvo --desviacion '<causa>'; mutante",
+  "codigo": "registro-par P-KI67 se niega si un hash difiere de anexo_codigo; cambios antes de la primera confirmacion son desarrollo; despues, repetir confirmacion y cuenta como iteracion de P1",
+  "cotejo": "contra superpone['modulo_b.registro']; clave que falta o sobra = error (fail-closed); test set(PARAMS_V2) == claves; hoy coteja hace 'if v is None: continue' (laminillas_metricas.py:350-356)",
+  "gancho_auditoria": {
+   "mecanismo": "sys.addaudithook en procesos v2; aborta open de rutas vetadas",
+   "test": "mutante",
+   "vetadas": [
+    "objetos_*.npz de dianas",
+    "escalera.json",
+    "metricas/",
+    "piloto-i.json",
+    "L.json",
+    "lecturas_diana.jsonl",
+    "GeoJSON",
+    "visor",
+    "capas",
+    "piloto*.log"
+   ]
+  },
+  "guarda_ki67": "registro-par P-KI67 P-CK19 exige anexo_validacion valido que cite la adenda activa y anexo_codigo con hashes iguales",
+  "hecho": "marca_hecho(..., metodo='registro-v2+<sha12 adenda>'); esta_hecho(..., metodo=); v1 no vale para v2",
+  "libro_corridas": "SESION/registro_corridas.jsonl, solo se anade, encadenado por hash; cada corrida v2 apunta adenda, codigo, semillas y sha256 de productos",
+  "sello_tiempo_externo": "OpenTimestamps o RFC 3161: egress, necesita el OK de {{TITULAR}}; si no, 'internal timestamps only'"
+ },
+ "sha256": null,
+ "superpone": {
+  "modulo_b.registro": {
+   "canal": {
+    "clahe_solo_rasgos": {
+     "clip": 0.01,
+     "kernel_um": 128.0
+    },
+    "nombre": "hematoxilina_od",
+    "od_max": 1.0,
+    "suavizado_sigma_um_en_4um": 8.0,
+    "vectores": "tanda del sello; DAB propio si lo lleva"
+   },
+   "cotas": {
+    "anisotropia_condicion": "razon de momentos de landmarks <= 4",
+    "anisotropia_max": 1.1,
+    "cizalla_max_grados": 5.46,
+    "contencion_min": 0.95,
+    "densidad": {
+     "area_fc_desvio_max": 0.03,
+     "celda_tejido_min": 0.9,
+     "celda_um": 600.0,
+     "int_det_j_desvio_max": 0.2
+    },
+    "det_lineal": "> 0",
+    "escala_max": 1.1,
+    "escala_min": 0.9,
+    "fc_delgado": "R2 solo pasa con max |A x - S x| <= 25 um frente a R1",
+    "fc_delgado_max_um": 25.0,
+    "giro_por_pieza": "sin cota (busqueda 360)",
+    "inversa": {
+     "forma": "T = A o (Id + u); A analitica; Id+u iterativa (itk.IterativeInverseDisplacementFieldImageFilter)",
+     "p99_max_um": 2.0
+    },
+    "no_rigido": {
+     "det_j_positivo_fraccion": 1.0,
+     "estiramientos_principales": [
+      0.9,
+      1.1
+     ],
+     "fraccion_min_pixeles": 0.99,
+     "giro_local_max_grados": 5.0
+    },
+    "razon_momentos_max": 4.0
+   },
+   "descripcion": {
+    "canal": "hematoxilina OD (vectores de tanda del sello; DAB propio si lo lleva), recorte [0, 1.0] OD; reduce, no excluye, la dependencia del DAB",
+    "estimador": "skimage.measure.ransac (SimilarityTransform, AffineTransform)",
+    "instrumento": "validacion cruzada espacial con franja (bloques 600 um, franja 100 um, 5 origenes, 2 pliegues); I-a landmarks retenidos certifica con U95 del p90 de e_final; I-b arquitectura veta; cierre en centroide (plan) puerta y rejilla informativa; I-e informativa",
+    "rasgos": "kornia.feature.DISK + LightGlueMatcher('disk'), pesos sellados en F1.0",
+    "referencia": "P-CK19",
+    "topologia": "encadenado por vecinos: orden por persistencia de textura, pares adyacentes registrados y compuestos hasta el marco P-CK19; camino directo como alternativa y para el cierre",
+    "transformada": "por FC: R1 similitud, R2 afin, R3 lineal + B-spline (elastix); R4 similitud de VALIS guardada; R5 VALIS no rigido solo sensibilidad",
+    "unidad": "pieza (mascara provisional independiente de la tincion) y FC = pieza_ref ∩ T(pieza_movil)"
+   },
+   "elastix": {
+    "bspline_rejilla_final_mm": 0.25,
+    "calibracion": {
+     "criterio": "menor U95 en VC",
+     "donde": "solo desarrollo (HER2NEG-CK19)",
+     "empate": "mayor w_b",
+     "rejilla": {
+      "w_b": [
+       0.1,
+       1.0,
+       10.0
+      ],
+      "w_p": [
+       0.1,
+       1.0,
+       10.0
+      ]
+     },
+     "se_sella_en": "anexo_desarrollo"
+    },
+    "convenio": "fija -> movil; un test de verdad conocida fija el sentido; se guardan directa e inversa",
+    "hilos": 1,
+    "iteraciones_por_nivel": 300,
+    "mascara_fija": "FC ∩ bloques de ajuste sin la franja",
+    "metricas": [
+     {
+      "nombre": "AdvancedNormalizedCorrelation",
+      "peso": 1.0
+     },
+     {
+      "nombre": "CorrespondingPointsEuclideanDistanceMetric",
+      "peso": "w_p"
+     },
+     {
+      "nombre": "TransformBendingEnergyPenalty",
+      "peso": "w_b"
+     }
+    ],
+    "muestreador": "Full",
+    "optimizador": "AdaptiveStochasticGradientDescent",
+    "piramide_factores": [
+     4,
+     4,
+     2,
+     2,
+     1,
+     1
+    ],
+    "piramide_mpp": [
+     16.0,
+     8.0,
+     4.0
+    ],
+    "registro": "MultiMetricMultiResolutionRegistration",
+    "spacing_base_mm": 0.004,
+    "spacing_unidades": "mm",
+    "version": "itk-elastix 0.25.4"
+   },
+   "eleccion": {
+    "informar": "todos los peldanos y la cota superior del ganador",
+    "min_celdas": 10,
+    "orden": [
+     "R1",
+     "R2",
+     "R3"
+    ],
+    "regla": "gana el primero que pasa; se cambia a uno posterior que pase solo si el IC 95 % pareado (bootstrap por celdas, >= 10 celdas) de p90(posterior) - p90(actual) queda entero por debajo de -5 um; si ningun propio pasa, R4",
+    "umbral_um": -5.0
+   },
+   "emparejado_piezas": {
+    "ambiguo": "hereda la global, rotulo 'fragment pairing ambiguous'",
+    "conflicto_quiralidad": "otra quiralidad con >= 2x inliers: pieza fuera",
+    "contra": "union del tejido fijo",
+    "giros_grados": {
+     "fin": 345,
+     "inicio": 0,
+     "paso": 15
+    },
+    "margen_alternativa": 2.0,
+    "min_inliers": 15,
+    "modelo": "similitud",
+    "mpp": 8.0176,
+    "pose_alternativa": {
+     "giro_min_grados": 30.0,
+     "traslacion_min_um": 300.0
+    },
+    "radio_recorte_um": 2000.0,
+    "sin_candidata": "todo el tejido fijo"
+   },
+   "emparejador": {
+    "nombre": "kornia.feature.LightGlueMatcher('disk')",
+    "pesos": "sellados F1.0 (sha256 b5b21d47...)",
+    "umbral_filtro": 0.1,
+    "verificar_sha256_cache_torch_hub": true
+   },
+   "escalas": {
+    "arquitectura": {
+     "V3a": "V3a.arquitectura",
+     "V9_compuerta_um": 300.0,
+     "analisis": [
+      "Spearman regional de (a) a L en {300, 400} um (L >= 2x cota)",
+      "mapa"
+     ],
+     "cierre": "<= 3 grados y <= la cota del par",
+     "cota_max_um": 200.0,
+     "cota_min_um": 50.0,
+     "estado": "analisis secundario declarado, especificado tras el fallo por protocolo y antes de cualquier medida registrada de diana; SOLO como ultimo recurso (choca con el mandato de {{TITULAR}} 'no alternativas menos precisas'); nunca sustituye a (ii), (a), (a-bis) ni al denominador CK19; revisado por el metodologo (segunda vuelta)",
+     "lista_cerrada": true,
+     "rotulo": "secondary analysis specified after the per-protocol registration failure and before any registered target measurement; relaxes the protocol TRE <50 um gate for regional co-localization; never replaces (ii), (a), (a-bis) or the CK19 denominator",
+     "veto": "veto_ib_por_escala.arquitectura"
+    },
+    "vecindad": {
+     "cota_max_um": 50.0,
+     "estado": "preespecificada; unica que cuenta para (ii) >= 50 %",
+     "permite": "todo lo del plan: (a), (a-bis), denominador CK19, L por la regla sellada"
+    }
+   },
+   "escalera": [
+    {
+     "ajusta": "landmarks del pliegue",
+     "herramienta": "skimage ransac SimilarityTransform",
+     "id": "R1",
+     "modelo": "similitud",
+     "papel": "candidato"
+    },
+    {
+     "ajusta": "landmarks del pliegue",
+     "herramienta": "skimage ransac AffineTransform",
+     "id": "R2",
+     "modelo": "afin",
+     "papel": "candidato"
+    },
+    {
+     "ajusta": "NCC hematoxilina suavizada en pliegue + puntos del pliegue + energia de flexion",
+     "herramienta": "itk-elastix 0.25.4",
+     "id": "R3",
+     "inicial": "R2 si razon de momentos de landmarks <= 4 y cumple cotas; si no R1; si ninguna, no se intenta",
+     "modelo": "lineal + B-spline",
+     "papel": "candidato"
+    },
+    {
+     "ajusta": "nada",
+     "herramienta": "producto guardado de VALIS 1.2.0",
+     "id": "R4",
+     "modelo": "similitud de VALIS guardada (vuelta gastada), sin reajuste ni proyeccion",
+     "papel": "solo en la ruta directa P-KI67-P-CK19 y solo si ningun propio pasa en el FC"
+    },
+    {
+     "ajusta": "toda la imagen",
+     "herramienta": "VALIS 1.2.0, una corrida",
+     "id": "R5",
+     "modelo": "VALIS en modo serie (align_to_reference=False), rigido y no rigido por defecto (OpticalFlowWarper), sin micro, sobre las IHQ de la cadena",
+     "papel": "solo sensibilidad; nunca verifica un FC del analisis principal"
+    }
+   ],
+   "fc": {
+    "area_min_um2": 20000.0,
+    "definicion": "componente conexa de (pieza_ref ∩ T_emparejado(pieza_movil)) >= 0.02 mm2; F3: consenso >= 6 de 11 sobre las mascaras provisionales"
+   },
+   "global": {
+    "escala_en_busqueda": 1.0,
+    "giros_grados": {
+     "fin": 345,
+     "inicio": 0,
+     "paso": 15
+    },
+    "margen_quiralidad": 2.0,
+    "min_inliers": 30,
+    "modelo": "similitud",
+    "mpp": 8.0176,
+    "quiralidades": 2,
+    "si_no_decide": "quiralidad del eslabon 1 (IoU de mascaras, margen >= 0.10, regla sellada)"
+   },
+   "instrumento": {
+    "I-a": {
+     "aclarado": "como mucho 1 punto por celda de 50x50 um (semilla maestra+9)",
+     "confirmacion": "RANSAC similitud dentro del bloque solo con emparejamientos del pliegue de medida",
+     "error": "e_final",
+     "min_inliers_bloque": 4,
+     "papel": "certifica",
+     "residuo_um": 25.0
+    },
+    "I-b": {
+     "configuracion": "ver veto_ib_por_escala (unico campo)",
+     "movil": "centroides llevados con la transformada medida",
+     "mpp": 8.0,
+     "nucleos": "centroides InstanSeg (RGB), todos, sin positividad",
+     "papel": "veta, no certifica",
+     "pico": "NCC subpixel",
+     "posicion": "en el nucleo de medida; 100 % dentro del FC erosionado 50 um",
+     "sigma_um": 16.0
+    },
+    "I-c": {
+     "papel": "validacion",
+     "usos": [
+      "V1",
+      "V3b",
+      "V11"
+     ]
+    },
+    "I-d": {
+     "informativo": "rejilla cada 100 um con referencia sqrt(suma p90^2)",
+     "puerta": "cierre en el centroide del FC solo entre transformadas estimadas de forma independiente (cadena frente a directo, o pares sin saltos en comun): <= 3 grados y <= 50 um (vecindad) o <= 3 grados y <= la cota del par (arquitectura)",
+     "si_falla": "FC fuera del mapa en todas las parejas implicadas",
+     "si_no_evaluable": "no es puerta; se declara",
+     "tautologico": "entre composiciones que comparten saltos no es puerta; se declara"
+    },
+    "I-e": {
+     "damero_um": 128.0,
+     "imagen": "hematoxilina gris sin DAB, N1, <= 1024 px",
+     "jueces": 2,
+     "papel": "informativa; nunca puerta",
+     "semilla": "maestra+6",
+     "senuelos_p90_anadido_um": [
+      25.0,
+      50.0
+     ]
+    },
+    "centinela_ib": "si > 20 % de ventanas I-b dan desplazamiento exactamente 0: error de ejecucion, se para",
+    "distancia_landmarks": {
+     "efecto": "la zona a > 300 um de cualquier punto de I-a no cuenta como verificada",
+     "estado_fuentes": "abiertas en Crossref (solo resumen)",
+     "frac_nucleos_max": 0.1,
+     "fuentes": [
+      "Roberts et al. 2017 doi 10.1111/ecog.02881",
+      "Mila et al. 2022 doi 10.1111/2041-210X.13851"
+     ],
+     "umbral_um": 300.0
+    },
+    "fragmento_pequeno": {
+     "min_puntos": 5,
+     "rotulos": [
+      "small fragment: registration verified on {n} points",
+      "small fragment: registration not independently verified"
+     ],
+     "todos_bajo_um": 50.0
+    },
+    "suelo_fisico": "el error crece con la distancia entre cortes; orden estimado y distancia en ese orden; dz real no lo se",
+    "suficiencia_ia": {
+     "celda_um": 600.0,
+     "formula": "n_min(m) = ceil(ln(0.025/m) / ln(1 - 0.10/m))",
+     "m_max_con_11_laminas": 10,
+     "min_celdas": 4,
+     "n_min_por_m": {
+      "1": 36,
+      "10": 597,
+      "2": 86,
+      "3": 142,
+      "4": 201,
+      "5": 263,
+      "6": 327,
+      "7": 392,
+      "8": 459,
+      "9": 527
+     }
+    },
+    "suficiencia_por_salto": "n_min(m) de suficiencia_ia (nivel 1-0.025/m, cuantil 1-0.10/m)",
+    "tre_exportado": "U de la ruta que rige (U_camino o U del directo)",
+    "u_certificada": {
+     "bootstrap": {
+      "min_celdas": 10,
+      "replicas": 2000,
+      "semilla": "maestra+8",
+      "unidad": "celda de 600 um de rejilla fija"
+     },
+     "cuantil": "p_{1-0.10/m}",
+     "estadistico_orden": "k minimo con P(Bin(n,q) <= k-1) >= nivel; m=1 al 97.5 % -> n=36 da el maximo",
+     "multiplicidad": "eleccion de peldano no corregida; cobertura real medida por V12",
+     "nivel_por_ruta": "0.975 nominal por candidato y ruta",
+     "nota_nombre": "la clave conserva el nombre 'certificada' por compatibilidad; el nivel es nominal",
+     "rige": "el mayor de los dos"
+    }
+   },
+   "lectura": {
+    "factores": {
+     "afinado_fc": 2,
+     "global_y_emparejado": 4
+    },
+    "mpp": {
+     "afinado_fc": 4.0088,
+     "global_y_emparejado": 8.0176
+    },
+    "mpp_x8_medido": 2.004411,
+    "nivel": "x8 nativo",
+    "reduccion": "media por bloques",
+    "relleno": "vidrio local (como v1)"
+   },
+   "mascara": {
+    "erosion_fc_medida_um": 50.0,
+    "piezas_y_fc": "provisional sellada: raster de centroides InstanSeg 8 um/px, sigma 16 um, umbral fijo 250 nucleos/mm2; recalculada desde centroides de segmentacion, nunca desde objetos_*.npz",
+    "sensibilidad": "mascara sellada sobre ODsum (lleva DAB)"
+   },
+   "memoria_gb_por_par": 6,
+   "piezas": {
+    "apertura_radio_um": 50.0,
+    "area_min_um2": 20000.0,
+    "laminas": "las dos",
+    "particion": "geodesica: cada pixel de la mascara original a la semilla abierta mas cercana"
+   },
+   "puerta": {
+    "R4": "solo ruta directa P-KI67-P-CK19; medida con todos los puntos (fuga despreciable, 4 gdl; inferencia)",
+    "R5": "solo sensibilidad, fuera del consenso principal",
+    "escala_arquitectura_veto": "a escala de arquitectura el veto de vecindad no se aplica en ninguna ruta; solo rige el veto de los extremos con la configuracion de arquitectura; las dos rutas pueden llegar a arquitectura",
+    "ii_area_min": 0.5,
+    "ii_escala": "solo vecindad",
+    "iii": {
+     "alternativas": "mismo modelo (similitud RANSAC sobre DISK+LightGlue)",
+     "margen_alternativa": 2.0,
+     "min_inliers": 30,
+     "otro_giro_grados": 15.0
+    },
+    "por_par": [
+     "U de la ruta, al 97.5 % nominal, < umbral de la escala",
+     "veto I-b en los extremos (veto_ib_por_escala)",
+     "cierre en centroide solo entre estimaciones independientes (I-d)"
+    ],
+    "por_salto": [
+     "I-a suficiente (n_min de su camino) y cota < umbral de la escala, o fragmento pequeno rotulado",
+     "solo al certificar a escala de vecindad: veto I-b de vecindad si suficiente (estadistico con censura < 50 um), en los saltos de la cadena y en el directo",
+     "cotas en los 10 ajustes de pliegue y en el final",
+     "contencion >= 0.95",
+     "distancia a landmarks (300 um / 10 %)"
+    ]
+   },
+   "ransac": {
+    "funcion": "skimage.measure.ransac",
+    "max_trials": 10000,
+    "modelos": [
+     "SimilarityTransform",
+     "AffineTransform"
+    ],
+    "residuo_um": 25.0,
+    "rng": "maestra+4"
+   },
+   "rasgos": {
+    "detector": "kornia.feature.DISK",
+    "deterministas": true,
+    "dispositivo": "cpu",
+    "n": 4096,
+    "pesos": "sellados F1.0 (sha256 9c2ee4de...)",
+    "umbral": 0.0,
+    "ventana_nms": 5
+   },
+   "retirado": {
+    "R3b_ants_syn": "random_seed ignorado y convenio de ejes arriesgado (critico de registro)"
+   },
+   "semillas": {
+    "aclarado": "+9",
+    "bootstrap": "+8",
+    "global": "+1",
+    "inmutable_entre_adendas": true,
+    "libres": [
+     "+3",
+     "+5"
+    ],
+    "maestra": 20261002,
+    "nota": "antes los origenes +30...+34 pisaban las pilas de V12 (+30...+32) y el sorteo (+33); corregido",
+    "nulo": "+7",
+    "orden_bootstrap": "+12",
+    "origenes": "+34+i (+34...+38)",
+    "piezas": "+2",
+    "ransac": "+4",
+    "s_conf": "+11",
+    "s_dev": "+10",
+    "senuelos": "+6",
+    "sorteo_confirmacion": "+33",
+    "test": "todas las semillas derivadas son distintas",
+    "v12_pilas": "+13...+32"
+   },
+   "topologia": {
+    "camino": "toda T_{A->B} por el camino minimo A...B del orden, sin rodeo por P-CK19; test a +-2 um",
+    "comparador": "orden de VALIS en modo serie (informativo)",
+    "cuando_orden": {
+     "confirmacion": "se anade P-P63, con el codigo sellado",
+     "desarrollo": "sin P-KI67 y sin P-P63",
+     "las_11": "solo como primer paso de registro-par P-KI67, con el codigo sellado en anexo_codigo; se informa si cambia el orden relativo de las demas"
+    },
+    "estabilidad": {
+     "adyacencia_inestable": "si una adyacencia del camino aparece en < 80 % de las replicas, U_camino = maximo sobre los ordenes con frecuencia >= 10 %",
+     "orden_held_karp": "siempre entra en el maximo, aunque aparezca en < 10 % de las replicas",
+     "replicas_bootstrap": 200,
+     "semilla": "maestra+12"
+    },
+    "intermedias": {
+     "detector_ciego_tribunal": [
+      "Ki67 en FC verificados por la cadena frente a por el directo",
+      "positividad de cada diana intermedia dentro y fuera del area verificada"
+     ],
+     "detector_cuando": "tras congelar el registro; proceso no expuesto; solo tribunal",
+     "exclusion_por_regla": "no: excluir solo NE rompe la simetria luminal/NE de {{TITULAR}}; excluir por intensidad de DAB usaria datos de diana",
+     "riesgo": "si el DAB de una diana intermedia tapa la hematoxilina (nuclear o citoplasmico), sus zonas positivas pierden landmarks; riesgo igual para NE que para luminal; no se usa ninguna medida de intensidad para decidir a cuales afecta",
+     "sensibilidad": "por mecanismo: cadena que solo admite como intermedias las laminas de SUELO del sello (P-HER2NEG, P-HER2; sin DAB de diana por diseno) y salta toda diana con DAB nuclear o citoplasmico; se informa, nunca se elige"
+    },
+    "laminas": "las 11 de IHQ_CON_TEJIDO del sello base (todas menos P-AE1AE3; laminillas_congela.py:80; = SERIE_IHQ, laminillas_f3.py:71); P-HE solo informativa",
+    "marco": "P-CK19: REGLA_L rejilla_anclada='P-CK19' (laminillas_congela.py:156) y el denominador de toda diana es CK19; el error de un par depende del camino, no del marco",
+    "marco_central": "rechazado en esta adenda (tocaria regla_L)",
+    "modo": "cadena por vecinos (estandar de reconstruccion 3D; modo por defecto de VALIS align_to_reference=False)",
+    "propagacion": {
+     "Lambda_i": "prod_{j>i} max_FC ||J_{T_j}||_2 medido sobre la transformada estimada (Lambda_m = 1)",
+     "U_i": "U_{1-0.025/m}(p_{1-0.10/m}) del salto i, solo con landmarks en la imagen del FC del par A-B en el marco del salto i",
+     "formula": "U_camino = suma_i Lambda_i * U_i",
+     "infraestimacion_sin_Lambda": {
+      "m2": 0.05,
+      "m3": 0.103,
+      "m4": 0.16
+     }
+    },
+    "proximidad": "S_ij = inliers RANSAC-similitud por mm2 de FC (DISK+LightGlue a 4 um/px en piezas emparejadas)",
+    "rotulo": "estimated section order (texture persistence); spacing unknown",
+    "rutas": {
+     "R4": "solo en la ruta directa P-KI67-P-CK19",
+     "alternativa_no_adoptada": "1 - 0.025/(K*m) por candidato; n minimo 46/107/174 (K=3, m=1/2/3) y 49 con R4; deja mas FC sin certificar y V12 ya mide la cobertura real",
+     "bonferroni_cubre": "solo la eleccion entre las dos rutas",
+     "cobertura_procedimiento": "la mide V12 (limite inferior de Clopper-Pearson >= 0.90); no se afirma una cobertura conjunta del 95 %",
+     "evaluadas": [
+      "cadena",
+      "directo"
+     ],
+     "multiplicidad_peldanos": "no corregida: dentro de cada ruta gana el primero que pasa entre R1, R2, R3 (mas R4 en el directo) mas el cambio por IC pareado; falso pase hasta K x 2.5 % en el peor caso (K=3; 4 en el directo)",
+     "nivel_por_candidato": "0.975 nominal (cadena: 1 - 0.025/m por salto)",
+     "regla": "rige la cadena si pasa; si no, el directo si pasa"
+    },
+    "segmentacion_intermedias": "InstanSeg con la configuracion sellada; sin positividad",
+    "sensibilidad_orden": "orden con la metrica del plan (densidad de centroides a 8 um/px, F3 'Orden de los cortes')",
+    "seriacion": "Held-Karp exacto (orden_cortes, <= 15 laminas) maximizando la suma de S entre vecinos",
+    "veto_extremos": "ver veto_ib_por_escala"
+   },
+   "validacion_cruzada": {
+    "bloque_um": 600.0,
+    "error_por_punto": "e_final = e_cv + |T_final(p) - T_pliegue(no p)(p)|",
+    "final": "reajuste con todos los datos; cotas en los 10 ajustes de pliegue y en el final",
+    "franja_exclusion_um": 100.0,
+    "nucleo_medida_um": 400.0,
+    "origenes": 5,
+    "pliegues_por_origen": 2,
+    "semilla_origenes": "maestra+34+i, i=0..4 (+34...+38)",
+    "varios_origenes": "max por punto"
+   },
+   "validez": {
+    "D": [
+     "D1 s=0.95 th=+7 t=(150,-80)um",
+     "D2 s=1.05 th=-7",
+     "D3 anisotropia 1.06 a 30 grados",
+     "D4 cizalla 4 grados",
+     "D5 D2 + campo B-spline aleatorio, control 500 um, max 40 um",
+     "D6 campo max 80 um",
+     "D7 D5 + gamma 0.8 + vector H girado 5 grados",
+     "D8 D5 + desgarro banda 150 um",
+     "D9 s=1.20 (fuera de cota)",
+     "D10 campo max 200 um con estiramientos fuera de cota"
+    ],
+    "V1": {
+     "fuera_de_cota": "ningun peldano pasa",
+     "max_um": 30.0,
+     "p90_max_um": 10.0,
+     "rejilla_um": 100.0,
+     "u95_ia_frac_min": 0.9,
+     "u95_ia_tolerancia_um": 10.0
+    },
+    "V10": {
+     "area_verificada_max": 0.05,
+     "escalas": "las dos"
+    },
+    "V11": {
+     "cambios_pasa_max": 0,
+     "delta_u95_max_um": 5.0,
+     "sintetico": "en S_conf quitar H y poner DAB en 10-60 % de nucleos agrupados"
+    },
+    "V12": {
+     "criterios": [
+      "orden recuperado en >= 18 de 20 pilas",
+      "cobertura (error del extremo <= U_camino) con limite inferior de Clopper-Pearson >= 0.90, en cada serie",
+      "V9 sin optimismo en los caminos compuestos de confirmacion"
+     ],
+     "dab_sintetico": "alternado: nuclear en una lamina, citoplasmico en la siguiente",
+     "deformacion_por_salto_p90_um": {
+      "arquitectura": 60.0,
+      "vecindad": 20.0
+     },
+     "descorrelacion": "calibrada para NCC del salto 0.4-0.5 (como el control real, E11)",
+     "pilas": {
+      "base": "x8 de P-CK19",
+      "cortes": 5,
+      "n_min": 20,
+      "semillas": "maestra+13 ... maestra+32"
+     }
+    },
+    "V3a": {
+     "arquitectura": {
+      "deteccion_min": 0.95,
+      "detectado_como_min_um": 100.0,
+      "no_pasan_um": [
+       250.0,
+       400.0
+      ],
+      "senuelo_um": 150.0
+     },
+     "juicio": "puerta de su escala",
+     "tipos": [
+      "traslacion",
+      "giro",
+      "escala",
+      "campo_suave"
+     ],
+     "variantes": {
+      "V3a-c": "senuelo sumado a la transformada compuesta del par: prueba el veto de los extremos y el cierre",
+      "V3a-s": "senuelo sumado a un solo salto (cada salto por turno): prueba la U"
+     },
+     "vecindad": {
+      "deteccion_min": 0.95,
+      "detectado_um": 60.0,
+      "no_pasan_um": [
+       150.0,
+       300.0
+      ]
+     }
+    },
+    "V3b": {
+     "cambio_u95_max_um": 10.0,
+     "d": "similitud + campo, p90 60 um, aplicado a la movil antes de ajustar",
+     "transformada_p90_max_um": 10.0
+    },
+    "V4": {
+     "informativo": true,
+     "que": "acuerdo I-a / I-b"
+    },
+    "V5": {
+     "cobertura_area_min": 0.5,
+     "pares": "todos los de confirmacion, P-P63-P-CK19 incluido"
+    },
+    "V6": {
+     "area_verificada_min": 0.5,
+     "nota": "par ya mirado en 995fb22; se declara",
+     "par": "P-HER2NEG-P-HER2",
+     "u_max_um": 50.0
+    },
+    "V7": {
+     "corridas": 2,
+     "par": "P-HER2-P-CK19",
+     "tolerancia_um": 0.1
+    },
+    "V8": {
+     "informativo": true,
+     "min_aciertos": 27,
+     "min_ensayos": 30
+    },
+    "V9": {
+     "compuerta_um": {
+      "arquitectura": 300.0,
+      "vecindad": 100.0
+     },
+     "criterio": "p90_instrumento >= p90_referencia - 10 um",
+     "frac_fc_min": 0.9,
+     "margen_um": 10.0,
+     "min_pares_fc": 20,
+     "referencia": "centroides de huecos de la mascara >= 50 um (adipocitos, luces, vasos), hungaro con compuerta por escala (ver compuerta_um), sin landmarks manuales",
+     "si_ningun_fc": "agrupar por par de laminas (>= 20); si tampoco: no evaluable y valido false"
+    },
+    "confirmacion": {
+     "corridas": "una por adenda",
+     "negativos": "P-CK19 frente a B-HE-1; HER2NEG con piezas permutadas entre FC",
+     "ninguna_imagen_de": "ningun salto de desarrollo ni de confirmacion usa imagenes de P-KI67; si P-KI67 cae entre dos laminas de un camino de validacion, el camino la salta; se declara",
+     "par_no_inspeccionado": {
+      "ejecucion": "el sorteo con +13 no se ejecuto nunca; dos intentos, ambos con +33: el primero fallo al importar numpy (python del sistema) sin resultado; el segundo dio P-P63; no hay bifurcacion en el control de validez",
+      "orden": "fuera del orden de desarrollo; entra con el codigo sellado",
+      "par": "P-P63-P-CK19",
+      "resultado": "P-P63",
+      "semilla_nota": "+33 en lugar de +13 (+13...+32 son las pilas de V12)",
+      "sorteo": "numpy.random.default_rng(20261002+33).integers(0,7) sobre ['P-CHGA','P-{{DIANA3}}','P-P63','P-RA','P-RE','P-RP','P-SYN'] (orden alfabetico); numpy 2.4.6; 2-oct"
+     },
+     "pares_inspeccionados_995fb22": [
+      "P-HER2-P-CK19",
+      "P-HER2NEG-P-HER2"
+     ],
+     "sinteticos": "S_conf: x8 de P-CK19 y P-HER2, D1-D10, semilla maestra+11; pilas de V12"
+    },
+    "desarrollo": {
+     "datos": [
+      "P-HER2NEG-P-CK19",
+      "S_dev: x8 de P-HER2NEG, D1-D10, semilla maestra+10"
+     ],
+     "previo": "segmentacion (configuracion sellada, sin positividad) de las IHQ que falten",
+     "salidas": [
+      "tau I-b de las dos configuraciones (>= 200 ventanas nulas; >= 1 mm en vecindad, >= 1.5 mm en arquitectura; estratificado por borde)",
+      "(w_p, w_b) de elastix",
+      "orden de la cadena SIN P-KI67 y SIN P-P63, con su estabilidad",
+      "E11 (ya medido en 995fb22; el anexo lo recoge con sus hashes)"
+     ],
+     "se_sella_en": "anexo_desarrollo"
+    },
+    "valido": "V1 and V3a and V3b and V5 and V6 and V7 and V9 and V10 and V11 and V12"
+   },
+   "version_metodo": "registro-v2",
+   "veto_ib_por_escala": {
+    "arquitectura": {
+     "busqueda_um": 400.0,
+     "censura_um": 400.0,
+     "donde": "solo en los extremos",
+     "informar": "fraccion de FC de arquitectura sin veto porque no caben 2 ventanas",
+     "min_validas_sin_solape": 2,
+     "nota": "2 ventanas: inferencia por la anchura de los cilindros (~1 mm)",
+     "nulo_min_mm": 1.5,
+     "umbral_veto_um": 200.0,
+     "ventana_um": 768.0
+    },
+    "comun": {
+     "dentro_fc_erosionado": 1.0,
+     "estadistico": "p90 con censura si hay >= 10 ventanas validas; con menos, el maximo",
+     "frac_validas_min": 0.5,
+     "valida": "pico >= tau de su configuracion, razon de curvaturas <= 3, eje mayor 1 sigma <= 16 um"
+    },
+    "vecindad": {
+     "busqueda_um": 128.0,
+     "censura_um": 128.0,
+     "donde": "por salto (en la VC) y en los extremos",
+     "min_validas_sin_solape": 4,
+     "nulo_min_mm": 1.0,
+     "umbral_veto_um": 50.0,
+     "ventana_um": 384.0
+    }
+   },
+   "zonas_sin_rasgos": {
+    "borde_escaneo_um": 50.0,
+    "borde_tejido_um": 50.0,
+    "relleno_recorte_girado_px": 20
+   }
+  }
+ },
+ "tipo": "adenda-registro",
+ "tope_adendas": 3,
+ "version_metodo": "registro-v2",
+ "vuelta_valis": {
+  "despues": "ninguna adenda vuelve a usar VALIS en (ii) KI67-CK19",
+  "enmienda": "la vuelta unica significa 'salida de VALIS juzgada por un instrumento valido'; evaluar la misma salida no es segunda vuelta; una sola vez, declarada",
+  "estado_vuelta": "gastada segun el plan (estado ~13:05 local); escalera.json no abierto (sala limpia): sin verificar",
+  "paso_i": [
+   "tras valido: verificar sin datos el conversor _px_proc_a_um (formas 5120x3584 y 3584x4096, s=1.05, giro 18) frente a Slide.warp_xy_from_to: error de escala <= 0.002 y <= 2 um en rejilla",
+   "si pasa: evaluar como R4 la matriz guardada (registro/P-KI67.json resumen.valis.matriz_um), por FC, sin proyeccion euclidea, cotas e instrumento v2; informar su escala a nivel 0",
+   "si no pasa: corregir el conversor; reproducir LA MISMA corrida dos veces (PNG v1, VALIS 1.2.0, mismos parametros); M crudos identicos = recuperacion; si difieren: 'VALIS similarity not recoverable' y R4 cae",
+   "se informa siempre"
+  ],
+  "paso_ii": "VALIS en modo serie (align_to_reference=False), rigido y no rigido por defecto, sin micro, una corrida sobre las IHQ de la cadena (PNG v1); solo sensibilidad; su orden se compara con el estimado"
+ }
+}

@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/canario_muro.sh",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/canario_muro.sh",
             "timeout": 10
           }
         ]
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/muro_guard.sh",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/muro_guard.sh",
             "timeout": 10
           }
         ]

@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_jaulas.py",
+ "estado_ficha": "completa",
+ "para": "Genera en cada arranque los perfiles sandbox-exec (SBPL) de las laminillas: red-sin-zona, analisis, analisis-ingesta, visor-clinico, visor-n1, exporta y vision. Orden: extras de quien llama (antes de todo deny, no reabren nada), deny de zonas clínicas familia A y B (realpath y regex de segmento) y Llavero, allow de SESION/ORIGEN/N1 y, lo ÚLTIMO, el bloque de secretos (credenciales del repo y de HOME; con red, también estado vivo y overlays de PII). Lo prueba además tests/test_laminillas_jaulas_secretos.py.",
+ "cuando_si": "Al lanzar cualquier procesador de laminillas (lo llama laminillas_ventanilla) o al instalar en red-sin-zona (laminillas_stack).",
+ "cuando_no": "No para escribir perfiles a mano ni versionarlos: llevan las raíces del overlay local (posible PII) y viven en ~/Clinico-PRIVADO/laminillas-DFCI/jaulas/.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

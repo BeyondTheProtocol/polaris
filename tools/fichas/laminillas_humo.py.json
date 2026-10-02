@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_humo.py",
+ "estado_ficha": "completa",
+ "para": "F2 humo sin datos: TIFF sintético con estructura Grundium (pasado a YCbCr de JFIF antes de escribir) y parches de color conocido que deben volver con ≤3 niveles; lo leen OpenSlide, wsidata/LazySlide y VALIS; cada modelo carga offline y hace forward en analisis.sb real (InstanSeg también por zs.seg.cells).",
+ "cuando_si": "Tras instalar o cambiar el stack o los pesos, antes del piloto: procesa laminillas_humo y laminillas_humo_valis.",
+ "cuando_no": "No con láminas reales: solo fabrica y lee sintéticos en SESION/humo/.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/subagente_contexto.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/subagente_contexto.py",
             "timeout": 6
           }
         ]
@@ -20,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.sh",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/session_start.sh",
             "timeout": 8
           }
         ]
@@ -32,12 +32,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/precompact_traspaso.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/precompact_traspaso.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/tools/continuidad_auto.py",
+            "command": "python3 $(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/tools/continuidad_auto.py",
             "timeout": 5
           }
         ]
@@ -48,29 +48,29 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/plan_nudge.sh",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/plan_nudge.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/memoria_recall.sh",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/memoria_recall.sh",
             "timeout": 12
           },
           {
             "_comment": "Enrutado de COMITE (5-sep-26). plan_nudge mira el ALCANCE del prompt; este mira QUIEN debe analizarlo, y lo RECLASIFICA en cada vuelta: una sesion que entra por 'interpreta esta imagen' y acaba analizando el panel molecular del nodo NED hereda el nivel del contexto, no se queda con la clasificacion del primer mensaje. Avisa, no bloquea ni invoca (el coste es decision consciente). Un aviso por comite y sesion. Fail-open; bypass BTP_ENRUTADO_OFF=1.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/enrutado_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/enrutado_guard.py",
             "timeout": 10
           },
           {
             "_comment": "Presencia por Claude Code (11-sep-26). El dead-man de healthcheck solo oia a Telegram y daba a {{TITULAR}} por ausente mientras trabajaba aqui (deuda dead_man_ausencia, 1241 veces). Este hook solo APUNTA el prompt_id en una cola (sin el texto); healthcheck lo coteja contra el transcript (origin human, sin envoltorio de automatismo) y solo entonces llama a mark_seen. Fail-open para el prompt, fail-closed para la presencia.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/presencia_cc.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/presencia_cc.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/ok_envio_prompt.py"
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/ok_envio_prompt.py"
           }
         ]
       }
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/gate_salida.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/gate_salida.py",
             "timeout": 8
           }
         ]
@@ -91,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/cosecha_panel.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/cosecha_panel.py",
             "timeout": 10
           }
         ]
@@ -104,18 +104,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/clinico_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/clinico_guard.py",
             "timeout": 8
           },
           {
             "_comment": "Recordatorio de la regla EN EL MOMENTO de actuar (25-jul-26). No bloquea: eso es cosa del muro (muro_guard) y del guard clinico. Existe porque lo que inyectan los hooks al empezar la sesion no sobrevive a /compact, y la accion arriesgada llega 40 turnos despues. Fail-open.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/regla_en_accion.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/regla_en_accion.py",
             "timeout": 8
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/salida_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/salida_guard.py",
             "timeout": 10
           }
         ]
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/scite_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/scite_guard.py",
             "timeout": 5
           }
         ]
@@ -137,7 +137,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/borrador_unico_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/borrador_unico_guard.py",
             "timeout": 5
           }
         ]
@@ -148,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/worktree_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/worktree_guard.py",
             "timeout": 5
           }
         ]
@@ -159,7 +159,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/ficha_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/ficha_guard.py",
             "timeout": 10
           }
         ]
@@ -170,7 +170,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/launch_loopback_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/launch_loopback_guard.py",
             "timeout": 5
           }
         ]
@@ -181,7 +181,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/contrato_asiento.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/contrato_asiento.py",
             "timeout": 5
           }
         ]
@@ -191,31 +191,31 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/casa_base_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/casa_base_guard.py",
             "timeout": 5
           },
           {
             "_comment": "Los 3 singletons van por su puerta con candado (18-sep-26, norma feedback-sesion-paralela-seguridad-primero, clase BLOQUEO y repetida). Las puertas existen desde el 10-jul-26 — tools/git_mutex.py (candado 'git-mutex') y tools/activar_daemon.py (candado 'launchd') — y el charter .claude/agents/git.md YA prohibe por escrito el git crudo. Medido con clasificador tokenizado sobre los transcripts reales: 107 de 112 fusiones a base y 46 de 46 launchctl mutantes fueron por Bash a pelo. El texto no era enforcement; esto lo es. ENRUTA, no cierra candados (un hook no puede sostener un lock entre tool-calls, ver tools/_lock.py): deniega la forma cruda y nombra la puerta. Ambito: solo casa base y sus worktrees, rastreando el cd. NO entra `commit` ni `push`, y falta el tercer singleton (control de pantalla) porque no tiene puerta que nombrar. FAIL-OPEN. Escotilla: BTP_SINGLETON_OK=1.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/singleton_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/singleton_guard.py",
             "timeout": 5
           },
           {
             "_comment": "La rama no cambia bajo tus pies (18-sep-26, norma feedback-web-repo-checkout-compartido, clase BLOQUEO y repetida). Es un TOCTOU: entre que miras la rama y commiteas, otra sesion hace checkout. Apunta por SESION la ultima rama que esa sesion vio en cada repo (tools/state/rama_vista/<session_id>.json) y deniega `git commit`/`git push` si la rama actual no es esa. Un checkout PROPIO actualiza el apunte; si el destino no se puede leer sin ambiguedad, se borra el apunte en vez de inventarlo. Vigila CUALQUIER repo, no solo el web: medido sobre 366 eventos git con sello de tiempo de 41 sesiones, los 28 candidatos de deriva estan en casa base y NINGUNO en el repo web — la norma nombra el web porque es donde le mordio, pero el dano ocurre en casa base. Sin apunte previo se permite: detecta que la rama CAMBIO, no exige haber mirado. FAIL-OPEN. Escotilla: BTP_RAMA_OK=1.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/rama_vista_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/rama_vista_guard.py",
             "timeout": 8
           },
           {
             "_comment": "El copy publicado de la web no se toca solo (18-sep-26, norma feedback-no-tocar-copy-web-sin-ok, clase BLOQUEO). El gate va en `git commit` y NO en Write/Edit porque el copy se edita por Bash: medido sobre todos los transcripts hay 0 llamadas a Write/Edit contra i18n/locales o content/, y 23 comandos Bash que las tocan con python3 <<EOF y sed — sobre el diff de git da igual como se escribio. TRES NIVELES, medidos replicando los 86 commits directos del repo web: FRENA (27) si cambia una clave de HERO/H1 o si BORRA una clave publicada; AVISA sin bloquear (32) si cambia otro copy existente; PASA en silencio (27) si solo anade claves, paginas o lineas, que es zona autonoma por la propia norma. Denegarlo todo habria saltado en 59 de 86 y un gate que se esquiva siempre ensena a esquivarlo; `ask` tampoco vale, este repo lo probo el 25-jul-26 y se resolvio solo sin que nadie lo viera (ver regla_en_accion.py). Precedente: el hero se cambio y hubo que revertirlo DOS veces (26514d8->02ccb94, 4187131->4084efa). Ambito: cualquier clon del repo web (nuxt.config.ts + i18n/locales), incluidos los .mgc-staging. FAIL-OPEN. Escotilla: BTP_COPY_OK=1.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/copy_web_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/copy_web_guard.py",
             "timeout": 10
           },
           {
             "_comment": "Canjear un refresh token es de UN SOLO USO (18-sep-26, norma feedback-refresh-token-es-de-un-solo-uso, clase BLOQUEO). Un grant_type=refresh_token devuelve un par nuevo E INVALIDA el viejo: hacerlo 'para ver si sigue vivo' sin guardar lo que vuelve QUEMA el token guardado y obliga a un login humano con navegador — asi estuvo Consensus 28 dias mudo con el panel en verde (lo cuenta tools/_oauth_refresh.py). La puerta que canjea Y GUARDA el par nuevo a 0600 ya existe: _oauth_refresh.renovar(). El marcador es el parametro del propio estandar OAuth 2.0, no una heuristica, y aparece 0 veces en los ~2.900 comandos reales de los transcripts: no puede romper nada que se estuviera haciendo. FAIL-OPEN. Escotilla: BTP_TOKEN_OK=1.",
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/token_rotacion_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/token_rotacion_guard.py",
             "timeout": 5
           }
         ]
@@ -228,7 +228,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/borrador_unico_guard.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/borrador_unico_guard.py",
             "timeout": 5
           }
         ]
@@ -239,7 +239,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/traza_subagente.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/traza_subagente.py",
             "timeout": 8
           }
         ]
@@ -250,7 +250,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/gate_subagente.py",
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/gate_subagente.py",
             "timeout": 25
           }
         ]
@@ -260,7 +260,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/entrada_guard.py"
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/entrada_guard.py"
           }
         ]
       }
@@ -271,7 +271,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/tools/continuidad_auto.py",
+            "command": "python3 $(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/tools/continuidad_auto.py",
             "timeout": 5
           }
         ]
@@ -283,7 +283,8 @@
     "allow": [
       "Bash(python3 tools/web_novedad.py:*)",
       "Bash(python3 tools/web_revertir.py:*)",
-      "Bash(python3 tools/web_lint.py:*)"
+      "Bash(python3 tools/web_lint.py:*)",
+      "Read(//Users/polaris/Laminillas-N1/**)"
     ],
     "deny": [
       "Edit(~/claudecode/.claude/hooks/**)",

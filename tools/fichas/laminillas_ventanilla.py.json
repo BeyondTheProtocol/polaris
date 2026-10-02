@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_ventanilla.py",
+ "estado_ficha": "completa",
+ "para": "Lo que hace `lector_clinico.py procesa laminillas_*`: argumentos opacos, puerta de disco (<15 GiB), sha256 del manifiesto de SESION, cerrojo flock entre pesados, puerta de memoria (ollama, memory_pressure, swap que crece; aviso único por salida.py a los 15 min), jaula generada, entorno en lista blanca y guarda_memoria con TOPE_GB 10 (6 con colima). laminillas_congela y laminillas (puerta del piloto: piloto-i, piloto-ibis, registro-par, lista-postcongelacion, metricas, geojson, tribunal-listo) con orden de lista cerrada, memoria por orden y por bandera (--valis 9 GB) y, tras (0), el umbral sellado del procesador (pico + 2 GB) si es mayor; la primera corrida vigilada de cada procesador (sobre P-HER2NEG si nombra láminas) deja SESION/trazas/<procesador>.tsv, y el `--traza a,b` de congela se traduce de nombres de procesador a esas trazas.",
+ "cuando_si": "Siempre que un procesador de laminillas toque SESION/ORIGEN o la red de pesos: por lector_clinico.py procesa.",
+ "cuando_no": "No se invoca a mano para lanzar nada (su main solo inspecciona puertas). Nunca con MURO_ALLOW_CLINICAL=1 ni con os.environ entero.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

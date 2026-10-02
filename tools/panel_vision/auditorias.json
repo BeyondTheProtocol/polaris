@@ -1,0 +1,38 @@
+{
+ "gemini": {
+  "veredicto": "apto con condiciones",
+  "modelo": "gemini-3.1-pro-preview",
+  "fecha": "2026-10-02",
+  "fuente": "00_FUENTE-DE-VERDAD/01 · Tratamiento/Laminillas DFCI/laminillas-auditoría-de-la-api-de-gemini-para-el-panel-de-vi-2026-10-02.md",
+  "estado_fuente": "BORRADOR",
+  "condiciones": [
+   "solo copias N1 de solo píxeles que revisan capas; nunca puntuar ni decidir",
+   "gemini-3.1-pro-preview fijado en vision_n1; generateContent con inline_data image/png; sin File API, Interactions API, Grounding ni context caching",
+   "{{TITULAR}} comprueba en AI Studio que el proyecto de btp-gemini-api es de pago",
+   "logging de AI Studio desactivado (o 7 días) y sin compartir datasets",
+   "aceptar 55 días de retención antiabuso y posible revisión humana",
+   "ninguna salida entra en una decisión clínica"
+  ],
+  "condiciones_cumplidas": true,
+  "condiciones_cumplidas_quien": "pasa a true SOLO cuando {{TITULAR}} confirma en AI Studio el nivel de pago del proyecto de btp-gemini-api y el logging apagado (o 7 días); nunca por inferencia (plan, actualización 16). vision_n1 lo lee de casa base y sin true no envía, aunque haya trust-cloud",
+  "trust_cloud": "pendiente: paso 6 (trust-cloud vision-n1:gemini tecleado por {{TITULAR}})",
+  "adaptador": "escrito: tools/vision_n1.py (gemini-3.1-pro-preview fijado; generateContent con inlineData image/png, petición ≤20 MB, mediaResolution HIGH, temperatura por defecto, sin File API, Interactions, grounding ni caché; clave btp-gemini-api del Llavero solo al enviar)",
+  "condiciones_constancia": {
+   "fecha": "2026-10-02",
+   "nivel_de_pago": "verificado por la sesión con una llamada sin datos a gemini-3.1-pro-preview (modelo sin nivel gratuito) desde btp-gemini-api: respondió OK",
+   "proyecto": "BTP Stitch (AI Studio)",
+   "almacenamiento": "GenerateContent API: off; Interactions API: off (confirmado por {{TITULAR}} en captura y en chat)",
+   "retencion_logs": "7 días ({{TITULAR}})",
+   "retencion_antiabuso": "55 días, no desactivable en la Developer API: aceptado por {{TITULAR}} el 2-oct (ok a todo, con la auditoría delante)"
+  }
+ },
+ "medgemma": {
+  "tipo": "local",
+  "modelo": "google/medgemma-4b-it",
+  "estado": "sellado y calibrado a ciegas; no habilitado en ninguna tarea",
+  "motivo": "pesos de google/medgemma-4b-it en el commit 290cda5 con sha256 en tools/laminillas_stack/pesos.json (e5967e2); calibración sintética de 300 casos (512e3e8): responde casi igual a cualquier imagen («con error» en núcleos, ck19, registro y artefacto; «sin error» en figura) y no llega a sens ≥ 0,8 y esp ≥ 0,8 en ninguna tarea. Queda fuera del panel.",
+  "adaptador": "tools/panel_vision/medgemma_local.py (transformers en MPS, sin red, pesos del commit sellado con sha256; falla cerrado con «pendiente de acceso»)",
+  "auditoria_externa": "no aplica: corre en el Mac y no envía nada",
+  "actualizado": "2026-10-02"
+ }
+}

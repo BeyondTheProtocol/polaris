@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_congela.py",
+ "estado_ficha": "completa",
+ "para": "Pre-congelación (solo P-HER2NEG y P-HER2; con sello no se pisa salvo --para-recongelar, que la archiva) y congelación (0) del piloto de laminillas DFCI: escribe el sello único (formato de laminillas_sello) con vectores de tanda, residuo (i)-(iii) de las 11 IHQ con tejido (DAB propio y T recalculado en HER2NEG dentro del sello), T de los dos regímenes por compartimento con la rama > 0,25 evaluada en todos, tasa de P-HER2 con IC binomial y por bootstrap de bloques, regla de L, registro, hotspot, módulo B, umbral de memoria desde la traza de guarda_memoria, semillas y TODOS los parámetros de regla; revisión de la rama alta solo con su pendiente y registrada al sellar; recongelación una sola vez por error de ejecución (si cae en pendiente, el anterior sigue rigiendo). Tras el sello: (iv) de las láminas no de suelo a un anexo sellado (fuera_del_mapa), máscara CK19 con la regla sellada; toda medida de células diana exige el sello completo y con los parámetros del código.",
+ "cuando_si": "Por la ventanilla (procesador `laminillas_congela`, cwd = SESION; todo se escribe en SESION y el sello en la ruta canónica única de laminillas_sello, SESION/congelacion.json): `precongela [--para-recongelar]`, `congela --fecha AAAA-MM-DD --traza a,b`, `recongela --fecha --causa lector|I0|segmentador --traza a,b`, `verifica`; y `precongela --diagnostico-area [--lamina P-HER2]` (área nuclear InstanSeg frente al detector B en µm², solo números agregados, sin escribir ni sellar; sale con 4 para no dejar traza de memoria); y `precongela --diagnostico-mpp` (regla física del mpp: diámetro de hematíes aislados, de cara y sin núcleo en las H&E de hueso B-HE-1 y B-HE-2 con el mpp de la etiqueta; acepta con mediana 6,0-9,0 µm y ≥ 100 por lámina; mismas reglas: solo números agregados, sin escribir ni sellar, sale con 4). `--traza` lleva NOMBRES de procesador; la ventanilla los traduce a `a=trazas/a.tsv` (solo si existen).",
+ "cuando_no": "Nunca para medir células diana antes del sello, ni para recongelar por un resultado que no gusta (eso va a incertidumbres).",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo A).",
+ "test": "tests/test_laminillas_piloto_congela.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), Puerta del piloto, puntos 2 y 3."
+}

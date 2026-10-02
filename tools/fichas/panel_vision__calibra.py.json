@@ -1,0 +1,11 @@
+{
+ "pieza": "panel_vision/calibra.py",
+ "estado_ficha": "completa",
+ "para": "Arnés de calibración del panel de visión de laminillas DFCI: genera un conjunto sintético con errores sembrados (5 tareas: máscara nuclear, máscara CK19, registro, figura, artefacto), pregunta a cada modelo una imagen por petición con respuesta JSON cerrada {hay_error, tipo, cuadrante}, puntúa sensibilidad localizada y especificidad con IC de Wilson y decide por tarea (n≥30, sens y esp ≥0,8, límite inferior ≥0,6). Adaptadores: ollama local (loopback, sin proxies, sin modelos cloud, memoria comprobada antes de cada lote), transcrito (respuestas de Claude en sesión o de una persona), gemini por tools/vision_n1.py (modelo fijado; sin condiciones_cumplidas o sin trust-cloud falla cerrado con ProveedorNoListo; las imágenes sintéticas pasan antes a N1 con `a-n1`, que usa exporta_n1 y comprueba los píxeles), medgemma en local (medgemma_local.py, hoy «pendiente de acceso») y claude como interfaz que falla cerrado. `modelos` lista el estado de cada uno. `exportar` escribe calibracion_sintetica.json (y, del conjunto de `sembrar-n1`, calibracion_n1.json); `modelos_autorizados` es la consulta del panel y solo cuenta calibraciones a ciegas (un transcrito sin --ciega o marcado --no-ciega se informa pero no habilita).",
+ "cuando_si": "Para decidir qué modelo de visión revisa qué capa antes del tribunal (punto 5-bis del plan) y para recalibrar cuando cambie un modelo, su digest o una plantilla de pregunta.",
+ "cuando_no": "Nunca para puntuar biomarcadores ni para enviar imágenes a un proveedor externo: eso solo por tools/vision_n1.py tras el paso 6.",
+ "reemplaza": "Nada: pieza nueva del panel de visión (antes no había forma de medir qué detecta cada modelo).",
+ "test": "tests/test_panel_vision.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI» (eventual-puzzling-chipmunk), actualización 3 y punto 5-bis: «cada modelo se usa solo para lo que demuestre detectar»."
+}

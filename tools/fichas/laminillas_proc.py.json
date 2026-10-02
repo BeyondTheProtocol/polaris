@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_proc.py",
+ "estado_ficha": "completa",
+ "para": "Procesadores con datos por la ventanilla: ingesta y qc (F1.1-F1.3), registro prueba-vips, segmenta (InstanSeg sellado por lámina; rejilla desplazada en P-KI67 y GrandQC si rige) y analisis, la puerta del piloto tras (0) con orden de lista cerrada: piloto-ibis (CK19: objetos, máscara CK19 y regla morfométrica), registro-par (ii)/(ii-bis)/(iii) con la regla del 50 % y la escalera sin registro, piloto-i (P-KI67: QC, objetos, % y hotspot, GeoJSON y capa del visor), metricas y geojson de cualquier lámina (extensión NE incluida), lista-postcongelacion (punto 5, para al primer «no pasa») y tribunal-listo (5-bis por código). Productos en SESION/piloto/ con «hecho» y huella de entradas. Despacha a laminillas_f3 las órdenes de F3 parte A (consenso, puerta-p63, regiones-pobres, lectura-digital; roi-carlos por el procesador laminillas_roi).",
+ "cuando_si": "Solo por la ventanilla: procesa laminillas_segmenta <lámina>… | laminillas -- <orden> [láminas opacas] (piloto-ibis, registro-par A B [--valis], piloto-i, metricas L, geojson L, lista-postcongelacion, tribunal-listo).",
+ "cuando_no": "Ninguna medida de lámina diana sin el sello (0) verificado (código 3); sin un producto previo dice cuál falta (código 5); no hace el mapa de vecindad (a) ni exporta a N1; la FC de F3, la puerta de p63, (a-bis), (b) y la ROI de Carlos son de laminillas_f3. visor sigue en esqueleto.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F2, Puerta del piloto (puntos 4-6 y 5-bis) y F3."
+}

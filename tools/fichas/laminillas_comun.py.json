@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_comun.py",
+ "estado_ficha": "completa",
+ "para": "Utilidades stdlib de los procesadores enjaulados: SESION por cwd (solo con BTP_VENTANILLA=1) y «hecho» sellado por lámina/tesela con el sha256 de cada producto, para reanudar tras 98/99.",
+ "cuando_si": "Dentro de un procesador de laminillas que deba poder reanudarse.",
+ "cuando_no": "No fuera de la jaula ni como lector de píxeles.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

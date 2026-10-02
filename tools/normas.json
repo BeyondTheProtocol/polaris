@@ -3514,6 +3514,54 @@
       "auditable": true,
       "repetida": false,
       "nota": "El check gestion_pide_ok (22-sep) ya canta al pedir OK para fusionar a casa base o podar. Su aceptación de la tarea es el OK de BTP_GIT_BASE_OK."
+    },
+    {
+      "slug": "feedback-resolver-no-degradar",
+      "que": "un problema técnico se resuelve (estado del arte primero); nunca ofrecer como menú una salida con menos información o precisión",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "2-oct-26: escrita en una sesión arrancada en $HOME (dir de memoria equivocado) y copiada al canónico. Sin mecanizar."
+    },
+    {
+      "slug": "feedback-fontaneria-no-se-le-pregunta",
+      "que": "fusiones, merges, pasos y fontanería los ejecuto yo; a {{TITULAR}} solo lo clínico, lo de fuera y lo irreversible",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "2-oct-26: escrita en una sesión arrancada en $HOME (dir de memoria equivocado) y copiada al canónico. Sin mecanizar."
+    },
+    {
+      "slug": "feedback-eje-neuroendocrino-siempre",
+      "que": "el eje neuroendocrino al mismo nivel que el adeno luminal hasta que los datos descarten que influye, con criterio de descarte escrito antes",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "2-oct-26: escrita en una sesión arrancada en $HOME (dir de memoria equivocado) y copiada al canónico. Sin mecanizar."
+    },
+    {
+      "slug": "feedback-piezas-del-plan-atadas-a-su-puerta",
+      "que": "lo diferido de un plan se ata por código a la puerta donde se usa (preparar en paralelo, bloquear en su puerta)",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "2-oct-26: escrita en una sesión arrancada en $HOME (dir de memoria equivocado) y copiada al canónico. Sin mecanizar."
     }
   ]
 }

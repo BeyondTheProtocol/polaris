@@ -1,0 +1,11 @@
+{
+ "pieza": "panel_vision/medgemma_local.py",
+ "estado_ficha": "completa",
+ "para": "Adaptador LOCAL de MedGemma 4B (google/medgemma-4b-it) para el panel de visión de laminillas DFCI: corre con transformers en MPS, sin red (HF_HUB_OFFLINE), solo desde el commit sellado en tools/laminillas_stack/pesos.json con el sha256 de cada fichero comprobado antes de cargar. Hoy el modelo es gated y no está descargado: falla cerrado con «pendiente de acceso» y el panel (calibra.py modelos) lo marca así.",
+ "cuando_si": "Para calibrar y usar MedGemma en el panel (calibra.py correr/revisar --modelo medgemma) cuando {{TITULAR}} haya aceptado sus condiciones en Hugging Face y los pesos estén bajados y sellados en pesos.json.",
+ "cuando_no": "Nunca para descargar el modelo (eso es la ventanilla de pesos, con commit y sha256) ni para puntuar biomarcadores. No manda nada fuera del Mac.",
+ "reemplaza": "La interfaz «medgemma» de calibra.Externo, que apuntaba a vision_n1 como si fuera un proveedor externo.",
+ "test": "tests/test_laminillas_n1.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI» (eventual-puzzling-chipmunk), actualizaciones 3 y 15: MedGemma, candidato del panel, pendiente de que {{TITULAR}} acepte sus condiciones."
+}

@@ -185,6 +185,31 @@ PROCESADORES = {
     # Stdlib; con NER llama a .venv-deid por subproceso, sin conexión (egress 0).
     "deid_eval": ("tools/deid_eval.py", "/usr/bin/python3"),
 }
+# Laminillas DFCI (plan F1-infra, 1-oct-26): procesadores ENJAULADOS. Además del script y el
+# intérprete (el del venv, por ruta absoluta, fuera del repo), cada uno corre en un perfil
+# `sandbox-exec` generado en el arranque, con entorno en lista blanca, argumentos opacos, puertas
+# de disco y memoria, cerrojo entre pesados y techo de memoria. Todo eso vive en
+# `laminillas_ventanilla.py`; aquí solo se registran por nombre y se delega.
+_VENVS_LAM = os.path.join(HOME, ".polaris-venvs")
+LAMINILLAS = {
+    "laminillas_ingesta": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_registro": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "valis", "bin", "python")),
+    "laminillas_qc": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_congela": ("tools/laminillas_congela.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_segmenta": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_visor": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    # F3 parte A: ROI de Carlos (pptx de ORIGEN) en la jaula de la ingesta; orden `roi-carlos`.
+    "laminillas_roi": ("tools/laminillas_proc.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_exporta": ("tools/laminillas_exporta.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_humo": ("tools/laminillas_humo.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_humo_valis": ("tools/laminillas_humo.py", os.path.join(_VENVS_LAM, "valis", "bin", "python")),
+    "laminillas_pesos": ("tools/laminillas_pesos.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+    "laminillas_pesos_valis": ("tools/laminillas_pesos.py", os.path.join(_VENVS_LAM, "valis", "bin", "python")),
+    # F3 parte B: H&E del primario, hueso y exploratorio (órdenes en `laminillas_he.ORDENES`).
+    "laminillas_he": ("tools/laminillas_he.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
+}
+PROCESADORES.update(LAMINILLAS)
 
 
 def _raices_para_listar():
@@ -416,6 +441,18 @@ def procesa(agent, argv):
         print("RECHAZADO: falta %s o su intérprete %s." % (script, interprete), file=sys.stderr)
         return 1
     _log(agent, "PROCESA-%s" % nombre, " ".join(args)[:400])
+    if nombre in LAMINILLAS:
+        # Enjaulado: nunca con os.environ entero ni sin sandbox. Si el módulo no carga, NO corre.
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import laminillas_ventanilla
+        except Exception as e:
+            _log(agent, "RECHAZADO-laminillas-sin-ventanilla", repr(e)[:200])
+            print("RECHAZADO: no pude cargar laminillas_ventanilla (%r)." % e, file=sys.stderr)
+            return 1
+        codigo = laminillas_ventanilla.ejecuta(agent, nombre, args)
+        _log(agent, "PROCESA-%s-rc%d" % (nombre, codigo), "")
+        return codigo
     env = dict(os.environ, BTP_VENTANILLA="1")
     if nombre in VIGILA_CUELGUE:
         return _procesa_vigilado(agent, nombre, [interprete, script] + args, env)

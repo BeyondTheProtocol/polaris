@@ -1,0 +1,23 @@
+#cloud-config
+# nube_n1 · trabajo CellViT++ en la máquina GPU (versionado en tools/nube_n1_cloudinit/).
+# Lo rellena tools/nube_n1.py `lanzar`: los marcadores son el base64 de tres ficheros ya validados
+# (_ejecuta.sh con sus valores, _a_enganche.py y el mapa de clases); nada más se sustituye.
+# Sin claves: la máquina solo recibe URLs prefirmadas de un solo objeto cada una.
+write_files:
+  - path: /root/btp/ejecuta.sh
+    owner: root:root
+    permissions: '0700'
+    encoding: b64
+    content: @@EJECUTA_B64@@
+  - path: /root/btp/a_enganche.py
+    owner: root:root
+    permissions: '0600'
+    encoding: b64
+    content: @@ENGANCHE_B64@@
+  - path: /root/btp/mapa.json
+    owner: root:root
+    permissions: '0600'
+    encoding: b64
+    content: @@MAPA_B64@@
+runcmd:
+  - [bash, -c, "bash /root/btp/ejecuta.sh > /root/btp/ejecuta.log 2>&1"]

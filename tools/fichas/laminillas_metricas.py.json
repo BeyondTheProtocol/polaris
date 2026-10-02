@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_metricas.py",
+ "estado_ficha": "completa",
+ "para": "Métricas del piloto de laminillas DFCI sobre núcleos ya detectados y registrados (no lee píxeles): contexto con T, banda y tasa de P-HER2 del sello (régimen elegible sin recongelar; control de fondo por lámina con las dos cifras), regla de L, % global con IC por bloques contiguos (envolvente bootstrap/t/semivariograma, declarado aproximado) y rango de sensibilidad (banda de T, tres denominadores, detector), H-score con histograma completo, heterogeneidad por fragmento (IC binomial, CV, Moran por fragmento), hotspot de Ki67 con permutación, puerta de señal con tasas en su propio umbral, HER2 descriptivo, denominador (supervivencia de la erosión, parada de densidad), puerta de p63 y (a-bis). Simetría NE (actualización 11): `mide_marcador` da a SYN/CHGA/{{DIANA3}} las mismas métricas que a RE y Ki67 y un NE «focal» añade el patrón de puntos de sus positivos (etiquetado aleatorio por fragmento, vecino más próximo, Ripley, distancia a terciles de RE y Ki67); `mapa_multimarcador` con IC de Spearman calibrado, pares RE×SYN y Ki67×SYN siempre en la tabla y fuera lo que (iv) del módulo A marca.",
+ "cuando_si": "Tras la congelación (0) y el registro, desde el procesador de análisis del piloto, con las tablas Nucleos de cada lámina y su Contexto sellado.",
+ "cuando_no": "Nunca para medir una lámina diana sin sello ni con un T pasado a mano; nunca para clasificar 0/ultralow, ni para emitir p-valores del mapa de vecindad.",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo B).",
+ "test": "tests/test_laminillas_piloto_b.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F3 «Qué se mide», análisis estrella (a)/(a-bis) y actualizaciones 10 y 11 (eje neuroendocrino simétrico)."
+}

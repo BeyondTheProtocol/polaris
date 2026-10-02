@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_f3.py",
+ "estado_ficha": "completa",
+ "para": "F3 parte A de las laminillas DFCI, como órdenes de laminillas_proc por la ventanilla: `consenso` (máscara de tejido por lámina, global euclídea contra P-CK19, FC = píxel en ≥6 de 11 máscaras, refinado y puerta por FC con registra_serie y la BASE: áreas, interior, regiones de lado L con su distancia al borde, láminas verificadas por FC, densidad y parada dura), `puerta-p63` (control positivo interno por FC con laminillas_metricas.puerta_p63 y, por lámina pedida, la cifra aparte «invasive-only where p63 available»), `regiones-pobres` ((a-bis) en P-RE con regiones_re_pobres tal cual, mini-puerta automática por FC, CK19 y p63 registrados, Ki67 regional y galería a L0; gemela NE en P-SYN/P-CHGA/P-{{DIANA3}} con regiones pobres y ricas por los mismos criterios), `lectura-digital` ((b): tabla por fragmento, todo e interior, y biopsias virtuales con la ventana sellada; la lectura visual solo desde un cotejo verificado) y `roi-carlos` (cada imagen del pptx contra el ×4 de las 13 láminas del primario: SIFT sellado + SimilarityTransform de escala 0,25-4, ≥30 inliers y ≥2× la segunda; «label in deck: X; image matches: Y»).",
+ "cuando_si": "Tras la puerta del piloto (sello (0), piloto-ibis, registro-par P-KI67 P-CK19 y metricas P-KI67) y con las 11 IHQ segmentadas: procesa laminillas -- consenso [--valis] | puerta-p63 [L…] | regiones-pobres L | lectura-digital L; procesa laminillas_roi -- roi-carlos (jaula analisis-ingesta, la que lee ORIGEN).",
+ "cuando_no": "Nunca fuera de la ventanilla (roi-carlos se niega sin BTP_VENTANILLA=1: no toca ORIGEN), nunca sin sello (código 3) ni con un producto previo ausente (código 5, dice cuál). No hace el mapa de vecindad (a), ni H&E, ni exporta a N1; no inventa la lectura visual ni llama tumoral a ninguna región.",
+ "reemplaza": "Nada: pieza nueva de F3 (parte A); usa laminillas_registro, laminillas_metricas y laminillas_proc sin cambiar su API.",
+ "test": "tests/test_laminillas_f3.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI» (eventual-puzzling-chipmunk), análisis estrella (a-bis) y (b), F3 «Qué se mide» (Geometría de consenso, Puerta de p63, Denominador, Heterogeneidad, ROI de Carlos) y actualización 11 (simetría NE)."
+}

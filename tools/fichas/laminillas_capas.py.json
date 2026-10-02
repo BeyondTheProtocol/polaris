@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_capas.py",
+ "estado_ficha": "completa",
+ "para": "Pinta y exporta a N1 las capas del piloto que revisa el panel de visión (las 5 tareas: núcleos de InstanSeg de P-HE en ámbar, máscara CK19 en magenta y artefactos de la H&E en naranja, a 0,5 µm/px; superposición de registro P-CK19/móvil con sinteticos.pinta_registro y barra de 100 µm al ×8 nativo; figura de informe de P-CK19 con su especificación y sus cajas) y escribe ~/Laminillas-N1/panel_vision/capas_piloto.json, el contrato que leen siembra_n1._carga_capas, calibra.revisa_capas y laminillas_proc.tribunal_listo. Cada capa entra en N1 SOLO por exporta_n1.exporta_png (por tubería /dev/fd, sin fichero intermedio) y el JSON por puerta_n1.revisar_json; una capa que la Puerta rechaza no entra. Campos elegidos con semilla sellada (semillas.maestra del sello + desplazamiento por tarea) solo por tejido, núcleos, máscara CK19 y FC verificado, nunca por DAB o positividad de una diana.",
+ "cuando_si": "Tras el piloto (piloto-ibis P-CK19 P-HE, registro-par de (ii)/(ii-bis)) y antes de `calibra.py sembrar-n1` y `calibra.py revisar`: `lector_clinico.py procesa laminillas_exporta -- capas-piloto`. Repetirla tras recalcular productos abre una ronda nueva (nombres nuevos); con la misma huella reanuda.",
+ "cuando_no": "Nunca a mano ni fuera de la ventanilla (exporta.sb: lee SESION, escribe solo N1). No sirve para revisar la detección nuclear de P-KI67: la pregunta del panel dice H&E. No mide nada ni lee positividad de ninguna diana.",
+ "reemplaza": "Nada: es el productor que faltaba del contrato de la actualización 15 (antes nadie escribía capas_piloto.json).",
+ "test": "tests/test_laminillas_capas.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI», punto 5-bis (requisito bloqueante del tribunal) y actualización 15, «Contrato para la siembra N1» (2-oct-26)."
+}

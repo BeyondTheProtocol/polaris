@@ -43,6 +43,8 @@ CLI:
   python3 tools/borde.py verify           # integridad de la cadena de traza
   python3 tools/borde.py revocar <sesion>
   python3 tools/borde.py trust-cloud <destino> [--para sensible]   # ACTO HUMANO (confirma tecleando)
+      (vision-n1:* y nube-n1:*: sin --yes ni stdin; la palabra CONFIAR-N1 se teclea en /dev/tty,
+       desde Terminal.app y no desde una sesión de Claude Code: ver la cabecera de trust_cloud)
   python3 tools/borde.py revoke-cloud <destino>                    # revoca una nube confiada
   python3 tools/borde.py status | selftest
 """
@@ -51,6 +53,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from collections import namedtuple
 from datetime import datetime, timezone
@@ -513,23 +516,315 @@ def _cloud_confiados():
 
 def es_trusted(destino):
     """True solo si el destino es local/cleared, está en la allowlist explícita, o fue confiado a
-    mano por un humano vía el gate `trust-cloud` (registrado y revocable). Fail-closed."""
+    mano por un humano vía el gate `trust-cloud` (registrado y revocable). Fail-closed.
+
+    Para `vision-n1:*` y `nube-n1:*` no basta con estar en `cloud_confiados.json` (un fichero que
+    cualquier proceso del usuario escribe): su último `trust_cloud` en la cadena tiene que llevar
+    `via: 'tty'`, que solo sella `trust_cloud()` (revisión del muro, 1-oct-26, hallazgo 1)."""
     if not destino:
         return False
-    return (destino in _trusted_exactos()
-            or any(destino.startswith(p) for p in TRUSTED_PREFIXES)
-            or destino in _cloud_confiados())
+    if destino in _trusted_exactos() or any(destino.startswith(p) for p in TRUSTED_PREFIXES):
+        return True
+    if destino not in _cloud_confiados():
+        return False
+    return _confianza_tty_sellada(destino) if exige_tty(destino) else True
+
+
+def _confianza_tty_sellada(destino):
+    """¿La cadena está íntegra y el último `trust_cloud`/`revoke_cloud` de `destino` en ella es un
+    `trust_cloud` con `via: 'tty'`? Mismo criterio que `puerta_n1.evento_confianza`. Ilegible →
+    False. La integridad se exige aquí desde la 2.ª pasada (hallazgo 1): una línea sin seq, prev ni
+    hash en cualquier `ledger-*.jsonl` bastaba para que `es_trusted` dijera True a quien no pasa
+    por `puerta_n1`."""
+    try:
+        if not verificar_cadena()[0]:
+            return False
+    except Exception:                                       # noqa: BLE001 — ilegible: no confía
+        return False
+    ultimo = None
+    try:
+        ficheros = sorted(f for f in os.listdir(BORDE_DIR) if f.startswith("ledger-"))
+        for fn in ficheros:
+            with open(os.path.join(BORDE_DIR, fn), encoding="utf-8") as fh:
+                for ln in fh:
+                    if destino not in ln:
+                        continue
+                    try:
+                        rec = json.loads(ln)
+                    except ValueError:
+                        continue
+                    if rec.get("destino") != destino:
+                        continue
+                    if rec.get("evento") == "trust_cloud":
+                        ultimo = rec
+                    elif rec.get("evento") == "revoke_cloud":
+                        ultimo = None
+    except OSError:
+        return False
+    return bool(ultimo and ultimo.get("via") == "tty")
+
+
+# Destinos que reciben PÍXELES de sus láminas (plan «laminillas DFCI», F1.4, 1-oct-26). Para estos
+# la confirmación no la pide el CLI sino `trust_cloud()`, en /dev/tty: hasta ese día la función no
+# comprobaba nada y el CLI aceptaba `--yes` o una respuesta por stdin, así que cualquier proceso
+# (un agente con Bash, un `python -c`) podía confiar una nube.
+#
+# LÍMITE DECLARADO (revisión del muro, 1-oct-26; el rastro, corregido en la 2.ª pasada, 2-oct-26):
+# obstáculo y rastro, no frontera. En un Mac de un solo usuario no hay frontera dura contra un
+# agente del mismo usuario: un /dev/tty NO prueba que teclee un humano (`script`, `expect`,
+# `pty.spawn` o `tmux` le crean un terminal a cualquier proceso) y desde el mismo intérprete se
+# alcanza cualquier objeto.
+# OBSTÁCULOS: (1) `_sellar` rechaza un evento de confianza de píxeles (un `trust_cloud` de
+# vision-n1/nube-n1 o cualquier `via: 'tty'`) sin sello, y lo mira sobre el registro ya pasado a
+# JSON, que es justo lo que escribe; (2) `trust_cloud` rechaza si un ancestro del proceso es Claude
+# Code o si stdin no es el terminal de control, y luego pide la palabra en /dev/tty; (3) esas
+# comprobaciones, `_sellar` y el sello de `trust_cloud` resuelven sus nombres en una FOTO del
+# módulo tomada al importar (`_congela`, que se borra): reasignar un nombre de borde (`open`,
+# `_tabla_procesos`, `_comprobar_lanzador`…), una función de `os`, `subprocess` o `json`, o un
+# builtin ya no las quita, y no queda fábrica pública ni el sello como atributo; (4) `es_trusted`
+# exige la cadena íntegra y ese evento; (5) el hook.
+# RASTRO, exactamente:
+#   · deja evento en la cadena: todo rechazo de `trust_cloud` o del CLI a un destino de píxeles
+#     (`trust_cloud_rechazado`), todo evento de confianza sin sello (`sello_rechazado`) y todo el
+#     que entra con `_SELLO_CONFIANZA`, la puerta de las fixtures de test
+#     (`sello_fuera_de_trust_cloud`, sellado ANTES del propio evento). Las denegaciones del hook
+#     van a `salida_guard.jsonl`;
+#   · NO deja evento: tocar la foto (`__globals__` de las funciones, `gc`; ya no hay cierre que
+#     tocar), parchear la biblioteca estándar por dentro (`subprocess.Popen` falso para que `ps`
+#     no enseñe a Claude Code, con `pty.fork()` dándole al hijo un terminal de control propio),
+#     lanzar el CLI con un doble fork y un terminal propio (`( ( … | script … borde.py
+#     trust-cloud … ) & )`: lo adopta launchd y la comprobación de ancestros no ve al agente),
+#     ejecutar una copia modificada de este código, o escribir el ledger y head.txt a mano con el
+#     hash recalculado. El evento que queda es idéntico a uno legítimo: ni `verificar_cadena`, ni
+#     `puerta_n1.exigir_confianza`, ni una revisión del ledger lo distinguen. Su único rastro es la
+#     tool call que lo hizo, en el transcript de la sesión (`~/.claude/projects/…/*.jsonl`, que el
+#     hook no deja escribir: obstáculo también).
+# LOS DESTINOS SIN TTY (todo lo que no empieza por PREFIJOS_TTY: `jev-typesafe`, `gemini` a secas,
+# los carriles de texto): ni palabra ni sello. Les basta el JSON: una entrada en
+# `cloud_confiados.json` los confía, sin evento en la cadena. Contra eso solo está el hook.
+# LO MISMO, PARA LOS OTROS DOS EVENTOS DE N1 (cierre del hueco que dejó declarado f3c2a2f, 2-oct-26):
+#   · `n1_revision_humana` (paso 1-bis: {{TITULAR}} miró el cristal de una lámina cuyo OCR saltó y deja
+#     salir ESE sha256) solo lo sella `revisar_cristal_en_tty()`, con las mismas comprobaciones de
+#     ancestros y de terminal de control que `trust_cloud` y la palabra VISTO-N1 en /dev/tty, y
+#     siempre con `via: 'tty'`. `_sellar` rechaza cualquier otro (`sello_rechazado`) y
+#     `puerta_n1.revision_humana` solo cuenta el que lleva `via: 'tty'` con la cadena íntegra. Cada
+#     rechazo de la función deja `n1_revision_rechazada`. Las forjas por debajo de la API de arriba
+#     valen igual aquí y siguen sin dejar evento.
+#   · `n1_aviso_primer_envio` se sigue sellando con `_sellar`, pero ya no calla nada por sí solo:
+#     `puerta_n1` manda el aviso por salida.py ANTES de sellarlo, el evento lleva el id del aviso
+#     (va en el texto, porque salida.py no devuelve ninguno) y solo cuenta como «ya avisado» si
+#     ese id está en el registro de lo que salida.py entregó, retuvo o aplazó. Forjar el evento
+#     no calla el aviso: el siguiente envío vuelve a avisar y deja `n1_aviso_sin_registro`.
+#     Forjar también el registro de salida.py es escribir a mano en su estado (el hook lo
+#     deniega por las vías que lee; fuera de ellas, solo queda el transcript).
+# Lo fija tests/test_trust_cloud_tty.py (`test_limite_declarado_*`): si eso deja de forjar, cambia
+# esta cabecera.
+PREFIJOS_TTY = ("vision-n1:", "nube-n1:")
+PALABRA_CONFIAR_N1 = "CONFIAR-N1"
+EVENTO_REVISION_N1 = "n1_revision_humana"
+PALABRA_VISTO_N1 = "VISTO-N1"
+# La puerta de las FIXTURES de test (una casa base falsa con un destino confiado sin pasar por la
+# terminal). Es pública a propósito y por eso no es secreta: `_sellar` la acepta, pero antes sella
+# un `sello_fuera_de_trust_cloud` de alarma. El sello de `trust_cloud()` es otro y no es atributo
+# del módulo: vive en la foto de `_congela`.
+_SELLO_CONFIANZA = object()
+
+
+def exige_tty(destino):
+    """¿Confiar este destino exige la palabra tecleada en /dev/tty?"""
+    return isinstance(destino, str) and destino.startswith(PREFIJOS_TTY)
+
+
+def _es_confianza_tty(evento):
+    """¿Este evento afirmaría que un humano confió un destino de píxeles, o miró el cristal de una
+    lámina N1 (paso 1-bis), en su terminal?"""
+    return isinstance(evento, dict) and (
+        evento.get("via") == "tty"
+        or evento.get("evento") == EVENTO_REVISION_N1
+        or (evento.get("evento") == "trust_cloud" and exige_tty(evento.get("destino"))))
+
+
+# Procesos de Claude Code (vistos el 1-oct-26 en el mini): la CLI (`claude`, `node …claude…`), la
+# CLI remota (`~/.claude/remote/ccd-cli/<versión>`, que NO se llama `claude`), su servidor, el
+# shell de cada tool call (`zsh -c source ~/.claude/shell-snapshots/…`) y la app de escritorio
+# (`Claude.app`, `…/claude-code/<v>/claude.app/…`), cuyo panel de terminal también lo maneja el
+# agente (`run_in_terminal`).
+_RE_PROCESO_AGENTE = re.compile(
+    r"/\.claude/(?:remote|local|shell-snapshots)/|/claude\.app/|/claude-code/|@anthropic-ai/claude-code",
+    re.I)
+_RE_LANZA_SCRIPT = re.compile(r"^(?:sh|bash|zsh|dash|ksh|fish|node|bun|deno|python[\d.]*)$")
+
+
+def _es_proceso_del_agente(args):
+    """¿Esta línea de `ps -o args=` es Claude Code o un proceso suyo?"""
+    if not args:
+        return False
+    if _RE_PROCESO_AGENTE.search(args):
+        return True
+    trozos = args.split()
+    exe = os.path.basename(trozos[0]).lower().lstrip("-")
+    if exe == "claude":
+        return True
+    if exe in ("node", "bun", "deno") and "claude" in args.lower():
+        return True
+    return bool(_RE_LANZA_SCRIPT.match(exe) and len(trozos) > 1
+                and os.path.basename(trozos[1]).lower() == "claude")
+
+
+def _tabla_procesos():
+    """{pid: (ppid, tty, args)} de todos los procesos, con UNA llamada a `ps`."""
+    out = subprocess.run(["ps", "-axww", "-o", "pid=", "-o", "ppid=", "-o", "tty=", "-o", "args="],
+                         capture_output=True, text=True, timeout=15).stdout
+    tabla = {}
+    for ln in out.splitlines():
+        partes = ln.split(None, 3)
+        if len(partes) < 3:
+            continue
+        try:
+            tabla[int(partes[0])] = (int(partes[1]), partes[2], partes[3] if len(partes) > 3 else "")
+        except ValueError:
+            continue
+    return tabla
+
+
+def _comprobar_lanzador(destino, rechazo=None, que=None, etiqueta="trust-cloud BLOQUEADO"):
+    """RuntimeError si un ancestro de este proceso es Claude Code o si stdin no es el terminal de
+    control (el mismo que abre /dev/tty). Cada rechazo deja un evento de alarma en la cadena
+    (`rechazo`, por defecto `trust_cloud_rechazado` de `destino`). Fail-closed: si no se puede leer
+    la tabla de procesos, no se confía."""
+    rechazo = dict(rechazo) if rechazo else {"evento": "trust_cloud_rechazado",
+                                             "destino": str(destino)[:120]}
+    que = que or "'%s' se confía" % destino
+
+    def _rechaza(motivo, detalle):
+        _sellar(dict(rechazo, motivo=motivo, nivel="alarma"))
+        raise RuntimeError("%s: %s" % (etiqueta, detalle))
+    try:
+        tabla = _tabla_procesos()
+    except Exception as e:                                  # noqa: BLE001 — fail-closed
+        _rechaza("ps ilegible", "no he podido leer quién me lanza (%s)." % type(e).__name__)
+    yo = os.getpid()
+    if yo not in tabla:
+        _rechaza("ps ilegible", "no me encuentro en la tabla de procesos.")
+    pid, pasos = tabla[yo][0], 0
+    while pid > 1 and pasos < 128:
+        fila = tabla.get(pid)
+        if fila is None:
+            break
+        if _es_proceso_del_agente(fila[2]):
+            _rechaza("lanzado desde Claude Code",
+                     "me ha lanzado un proceso de Claude Code (pid %d). %s desde Terminal.app, "
+                     "tecleando tú; no desde una sesión de Claude ni desde su panel de terminal."
+                     % (pid, que))
+        pid, pasos = fila[0], pasos + 1
+    control = tabla[yo][1]
+    try:
+        entrada = os.ttyname(0)
+    except OSError:
+        entrada = ""
+    if entrada.startswith("/dev/"):
+        entrada = entrada[len("/dev/"):]
+    if not entrada or control in ("", "?", "??", "-") or entrada != control:
+        _rechaza("stdin no es el terminal de control",
+                 "stdin (%s) no es el terminal de control (%s)." % (entrada or "sin tty", control))
+
+
+def _palabra_en_tty(palabra, pregunta, rechazo, etiqueta, que):
+    """Escribe `pregunta` en /dev/tty y exige que se teclee `palabra`. Sin terminal real o con otra
+    palabra, RuntimeError; cada rechazo deja `rechazo` (con su motivo) en la cadena."""
+    def _rechaza(motivo, nivel, detalle):
+        _sellar(dict(rechazo, motivo=motivo, nivel=nivel))
+        raise RuntimeError(detalle)
+    try:
+        r = open("/dev/tty", "r")
+        w = open("/dev/tty", "w")
+    except Exception:
+        _rechaza("sin TTY", "alarma", "%s: %s exige la palabra tecleada en la terminal de {{TITULAR}} y "
+                 "aquí no hay TTY." % (etiqueta, que))
+    try:
+        if not (r.isatty() and w.isatty()):
+            _rechaza("sin TTY", "alarma", "%s: no hay TTY real." % etiqueta)
+        w.write(pregunta)
+        w.flush()
+        if (r.readline() or "").strip() != palabra:
+            _rechaza("palabra distinta", "info", "%s: cancelado por el humano (palabra distinta)."
+                     % etiqueta)
+        return True
+    finally:
+        r.close()
+        w.close()
+
+
+def _confirmar_confianza_en_tty(destino, para):
+    """Exige teclear PALABRA_CONFIAR_N1 en /dev/tty. Sin terminal real, RuntimeError. Cada rechazo
+    deja `trust_cloud_rechazado` en la cadena (2.ª pasada: sin TTY no dejaba nada)."""
+    return _palabra_en_tty(
+        PALABRA_CONFIAR_N1,
+        "\n⚠️  Vas a CONFIAR '%s' para %s.\n"
+        "    Saldrán copias N1 (píxeles sin identificar) hacia ese proveedor externo.\n"
+        "    Queda sellado en la cadena y es revocable. Escribe %s para confirmar: "
+        % (destino, para, PALABRA_CONFIAR_N1),
+        {"evento": "trust_cloud_rechazado", "destino": str(destino)[:120]},
+        "trust-cloud BLOQUEADO", "'%s'" % destino)
+
+
+def revisar_cristal_en_tty(opaco, sha256, motivos=()):
+    """Paso 1-bis de `exporta_n1 tiff --revisado-en-tty`: el OCR o el detector de trazos saltó en
+    la lámina `opaco`, {{TITULAR}} miró su miniatura y lo dice tecleando VISTO-N1 en SU terminal. Es la
+    ÚNICA vía que sella `n1_revision_humana` (con `via: 'tty'`, atado a `sha256`, el de la copia
+    N1): `_sellar` rechaza ese evento sin el sello privado de la foto.
+
+    Mismas comprobaciones que `trust_cloud`: rechaza si un ancestro del proceso es Claude Code o si
+    stdin no es el terminal de control; luego pide la palabra en /dev/tty. Cada rechazo deja
+    `n1_revision_rechazada` en la cadena. Devuelve el hash del evento; RuntimeError si no lo sella.
+    LÍMITE DECLARADO: el de la cabecera de PREFIJOS_TTY (obstáculo y rastro, no frontera)."""
+    opaco = str(opaco)[:40]
+    motivos = [str(m)[:160] for m in (motivos or ())]
+    sha = sha256 if isinstance(sha256, str) else ""
+    rechazo = {"evento": "n1_revision_rechazada", "opaco": opaco, "sha256": sha[:64]}
+    etiqueta = "revisión 1-bis BLOQUEADA"
+    if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
+        _sellar(dict(rechazo, motivo="sha256 no válido", nivel="alarma"))
+        raise RuntimeError("%s: sha256 no válido para '%s'." % (etiqueta, opaco))
+    que = "La revisión del cristal de '%s' se hace" % opaco
+    _comprobar_lanzador(opaco, rechazo=rechazo, que=que, etiqueta=etiqueta)
+    lista = "".join("\n      · %s" % m for m in motivos[:12])
+    _palabra_en_tty(
+        PALABRA_VISTO_N1,
+        "\n⚠️  El OCR o el detector de trazos saltó en %s (sha256 %s…):%s\n"
+        "    Si has mirado la miniatura y no hay texto tuyo en el cristal, esa copia N1 podrá salir.\n"
+        "    Queda sellado en la cadena. Escribe %s para confirmar: "
+        % (opaco, sha[:12], lista, PALABRA_VISTO_N1),
+        rechazo, etiqueta, "la revisión de '%s'" % opaco)
+    h = _sellar({"evento": EVENTO_REVISION_N1, "opaco": opaco, "sha256": sha, "via": "tty",
+                 "motivos": len(motivos), "nivel": "info"},
+                _sello=_SELLO_PRIVADO)  # noqa: F821 — solo existe en la foto de `_congela`
+    if not h:
+        raise RuntimeError("%s: no he podido sellar la revisión de '%s' en la cadena." % (etiqueta, opaco))
+    return h
 
 
 def trust_cloud(destino, *, para="sensible", quien="titular", nota=None):
     """Confía a mano un destino de NUBE para contenido sensible. ACTO HUMANO: el CLI exige
     confirmación tecleada ANTES de llamar aquí (nunca lo dispara el flujo ni contenido externo).
     Lo persiste, lo sella en la cadena hash-chained y queda revocable. Devuelve (ok, motivo).
-    No admite destinos local:/cleared: (ya son trusted por suelo) ni vacíos."""
+    No admite destinos local:/cleared: (ya son trusted por suelo) ni vacíos.
+
+    `vision-n1:*` y `nube-n1:*`: rechaza si un ancestro del proceso es Claude Code o si stdin no
+    es el terminal de control; luego pide la palabra en /dev/tty (sin TTY, RuntimeError) y sella
+    el evento con `via: 'tty'`, que `vision_n1`/`nube_n1` exigen en la cadena.
+
+    LÍMITE DECLARADO: obstáculo y rastro, no frontera. Qué deja rastro y qué no, en la cabecera
+    de PREFIJOS_TTY. La versión que se usa es la de la foto de `_congela`."""
     if not destino or not isinstance(destino, str):
         return False, "destino vacío"
     if any(destino.startswith(p) for p in TRUSTED_PREFIXES):
         return False, "ese destino ya es trusted por suelo (local:/cleared:); no necesita gate"
+    via = None
+    if exige_tty(destino):
+        _comprobar_lanzador(destino)              # lanza si lo lanza Claude Code o stdin no es el terminal
+        _confirmar_confianza_en_tty(destino, para)  # lanza si no hay TTY o no la teclea
+        via = "tty"
     os.makedirs(BORDE_DIR, exist_ok=True)
     with _Lock():
         try:
@@ -546,8 +841,11 @@ def trust_cloud(destino, *, para="sensible", quien="titular", nota=None):
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, CLOUD_CONFIADOS)
-    _sellar({"evento": "trust_cloud", "destino": destino, "para": str(para),
-             "quien": str(quien), "nivel": "info"})
+    evento = {"evento": "trust_cloud", "destino": destino, "para": str(para),
+              "quien": str(quien), "nivel": "info"}
+    if via:
+        evento["via"] = via
+    _sellar(evento, _sello=_SELLO_PRIVADO)  # noqa: F821 — solo existe en la foto de `_congela`
     return True, "nube confiada (acto humano, trazado y revocable): %s" % destino
 
 
@@ -682,14 +980,51 @@ def _hash_rec(rec):
                           .encode("utf-8")).hexdigest()
 
 
-def _sellar(evento):
+def _sellar(evento, *, _sello=None):
     """Sella `evento` (dict de METADATOS) en la cadena. Devuelve el hash. Best-effort: un
-    fallo de E/S no debe tumbar una decisión de seguridad, pero deja rastro en stderr."""
+    fallo de E/S no debe tumbar una decisión de seguridad, pero deja rastro en stderr.
+
+    Un `trust_cloud` de `vision-n1:*`/`nube-n1:*` (o cualquier evento con `via: 'tty'`) solo lo
+    sella `trust_cloud()`, que pasa su sello privado. Si llega sin él, PermissionError y queda en la
+    cadena un `sello_rechazado` de alarma (hallazgos 0, 7 y 10 de la revisión del muro: la cadena no
+    lleva clave, así que hasta hoy cualquiera que importara el módulo fabricaba la prueba de TTY).
+    Igual un `n1_revision_humana`, que solo sella `revisar_cristal_en_tty()` (2-oct-26).
+    Con `_SELLO_CONFIANZA` (fixtures de test) se sella, pero antes queda un
+    `sello_fuera_de_trust_cloud` de alarma.
+
+    La comprobación se hace sobre el registro YA pasado a JSON, que es lo que se escribe: una
+    subclase de dict con otro `.get()`, una lista de pares o un MappingProxy ya no la esquivan
+    (2.ª pasada, hallazgo 10)."""
+    try:
+        rec = json.loads(json.dumps(dict(evento), ensure_ascii=False, sort_keys=True))
+    except Exception as e:
+        sys.stderr.write("borde: no pude sellar la traza (%r)\n" % e)
+        return None
+    if _es_confianza_tty(rec) and _sello is not _SELLO_PRIVADO:  # noqa: F821 — vive en la foto
+        revision = rec.get("evento") == EVENTO_REVISION_N1
+        if _sello is _SELLO_CONFIANZA:
+            _sellar({"evento": "sello_fuera_de_trust_cloud", "destino": str(rec.get("destino"))[:120],
+                     "de": str(rec.get("evento"))[:60],
+                     "motivo": "evento de confianza sellado con la puerta de las fixtures de test",
+                     "nivel": "alarma"})
+        elif revision:
+            _sellar({"evento": "sello_rechazado", "destino": str(rec.get("destino"))[:120],
+                     "de": EVENTO_REVISION_N1, "opaco": str(rec.get("opaco"))[:40],
+                     "motivo": "n1_revision_humana fuera de revisar_cristal_en_tty()",
+                     "nivel": "alarma"})
+            raise PermissionError("borde: la revisión humana de una lámina N1 (paso 1-bis) solo la "
+                                  "sella revisar_cristal_en_tty(), con la palabra tecleada por {{TITULAR}} "
+                                  "en su terminal")
+        else:
+            _sellar({"evento": "sello_rechazado", "destino": str(rec.get("destino"))[:120],
+                     "de": str(rec.get("evento"))[:60],
+                     "motivo": "trust_cloud de píxeles fuera de trust_cloud()", "nivel": "alarma"})
+            raise PermissionError("borde: un trust_cloud de '%s' solo lo sella trust_cloud(), con la "
+                                  "palabra tecleada por {{TITULAR}} en su terminal" % rec.get("destino"))
     try:
         with _Lock():
             seq, prev = _read_head()
             seq += 1
-            rec = dict(evento)
             rec["seq"] = seq
             rec["ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             rec["prev"] = prev
@@ -704,6 +1039,44 @@ def _sellar(evento):
     except Exception as e:
         sys.stderr.write("borde: no pude sellar la traza (%r)\n" % e)
         return None
+
+
+# ── La confianza N1, congelada al importar (revisión del muro, 2.ª pasada, 2-oct-26) ──────────
+# Una función de Python busca sus nombres globales en el módulo AL LLAMARSE: con reasignar
+# `borde.open` (un /dev/tty falso que dice CONFIAR-N1), `borde._tabla_procesos` y `os.ttyname`, un
+# `python -c` sin terminal confiaba `vision-n1:x` con la cadena íntegra y sin una sola alarma
+# (reproducido el 2-oct-26). Por eso `_sellar`, `trust_cloud` y sus comprobaciones se rehacen aquí
+# sobre una FOTO del módulo, de los builtins y de `os`, `os.path`, `subprocess` y `json` tomada
+# ahora, y el sello privado de `trust_cloud` solo existe en esa foto. Reasignar después cualquier
+# nombre de borde o de esos módulos no cambia lo que hacen. `_congela` se borra al usarse: no queda
+# una fábrica que dé a otro código la foto con el sello (hallazgo 2, «u otra»). Obstáculo, no
+# frontera: lo que esto no cubre está en la cabecera de PREFIJOS_TTY.
+def _congela():
+    import builtins
+    import types
+
+    def _copia(modulo, **cambios):
+        return types.SimpleNamespace(**dict(vars(modulo), **cambios))
+    foto = dict(globals())
+    foto["__builtins__"] = dict(vars(builtins))
+    foto["os"] = _copia(os, path=_copia(os.path))
+    foto["subprocess"] = _copia(subprocess)
+    foto["json"] = _copia(json)
+    foto["_SELLO_PRIVADO"] = object()
+    for nombre in ("_sellar", "trust_cloud", "revisar_cristal_en_tty", "_comprobar_lanzador",
+                   "_confirmar_confianza_en_tty", "_palabra_en_tty", "_tabla_procesos",
+                   "_es_proceso_del_agente", "_es_confianza_tty", "exige_tty", "_read_head",
+                   "_hash_rec", "_ledger_path"):
+        f = foto[nombre]
+        g = types.FunctionType(f.__code__, foto, f.__name__, f.__defaults__, f.__closure__)
+        g.__kwdefaults__ = dict(f.__kwdefaults__) if f.__kwdefaults__ else None
+        g.__doc__, g.__qualname__, g.__module__ = f.__doc__, f.__qualname__, f.__module__
+        foto[nombre] = g
+    return foto["_sellar"], foto["trust_cloud"], foto["revisar_cristal_en_tty"]
+
+
+_sellar, trust_cloud, revisar_cristal_en_tty = _congela()
+del _congela
 
 
 def verificar_cadena():
@@ -1213,6 +1586,25 @@ def main(argv):
         if any(destino.startswith(p) for p in TRUSTED_PREFIXES):
             print("🛑 '%s' ya es trusted por suelo (local:/cleared:): no necesita gate." % destino)
             return 3
+        if exige_tty(destino):
+            # Píxeles N1: ni `--yes` ni respuesta por stdin. La palabra la pide trust_cloud() en
+            # /dev/tty; un stdin que no es terminal (`echo sí | …`) se rechaza antes. Desde la 2.ª
+            # pasada del muro también estos rechazos dejan alarma en la cadena.
+            motivo = ("--yes" if auto else "stdin no es un terminal" if not sys.stdin.isatty()
+                      else None)
+            if motivo:
+                _sellar({"evento": "trust_cloud_rechazado", "destino": destino[:120],
+                         "motivo": "CLI: %s" % motivo, "nivel": "alarma"})
+                print("🛑 '%s' no admite %s: se confía tecleando en tu terminal." % (
+                    destino, "--yes" if auto else "la respuesta por stdin"))
+                return 2
+            try:
+                ok, motivo = trust_cloud(destino, para=para)
+            except RuntimeError as e:
+                print("🛑 %s" % e)
+                return 1
+            print(("✅ " if ok else "🛑 ") + motivo)
+            return 0 if ok else 3
         if not auto:
             print("⚠️  Vas a CONFIAR la nube '%s' para contenido %s." % (destino, para))
             print("    Esto deja que datos SENSIBLES salgan hacia ese destino externo. Es un acto")

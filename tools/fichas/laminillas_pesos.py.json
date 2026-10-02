@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_pesos.py",
+ "estado_ficha": "completa",
+ "para": "F1.0: baja por commit sellado UNI2-h, TITAN, H-optimus-1, HistoPLUS 40x, WSInfer breast-tumor, brightfield_nuclei, MedGemma 4B (google/medgemma-4b-it 290cda5, orden `medgemma`, para el panel de visión; 2-oct-26) y los allow_patterns de LazySlide-models; fija refs/main local al sha sellado; kornia DISK+LightGlue para VALIS. sha256 por fichero en cache/manifiesto-pesos.json (copia versionada: tools/laminillas_stack/pesos.json).",
+ "cuando_si": "Por la ventanilla (procesa laminillas_pesos / laminillas_pesos_valis), en contexto gui/501 para que el padre lea HF_TOKEN del Llavero.",
+ "cuando_no": "No con un commit distinto del sellado: si refs/main no coincide, aborta ese modelo. No instala paquetes.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1-infra, F1.0 y F2."
+}

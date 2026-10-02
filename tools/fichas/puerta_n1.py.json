@@ -1,0 +1,11 @@
+{
+ "pieza": "puerta_n1.py",
+ "estado_ficha": "completa",
+ "para": "La Puerta de N1: mira textos (CSV, JSON/GeoJSON por esquema, MD/TXT, prompts) antes de que entren en ~/Laminillas-N1/ o salgan a un modelo de visión. Aborta por diccionario de la titular, campos de nombre, email, DNI, NHC, su nombre, deny-list, código de anatomía patológica, canarios, fechas, teléfonos y casi-coincidencias con su nombre. Fail-closed sin diccionario, deny-list, titular o canarios.json. También verifica ficheros contra el manifiesto N1 y exige la confianza tecleada (via tty) de un destino.",
+ "cuando_si": "Lo importan exporta_n1, vision_n1 y nube_n1. A mano: python3 tools/puerta_n1.py revisar <fichero>.",
+ "cuando_no": "No es un de-identificador: no tapa, solo para. No mira píxeles (eso es el OCR de exporta_n1). No sustituye a borde.guard_cli en los carriles de texto de siempre.",
+ "reemplaza": "Nada; en el plan sustituye a guard_cli solo para N1 (guard_cli marca Ki67/HER2 como clínicos).",
+ "test": "tests/test_laminillas_n1.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1.4 y «Potencia y nube»."
+}

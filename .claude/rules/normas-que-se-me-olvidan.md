@@ -30,6 +30,7 @@
 
 - **El coste NUNCA corta el camino a NED**: se baja de marcha o se pide aprobación, no se para. [[feedback-coste-nunca-corta-ned-pide-aprobacion]] · [[feedback-credito-no-bloquea-degrada]]
 - **Lo crítico no se degrada**: si pedía máxima potencia y no se puede, se BLOQUEA y se avisa. [[feedback-no-degradar-lo-critico-bloquear-avisar]]
+- **Subir la inteligencia:** clínico, muro, verificación o síntesis: Opus, esfuerzo alto, subagentes incluidos; mecánico: Haiku/Sonnet; atascado: escala o bloquea [[feedback-elegir-modelo-y-modo]]
 - **Nunca «no puedo»** sobre adjuntar, enviar o borrar correos: sí puedo. Si es un gate de su OK, dilo así. [[feedback-si-puedo-adjuntar-correos]]
 
 ## Cómo trabajar
@@ -39,7 +40,3 @@
 - Tocar un hook del muro: normas en `.claude/rules/hooks-muro.md` (se cargan al tocarlo).
 - **Copiar, mejorar e instalar lo que eleve el producto: sin preguntar** (28-sep, a fuego); audita y cuéntaselo. [[feedback-copiar-y-mejorar-sin-preguntar-instalar-si]]
 - **Si cambia la estructura o el funcionamiento de Polaris, el panel lo cuenta ANTES de cerrar.** Freno: `tests/test_anatomia_al_dia.py`; se cierra con `python3 tools/anatomia.py sellar`. [[feedback-panel-refleja-cada-cambio-de-polaris]]
-
-## En `CLAUDE.md`, no aquí
-
-Sello de evidencia, comprobar antes de «lo que te queda», verificar el efecto, voz humana, secuencias en tabla, parsimonia, archivar todo entregable y capturar cada corrección en el momento.

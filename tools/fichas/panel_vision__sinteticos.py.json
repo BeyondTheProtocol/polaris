@@ -1,0 +1,11 @@
+{
+ "pieza": "panel_vision/sinteticos.py",
+ "estado_ficha": "completa",
+ "para": "Generador de imágenes SINTÉTICAS (≤1024 px) para calibrar el panel de visión: tejido H&E o IHQ DAB inventado por Beer-Lambert con núcleos, y encima la capa revisada, con UN error sembrado de tipo, cuadrante y magnitud conocidos (o ninguno, en los controles): núcleos omitidos, fusionados o contornos fuera; CK19 con estroma incluido o epitelio excluido; registro desalineado 75-160 µm; figura con etiqueta, escala o leyenda equivocada; pliegue, desenfoque o burbuja sin marcar. Colores y textos compatibles con el detector de trazos de exporta_n1.",
+ "cuando_si": "Desde calibra.py (generar) y los tests; a mano, para ver cómo es un caso de una tarea.",
+ "cuando_no": "Nunca con píxeles, nombres ni accesiones reales; para sembrar errores en capas N1 reales está siembra_n1.py (que usa de aquí los colores, las fórmulas y pinta_registro).",
+ "reemplaza": "Nada: pieza nueva del panel de visión.",
+ "test": "tests/test_panel_vision.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI», actualización 3: «se calibran con capas que llevan errores sembrados a propósito»."
+}

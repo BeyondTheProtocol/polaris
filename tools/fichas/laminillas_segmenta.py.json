@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_segmenta.py",
+ "estado_ficha": "completa",
+ "para": "Segmentación nuclear del piloto de laminillas DFCI: teselado LazySlide sobre el polígono de zona escaneada (512 px a 0,5 µm/px, paso 448, edge, sin filtro de fondo; respaldo tissue_key=None con la caja de toda la imagen y descarte), InstanSeg y GrandQC cargados desde los pesos sellados en pesos.json (sha256 comprobado; GrandQC reintenta en CPU), comprobaciones de la pre-congelación (nº de teselas con criterio declarado, descartadas, tile_spec.mpp, check_input_tile, rejilla desplazada 128 px, área nuclear 25-80 µm²), detector clásico B, máscara provisional por densidad de centroides con borde corregido al real y valles entre fragmentos abiertos, reglas clásicas de artefacto con candidatos a pliegue grande para el tribunal, y GrandQC opcional. Guardia: sin sello completo y con estos parámetros no segmenta láminas diana.",
+ "cuando_si": "Dentro de la jaula de análisis (ventanilla), llamado por laminillas_congela o por el código de medida tras el sello.",
+ "cuando_no": "Nunca sobre KI67/SYN/CK19 ni otra lámina diana antes de la congelación (0); nunca con find_tissues.",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo A).",
+ "test": "tests/test_laminillas_piloto_segmenta.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F2 «Segmentación nuclear» y Puerta del piloto, punto 2."
+}

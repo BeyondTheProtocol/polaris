@@ -82,11 +82,24 @@ def revisar_worktrees(rutas):
     check(n > 0, "hay hooks de worktrees que revisar (%d)" % n)
 
 
+# Raíz de los hooks (2-oct-26). Una sesión que arranca fuera del repo (en $HOME) y entra en un
+# worktree carga estos hooks con CLAUDE_PROJECT_DIR = $HOME: con `${CLAUDE_PROJECT_DIR}/…` a pelo,
+# los 30 hooks apuntaban a rutas inexistentes y fallaban ABIERTOS (rc 127; el guard clínico no
+# corría). Todo hook resuelve su raíz con esta expresión: el proyecto si tiene .claude/hooks, si no
+# casa base. Debe ser IDÉNTICA a la de settings.json.
+RESOLVEDOR = ('$(d="${CLAUDE_PROJECT_DIR}"; [ -d "$d/.claude/hooks" ] || d="$HOME/claudecode"; '
+              'printf %s "$d")')
+
+
 def main():
     vistos = set()
     n = 0
     for fichero, evento, cmd in comandos():
         n += 1
+        check("${CLAUDE_PROJECT_DIR}/" not in cmd.replace(RESOLVEDOR, ""),
+              "usa el resolvedor de raíz, no ${CLAUDE_PROJECT_DIR} a pelo: %s (%s, %s)"
+              % (cmd[:60], evento, fichero))
+        cmd = cmd.replace(RESOLVEDOR, ROOT)
         primero = cmd.strip().split()[0]
         if os.path.basename(primero) in INTERPRETES:
             continue

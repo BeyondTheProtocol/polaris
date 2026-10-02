@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_ingesta.py",
+ "estado_ficha": "completa",
+ "para": "F1.1-F1.3 de las laminillas DFCI, enjaulado por la ventanilla: copia del zip a ORIGEN con sha256, extracción de las 15 pirámides con nombre opaco desde el primer byte, hoja de claves en ORIGEN, manifiesto en SESION; por lámina zona escaneada, I0 local, máscara de tejido, prueba del lector (a)(b)(c), PNG de revisión y OCR/trazos del cristal; eslabón 1 IHQ↔IHQ por máscaras a 32 µm/px; identidad de las H&E contra los informes AP originales.",
+ "cuando_si": "Solo por `lector_clinico.py procesa laminillas_ingesta|laminillas_qc|laminillas_registro -- <paso>`.",
+ "cuando_no": "Nunca a mano ni fuera de su jaula; no imprime nombres del zip (solo esqueletos y opacos).",
+ "reemplaza": "El esqueleto de `laminillas_proc.py` para los modos ingesta, qc y registro prueba-vips.",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1.1, F1.2, F1.3 y F1.4. r5 con sha256 del TIFF, ventanas de coherencia y relleno (2-oct-26)."
+}

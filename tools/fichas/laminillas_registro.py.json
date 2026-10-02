@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_registro.py",
+ "estado_ficha": "completa",
+ "para": "Registro de los cortes seriados del piloto de laminillas DFCI contra P-CK19 (nunca P-HE), euclídeo con escala 1, sobre la ODsum ×8 nativa leída solo por el lector único: inicialización por el eslabón 1 (fija la quiralidad), SIFT+RANSAC en las dos quiralidades con global aceptada por mínimo de inliers, fragmentos de consenso (piloto KI67∩CK19; F3 ≥6 de 11 contando 0 la que no tiene global), refinado por FC con respaldos solo si <30 inliers (fase sobre ODsum, mapa de densidad nuclear, VALIS proyectado a euclídea) y puerta por FC (contención y TRE <50 µm por correlación local de hematoxilina (b) o de densidad (b'); FC pendiente de la comprobación a ciegas si (b) cae con el mapa de densidad; rótulos de fragmento pequeño), triángulo de cierre por FC, orden estimado de los cortes con distancias entre compañeros, y la puerta (iii) de P-HE por fragmento (`registra_he`). Parámetros del sello (modulo_b.registro, cotejados con su sección registro).",
+ "cuando_si": "Por el procesador `laminillas_registro` (venv patologia) tras la congelación (0): `registra_serie` para (ii)/(ii-bis) o F3 y `registra_he` para (iii).",
+ "cuando_no": "Nunca con láminas diana sin el sello completo, nunca con P-HE de referencia, nunca leyendo píxeles por su cuenta (tifffile/OpenSlide directos).",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo B).",
+ "test": "tests/test_laminillas_piloto_b.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F3 «Registro» y Puerta del piloto (ii), (ii-bis) y (iii)."
+}

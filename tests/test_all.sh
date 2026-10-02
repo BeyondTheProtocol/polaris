@@ -135,6 +135,10 @@ runpy test_agentes_ritmo.py
 runpy test_radar_personas.py
 runpy test_salida_guard.py
 runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos a la red se juzga por el DESTINO
+runpy test_trust_cloud_tty.py     # 1-oct · confiar una nube de píxeles N1 solo tecleando en su terminal
+runpy test_laminillas_n1.py       # 1-oct · Puerta de N1, exporta_n1, vision_n1, nube_n1 (PII sintética)
+runpy test_laminillas_n1_jaula.py # 2-oct · jaula vision.sb de la llamada HTTP de vision_n1/nube_n1 (canarios sintéticos) y config.json sellado
+runpy test_laminillas_jaulas_secretos.py # 2-oct · ninguna jaula SBPL (×extras reales) abre secretos ni zona clínica: deny de secretos al FINAL, sandbox-exec con señuelos
 runpy test_nivel_salida.py   # 25-sep · P3 F1: nivel de cada salida EN SOMBRA (anota, no manda)
 runpy test_ok_envio_blindado.py
 runpy test_correos_publicables.py
@@ -170,6 +174,7 @@ runpy test_verifica_citas_datacite.py   # 24-sep · un 404 de Crossref no es cit
 runpy test_memoria_radar.py
 runpy test_memoria_sistema.py
 runpy test_constitucion_sin_perdida.py
+runpy test_escalado_inteligencia.py
 runpy test_normas_registro.py
 runpy test_normas_gracia.py
 runpy test_normas_mecanizadas.py
@@ -402,6 +407,15 @@ runpy test_muro_secreto_stdout.py
 runpy test_clinico_guard.py
 runpy test_log_auditoria_casa_base.py
 runpy test_lector_clinico_binario.py
+runpy test_laminillas.py   # 1-oct · laminillas DFCI F1-infra: ventanilla enjaulada (sandbox-exec), puertas y jaulas con canarios sintéticos
+runpy test_laminillas_piloto_color.py; runpy test_laminillas_piloto_segmenta.py; runpy test_laminillas_piloto_congela.py   # 1-oct · piloto módulo A (venv patologia; sin él, SKIP 77)
+runpy test_laminillas_piloto_b.py   # 1-oct · piloto módulo B: registro, métricas y GeoJSON sobre cortes sintéticos (venv patologia; sin él, SKIP 77)
+runpy test_laminillas_valis.py   # 2-oct · respaldo VALIS del registro con VALIS REAL: corre (también dentro de analisis) y Slide.M recupera una transformada conocida <1 px, directo y espejo (~40 s; sin venvs, SKIP 77)
+runpy test_laminillas_f3.py   # 2-oct · F3 parte A: FC de consenso, puerta de p63, (a-bis) y gemela NE, (b) y ROI de Carlos, sintéticos (venv patologia; sin él, SKIP 77)
+runpy test_laminillas_he.py   # 2-oct · F3 parte B: H&E del primario (mini-puerta HistoPLUS/NuLite, regiones, infiltrado), hueso sin células y exploratorio, sintéticos (venv patologia; sin él, SKIP 77)
+runpy test_laminillas_1bis.py   # 2-oct · hoja del paso 1-bis (PDF en SESION) y su orden tecleada en un pty: VISTO-N1 sella vía tty, sintético (venv patologia)
+runpy test_laminillas_capas.py   # 2-oct · capas-piloto: capas N1 del panel de visión → capas_piloto.json; pasan siembra_n1 y revisa_capas, tribunal_listo las ve, la Puerta de verdad rechaza un rotulado, selección sin DAB de Ki67 (mutante) (~70 s; venv patologia, sin él SKIP 77)
+runpy test_panel_vision.py   # 1-oct · panel de visión: calibración con errores sembrados, criterio por tarea, ollama solo local (imágenes con venv patologia; sin él, solo stdlib)
 runpy test_mutantes.py
 runpy test_visor3d.py
 runpy test_visor3d_mps.py

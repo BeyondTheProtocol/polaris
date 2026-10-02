@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_color.py",
+ "estado_ficha": "completa",
+ "para": "Color de la tanda del piloto de laminillas DFCI (matemática pura, no lee láminas): desmezcla de Ruifrok con vectores de tanda (H de píxeles nucleares de HER2NEG+HER2, DAB de KI67/SYN/CK19 sin OD>1, tercero por producto vectorial) y sesgo del estimador frente a contratinción, residuo (i)-(iv) con umbral 2× el máximo de las cinco, T por compartimento = max(p99,9 + 0,05; 0,10 OD) con IC por bootstrap de fragmentos, tasa de falsos positivos con IC binomial y por bootstrap de bloques, banda de T, H-score T/0,4/0,6, máscara CK19+ por la regla del plan (sensibilidad por fragmento), franjas del I0 y píxeles saturados no H/DAB. Todos sus parámetros en parametros() para sellarlos; sus rótulos son las frases exactas del plan.",
+ "cuando_si": "Desde laminillas_congela y el código de medida, con OD ya leídas por el lector único.",
+ "cuando_no": "Nunca para leer píxeles ni para decidir si se puede medir una lámina diana (eso es el sello).",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo A).",
+ "test": "tests/test_laminillas_piloto_color.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), Puerta del piloto, punto 3 (congelación (0)) y F3."
+}

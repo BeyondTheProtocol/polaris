@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_lector.py",
+ "estado_ficha": "completa",
+ "para": "Lector único de píxeles de las laminillas sobre OpenSlide: abre por nombre opaco desde el manifiesto de SESION, niveles por factor/mpp, lee regiones a cualquier mpp con remuestreo por área y sirve la zona escaneada y el I0 local que deja la ingesta.",
+ "cuando_si": "Cualquier procesador enjaulado que necesite píxeles de una lámina (ingesta, QC, piloto, registro).",
+ "cuando_no": "No para leer tags ni bytes comprimidos (eso no es píxel), ni fuera de la ventanilla salvo tests con configura().",
+ "reemplaza": "Lecturas con tifffile page.decode / seek manual (prohibidas por el plan).",
+ "test": "tests/test_laminillas.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), «Lector único» y F1.1."
+}

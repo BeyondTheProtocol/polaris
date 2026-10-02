@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_sello.py",
+ "estado_ficha": "completa",
+ "para": "Lector y puerta del sello de la congelación (0) del piloto de laminillas DFCI (formato «congelacion-tanda» que escribe laminillas_congela: JSON canónico con sha256 y fecha). `exige` es la puerta de todo el código de medida: sin sello no se mide ninguna lámina diana; solo vale la ruta canónica congelacion.json (por la ventanilla, la de SESION), releída de disco, con su cadena de recongelación (una sola, causa lector/I0/segmentador, anterior archivado) y COMPLETA (SECCIONES_BASE para la guardia del módulo A; SECCIONES_MODULO_B para registro y métricas). Expone T, banda, rótulos («high floor» por régimen) y T del vector DAB propio de cada régimen sellado, la tasa de P-HER2 por régimen y en los extremos de la banda, vectores y los parámetros del módulo B.",
+ "cuando_si": "Desde laminillas_metricas, laminillas_registro, laminillas_segmenta y laminillas_congela, antes de medir células o registrar láminas diana; `sella` solo desde laminillas_congela (y los tests).",
+ "cuando_no": "Nunca para escribir un sello a mano en producción ni para recongelar por un resultado que no gusta (eso va a incertidumbres).",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo B, compartida con el módulo A).",
+ "test": "tests/test_laminillas_piloto_b.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), Puerta del piloto, punto 3 (congelación (0) y recongelación)."
+}

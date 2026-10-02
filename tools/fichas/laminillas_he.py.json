@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_he.py",
+ "estado_ficha": "completa",
+ "para": "F3 parte B del plan de laminillas DFCI, procesador `laminillas_he` (venv patologia, jaula analisis.sb). `primario`: H&E del primario (P-HE) con los núcleos de InstanSeg ya sellados, clasificados por HistoPLUS 40x sobre L0 (LazySlide, MPS, sin xformers) y NuLite, casados núcleo a núcleo y con una mini-puerta que decide cuál manda o si se da el rango; regiones tumoral (densidad de núcleos neoplásicos cruzada con el TorchScript de WSInfer breast-tumor-resnet34), estroma y grasa (huecos sin núcleos); necrosis sin clasificar; densidad de infiltrado inflamatorio en el estroma intratumoral (aproximación); declara que ningún modelo separa invasivo de in situ; enganche y formato de CellViT++ (corre en la nube con nube_n1; aquí solo se lee): sus clases se traducen a la taxonomía común al leerlas y Métodos las nombra por índice y descripción saneada (CELLVITPP_CLASES, db34d49), nunca por el nombre crudo del modelo. `hueso`: QC y composición de TEJIDO por área (trabécula, espacio medular, adipocitos) por color y textura a 4 µm/px, sin clasificador nuclear ni recuento; B-HE-2 «no atribuible». `explora`: embeddings de teselas tumorales (UNI2-h, H-optimus-1, TITAN) frente a la positividad registrada de RE, Ki67, SYN, CHGA, {{DIANA3}} (y RP, RA), con comparador trivial y validación dejando fuera un fragmento entero; si no hay señal, lo dice. Pesos cargados del commit sellado en pesos.json con sha256.",
+ "cuando_si": "Por la ventanilla: `lector_clinico.py procesa laminillas_he -- primario | hueso [B-HE-1] [B-HE-2] | explora | cellvitpp`, tras la congelación (0) y la segmentación de P-HE (piloto-ibis); `explora`, además, tras (iii) y las métricas de los marcadores.",
+ "cuando_no": "Nunca sobre IHQ (eso es laminillas_proc/laminillas_metricas), nunca fuera de la ventanilla, nunca para puntuar tumor en el hueso, nunca para dar cifras del exploratorio como resultado.",
+ "reemplaza": "Nada: pieza nueva de F3 (H&E, hueso, exploratorio).",
+ "test": "tests/test_laminillas_he.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI» (eventual-puzzling-chipmunk), F2 «HistoPLUS» y «Cada modelo a su mpp», F3 «H&E del primario», «Hueso» y «Exploratorio», licencias y actualizaciones 1-3 y 10-13."
+}

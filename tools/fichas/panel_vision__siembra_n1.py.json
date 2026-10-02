@@ -1,0 +1,11 @@
+{
+ "pieza": "panel_vision/siembra_n1.py",
+ "estado_ficha": "completa",
+ "para": "Siembra errores de tipo, cuadrante y magnitud conocidos (las 5 tareas del panel: núcleos omitidos/fusionados/fuera, CK19 con estroma incluido o epitelio excluido, registro desalineado 75-160 µm, figura con etiqueta/escala/leyenda cambiada, pliegue/desenfoque/burbuja sin marcar) sobre las capas N1 REALES del piloto listadas en <n1>/panel_vision/capas_piloto.json, más controles, y escribe un conjunto con el formato de calibra (manifiesto, preguntas, verdad, casos) SOLO dentro de <n1>/panel_vision/. Cada capa entra por exporta_n1.revalidar_n1 y cada imagen sale por exporta_n1.verificar_png_n1 (OCR + Puerta de N1 + trazos); cada pregunta, por puerta_n1.revisar_texto.",
+ "cuando_si": "Para la calibración sobre capas N1 reales del requisito 5-bis (i): calibra.py sembrar-n1 → correr → exportar --salida <n1>/panel_vision/calibracion_n1.json, cuando el piloto haya dejado sus capas y capas_piloto.json.",
+ "cuando_no": "Nunca fuera de <n1>/panel_vision/ ni para escribir en la raíz de N1 o su manifiesto; no sirve para capas pintadas con otros colores que los que dice la pregunta (ni para núcleos/CK19/artefacto a otro mpp que 0,5 µm/px).",
+ "reemplaza": "Nada: segunda parte del arnés del panel de visión (antes solo había calibración sintética).",
+ "test": "tests/test_panel_vision.py",
+ "alta": "2026-10-02",
+ "origen": "Plan «laminillas DFCI», requisito 5-bis (i): «la calibración sobre capas N1 reales con errores sembrados»."
+}

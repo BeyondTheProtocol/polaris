@@ -1,0 +1,11 @@
+{
+ "pieza": "laminillas_geojson.py",
+ "estado_ficha": "completa",
+ "para": "GeoJSON para QuPath de cada lámina del piloto de laminillas DFCI, en píxeles de L0 de esa lámina: núcleos clasificados con el T del Contexto sellado (nunca un T suelto), regiones con k/n, % e IC llevadas a L0 con la transformada de SU fragmento, capa editable «in situ/exclude» y tabla nombre opaco ↔ marcador; valida contra el esquema oficial vendorizado (sha256), anillos cerrados, números finitos y sin rutas ni nombres de imagen (lo mismo que mira la Puerta de N1); `recalcula_con_exclusiones` rehace los % con los tres denominadores, la banda de T y por región tras lo que dibuje el patólogo.",
+ "cuando_si": "Al preparar el entregable F4 para QuPath y al recibir la capa editada por el patólogo.",
+ "cuando_no": "Nunca sin Contexto sellado de la lámina; nunca con fechas, rutas o identificadores en properties (va a N1).",
+ "reemplaza": "Nada: pieza nueva del piloto (módulo B).",
+ "test": "tests/test_laminillas_piloto_b.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F4 «GeoJSON para QuPath»."
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "vision_n1.py",
+ "estado_ficha": "completa",
+ "para": "Boca hacia modelos de visión externos para revisar capas y figuras N1 (no puntúan biomarcadores): destino vision-n1:<proveedor>, ≤20 ficheros de N1 con sha256 en el manifiesto, PNG ≤1568 px re-validado y recodificado, nombre opaco, prompt por la Puerta, es_trusted + cadena íntegra + trust_cloud via tty. Adaptador de Gemini escrito: gemini-3.1-pro-preview fijado, generateContent con inlineData image/png (≤20 MB), mediaResolution alta, sin File API/Interactions/grounding/caché; no envía sin condiciones_cumplidas: true en auditorias.json de casa base; clave btp-gemini-api del Llavero solo al enviar; aviso del primer envío por salida.py antes del sello; sello antes de la llamada y sello de la respuesta (sin texto ni clave). La llamada HTTP (la suya y la de nube_n1) la hace un hijo dentro de la jaula vision.sb: red sí; sin zona clínica, SESION, secretos en fichero ni Llavero; no escribe; la clave solo por el entorno del hijo, nunca en argv ni stdin.",
+ "cuando_si": "comprobar/estado: ver si una petición o un proveedor pasa las guardas. enviar (o calibra.py correr --modelo gemini): solo con el trust-cloud de vision-n1:gemini tecleado por {{TITULAR}} (paso 6) y las condiciones de la auditoría confirmadas por ella.",
+ "cuando_no": "No para texto general a Gemini o ChatGPT (eso es gemini.py/chatgpt.py con guard_cli). Ni Claude por API (sin adaptador) ni MedGemma (corre en local, panel_vision/medgemma_local.py). Ninguna llamada real a Gemini todavía (límite declarado en su docstring): la primera confirma o tumba los nombres de campo de la API.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_laminillas_n1.py",
+ "alta": "2026-10-01",
+ "origen": "Plan «laminillas DFCI» (1-oct-26), F1.4 y «Potencia y nube»; adaptador de Gemini según la auditoría del 2-oct-26 («apto con condiciones»); llamada HTTP en la jaula vision.sb desde 8df6c2b (tests/test_laminillas_n1_jaula.py, en test_all desde 24fe85b)."
+}
