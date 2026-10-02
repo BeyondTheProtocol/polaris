@@ -1,0 +1,13 @@
+{
+ "_comment": "Decisiones DELIBERADAS de {{TITULAR}} que el código rojo no debe volver a parar. Una excepción NO silencia: no para las máquinas, pero apunta el intento en el buzón de Vega. Y nunca se aplica si el motivo o el detalle traen una señal de daño real («salvo»): ahí el código rojo dispara como siempre. Cambiar esto es un commit. Lo usa tools/codigo_rojo.py.",
+ "version": 1,
+ "excepciones": [
+  {
+   "id": "pauta-metabolica-lola",
+   "decidido": ["2026-09-25", "2026-10-02"],
+   "cita": "{{TITULAR}}, 2-oct-26: «lo de Lola, metabólico, antiparasitarios, es algo paralelo que probaré, sin dejar la medicación con evidencia. Pero nunca lo diré al equipo médico». 25-sep-26: «está todo controlado con Lola, que el código rojo haga esa excepción».",
+   "si": ["antiparasit", "ivermect", "mebendazol", "lomper", "fenbendazol", "albendazol", "metformina", "doxiciclina", "sulforafano", "pauta de lola", "dra\\.? lola", "metab[oó]lic"],
+   "salvo": ["transaminas", "\\bgot\\b", "\\bgpt\\b", "\\balt\\b", "\\bast\\b", "bilirrub", "grado [34]", "hepatitis", "ictericia", "urgencia", "ingres", "insuficiencia", "acidosis", "l[aá]ctic", "abandon", "(?<!sin )dejar (la|el) (medicaci[oó]n|tratamiento|ensayo)", "sin (la )?medicaci[oó]n"]
+  }
+ ]
+}
