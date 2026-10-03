@@ -1,8 +1,10 @@
 {
  "_nota": "Guion del vídeo «Polaris» con historia (EN). Frases FIRMADAS por {{TITULAR}} el 28-sep-2026 (la 1 con «standard», decisión suya). No se cambia una frase sin su OK. voice_id = clon profesional (B), elegido por ella. Plan: 07 · Marca/plan-vídeo-polaris-storytelling-con-su-voz-en-largo-2026-09-28.md 28-sep: añade «It's all explained at helptitular.com.» (petición suya). 28-sep noche: guion revisado por voz-titular, redes y verificación, aprobado por ella («dale»): 3d tras aprender; 6 dice «to help choose»; cierre honesto «My whole case is explained at helptitular.com» (la web no explica Polaris).",
- "_tono": "28-sep: se probó tono «promo» (stability 0.32, style 0.55, tempo 1.06) y a {{TITULAR}} le sonó «super raro, muy acelerada, no natural». Vuelta a los ajustes de la v1 (naturales). La energía de promo va en la música y el movimiento, NO en su voz. No acelerar su voz con atempo. 28-sep, más tarde: pidió «un punto más de ventas»; se sube SOLO un punto dentro de los márgenes naturales (stability 0.45, style 0.2), sin tocar el tempo. 28-sep, tarde: «sobre todo es el tono de hablar» → frases ENLAZADAS (previous_text/next_text) y 3 tomas por frase; se queda la más viva (más variación de tono) salvo que «tomas» fije una a mano.",
+ "_tono": "28-sep: se probó tono «promo» (stability 0.32, style 0.55, tempo 1.06) y a {{TITULAR}} le sonó «super raro, muy acelerada, no natural». Vuelta a los ajustes de la v1 (naturales). La energía de promo va en la música y el movimiento, NO en su voz. No acelerar su voz con atempo. 28-sep, más tarde: pidió «un punto más de ventas»; se sube SOLO un punto dentro de los márgenes naturales (stability 0.45, style 0.2), sin tocar el tempo. 28-sep, tarde: «sobre todo es el tono de hablar» → frases ENLAZADAS (previous_text/next_text) y 3 tomas por frase; se queda la más viva (más variación de tono) salvo que «tomas» fije una a mano. 29-sep: pasa a Eleven v4 ({{TITULAR}}: «me parece espectacular de verdad»), en inglés AMERICANO: sin etiqueta su clon en v4 sale británico (clasificador de acento local: england 0,72); con «[American accent]» sale americano en unas frases (us 0,78) pero no en otras (radar y carga seguían británicas en las 3 tomas); con «[General American accent]» y la misma stability 0.45 salen americanas casi todas (radar us 0,69, carga 0,70, olvido 0,76). v4 no admite style (lo ignora) ni se puede entrenar (can_be_finetuned=False). Para volver a la v18: model eleven_multilingual_v2, sin prefijo ni language_code. 29-sep: tomas elegidas a mano con revisión (Whisper = texto exacto; clasificador CommonAccent = us > england; luego la más viva). Descartadas: ned-a (dice «Ned», no «N-E-D»), web-final-c («helpmerium»).",
  "voice_id": "51aLNh96A9WJZODzYIyP",
- "model": "eleven_multilingual_v2",
+ "model": "eleven_v4",
+ "prefijo": "[General American accent] ",
+ "language_code": "en",
  "ajustes": {
   "stability": 0.45,
   "similarity": 0.85,
@@ -79,5 +81,18 @@
  ],
  "enlazado": true,
  "n_tomas": 3,
- "tomas": {}
+ "tomas": {
+  "problema": "b",
+  "mas-alla": "b",
+  "polaris": "b",
+  "aprender": "a",
+  "3d": "a",
+  "radar": "c",
+  "carga": "c",
+  "web": "a",
+  "olvido": "c",
+  "medicos": "a",
+  "ned": "c",
+  "web-final": "b"
+ }
 }

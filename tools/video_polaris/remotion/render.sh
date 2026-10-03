@@ -9,7 +9,8 @@ set -euo pipefail
 V="${1:?uso: render.sh <version> [Composicion] [nombre]}"
 COMP="${2:-Polaris}"
 cd "$(dirname "$0")"
-D="$HOME/claudecode/00_FUENTE-DE-VERDAD/07 · Marca/Videos-Polaris"
+D="${DESTINO:-$HOME/claudecode/00_FUENTE-DE-VERDAD/07 · Marca/Videos-Polaris}"  # DESTINO=… para otra carpeta de marca
+mkdir -p "$D"
 if [ "$COMP" = "Polaris" ]; then
   BASE="$D/polaris-story-$V-remotion"; TL=public/timeline.json
 else

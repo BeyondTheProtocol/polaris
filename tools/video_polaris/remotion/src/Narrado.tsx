@@ -4,7 +4,7 @@
 // y cambia de forma y de contenido (nunca un corte seco: onetake), diagramas que se dibujan, y cada fila / nodo /
 // cifra entra cuando ella dice su palabra. Los subtítulos quitan solos lo que ya está escrito en pantalla.
 import React from 'react';
-import {AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, Solid, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Audio, Img, Loop, OffthreadVideo, Sequence, Solid, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {lightLeak} from '@remotion/effects/light-leak';
 import {loadFont as fFraunces} from '@remotion/google-fonts/Fraunces';
 import {loadFont as fHanken} from '@remotion/google-fonts/HankenGrotesk';
@@ -64,6 +64,26 @@ const Fondo: React.FC = () => {
       </svg>
     </AbsoluteFill>
   );
+};
+
+// ---------- plano de ambiente por capítulo (generado con IA: SIN datos, texto, caras ni biología inventada) ----------
+// Va detrás del contenido y bajo un velo berenjena para que el texto se lea; entra y sale fundido y se repite en bucle.
+// En el guion: escena.fondo = ruta del clip (sin audio) y escena.fondo_dur = lo que dura, en segundos.
+const FondoCap: React.FC = () => {
+  const t = useT();
+  return <>{CAPS.map((c, i) => {
+    const src = c.escena.fondo as string | undefined, a = inicio(i), b = fin(i);
+    if (!src || t < a - 0.1 || t > b + 0.1) return null;
+    const op = suave(lin(t, a, a + 0.8)) * (1 - suave(lin(t, b - 0.6, b)));
+    return <Sequence key={c.id} from={Math.round(a * 30)} durationInFrames={Math.round((b - a) * 30) + 6} layout="none">
+      <AbsoluteFill style={{opacity: op}}>
+        <Loop durationInFrames={Math.max(30, Math.round((c.escena.fondo_dur || 5) * 30) - 2)}>
+          <OffthreadVideo src={staticFile(src)} muted style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+        </Loop>
+        <AbsoluteFill style={{background: 'linear-gradient(180deg, rgba(29,17,39,.60) 0%, rgba(45,27,61,.70) 55%, rgba(29,17,39,.82) 100%)'}} />
+      </AbsoluteFill>
+    </Sequence>;
+  })}</>;
 };
 
 // ---------- titular: rótulo numerado + titular con la palabra de acento en cursiva violeta ----------
@@ -151,6 +171,8 @@ const Escena: React.FC<{c: Cap; w: number; h: number; e?: any}> = ({c: c0, w, h,
     case 'lista': return <ELista c={c} w={w} h={h} />;
     case 'cita': return <ECita c={c} w={w} h={h} />;
     case 'repo': return <ERepo c={c} w={w} h={h} />;
+    case 'puntos': return <EPuntos c={c} w={w} h={h} />;
+    case 'dias': return <EDias c={c} w={w} h={h} />;
     default: return null;
   }
 };
@@ -186,7 +208,7 @@ const EContadores: React.FC<EP> = ({c, w, h}) => {
   return <AbsoluteFill style={{display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', padding: '0 40px'}}>
     {items.map((it, k) => {const t0 = c.t0 + 0.3 + k * 0.35, g = m(t0, 14), cuenta = suave(lin(t, t0, t0 + 1.4)), v = CIFRAS[it.k] || 0;
       return <div key={it.k} style={{textAlign: 'center', opacity: cl(g * 1.4), transform: `translateY(${40 * (1 - g)}px)`}}>
-        <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, lineHeight: 1, color: K.crema, letterSpacing: '-0.04em'}}>{Math.round(v * cuenta)}</div>
+        <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, lineHeight: 1, color: K.crema, letterSpacing: '-0.04em'}}>{Math.round(v * cuenta).toLocaleString('es-ES')}</div>
         <div style={{marginTop: 14, fontFamily: MONO, fontSize: 24, letterSpacing: '0.14em', textTransform: 'uppercase', color: K.acento}}>{it.lbl}</div>
       </div>;})}
   </AbsoluteFill>;
@@ -232,7 +254,7 @@ const EDiagrama: React.FC<EP> = ({c, w, h}) => {
         background: x.puerta ? 'rgba(255,107,71,.10)' : 'rgba(250,246,240,.05)', border: `2px solid ${x.puerta ? K.coral : vivo ? K.acento : 'rgba(232,212,237,.25)'}`,
         boxShadow: vivo ? `0 0 40px ${x.puerta ? 'rgba(255,107,71,.35)' : 'rgba(201,139,211,.35)'}` : 'none',
         opacity: cl(g * 1.4), transform: `translateY(${30 * (1 - g)}px) scale(${0.9 + 0.1 * g})`, display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-        <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 44, color: K.crema}}>{x.t}</div>
+        <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: Math.min(44, Math.floor((bw - 36) / (x.t.length * 0.56))), color: K.crema}}>{x.t}</div>
         <div style={{fontFamily: MONO, fontSize: 19, letterSpacing: '0.1em', textTransform: 'uppercase', color: x.puerta ? K.coral : K.acento, marginTop: 8}}>{x.s}</div>
       </div>;})}
   </AbsoluteFill>;
@@ -256,7 +278,7 @@ const ELista: React.FC<EP> = ({c, w, h}) => {
 };
 
 const ECita: React.FC<EP> = ({c, w, h}) => {
-  const t = useT(); const m = useMuelle(); const tc = c.frases[c.frases.length - 1].t0; const pre = m(c.t0 + 0.2, 16), luz = m(tc - 0.15, 14);
+  const t = useT(); const m = useMuelle(); const tc = c.escena.en ? dice(c, c.escena.en) : c.frases[c.frases.length - 1].t0; const pre = m(c.t0 + 0.2, 16), luz = m(tc - 0.15, 14);
   const g = 0.35 * pre + 0.65 * luz, raya = suave(lin(t, tc + 0.3, tc + 1.2));
   return <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center', padding: '0 110px'}}>
     <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 150, lineHeight: 0.6, color: K.violeta, opacity: g}}>“</div>
@@ -281,6 +303,49 @@ const ERepo: React.FC<EP> = ({c, w, h}) => {
           <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 52, color: K.crema}}>{l}</div>
         </div>;})}
     </div>
+  </AbsoluteFill>;
+};
+
+// pictograma: 100 estrellas pequeñas y se encienden las de la cifra (una frecuencia general, no un dato de su caso)
+const EPuntos: React.FC<EP> = ({c, w, h}) => {
+  const t = useT(); const m = useMuelle(); const e = c.escena;
+  const tLuz = e.en ? dice(c, e.en) - 0.1 : c.t0 + 1, fuertes = e.fuertes ?? 2, flojas = e.flojas ?? 3;
+  const n = 100, cols = 20, S = 46, gap = 18, gw = cols * S + (cols - 1) * gap, x0 = (w - gw) / 2, y0 = 60;
+  const pie = suave(lin(t, tLuz + 0.4, tLuz + 0.9));
+  return <AbsoluteFill>
+    {Array.from({length: n}, (_, k) => {
+      const g = m(c.t0 + 0.012 * k, 18), lit = k < fuertes + flojas, luz = lit ? suave(lin(t, tLuz + 0.08 * k, tLuz + 0.08 * k + 0.4)) : 0;
+      const col = k < fuertes ? K.coral : K.acento;
+      return <div key={k} style={{position: 'absolute', left: x0 + (k % cols) * (S + gap), top: y0 + Math.floor(k / cols) * (S + gap), width: S, height: S,
+        opacity: cl(g * 1.3), transform: `scale(${(0.6 + 0.4 * g) * (1 + 0.3 * luz)})`,
+        filter: luz > 0.01 ? `drop-shadow(0 0 ${16 * luz}px ${k < fuertes ? 'rgba(255,107,71,.85)' : 'rgba(201,139,211,.85)'})` : undefined}}>
+        <svg viewBox="0 0 20 20" width={S} height={S}><path d={STAR_D} fill={luz > 0.01 ? col : 'rgba(232,212,237,.34)'} opacity={luz > 0.01 ? 0.35 + 0.65 * luz : 1} /></svg>
+      </div>;})}
+    <div style={{position: 'absolute', left: 0, right: 0, top: y0 + 5 * (S + gap) + 34, textAlign: 'center', opacity: pie, transform: `translateY(${20 * (1 - pie)}px)`}}>
+      <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 64, color: K.crema, letterSpacing: '-0.02em'}}>{e.txt}</div>
+      <div style={{fontFamily: MONO, fontSize: 24, letterSpacing: '0.14em', textTransform: 'uppercase', color: K.acento, marginTop: 12}}>{e.lbl}</div>
+    </div>
+  </AbsoluteFill>;
+};
+
+// el tiempo en días: un punto por día desde abril, que se van llenando; al decir «cada» late el de hoy
+const EDias: React.FC<EP> = ({c, w, h}) => {
+  const t = useT(); const m = useMuelle(); const e = c.escena; const meses = e.meses as {m: string; d: number}[];
+  const total = meses.reduce((a, x) => a + x.d, 0), llena = suave(lin(t, c.t0 + 0.2, c.t0 + 2.8)), tCada = e.en ? dice(c, e.en) - 0.1 : c.t0 + 3;
+  const S = 22, gx = 9, gy = 20, x0 = (w - (31 * (S + gx) - gx)) / 2 + 50, y0 = 50, txt = suave(lin(t, tCada, tCada + 0.5));
+  let idx = 0;
+  return <AbsoluteFill>
+    {meses.map((mm, r) => <React.Fragment key={r}>
+      <div style={{position: 'absolute', left: x0 - 110, top: y0 + r * (S + gy) - 3, width: 88, textAlign: 'right', fontFamily: MONO, fontSize: 22,
+        letterSpacing: '0.12em', color: K.acento, opacity: cl(m(c.t0 + 0.06 * r, 16) * 1.3)}}>{mm.m}</div>
+      {Array.from({length: mm.d}, (_, d) => {const k = idx++, on = (k + 1) / total <= llena + 1e-6, hoy = k === total - 1;
+        const late = hoy ? (0.55 + 0.45 * Math.sin((t - tCada) * 6)) * txt : 0;
+        return <div key={d} style={{position: 'absolute', left: x0 + d * (S + gx), top: y0 + r * (S + gy), width: S, height: S, borderRadius: S / 2,
+          background: hoy && txt > 0.01 ? K.coral : on ? K.acento : 'rgba(232,212,237,.12)', transform: `scale(${1 + 0.7 * late})`,
+          boxShadow: late ? `0 0 ${26 * late}px rgba(255,107,71,.9)` : undefined}} />;})}
+    </React.Fragment>)}
+    <div style={{position: 'absolute', left: 0, right: 0, top: y0 + meses.length * (S + gy) + 46, textAlign: 'center', fontFamily: FRAUNCES, fontWeight: 600,
+      fontSize: 92, color: K.crema, letterSpacing: '-0.02em', opacity: txt, transform: `translateY(${20 * (1 - txt)}px)`}}>{e.txt}</div>
   </AbsoluteFill>;
 };
 
@@ -428,6 +493,9 @@ const Cierre: React.FC = () => {
     </AbsoluteFill>}
     {!e.video && <div style={{position: 'absolute', left: 960 - 60, top: 250, width: 120, height: 120, transform: `scale(${0.3 + 0.7 * g}) rotate(${45 * g}deg)`,
       filter: 'drop-shadow(0 0 40px rgba(255,107,71,.6))'}}><svg viewBox="0 0 20 20" width={120} height={120}><path d={STAR_D} fill={K.coral} /></svg></div>}
+    {e.credito && (() => {const k = suave(lin(t, T_CREDITO, T_CREDITO + 0.6));  // nota de créditos, pequeña y sin voz
+      return k > 0.01 && <div style={{position: 'absolute', bottom: 70, left: 0, right: 0, textAlign: 'center', opacity: 0.85 * k,
+        fontFamily: HANKEN, fontWeight: 500, fontSize: 30, color: K.crema, textShadow: '0 2px 16px rgba(29,17,39,.9)'}}>{e.credito}</div>;})()}
     <div style={{position: 'absolute', top: 410, left: 0, right: 0, textAlign: 'center', textShadow: '0 4px 40px rgba(29,17,39,.85)'}}>
       <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 124, color: K.crema, letterSpacing: '-0.03em', opacity: cl(g * 1.4), transform: `translateY(${30 * (1 - g)}px)`}}>{e.titular}</div>
       <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: 96, color: K.acento, marginTop: 30, opacity: cl(u * 1.4),
@@ -439,12 +507,26 @@ const Cierre: React.FC = () => {
   </AbsoluteFill>;
 };
 
+// ---------- aviso de voz clonada (art. 50.4 del Reglamento de IA) ----------
+// {{TITULAR}} (3-oct-2026): «que sea un detalle, escrito en pequeño». Legal: tiene que verse como tarde al empezar.
+// Así que: etiqueta pequeña en una esquina durante los primeros segundos, y la nota de créditos al final (Cierre).
+const AVISO = (T as any).aviso as {texto: string; entrada: number; hasta?: number} | undefined;
+const ULTIMA = CAPS[CAPS.length - 1];
+const T_CREDITO = ULTIMA.frases[ULTIMA.frases.length - 1].t1 + 0.5;
+const AvisoVoz: React.FC = () => {
+  const t = useT(); if (!AVISO) return null;
+  const hasta = AVISO.hasta ?? AVISO.entrada + 8, v = suave(lin(t, 0.2, 0.7)) * (1 - suave(lin(t, hasta - 0.5, hasta)));
+  if (v <= 0.01) return null;
+  return <div style={{position: 'absolute', top: 30, right: 36, opacity: v, padding: '6px 18px', borderRadius: 999, background: 'rgba(29,17,39,.7)',
+    border: '1px solid rgba(232,212,237,.22)', fontFamily: HANKEN, fontWeight: 500, fontSize: 32, color: K.crema}}>{AVISO.texto}</div>;
+};
+
 // ---------- subtítulos: quitan solos lo que ya está escrito en pantalla ----------
 const VACIAS = new Set('el la los las un una unos unas de del y a en que con por para es no se lo le mi mis me yo su sus al como mas pero o the a of and to is it'.split(' '));
 const enPantalla = (c: Cap): Set<string> => {
   const e = c.escena;
   if (e.pasos) return new Set((e.pasos as any[]).flatMap((p) => [...enPantalla({...c, escena: p})]).concat([...enPantalla({...c, escena: {tipo: 'x'}})]));
-  const txt: string[] = [...(e.palabras || []).map((x: any) => x.txt), e.nombre, e.rol, ...(e.piezas || []).map((x: any) => x.nombre), c.kicker, c.titulo.replace(/\*/g, ''), e.sub, e.meta, e.pregunta, e.texto, e.titular, e.url, e.etiqueta,
+  const txt: string[] = [...(e.palabras || []).map((x: any) => x.txt), e.nombre, e.rol, ...(e.piezas || []).map((x: any) => x.nombre), c.kicker, c.titulo.replace(/\*/g, ''), e.sub, e.meta, e.pregunta, e.texto, e.txt, e.lbl, e.titular, e.url, e.etiqueta,
     ...(e.items || []).map((x: any) => `${x.texto || ''} ${x.lbl || ''}`), ...(e.nodos || []).map((x: any) => `${x.t} ${x.s}`), ...(e.lineas || [])];
   return new Set(norm(txt.filter(Boolean).join(' ')).split(/\s+/).filter((w) => w && !VACIAS.has(w)));
 };
@@ -483,6 +565,7 @@ const volMusica = (f: number) => {const t = f / 30; let v = 0; for (let k = -8; 
 export const Narrado: React.FC = () => (
   <AbsoluteFill style={{background: K.berenjena}}>
     <Fondo />
+    <FondoCap />
     <Portada />
     <Titular />
     <Ventana />
@@ -490,6 +573,7 @@ export const Narrado: React.FC = () => (
     <Sequence from={Math.round((fin(0) - 0.3) * 30)} durationInFrames={24}><Luz seed={3} /></Sequence>
     <Sequence from={Math.round((inicio(CAPS.length - 1) + 0.2) * 30)} durationInFrames={24}><Luz seed={8} /></Sequence>
     <Subtitulos />
+    <AvisoVoz />
     <Audio src={staticFile('narrado/voz.wav')} />
     <Audio src={staticFile('narrado/musica.wav')} volume={volMusica} />
     <Audio src={staticFile('narrado/sfx.wav')} volume={0.6} />

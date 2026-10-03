@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/revisa_tomas.py",
+ "estado_ficha": "completa",
+ "para": "Antes de montar, revisa cada toma de su voz en local: que diga el texto exacto del guion (Whisper) y, en inglés, que suene americana (clasificador de acento CommonAccent, us frente a england), además de su viveza de tono.",
+ "cuando_si": "Después de voz.py y antes de montaje.py, sobre todo con Eleven v4, donde la etiqueta de acento no pega igual en todas las tomas. Las elegidas se fijan a mano en «tomas» del guion.",
+ "cuando_no": "Como juez final de cómo suena: la fluidez y el tono los decide el oído de {{TITULAR}}. En frases de menos de ~4 s el acento medido es ruidoso.",
+ "reemplaza": "nada: voz.py elige la toma más viva sin mirar texto ni acento",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-09-29, v19 del vídeo «Polaris» con voz Eleven v4 en inglés americano",
+ "origen": "encargo de {{TITULAR}} 29-sep-2026: «haz la mejor posible para que suene bien en inglés americano»"
+}

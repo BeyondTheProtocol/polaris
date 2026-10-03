@@ -114,7 +114,9 @@ const PalabraClave: React.FC = () => {
 // (launch-video-kit, 28-sep). Tramo → [primera, última] palabra rotulada (null = desde el principio, '*' = hasta el final).
 // Las palabras clave sueltas (TWO SIDES., Go further., AND A LOT MORE.) sí llevan subtítulo: la frase dice más que el rótulo.
 // {{TITULAR}}, 28-sep: los golpes del principio también salían dos veces.
-const ROTULADO: Record<string, [string | null, string]> = X.rotulado;  // por idioma: las palabras van en textos.ts
+const ROTULADO: Record<string, [string | null, string]> = X.rotulado;
+// capturas de la web en su idioma (public/<X.web.dir>); los nombres de fichero no cambian (la escena web compara por nombre)
+const captura = (n: string) => staticFile(X.web.dir + n);  // por idioma: las palabras van en textos.ts
 // se quitan las PALABRAS rotuladas antes de trocear (si no, «disease.» se colaba pegada a «And nothing»)
 const visibles = (x: Tramo) => {
   const r = ROTULADO[x.id]; if (!r) return x.palabras;
@@ -174,7 +176,7 @@ const Gancho: React.FC = () => {
         {[['esqueleto.png', X.ganchoChips[0]], ['', X.ganchoChips[1]], ['', X.ganchoChips[2]]].map(([img, lbl], i) => (
           <div key={lbl} style={{width: 220, height: 130, borderRadius: 18, overflow: 'hidden', position: 'relative', background: C.lienzo,
             border: `2px solid ${i === 2 ? C.coral : 'rgba(199,125,210,.5)'}`, boxShadow: `0 0 ${16 + 10 * Math.sin(t * 8 + i)}px rgba(199,125,210,.35)`}}>
-            {img ? <Img src={staticFile(img)} style={{position: 'absolute', left: 50, top: -40, width: 120}} /> : i === 1 ?
+            {img ? <Img src={captura(img)} style={{position: 'absolute', left: 50, top: -40, width: 120}} /> : i === 1 ?
               <svg viewBox="-60 -60 120 120" style={{position: 'absolute', left: 60, top: 10, width: 100, height: 100}}>
                 <circle r={50} fill="none" stroke={C.violetaOsc} strokeWidth={1.5} />
                 {Array.from({length: 24}, (_, k) => <circle key={k} cx={40 * Math.cos(k * 0.9 + t)} cy={40 * Math.sin(k * 1.7)} r={2} fill={C.violetaOsc} />)}
@@ -237,7 +239,7 @@ const Problema: React.FC = () => {
           <Estrella size={360} color={col as string} mitad={lado as 'izq' | 'der'} />
         </div>))}
       {[['izq', -1], ['der', 1]].map(([lado, s]) => (
-        <Img key={lado as string} src={staticFile('dos-caras.png')} style={{position: 'absolute', left: 460, top: 256, width: 1000, borderRadius: 22,
+        <Img key={lado as string} src={captura('dos-caras.png')} style={{position: 'absolute', left: 460, top: 256, width: 1000, borderRadius: 22,
           boxShadow: '0 30px 80px rgba(0,0,0,.35)', clipPath: lado === 'izq' ? 'inset(0 50% 0 0)' : 'inset(0 0 0 50%)',
           opacity: cl(lin(t, tLados + 0.05, tLados + 0.3)) * (1 - sale),
           transform: `translateX(${(s as number) * 520 * (1 - llega) + (s === 1 ? 1500 * sale : 0)}px) scale(${0.9 + 0.1 * llega})`}} />))}
@@ -335,7 +337,7 @@ const PolarisEsc: React.FC = () => {
 
 // La columna vertebral (director creativo, 28-sep): el mismo sistema produce cada cosa que se ve después.
 const NODOS = X.nodos;
-const XS = [260, 610, 960, 1310, 1660];
+const XS = X.cadena.xs;
 const XB = XS.map((x) => 960 + (x - 960) * 0.92);
 const SALIDA: [string, string][] = X.salida;
 const Cadena: React.FC = () => {
@@ -346,7 +348,7 @@ const Cadena: React.FC = () => {
   const k = suave(lin(t, finPol - 0.5, finPol + 0.1));          // 0 = grande, 1 = barra
   const op = 1 - lin(t, finWeb - 0.3, finWeb);
   const lerp = (a: number, b: number) => a + (b - a) * k;
-  const cy = lerp(405, 66), w = lerp(300, 200), wOut = lerp(300, 300), h = lerp(150, 70);
+  const cy = lerp(405, 66), w = lerp(...X.cadena.w), wOut = lerp(300, 300), h = lerp(150, 70);
   const activa = SALIDA.map(([id, txt]) => ({a: ventana(id)[0], b: ventana(id)[1], txt})).find((x) => t >= x.a && t < x.b);
   const firma = m(tFirma - 0.05, 8), brillo = t >= tFirma - 0.05 ? 1 : 0;
   // la puerta late cada vez que le llega un borrador (escena carga)
@@ -366,7 +368,7 @@ const Cadena: React.FC = () => {
           transform: `translateY(${16 * (1 - g)}px) scale(${(esPuerta && t < finPol ? 1 + 0.12 * firma * (1 - lin(t, tFirma + 0.6, tFirma + 1.2)) : 1) + 0.12 * golpe})`,
           boxShadow: glow > 0 ? `0 0 ${50 * glow}px ${12 * glow}px rgba(255,107,71,.45)` : cerca > 0 ? `0 0 ${40 * cerca}px ${8 * cerca}px rgba(199,125,210,.45)` : undefined}}>
           <div style={{fontFamily: MONO, fontSize: lerp(26, 14), letterSpacing: '0.14em', textTransform: 'uppercase', color: esPuerta ? C.coral : C.violetaOsc}}>{lbl}</div>
-          <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: lerp(36, 21), color: C.crema, marginTop: lerp(8, 2), whiteSpace: 'nowrap'}}>{valor}</div>
+          <div style={{fontFamily: FRAUNCES, fontWeight: 600, fontSize: lerp(...X.cadena.letra), color: C.crema, marginTop: lerp(8, 2), whiteSpace: 'nowrap'}}>{valor}</div>
         </div>;})}
       {[0, 1, 2, 3].map((i) => {const a = xs[i] + w / 2 + 2, b = xs[i + 1] - (i === 3 ? wOut : w) / 2 - 2;
         return <div key={i} style={{position: 'absolute', left: a, top: cy - 1.5, width: Math.max(0, b - a), height: 3, background: C.violetaOsc, transformOrigin: 'left center',
@@ -383,8 +385,8 @@ const Aprender: React.FC = () => {
   if (va <= 0) return null;
   return (
     <AbsoluteFill style={{...e.style, opacity: (e.style.opacity as number) * va, transform: `${e.style.transform} scale(${1 + 0.08 * (1 - va)})`}}>
-      <Marco x={150} y={250} w={900} h={300} bg="#f5efe6"><Img src={staticFile('science.png')} style={{position: 'absolute', left: 20, top: 75, width: 860}} /></Marco>
-      <Marco x={1080} y={200} w={720} h={520}><Img src={staticFile('biopsia.png')} style={{position: 'absolute', left: '50%', top: '50%', height: 520,
+      <Marco x={150} y={250} w={900} h={300} bg="#f5efe6"><Img src={captura('science.png')} style={{position: 'absolute', left: 20, top: 75, width: 860}} /></Marco>
+      <Marco x={1080} y={200} w={720} h={520}><Img src={captura('biopsia.png')} style={{position: 'absolute', left: '50%', top: '50%', height: 520,
         transform: `translate(-50%,-50%) scale(${1.05 + 0.08 * lin(e.t, e.a, e.b)})`}} /></Marco>
     </AbsoluteFill>
   );
@@ -402,7 +404,7 @@ const Galeria: React.FC = () => {
   const rot = {fontFamily: MONO, fontSize: 24, letterSpacing: '0.14em', textTransform: 'uppercase' as const, color: C.violetaOsc};
   const Pieza: React.FC<{i: number}> = ({i}) => i === 0 ? <Secuencia dir="mama" n={240} t={t} style={{width: '100%', height: '100%'}} />
     : i === 1 ? <Secuencia dir="higado" n={240} t={t} style={{width: '100%', height: '100%'}} />
-    : i === 2 ? <Img src={staticFile('esqueleto.png')} style={{height: '96%', margin: '2% auto', display: 'block'}} />
+    : i === 2 ? <Img src={captura('esqueleto.png')} style={{height: '96%', margin: '2% auto', display: 'block'}} />
     : <Img src={staticFile('vertebra.png')} style={{height: '92%', margin: '4% auto', display: 'block'}} />;
   const nombres = X.galeria;
   // fase grande (mama / hígado): un visor a pantalla, con empuje lento de cámara
@@ -489,7 +491,7 @@ const Web: React.FC = () => {
   // {{CONTACTO}}: la home con «Support {{TITULAR}}» se leía como una campaña de donaciones. Aquí, tres páginas donde comparte el caso.
   const e = useEscena('web', {sale: false}); const m = useMuelle(); if (e.op <= 0) return null; const t = e.t;
   const entra = suave(lin(t, e.b - 0.45, e.b));  // costura 3: las páginas caen al centro del anillo que viene
-  const pags: [string, string, number][] = [['science.png', 'helptitular.com/science', 0], ['datos-cielo.png', 'helptitular.com/data', 1], ['esqueleto.png', 'helptitular.com/mapa-metastasis', 2]];
+  const pags: [string, string, number][] = [['science.png', X.web.urls[0], 0], ['datos-cielo.png', X.web.urls[1], 1], ['esqueleto.png', X.web.urls[2], 2]];
   return (
     <AbsoluteFill style={e.style}>
       {pags.map(([img, url, i]) => {const k = m(e.a + 0.15 + i * 0.35, 13);
@@ -503,7 +505,7 @@ const Web: React.FC = () => {
           </div>
           <div style={{position: 'absolute', top: 44, left: 0, right: 0, bottom: 0, background: img === 'science.png' ? '#f5efe6' : C.lienzo, display: 'flex',
             alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
-            <Img src={staticFile(img)} style={img === 'esqueleto.png' ? {height: 460} : {width: 720}} />
+            <Img src={captura(img)} style={img === 'esqueleto.png' ? {height: 460} : {width: 720}} />
           </div>
         </div>;})}
     </AbsoluteFill>

@@ -89,24 +89,32 @@ def speak_con_tiempos(text, voice_id, model, out, stability=0.5, similarity=0.85
     return j.get("alignment") or j.get("normalized_alignment")
 
 
-def speak(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0, previous_text="", next_text=""):
+SIN_STYLE = ("eleven_v3", "eleven_v4")  # la API los marca can_use_style=False (29-sep-2026)
+
+
+def speak(text, voice_id, model, out, stability=0.5, similarity=0.85, style=0.0, previous_text="", next_text="",
+          language_code=None, seed=None):
     """previous_text/next_text: el texto que va antes y después, para que la frase se entone enlazada
-    (como parte de un discurso) y no como una lectura suelta. No se leen en voz alta."""
+    (como parte de un discurso) y no como una lectura suelta. No se leen en voz alta.
+    language_code fija el idioma (v4 lo admite; multilingual_v2 no). En v4 el acento se pide con una
+    etiqueta al principio del texto, p. ej. «[American accent] »: sin ella, su clon en inglés tira a británico."""
     key = _key()
     if not voice_id:
         sys.exit("Falta voice_id. Pásalo con --voice <ID> o ponlo en tools/.elevenlabs.json. "
                  "Lístalas con: python3 elevenlabs_voz.py --list-voices")
-    body = {
-        "text": text,
-        "model_id": model,
-        "voice_settings": {"stability": stability, "similarity_boost": similarity,
-                           "style": style, "use_speaker_boost": True},
-    }
+    ajustes = {"stability": stability, "similarity_boost": similarity}
+    if not model.startswith(SIN_STYLE):
+        ajustes.update(style=style, use_speaker_boost=True)
+    body = {"text": text, "model_id": model, "voice_settings": ajustes}
     if previous_text:
         body["previous_text"] = previous_text
     if next_text:
         body["next_text"] = next_text
-    if model == "eleven_turbo_v2_5":
+    if seed is not None:
+        body["seed"] = seed  # la API intenta repetir la misma toma con la misma semilla («best effort»)
+    if language_code:
+        body["language_code"] = language_code
+    elif model == "eleven_turbo_v2_5":
         body["language_code"] = "es"  # multilingual_v2 autodetecta; turbo admite forzar idioma
     audio, ctype = _req(API + "/text-to-speech/%s?output_format=mp3_44100_128" % voice_id, key,
                         data=body, accept="audio/mpeg")

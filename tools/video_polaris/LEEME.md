@@ -40,8 +40,9 @@ La v15 tardó 15 versiones; esto es lo que hay que hacer a la primera la próxim
 |---|---|---|---|
 | 1 | Guion firmado por ella | `guion_voz.json` | No se toca una frase sin su OK |
 | 2 | Voz **enlazada**, 3 tomas por frase | `~/claudecode/.venv/bin/python voz.py <build>` | Frase a frase y sin contexto suena a «leer una lista» ({{TITULAR}}: «sobre todo es el tono de hablar»). Se queda la toma más viva; `tomas` en el guion fija una a mano |
+| 2b | **Revisar las tomas** (texto exacto y, en EN, acento americano) y fijar las buenas en `tomas` | `~/claudecode/.venv/bin/python revisa_tomas.py <build>` | v19 (29-sep): con Eleven v4 la etiqueta de acento no pega en todas las tomas y una dijo «Ned» en vez de «N-E-D». La más viva no basta |
 | 3 | Tiempos de palabra (Whisper local) | `~/claudecode/.venv/bin/python palabras.py <build>` | — |
-| 4 | Montaje sobre la música + voz nivelada | `python3 montaje.py <build> <musica.mp3>` | ElevenLabs entrega cada frase a su volumen: de -16 a -28 LUFS. Se iguala cada una a -18 con ganancia fija |
+| 4 | Montaje sobre la música + voz nivelada | `python3 montaje.py <build> <musica.mp3>` | ElevenLabs entrega cada frase a su volumen: de -16 a -28 LUFS. Se iguala cada una a -18 con ganancia fija. Música de la v18/v19: `musica-elevenlabs-tech-65s.mp3`. Si su voz llega a «Polaris» después del drop del tema, la música entra más tarde (`pieza_intro`) |
 | 5 | Efectos **después** del montaje | `python3 sfx.py <build>` | Si cambia la línea de tiempo y no se regeneran, los barridos caen fuera de sitio |
 | 6 | Copiar `voz.wav`, `musica.wav`, `sfx.wav`, `timeline.json` a `remotion/public/` | — | — |
 | 7 | Render + master | `bash remotion/render.sh vN` | Techo -4 dBTP: X recodifica al subir y el AAC sube ~0,5 dB |
@@ -73,3 +74,22 @@ Escenas (`Narrado.tsx`):
 - Se usa en su cuenta desde Chrome, con 16:9 y Omni 1.1 Flash. Cuesta 15 puntos el clip de 10 s a 720p, y cada generación se aprueba de una en una.
 - Se descarga a `07 · Marca/Videos-Polaris/flow/`, se revisa fotograma a fotograma y se copia sin audio a `remotion/public/narrado/flow/`.
 - En el guion va como `"video"` en la escena `portada` o `cierre`.
+
+## Voz en Eleven v4, inglés americano (v19, 29-sep-2026)
+
+{{TITULAR}} oyó la v4 frente a la v2 a ciegas y dijo «me parece espectacular de verdad». Lo que hay que saber:
+- **Su clon en v4 sale británico sin etiqueta** (clasificador local: england 0,72). `[American accent]` no basta en todas las frases; `[General American accent]` con stability 0.45 sí. Va en `prefijo` del guion, con `language_code: "en"`.
+- **v4 no admite style** (la API: `can_use_style=False`) **ni entrenamiento** (`can_be_finetuned=False`): no es cosa de su plan, es del modelo. Lo que suena es ya lo mejor que da la v4 con su clon.
+- Sale ~7 % más lenta que la v2 (v19: 83,8 s frente a 78,2 s). El montaje se adapta solo.
+- Remotion: `npm ci` en `remotion/` (el `node_modules` no viaja entre worktrees) y `public/narrado/timeline.json` tiene que existir aunque solo se renderice «Polaris» (lo importa `Root.tsx`).
+- Para volver a la v18: `model: eleven_multilingual_v2`, sin `prefijo` ni `language_code`.
+- **Español (ES v2):** `language_code: "es"` y sin etiqueta. La v4 decía «Convertió» y «mapas 3»: el campo `decir` de la frase lleva la grafía para la voz («Convirtio… tres D»). En pantalla y en los tiempos va el texto firmado.
+- Si «Polaris» cae después del drop del tema (ES v2: +3,43 s), `montaje.piezas_intro` repite los primeros compases de la intro, cortando en compás entero: hay música desde el segundo 0.
+
+## Versión ES con sus capturas (ES v3, 29-sep-2026)
+
+- Capturas de la web en español: `node capturar.mjs <dir> --idioma es` y `python3 preparar.py --web <dir> remotion/public/es --idioma es`. Remotion las coge de `public/<textos.web.dir>` con `captura()`. Los nombres de fichero no cambian: la escena web compara por nombre.
+- `RECORTES_ES` en `preparar.py`: en `/datos` el campo de puntos sube 20 px y justo encima está «731». No subas más la caja.
+- La geometría de la cadena va por idioma (`textos.cadena`): en ES, «Pruebas y mensajes» se salía de la caja. El test mide el texto contra la caja.
+- `semilla` por frase en el guion: fija la toma cuando solo una suena bien. En ES 3d, el tono subía al final de «convirtió»; se mide con Whisper, palabra a palabra, contra la ES v1.
+- `cifras.json`, del día del render (`anatomia.py inventario`).

@@ -1,0 +1,509 @@
+{
+  "_nota": "Guion APROBADO por {{TITULAR}} frase a frase el 3-oct-2026 (A6). No se cambia una frase sin su OK. Fuente y revisiones: 00_FUENTE-DE-VERDAD/05 · Legal-Finanzas/guion-final-aprobado-del-vídeo-de-orellana-a6-2026-10-03.md. Voz clonada declarada en pequeño, por decisión de {{TITULAR}} (3-oct): etiqueta en una esquina los primeros 9 s (legal: el art. 50.4 del RIA pide avisar como tarde al empezar) y nota de créditos al final. Verificación lo prefería más grande y durante todo el vídeo; decidió ella. «texto» es lo que dice el clon; «pantalla», el subtítulo cuando difiere.",
+  "slug": "orellana-circulo",
+  "idioma": "es",
+  "voice_id": "51aLNh96A9WJZODzYIyP",
+  "model": "eleven_v4",
+  "language_code": "es",
+  "ajustes": {
+    "stability": 0.45,
+    "similarity": 0.85,
+    "style": 0.2,
+    "tempo": 1.0
+  },
+  "toma_unica": "capitulo",
+  "enlazado": true,
+  "n_tomas": 3,
+  "tomas": {},
+  "pausa_entre_frases": 0.35,
+  "pausa_entre_capitulos": 0.9,
+  "entrada": 2.0,
+  "salida": 5.5,
+  "musica": "musica-elevenlabs-tech-65s.mp3",
+  "aviso": {
+    "texto": "Voz de {{TITULAR}} clonada con IA",
+    "hasta": 9
+  },
+  "cifras_extra": {
+    "vistas_higado": 863526
+  },
+  "capitulos": [
+    {
+      "id": "portada",
+      "kicker": "",
+      "titulo": "{{TITULAR}} {{APELLIDO}}",
+      "escena": {
+        "tipo": "portada",
+        "sub": "ingeniera de software",
+        "video": "narrado/flow/portada.mp4"
+      },
+      "frases": [
+        {
+          "texto": "Soy {{TITULAR}} {{APELLIDO}}."
+        }
+      ]
+    },
+    {
+      "id": "caso",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "imagen",
+            "src": "orellana/retrato-horizontal.jpg"
+          },
+          {
+            "tipo": "golpes",
+            "desde": "raro",
+            "palabras": [
+              {
+                "txt": "RARO",
+                "en": "raro"
+              },
+              {
+                "txt": "METASTÁSICO",
+                "en": "metast"
+              }
+            ]
+          },
+          {
+            "tipo": "puntos",
+            "desde": "parte",
+            "en": "dos",
+            "fuertes": 2,
+            "flojas": 3,
+            "txt": "entre 2 y 5 de cada 100",
+            "lbl": "cánceres de mama · según la OMS"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Tengo treinta y cinco años y {{DIAGNOSTICO}}."
+        },
+        {
+          "texto": "Raro."
+        },
+        {
+          "texto": "Y metastásico."
+        },
+        {
+          "texto": "Con una parte neuroendocrina, algo que, según la o eme ese, solo tienen entre el dos y el cinco por ciento de los cánceres de mama.",
+          "pantalla": "Con una parte neuroendocrina, algo que, según la OMS, solo tienen entre el dos y el cinco por ciento de los cánceres de mama."
+        }
+      ]
+    },
+    {
+      "id": "investigar",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "golpes",
+            "palabras": [
+              {
+                "txt": "INVESTIGAR",
+                "en": "investigar"
+              },
+              {
+                "txt": "CON IA",
+                "en": "ia",
+                "acento": true
+              }
+            ]
+          },
+          {
+            "tipo": "diagrama",
+            "desde": "pedi",
+            "nodos": [
+              {
+                "t": "Prueba",
+                "s": "adelantada",
+                "en": "prueba"
+              },
+              {
+                "t": "Biopsia",
+                "s": "Zúrich",
+                "en": "biopsia"
+              },
+              {
+                "t": "{{CENTRO}}",
+                "s": "Harvard",
+                "en": "dana"
+              }
+            ]
+          }
+        ],
+        "fondo": "narrado/stock/teclado.mp4",
+        "fondo_dur": 10.07
+      },
+      "frases": [
+        {
+          "texto": "Así que me puse a investigar con IA."
+        },
+        {
+          "texto": "Y dio resultado."
+        },
+        {
+          "texto": "Pedí adelantar una prueba que miró la parte neuroendocrina de mi tumor."
+        },
+        {
+          "texto": "Conseguí una biopsia en Zúrich."
+        },
+        {
+          "texto": "Y un equipo del {{CENTRO}}, en Harvard, se sumó a estudiar mi tumor."
+        }
+      ]
+    },
+    {
+      "id": "construir",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "golpes",
+            "palabras": [
+              {
+                "txt": "PROTOCOLO ESTÁNDAR",
+                "en": "protocolo"
+              },
+              {
+                "txt": "ESPERAR",
+                "en": "esperar"
+              },
+              {
+                "txt": "O CONSTRUIR",
+                "en": "construir",
+                "acento": true
+              }
+            ]
+          },
+          {
+            "tipo": "foto",
+            "desde": "soy",
+            "src": "titular-ingeniera.png",
+            "nombre": "{{TITULAR}} {{APELLIDO}}",
+            "rol": "ingeniera de software"
+          },
+          {
+            "tipo": "golpes",
+            "desde": "polaris",
+            "palabras": [
+              {
+                "txt": "POLARIS",
+                "en": "polaris",
+                "acento": true
+              }
+            ]
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Cuando el protocolo estándar no te cubre, te quedan dos opciones: esperar, o construir."
+        },
+        {
+          "texto": "Soy ingeniera de software."
+        },
+        {
+          "texto": "Elegí construir."
+        },
+        {
+          "texto": "Y así fue como nació Polaris."
+        }
+      ]
+    },
+    {
+      "id": "que-es",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "golpes",
+            "palabras": [
+              {
+                "txt": "POLARIS",
+                "en": "polaris"
+              },
+              {
+                "txt": "UN EQUIPO",
+                "en": "equipo"
+              },
+              {
+                "txt": "DÍA Y NOCHE",
+                "en": "dia",
+                "acento": true
+              }
+            ]
+          },
+          {
+            "tipo": "lista",
+            "desde": "lee",
+            "items": [
+              {
+                "icono": "web",
+                "texto": "Lee los estudios",
+                "en": "lee"
+              },
+              {
+                "icono": "radar",
+                "texto": "Busca ensayos en todo el mundo",
+                "en": "busca"
+              },
+              {
+                "icono": "firma",
+                "texto": "Prepara la información para mis médicos",
+                "en": "prepara"
+              }
+            ]
+          }
+        ],
+        "fondo": "narrado/stock/escritorio.mp4",
+        "fondo_dur": 12.13
+      },
+      "frases": [
+        {
+          "texto": "Polaris es como un equipo de investigación que trabaja para mí día y noche."
+        },
+        {
+          "texto": "Lee los estudios, busca ensayos clínicos en todo el mundo y prepara la información para mis médicos."
+        }
+      ]
+    },
+    {
+      "id": "entender",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "cita",
+        "texto": "Polaris no decide. Deciden mis médicos.",
+        "en": "sobre"
+      },
+      "frases": [
+        {
+          "texto": "Sobre todo, me ayuda a entender mi enfermedad."
+        },
+        {
+          "texto": "Y a llegar a cada consulta con mejores preguntas."
+        }
+      ]
+    },
+    {
+      "id": "visores",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "visores",
+            "en_zoom": "huesos",
+            "piezas": [
+              {
+                "dir": "higado",
+                "n": 240,
+                "nombre": "Hígado"
+              },
+              {
+                "dir": "vertebra3",
+                "n": 150,
+                "nombre": "Hueso"
+              },
+              {
+                "src": "esqueleto.png",
+                "nombre": "Esqueleto"
+              }
+            ]
+          },
+          {
+            "tipo": "contadores",
+            "desde": "desarrolle",
+            "items": [
+              {
+                "k": "vistas_higado",
+                "lbl": "visualizaciones del visor del hígado en X"
+              }
+            ]
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Llevaba desde el diagnóstico queriendo ver mis metástasis de verdad, no solo imaginarlas."
+        },
+        {
+          "texto": "Polaris pasó mis pruebas de imagen a mapas en tres dimensiones."
+        },
+        {
+          "texto": "El de los huesos ayudó a mis médicos a elegir qué lesión biopsiar."
+        },
+        {
+          "texto": "Lo desarrollé para mi caso y, para mi sorpresa, médicos de otros hospitales se han interesado por usarlo."
+        }
+      ]
+    },
+    {
+      "id": "tiempo",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "dias",
+        "en": "cada",
+        "txt": "Cada día cuenta.",
+        "meses": [
+          {
+            "m": "ABR",
+            "d": 30
+          },
+          {
+            "m": "MAY",
+            "d": 31
+          },
+          {
+            "m": "JUN",
+            "d": 30
+          },
+          {
+            "m": "JUL",
+            "d": 31
+          },
+          {
+            "m": "AGO",
+            "d": 31
+          },
+          {
+            "m": "SEP",
+            "d": 30
+          },
+          {
+            "m": "OCT",
+            "d": 3
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Todo esto ha pasado en seis meses, porque en mi caso cada día cuenta."
+        },
+        {
+          "texto": "La enfermedad no espera."
+        }
+      ]
+    },
+    {
+      "id": "ilusion",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "imagen",
+            "src": "orellana/retrato-vertical.jpg"
+          },
+          {
+            "tipo": "cita",
+            "desde": "casos",
+            "en": "casos",
+            "texto": "Que los casos raros dejen de ser notas a pie de página."
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Mi ilusión es que esto, que me está ayudando a mí, ayude a muchos más pacientes."
+        },
+        {
+          "texto": "Que los casos raros dejen de ser notas a pie de página y pasen a ser datos, estudios, opciones reales."
+        },
+        {
+          "texto": "Y lo que preparamos mis médicos y yo con Polaris no se puede quedar en teoría."
+        }
+      ]
+    },
+    {
+      "id": "peticion",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "puntos",
+            "en": "beyond",
+            "fuertes": 1,
+            "flojas": 99,
+            "txt": "Beyond the Protocol",
+            "lbl": "una asociación abierta a otros pacientes"
+          },
+          {
+            "tipo": "diagrama",
+            "desde": "necesito",
+            "nodos": [
+              {
+                "t": "Puertas",
+                "s": "hoy cerradas",
+                "en": "puertas",
+                "puerta": true
+              },
+              {
+                "t": "Hospitales",
+                "s": "quien decide",
+                "en": "hospitales"
+              },
+              {
+                "t": "Laboratorios",
+                "s": "quien decide",
+                "en": "laboratorios"
+              },
+              {
+                "t": "Fundaciones",
+                "s": "quien decide",
+                "en": "fundaciones"
+              }
+            ]
+          }
+        ],
+        "fondo": "narrado/stock/puerta.mp4",
+        "fondo_dur": 19.23
+      },
+      "frases": [
+        {
+          "texto": "Por eso quiero crear Beyond the Protocol, una asociación abierta a otros pacientes, que sostenga esto entre muchas personas."
+        },
+        {
+          "texto": "Y necesito vuestra ayuda para abrir puertas que ahora mismo están cerradas, las de quien decide en hospitales, laboratorios y fundaciones, para llevarlo a cabo."
+        }
+      ]
+    },
+    {
+      "id": "cierre",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "cierre",
+        "titular": "No pido garantías, pido oportunidades.",
+        "url": "helptitular.com/colabora",
+        "pie": "{{TITULAR}} {{APELLIDO}} · ingeniera de software",
+        "credito": "Todo este vídeo lo ha creado Polaris, también la voz: un clon de la mía hecho con IA.",
+        "video": "narrado/flow/cierre.mp4"
+      },
+      "frases": [
+        {
+          "texto": "No pido garantías, pido oportunidades."
+        },
+        {
+          "texto": "Gracias."
+        }
+      ]
+    }
+  ]
+}

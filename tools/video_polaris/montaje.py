@@ -36,6 +36,18 @@ def drop_exacto(musica, aprox=16.0):
     return aprox - 2 + k * h / 8000
 
 
+def piezas_intro(w_pol, drop, compas):
+    """Piezas (inicio_en_video, inicio_en_musica, duración) de la música antes de «Polaris», con el drop del tema en la palabra.
+    Si su voz llega a «Polaris» después del drop del tema (v4, 29-sep: EN +0,68 s, ES +3,43 s), se repiten los primeros
+    compases de la intro, cortando en compás entero, para que haya música desde el primer segundo. Antes un inicio
+    negativo en el tema lo recortaba ffmpeg a 0 y el drop se adelantaba a la palabra."""
+    if w_pol <= drop:
+        return [(0.0, drop - w_pol, w_pol)]
+    falta = w_pol - drop
+    repite = math.ceil(falta / compas - 1e-9) * compas  # compases enteros de intro que se repiten
+    return [(0.0, repite - falta, falta), (falta, 0.0, drop)]
+
+
 def main(build, musica, idioma="en"):
     g = guion.cargar(idioma)
     pal = json.load(open(os.path.join(build, "palabras.json"), encoding="utf-8"))
@@ -65,8 +77,7 @@ def main(build, musica, idioma="en"):
     calma_ini = next(i for i in range(cuerpo_fin, len(niveles)) if niveles[i] < max(niveles) - 12)
     vuelta_ini = next(i for i in range(calma_ini, len(niveles)) if niveles[i] > max(niveles) - 6)
     piezas = []  # (inicio_en_video, inicio_en_musica, duración)
-    intro = w_pol  # lo que suena antes del drop
-    piezas.append((0.0, drop - intro, intro))
+    piezas += piezas_intro(w_pol, drop, compas)  # lo que suena antes del drop
     # cuerpo: del drop hasta la calma, en compases enteros, repitiendo el cuerpo del tema si hace falta
     hueco_cuerpo = t_calma - w_pol
     n_comp = max(1, round(hueco_cuerpo / compas))

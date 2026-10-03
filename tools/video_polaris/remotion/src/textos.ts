@@ -20,6 +20,8 @@ export type Textos = {
   rotulado: Record<string, [string | null, string]>;  // de qué palabra a cuál NO se subtitula (ya está escrito en grande)  // N·E·D se despliegan en sus palabras (solo si las iniciales casan: EN)
   medicos: [string, string];
   cierre: [string, string, string];
+  cadena: {xs: number[]; w: [number, number]; letra: [number, number]};  // [grande, barra]. ES más ancha (29-sep: «Pruebas y mensajes» se salía de la caja; diseño)
+  web: {dir: string; urls: [string, string, string]};  // carpeta de las capturas en public/ y rótulos de URL de la escena web
 };
 
 const EN: Textos = {
@@ -40,6 +42,8 @@ const EN: Textos = {
   rotulado: {problema: [null, 'metastatic.'], polaris: ['NED.', 'disease.'], 'mas-alla': ['go', 'further'], medicos: [null, 'do.'], ned: [null, '*'], 'web-final': [null, '*']},
   medicos: ["It doesn't decide.", 'My doctors do.'],
   cierre: ['Still going for NED.', 'My whole case is explained at', 'Built with Polaris, my AI agent system.'],
+  cadena: {xs: [260, 610, 960, 1310, 1660], w: [300, 200], letra: [36, 21]},
+  web: {dir: '', urls: ['helptitular.com/science', 'helptitular.com/data', 'helptitular.com/mapa-metastasis']},
 };
 
 const ES: Textos = {
@@ -60,6 +64,9 @@ const ES: Textos = {
   rotulado: {problema: [null, 'metastásico.'], polaris: ['NED.', 'enfermedad.'], 'mas-alla': ['ir', 'allá'], medicos: [null, 'médicos.'], ned: [null, '*'], 'web-final': [null, '*']},
   medicos: ['Polaris no decide.', 'Deciden mis médicos.'],
   cierre: ['Sigo investigando hasta llegar a NED.', 'Todo mi caso está explicado en', 'Hecho con Polaris, firmado por mí.'],
+  cadena: {xs: [240, 600, 960, 1320, 1680], w: [320, 240], letra: [30, 21]},
+  // capturas de las páginas en español (29-sep, {{TITULAR}}: «las capturas de la web están en inglés»): capturar.mjs --idioma es
+  web: {dir: 'es/', urls: ['helptitular.com/ciencia', 'helptitular.com/datos', 'helptitular.com/mapa-metastasis']},
 };
 
 export const TEXTOS: Record<string, Textos> = {en: EN, es: ES};

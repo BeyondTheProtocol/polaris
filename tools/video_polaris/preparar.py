@@ -1,6 +1,7 @@
 """Prepara los recursos del vídeo en <build>/assets: recortes de las capturas y fotogramas del hígado.
 
 Uso: python3 preparar.py <carpeta_capturas> <carpeta_higado> <build>
+     python3 preparar.py --web <carpeta_capturas> <salida> [--idioma es]   (solo las capturas de la web)
   <carpeta_capturas> sale de capturar.mjs; <carpeta_higado>, de grabar_higado.mjs.
 
 Los recortes están elegidos a mano sobre capturas a 1920×1080 (27-sep-2026) para que
@@ -27,7 +28,12 @@ RECORTES = {  # (x0, y0, x1, y1) en px de la captura
     # vídeo con historia (28-sep): mismas reglas, ni una cifra clínica ni lo recaudado
     "science": (540, 170, 1380, 320),     # solo el título y la frase «behaves like two diseases at once»
     "home": (400, 140, 1520, 580),        # la presentación, cortada ANTES de la fila de cifras (lleva lo recaudado)
-    "esqueleto": (369, 247, 695, 868),    # el lienzo del esqueleto; los paneles de la derecha llevan SUV/mm/ml
+    "esqueleto": (373, 251, 691, 864),    # el lienzo del esqueleto; los paneles de la derecha llevan SUV/mm/ml
+                                          # (4 px hacia dentro por lado: (369, 247, 695, 868) dejaba esquinas claras; diseño, 29-sep)
+}
+# Versión ES (capturar.mjs --idioma es, 29-sep): solo cambia lo que se mueve en la página española.
+RECORTES_ES = {
+    "datos-cielo": (475, 328, 1440, 653),  # en /datos el campo sube 20 px; justo encima, «1.730 valores» y «731»: no subir más
 }
 
 def main(capturas, higado, build):
@@ -86,8 +92,20 @@ def extra(build, mama=None, vertebra=None):
         print("✓ tres huesos", len(fotos), "fotogramas")
 
 
+def recortar_web(capturas, out, idioma="en"):
+    """Solo las capturas de la web (sin el hígado ni las cifras): para la carpeta de capturas de otro idioma en public/."""
+    os.makedirs(out, exist_ok=True)
+    cajas = {**RECORTES, **(RECORTES_ES if idioma == "es" else {})}
+    for n, caja in cajas.items():
+        Image.open(os.path.join(capturas, n + ".png")).crop(caja).save(os.path.join(out, n + ".png"))
+        print("✓ recorte", idioma, n, caja)
+    Image.open(os.path.join(capturas, "dos-caras.png")).save(os.path.join(out, "dos-caras.png"))  # el esquema va entero
+
+
 if __name__ == "__main__":
-    if sys.argv[1] == "--extra":   # python3 preparar.py --extra <build> <carpeta_mama> <carpeta_vertebra>
+    if sys.argv[1] == "--web":     # python3 preparar.py --web <carpeta_capturas> <salida> [--idioma es]
+        recortar_web(sys.argv[2], sys.argv[3], sys.argv[5] if "--idioma" in sys.argv else "en")
+    elif sys.argv[1] == "--extra":   # python3 preparar.py --extra <build> <carpeta_mama> <carpeta_vertebra>
         extra(sys.argv[2], sys.argv[3], sys.argv[4])
     else:
         main(*sys.argv[1:4])

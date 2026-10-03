@@ -204,6 +204,105 @@ class TestVideoPolarisES(unittest.TestCase):
         self.assertNotIn('language="en"', leer("palabras.py"))
 
 
+class TestVozV4(unittest.TestCase):
+    """29-sep-2026: la voz pasa a Eleven v4 en inglés americano ({{TITULAR}}: «me parece espectacular de verdad»)."""
+
+    def test_drop_cae_en_polaris_aunque_la_voz_llegue_tarde(self):
+        # con la v4, «Polaris» llega después del drop del tema (EN +0,68 s, ES +3,43 s): antes el inicio negativo se
+        # recortaba a 0 y el drop se adelantaba; ahora se repiten compases de la intro y hay música desde el segundo 0
+        sys.path.insert(0, DIR)
+        from montaje import piezas_intro
+        compas = 4 * 0.5222
+        for w_pol, drop in ((15.901, 16.28), (16.96, 16.28), (19.71, 16.28)):
+            ps = piezas_intro(w_pol, drop, compas)
+            self.assertAlmostEqual(ps[0][0], 0.0, msg="la música suena desde el principio")
+            for v0, m0, d in ps:
+                self.assertGreaterEqual(m0, 0, "la música no puede empezar antes del principio del tema")
+            self.assertAlmostEqual(sum(d for _, _, d in ps), w_pol, places=6)
+            v0, m0, d = ps[-1]
+            self.assertAlmostEqual(v0 + (drop - m0), w_pol, places=6, msg="el drop del tema tiene que caer en «Polaris»")
+            if len(ps) == 2:  # el salto de la repetición cae en compás entero del tema
+                fin = ps[0][1] + ps[0][2]
+                self.assertAlmostEqual(fin / compas, round(fin / compas), places=6)
+
+    def test_v4_con_acento_americano_y_sin_style(self):
+        g = json.loads(leer("guion_voz.json"))
+        if g["model"] != "eleven_v4":
+            self.skipTest("el guion EN no está en v4")
+        self.assertEqual(g.get("language_code"), "en")
+        self.assertIn("American accent", g.get("prefijo", ""), "sin etiqueta su clon en v4 sale británico")
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import elevenlabs_voz
+        enviado = {}
+        viejo_req, viejo_key = elevenlabs_voz._req, elevenlabs_voz._key
+        elevenlabs_voz._req = lambda url, key, data=None, accept="": (enviado.update(data or {}), (b"x", ""))[1]
+        elevenlabs_voz._key = lambda: "k"
+        try:
+            import tempfile
+            with tempfile.TemporaryDirectory() as d:
+                elevenlabs_voz.speak(g["prefijo"] + "Hi.", "v", "eleven_v4", os.path.join(d, "a.mp3"), style=0.2,
+                                     language_code="en")
+        finally:
+            elevenlabs_voz._req, elevenlabs_voz._key = viejo_req, viejo_key
+        self.assertEqual(enviado["language_code"], "en")
+        self.assertNotIn("style", enviado["voice_settings"], "v4 no admite style (can_use_style=False)")
+        self.assertTrue(enviado["text"].startswith("[General American accent] "))
+
+    def test_decir_solo_lo_oye_la_voz(self):
+        # ES v2: la v4 decía «Convertió» y se comía la D de «3D»; «decir» cambia la grafía para la voz, nunca la pantalla
+        self.assertIn('f.get("decir", f["texto"])', leer("voz.py"))
+        for n in ("palabras.py", "montaje.py", "sfx.py"):
+            self.assertNotIn("decir", leer(n), f"{n} no puede usar «decir»: en pantalla va el texto firmado")
+        for ruta in ("guion_voz.json", "guion_voz_es.json"):
+            for f in json.loads(leer(ruta))["frases"]:
+                if "decir" in f:
+                    self.assertNotEqual(f["decir"], f["texto"])
+
+    def _bloque(self, idioma):
+        s = leer(os.path.join("remotion", "src", "textos.ts"))
+        return s[s.index(f"const {idioma.upper()}: Textos = {{"):].split("\n};", 1)[0]
+
+    def test_cadena_el_texto_cabe_en_su_caja(self):
+        # ES v2 (29-sep, {{TITULAR}}): «Pruebas y mensajes» se salía de la caja. Fraunces 600 ≈ 0,53 em por carácter (medido por diseño)
+        for idioma in ("en", "es"):
+            b = self._bloque(idioma)
+            geo = re.search(r"cadena: \{xs: \[([^\]]+)\], w: \[(\d+), (\d+)\], letra: \[(\d+), (\d+)\]\}", b)
+            self.assertIsNotNone(geo, f"{idioma}: falta la geometría de la cadena en textos.ts")
+            wg, wb, lg, lb = map(int, geo.groups()[1:])
+            nodos = re.findall(r"\['[^']*', '([^']*)'\]", re.search(r"nodos: \[(.*?)\]\],", b).group(1) + "]")
+            salidas = re.findall(r"\['[^']*', '([^']*)'\]", re.search(r"salida: \[(.*?)\]\],", b).group(1) + "]")
+            for v in nodos[:4]:
+                self.assertLessEqual(len(v) * lg * 0.53, wg - 20, f"{idioma}: «{v}» se sale de la caja grande")
+                self.assertLessEqual(len(v) * lb * 0.53, wb - 20, f"{idioma}: «{v}» se sale de la caja en barra")
+            for v in [nodos[4]] + salidas:  # la caja de salida mide 300 en los dos estados
+                self.assertLessEqual(len(v) * lb * 0.53, 300 - 20, f"{idioma}: «{v}» se sale de la caja de salida")
+            self.assertLessEqual(len(nodos[4]) * lg * 0.53, 300 - 20)
+
+    def test_capturas_y_urls_en_su_idioma(self):
+        # ES v2 (29-sep, {{TITULAR}}): «las capturas de la web están en inglés, debería salir la versión en español»
+        es = self._bloque("es")
+        self.assertIn("dir: 'es/'", es)
+        for ruta in ("helptitular.com/ciencia", "helptitular.com/datos"):
+            self.assertIn(ruta, es)
+        self.assertNotIn("helptitular.com/science", es)
+        cap = leer("capturar.mjs")
+        es_map = cap[cap.index("const ES = {"):cap.index("const TOMAS = ")]
+        self.assertNotIn("/en", es_map, "las capturas ES no pueden venir de /en/")
+        tsx = leer(os.path.join("remotion", "src", "Polaris.tsx"))
+        for img in ("science.png", "biopsia.png", "esqueleto.png", "dos-caras.png"):
+            self.assertNotIn(f"staticFile('{img}')", tsx, f"{img} tiene que pasar por captura() para salir en su idioma")
+        sys.path.insert(0, DIR)
+        from preparar import RECORTES, RECORTES_ES
+        self.assertIn("datos-cielo", RECORTES_ES)
+        self.assertEqual(RECORTES["esqueleto"], (373, 251, 691, 864), "sin el margen de 4 px vuelven las esquinas claras")
+
+    def test_revision_distingue_ned_deletreado(self):
+        # una toma de la v19 dijo «Ned» de corrido: el revisor tiene que verlo, no darlo por igual a «N-E-D»
+        sys.path.insert(0, DIR)
+        from revisa_tomas import plano
+        self.assertNotEqual(plano("We're still going for N-E-D."), plano("We're still going for NED."))
+
+
 if __name__ == "__main__":
     r = unittest.main(exit=False, verbosity=0).result
     ok = r.wasSuccessful()

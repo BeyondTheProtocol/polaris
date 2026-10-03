@@ -1,9 +1,10 @@
 {
  "_nota": "28-sep-2026 · Borrador escrito DESDE CERO en castellano de España por voz-titular, a partir de una ficha de hechos por escena (sin partir del guion EN ni de versiones ES anteriores). Tono de vídeo de producto tech. Pendiente de firma de {{TITULAR}}. Anclas sin actualizar: las rehace el orquestador.",
- "_tono": "28-sep: se probó tono «promo» (stability 0.32, style 0.55, tempo 1.06) y a {{TITULAR}} le sonó «super raro, muy acelerada, no natural». Vuelta a los ajustes de la v1 (naturales). La energía de promo va en la música y el movimiento, NO en su voz. No acelerar su voz con atempo. 28-sep, más tarde: pidió «un punto más de ventas»; se sube SOLO un punto dentro de los márgenes naturales (stability 0.45, style 0.2), sin tocar el tempo.",
+ "_tono": "28-sep: se probó tono «promo» (stability 0.32, style 0.55, tempo 1.06) y a {{TITULAR}} le sonó «super raro, muy acelerada, no natural». Vuelta a los ajustes de la v1 (naturales). La energía de promo va en la música y el movimiento, NO en su voz. No acelerar su voz con atempo. 28-sep, más tarde: pidió «un punto más de ventas»; se sube SOLO un punto dentro de los márgenes naturales (stability 0.45, style 0.2), sin tocar el tempo. 29-sep: pasa a Eleven v4 como el EN (v19). Sin etiqueta de acento: su clon es de su voz en castellano de España y, con language_code es, la etiqueta [Castilian Spanish accent from Spain] no cambió nada medible (parecido a la ES aprobada 0,70-0,77 con y sin ella). v4 ignora style. 3d lleva «decir» (grafía para la voz): con la tilde la v4 decía «Convertió» y se comía la D de «3D». Tomas a mano con revisa_tomas.py: descartadas las que decían «Net» (NED), «rastreé», «me he echado», «hacen», «no deciden». En web-final Whisper oye «helpmedium» en todas (también oía mal la v2): lo juzga su oído. 29-sep (tras ver la ES v2): «convirtió lo entona mal». Medido: en la toma sin tilde el tono subía al final de la palabra (1,21 frente a 0,98 de la ES v1). «Convir-tió» con semilla 7 da la vocal bien y el tono como la ES v1 (1,05).",
  "idioma": "es",
  "voice_id": "51aLNh96A9WJZODzYIyP",
- "model": "eleven_multilingual_v2",
+ "model": "eleven_v4",
+ "language_code": "es",
  "ajustes": {
   "stability": 0.45,
   "similarity": 0.85,
@@ -38,7 +39,9 @@
   {
    "id": "3d",
    "escena": "3d",
-   "texto": "Convirtió mis pruebas de imagen en mapas 3D de mis lesiones. Y el de los huesos me ayudó a elegir qué lesión biopsiar."
+   "texto": "Convirtió mis pruebas de imagen en mapas 3D de mis lesiones. Y el de los huesos me ayudó a elegir qué lesión biopsiar.",
+   "decir": "Convir-tió mis pruebas de imagen en mapas tres D de mis lesiones. Y el de los huesos me ayudó a elegir qué lesión biopsiar.",
+   "semilla": 7
   },
   {
    "id": "radar",
@@ -114,5 +117,18 @@
  },
  "enlazado": true,
  "n_tomas": 3,
- "tomas": {}
+ "tomas": {
+  "problema": "c",
+  "mas-alla": "b",
+  "polaris": "a",
+  "aprender": "c",
+  "3d": "a",
+  "radar": "a",
+  "carga": "c",
+  "web": "a",
+  "olvido": "c",
+  "medicos": "b",
+  "ned": "c",
+  "web-final": "a"
+ }
 }

@@ -74,7 +74,15 @@ def main(build, idioma="en", ruta_guion=None):
         antes = " ".join(x["texto"] for x in g["frases"][max(0, i - 2):i]) if g.get("enlazado") else ""
         despues = g["frases"][i + 1]["texto"] if g.get("enlazado") and i + 1 < len(g["frases"]) else ""
         n = g.get("n_tomas", 1)
-        base = g["voice_id"] + g["model"] + f["texto"] + json.dumps(aj, sort_keys=True) + (antes + "|" + despues if n > 1 else "")
+        # v4: «prefijo» es la etiqueta de acento (no se lee en voz alta) y «language_code» fija el idioma.
+        prefijo, lc = g.get("prefijo", ""), g.get("language_code")
+        # «decir»: lo que oye la voz cuando la v4 pronuncia mal el texto firmado (ES: «Convirtió» → «Convertió», «3D» → «3»).
+        # En pantalla y en los tiempos de palabra sigue el texto firmado; «decir» solo cambia la grafía, nunca las palabras.
+        decir = f.get("decir", f["texto"])
+        # «semilla»: fija la toma cuando solo una suena bien (ES 3d, 29-sep: el tono subía al final de «convirtió»)
+        semilla = f.get("semilla")
+        base = (g["voice_id"] + g["model"] + prefijo + decir + json.dumps(aj, sort_keys=True) + (lc or "") + str(semilla or "")
+                + (antes + "|" + despues if n > 1 else ""))
         tomas = []
         for x in "abcdefgh"[:n]:
             ruta = os.path.join(vd, "tomas", f"{f['id']}-{x}.mp3") if n > 1 else mp3
@@ -83,9 +91,10 @@ def main(build, idioma="en", ruta_guion=None):
             if not (os.path.exists(ruta) and os.path.exists(marca) and open(marca).read() == firma):
                 os.makedirs(os.path.dirname(ruta), exist_ok=True)
                 crudo = ruta + ".crudo.mp3"
-                elevenlabs_voz.speak(f["texto"], g["voice_id"], g["model"], crudo, stability=aj.get("stability", 0.5),
+                elevenlabs_voz.speak(prefijo + decir, g["voice_id"], g["model"], crudo, stability=aj.get("stability", 0.5),
                                      similarity=aj.get("similarity", 0.85), style=aj.get("style", 0.0),
-                                     previous_text=antes, next_text=despues)
+                                     previous_text=antes, next_text=despues, language_code=lc,
+                                     seed=None if semilla is None else semilla + "abcdefgh".index(x))
                 # atempo acelera sin cambiar el tono de la voz
                 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", crudo, "-af", "atempo=%s" % aj.get("tempo", 1.0),
                                 "-b:a", "160k", ruta], check=True)
