@@ -3562,6 +3562,18 @@
       "auditable": false,
       "repetida": false,
       "nota": "2-oct-26: escrita en una sesión arrancada en $HOME (dir de memoria equivocado) y copiada al canónico. Sin mecanizar."
+    },
+    {
+      "slug": "feedback-prueba-declarada-debe-casar-con-el-entregable",
+      "que": "al encolar, la prueba declarada tiene que ser el artefacto que de verdad se pide (nota archivada -> tipo ruta, no tipo deuda); un encargo, un entregable; sin-entregable se investiga antes de re-encolar",
+      "clase": "proceso",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": false,
+      "nota": "5-oct-26: antipatrón propio del lazo de auto-mejora. 4 entregables reales del pipeline de vacuna (comite-medico y consejero-precision, 25-sep y 1-oct) quedaron marcados sin-entregable y enterrados en queue/failed porque la prueba declarada era tipo deuda y el entregable era una nota archivada. Mecanismo pendiente: deuda prueba-entregable-sin-tipo-nota (añadir tipo nota a prueba_entregable.py + triaje de failed/ que separe alertas auto-generadas de encargos con intención)."
     }
   ]
 }
