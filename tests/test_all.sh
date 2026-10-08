@@ -437,6 +437,7 @@ runpy test_visor3d_cateter.py
 runpy test_visor3d_losa.py
 runpy test_visor3d_modelo_port.py
 runpy test_visor3d_traquea_inclinada.py
+runpy test_visor3d_tubo_a_rayas.py
 runpy test_visor3d_procedencia.py
 runpy test_visor3d_colab.py
 runpy test_sonda_silencio.py

@@ -4565,11 +4565,89 @@ def _submalla_por_mascara(v, f, mask):
     return v[usados], remap[f[ok]]
 
 
+RADIO_CATETER_WEB_MM = 1.35     # 8 F nominal, el mismo radio con el que se pinta en la escena
+
+
+def _tubo_a_rayas(v, arco, total, radio_mm=RADIO_CATETER_WEB_MM, lados=16, paso_mm=1.0):
+    """Catéter para la web como UN tubo continuo y limpio, partido en tres piezas que casan
+    cara con cara: `medido` (los dos extremos leídos), `interpolado` e `interpolado_b` (el
+    tramo de en medio, en bandas alternas de DASH_ON_MM y DASH_OFF_MM).
+
+    Antes el tramo interpolado se enseñaba con HUECOS de verdad recortando la malla de
+    marching cubes: las caras que cruzaban el corte se tiraban enteras y quedaban esquirlas
+    sueltas («se ve así», {{TITULAR}}, 8-oct-2026). Ahora el eje se saca de esa misma malla (el
+    centroide de sus vértices por tramos de arco), se suaviza y se barre con un círculo: anillos
+    regulares, cortes exactos en un anillo, ningún hueco. Que el tramo es interpolado se sigue
+    diciendo con la FORMA (rayas), no solo con el color: lo pinta el visor con dos materiales.
+
+    `v`, `arco`: vértices de `cateter.ply` y su distancia geodésica al extremo del portal.
+    Devuelve {nombre: (vértices, caras)}."""
+    import numpy as np
+    from scipy.ndimage import gaussian_filter1d
+    ok = np.isfinite(arco) & (arco <= total)
+    cubos = np.floor(arco[ok] / 2.0).astype(int)
+    n = int(cubos.max()) + 1
+    suma = np.zeros((n, 3))
+    cuenta = np.zeros(n)
+    np.add.at(suma, cubos, v[ok])
+    np.add.at(cuenta, cubos, 1)
+    eje = suma[cuenta > 0] / cuenta[cuenta > 0][:, None]
+    if len(eje) < 6:
+        raise SystemExit("ABORTA: el catéter no da para sacar un eje (%d tramos)" % len(eje))
+    eje = gaussian_filter1d(eje, 1.5, axis=0, mode="nearest")
+    # remuestreo a paso fijo sobre la longitud del propio eje
+    tramo = np.r_[0.0, np.cumsum(np.linalg.norm(np.diff(eje, axis=0), axis=1))]
+    s = np.arange(0.0, tramo[-1] + 1e-6, paso_mm)
+    c = np.stack([np.interp(s, tramo, eje[:, k]) for k in range(3)], axis=1)
+    largo = float(s[-1])
+    # marcos por transporte paralelo: el círculo no gira sobre sí mismo a lo largo del tubo
+    t = np.gradient(c, axis=0)
+    t /= np.linalg.norm(t, axis=1, keepdims=True) + 1e-12
+    u = np.cross(t[0], [0.0, 0.0, 1.0] if abs(t[0][2]) < 0.9 else [1.0, 0.0, 0.0])
+    u /= np.linalg.norm(u)
+    us = [u]
+    for i in range(1, len(c)):
+        u = u - t[i] * (u @ t[i])
+        u /= np.linalg.norm(u) + 1e-12
+        us.append(u)
+    us = np.asarray(us)
+    ws = np.cross(t, us)
+    ang = np.linspace(0.0, 2 * np.pi, lados, endpoint=False)
+    anillos = (c[:, None, :] + radio_mm * (np.cos(ang)[None, :, None] * us[:, None, :]
+                                             + np.sin(ang)[None, :, None] * ws[:, None, :]))
+    verts = np.vstack([anillos.reshape(-1, 3), c[:1], c[-1:]])
+    tapa0, tapa1 = len(verts) - 2, len(verts) - 1
+    medio = (s[:-1] + s[1:]) / 2.0
+    periodo = DASH_ON_MM + DASH_OFF_MM
+    caras = {"medido": [], "interpolado": [], "interpolado_b": []}
+    j = np.arange(lados)
+    jn = (j + 1) % lados
+    for i in range(len(c) - 1):
+        if medio[i] <= MEDIDO_MM or medio[i] >= largo - MEDIDO_MM:
+            pieza = "medido"
+        else:
+            pieza = "interpolado" if (medio[i] - MEDIDO_MM) % periodo < DASH_ON_MM else "interpolado_b"
+        a, b = i * lados, (i + 1) * lados
+        caras[pieza].append(np.stack([a + j, b + j, b + jn], axis=1))
+        caras[pieza].append(np.stack([a + j, b + jn, a + jn], axis=1))
+    ult = (len(c) - 1) * lados
+    caras["medido"].append(np.stack([np.full(lados, tapa0), jn, j], axis=1))
+    caras["medido"].append(np.stack([np.full(lados, tapa1), ult + j, ult + jn], axis=1))
+    piezas = {}
+    for nombre, lista in caras.items():
+        if not lista:
+            continue
+        f = np.vstack(lista)
+        usados, inv = np.unique(f, return_inverse=True)
+        piezas[nombre] = (verts[usados], inv.reshape(f.shape))
+    return piezas
+
+
 def _web_reservorio_fecha(carpeta, centro, con_modelo=False):
     """Mallas + metadatos de UNA fecha del reservorio, listas para publicar: sin marca ni
-    modelo del dispositivo, sin hospital, catéter partido en medido (continuo, los dos
-    extremos leídos)/interpolado (discontinuo de verdad —huecos reales en la malla, no un
-    efecto de línea— en el tramo de en medio) y todo recentrado en `centro`."""
+    modelo del dispositivo, sin hospital, catéter como un tubo continuo partido en medido (los
+    dos extremos leídos) e interpolado (el tramo de en medio, en dos piezas alternas para que
+    el visor lo pinte a rayas) y todo recentrado en `centro`."""
     import numpy as np
     d = _dir("visor", carpeta)
     esc = json.load(open(os.path.join(d, "escena.json")))
@@ -4591,14 +4669,7 @@ def _web_reservorio_fecha(carpeta, centro, con_modelo=False):
     if total < 4 * MEDIDO_MM:
         raise SystemExit("ABORTA: %s mide %.1f mm de camino, demasiado corto para separar "
                          "%.0f mm medidos en cada extremo" % (carpeta, total, MEDIDO_MM))
-    piezas = {}
-    mask_medido = finito & ((arco <= MEDIDO_MM) | (arco >= total - MEDIDO_MM))
-    piezas["medido"] = _submalla_por_mascara(v, f, mask_medido)
-    # discontinuo de verdad: se recorta por bandas de arco, no por un shader de línea
-    periodo = DASH_ON_MM + DASH_OFF_MM
-    fase = (arco - MEDIDO_MM) % periodo
-    mask_interp = finito & (arco > MEDIDO_MM) & (arco < total - MEDIDO_MM) & (fase < DASH_ON_MM)
-    piezas["interpolado"] = _submalla_por_mascara(v, f, mask_interp)
+    piezas = _tubo_a_rayas(v, arco, total)
     for nombre in ("portal", "hueso", "traquea"):
         ruta = os.path.join(d, nombre + ".ply")
         if not os.path.exists(ruta):
@@ -4683,7 +4754,7 @@ def _cmd_web_reservorio(a):
         "fuente": ("el trayecto sale del TC de cada fecha: los dos extremos (portal y punta) "
                    "están leídos directamente en el corte; el tramo intermedio es la ruta de "
                    "coste de brillo más probable entre ambos, no una medida punto a punto, y "
-                   "se dibuja discontinua por eso. Hueso y tráquea son solo referencia anatómica."),
+                   "se dibuja a rayas por eso. Hueso y tráquea son solo referencia anatómica."),
     }
     if procedencias:
         if any(p != procedencias[0] for p in procedencias):
