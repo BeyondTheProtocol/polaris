@@ -199,6 +199,29 @@
    "_nota": "Fila 4 del mapa: diseño web/frontend = GLM-5.2 (#2 mundial en WebDev Arena, confirmado por el comité el 28/6) y mucho más barato que un flagship. orden 18 = DESPUÉS de Gemini a propósito: su ventaja es el frontend, no el razonamiento general, así que en la cadena normal no le quita el sitio al default sustantivo; cuando la tarea ES frontend, el perfil lo promociona. Modelos verificados por API el 12-sep-26: la punta es glm-5.3 (había glm-5.2)."
   },
   {
+   "name": "nan",
+   "kind": "cli_chain",
+   "bin": "nan.py",
+   "destino": "nan",
+   "trusted": false,
+   "free": true,
+   "cost_per_1k": 0.0,
+   "capability": 4,
+   "generativo": true,
+   "orden": 14,
+   "enabled": true,
+   "secret": "btp-nan-api",
+   "models": [
+    "deepseek-v4-flash",
+    "glm5.3-flash",
+    "qwen3.8-flash"
+   ],
+   "para": [
+    "volumen"
+   ],
+   "_nota": "AÑADIDO Y ENCENDIDO 8-oct-26: clave en el Llavero y llamada real comprobada ese día (`--listar` devolvió 13 modelos; `deepseek-v4-flash` respondió). El catálogo real NO trae `glm5.3` aunque su web lo anuncie: solo los flash, por eso capability=4, igual que nvidia-deepseek. Exige User-Agent propio (sin él, 403 «error code: 1010»). NaN Community (nan.builders): GPUs compartidas en la UE con modelos abiertos y API formato OpenAI; membresía mensual de cuota plana (14,99 €/mes, activada por {{TITULAR}} el 8-oct-26), sin coste por token: por eso free=true y cost_per_1k=0 a efectos de enrutado, y el ledger apunta tokens con usd null. Segundo proveedor del carril de volumen, para cuando NVIDIA topa o se cae. Límites publicados en nan.builders/docs/models (leídos el 8-oct-26): 60 rpm por modelo. Su web declara «Zero logs»; es su afirmación, sin comprobar. PARA ENCENDERLO: crear la clave en cloud.nan.builders (ajustes → API Keys; lo hace {{TITULAR}}), guardarla con `security add-generic-password -U -a \"$USER\" -s btp-nan-api -w`, probar `python3 tools/nan.py --listar` y poner enabled:true aquí. NUNCA clínico (untrusted: lo niega el borde)."
+  },
+  {
    "name": "openrouter",
    "kind": "cli_chain",
    "bin": "openrouter.py",

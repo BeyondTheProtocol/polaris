@@ -320,6 +320,7 @@ FAMILIAS = [
     ("modelos de IA", ("chatgpt", "gemini", "glm", "=ia", "capacidades",
                        "carril_gratis", "elevenlabs", "voz_", "transcribe",
                        "openrouter",
+                       "=nan",       # nan.py: GPUs compartidas de NaN Community (8-oct-26)
                        "enruta",     # enruta.py es quien ELIGE el modelo: aqui, no en «otras»
                        "local",      # local.py es el LLM que corre en casa (ollama), egress 0
                        "modelo_mlx",    # el otro LLM de casa (MLX, egress 0) con sus frenos de memoria

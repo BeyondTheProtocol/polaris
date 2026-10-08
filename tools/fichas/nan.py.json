@@ -1,0 +1,11 @@
+{
+ "pieza": "nan.py",
+ "estado_ficha": "completa",
+ "para": "Cliente de NaN Community (nan.builders): modelos abiertos en GPUs compartidas, cuota plana.",
+ "cuando_si": "Trabajo de volumen o desechable sin datos sensibles, como segundo proveedor del carril de volumen.",
+ "cuando_no": "Nada clínico ni con PII: es un tercero no confiable y el borde lo niega.",
+ "reemplaza": "Nada. Se suma al carril de volumen, que colgaba solo del tier gratis de NVIDIA.",
+ "test": "tests/test_nan.py",
+ "alta": "2026-10-08",
+ "origen": "Petición de {{TITULAR}} del 8-oct-2026 («conectamos nan builders mientras»), con la membresía de NaN Community activada ese día."
+}
