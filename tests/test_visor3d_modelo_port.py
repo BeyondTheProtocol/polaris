@@ -215,5 +215,21 @@ m = np.asarray(V._mezcla_capa(base, Image.fromarray(capa)))
 check((m[1:, 1:] == 100).all() and tuple(m[0, 0]) != (100, 100, 100), "solo cambia donde hay modelo")
 check(m[0, 0, 2] > 0, "y debajo se sigue viendo lo medido (translúcido, no opaco)")
 
+print("\n[7] los rótulos pintados en las imágenes llevan tildes")
+fuente, con_tildes = V._fuente()
+if not con_tildes and os.environ.get("BTP_PORTABLE"):
+    print("  SKIP: esta máquina no tiene ninguna de las fuentes de rótulo")
+else:
+    check(con_tildes, "hay una fuente con tildes para los rótulos")
+    lienzo = Image.new("RGB", (200, 20))
+    d = V._lienzo(lienzo)
+    check(d.font is not None and bytes(d.font.getmask("é")) != bytes(d.font.getmask("\U0010ffff")),
+          "«é» no se pinta como el cuadrado de glifo ausente")
+    d.text((2, 2), "catéter tráquea ámbar diagnóstico", fill=(255, 255, 255))
+    check(np.asarray(lienzo).any(), "el texto con tildes se pinta")
+fuente_visor = open(os.path.join(RAIZ, "tools", "visor3d.py"), encoding="utf-8").read()
+check(fuente_visor.count("ImageDraw.Draw(") == 2,
+      "ningún rótulo se pinta con un lienzo sin fuente (solo quedan _lienzo y una línea sin texto)")
+
 print("\n%s" % ("TODO VERDE" if not fallos else "ROJO: %d fallo(s)" % len(fallos)))
 sys.exit(1 if fallos else 0)

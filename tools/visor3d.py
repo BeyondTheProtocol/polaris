@@ -4572,7 +4572,7 @@ def _cmd_reservorio(a):
         im = Image.fromarray((v.T[::-1] * 255).astype(np.uint8))   # j arriba
         im = im.resize((max(1, int(mip.shape[0] * ex * PX)), max(1, int(mip.shape[1] * ey * PX))),
                        Image.LANCZOS).convert("RGB")
-        d = ImageDraw.Draw(im)
+        d = _lienzo(im)
         d.text((6, 4), titulo, fill=(255, 220, 0))
         y = im.height - 12
         d.line([(6, y), (6 + int(10 * PX), y)], fill=(255, 220, 0), width=2)
@@ -4966,7 +4966,7 @@ def _lamina_cateter(ct, esp, afin, mask, portal, camino, car, medidas, px, vmin,
         im = Image.fromarray(np.ascontiguousarray(np.transpose(rgb, (1, 0, 2))[::-1]))
         W, H = max(1, int(mip.shape[0] * ex * px)), max(1, int(mip.shape[1] * ey * px))
         im = im.resize((W, H), Image.NEAREST)
-        d = ImageDraw.Draw(im)
+        d = _lienzo(im)
 
         def a_px(i, j):
             if flip_i:
@@ -5002,7 +5002,7 @@ def _lamina_cateter(ct, esp, afin, mask, portal, camino, car, medidas, px, vmin,
     lam = Image.new("RGB", (ancho, alto), (0, 0, 0))
     lam.paste(co, (10, 10))
     lam.paste(sa, (co.width + 20, 10))
-    d = ImageDraw.Draw(lam)
+    d = _lienzo(lam)
     pie = ("catéter=naranja · portal=azul · carina=verde · punta=magenta · "
            "MIP de un bloque, a escala real · MEDICIÓN automática, no lectura radiológica")
     d.text((10, alto - 30), pie, fill=(200, 200, 200))
@@ -5272,7 +5272,7 @@ def losa_volumen(ct, esp, afin, serie="sintetico", meta=None, sobre_mm=50.0, baj
         im = Image.fromarray(np.ascontiguousarray(np.transpose(rgb, (1, 0, 2))[::-1]))
         W, H = max(1, int(mip.shape[0] * ex * px)), max(1, int(mip.shape[1] * ey * px))
         im = im.resize((W, H), Image.LANCZOS)
-        d = ImageDraw.Draw(im)
+        d = _lienzo(im)
         n_h = mip.shape[0]
 
         def a_px(i, k, flip=flip, n_h=n_h, ex=ex, ey=ey, H=H):
@@ -5312,7 +5312,7 @@ def losa_volumen(ct, esp, afin, serie="sintetico", meta=None, sobre_mm=50.0, baj
     for p_ in paneles:
         lam.paste(p_, (x, 10))
         x += p_.width + 10
-    d = ImageDraw.Draw(lam)
+    d = _lienzo(lam)
     d.text((10, lam.height - 30), "portal=azul · hueso grueso=azul tenue (quitado de la MIP gris) · carina=verde (automática) · "
            "línea media=cian (tráquea) · la punta se lee a mano sobre la rejilla · MEDICIÓN, no lectura radiológica", fill=(200, 200, 200))
     d.text((10, lam.height - 16), "Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.",
@@ -5398,6 +5398,33 @@ def _tubo(camino, forma, esp, radio_mm):
         eje[c] = True
     d = ndimage.distance_transform_edt(~eje, sampling=esp)
     return d <= radio_mm
+
+
+FUENTES_ROTULO = ("/System/Library/Fonts/Supplemental/Arial.ttf", "/System/Library/Fonts/Helvetica.ttc",
+                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVuSans.ttf")
+
+
+def _fuente(px=11):
+    """Fuente de los rótulos pintados dentro de las imágenes. La que PIL trae por defecto no
+    tiene tildes: «catéter», «tráquea» o «diagnóstico» salían con un cuadrado (8-oct-2026,
+    deuda visor3d-rotulos-sin-tildes). Devuelve (fuente, tiene_tildes)."""
+    from PIL import ImageFont
+    for ruta in FUENTES_ROTULO:
+        try:
+            f = ImageFont.truetype(ruta, px)
+        except OSError:
+            continue
+        if bytes(f.getmask("á")) != bytes(f.getmask("\U0010ffff")):
+            return f, True
+    return ImageFont.load_default(), False
+
+
+def _lienzo(im):
+    """ImageDraw sobre `im` con la fuente de rótulos ya puesta (`d.text` la usa sin pedírsela)."""
+    from PIL import ImageDraw
+    d = ImageDraw.Draw(im)
+    d.font = _fuente()[0]
+    return d
 
 
 def _render_etiquetas(lab, esp, colores, ancho=1000):
@@ -5732,7 +5759,7 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
         ang = 360.0 * v / vueltas
         rot = ndimage.rotate(lab, ang, axes=(0, 1), reshape=True, order=0, prefilter=False)
         im = _render_etiquetas(rot, esp, colores)
-        d = ImageDraw.Draw(im)
+        d = _lienzo(im)
         d.text((8, 6), "%s · giro %.0f° (0° = de frente, dcha. del paciente a la izq.)" % (titulo, ang), fill=(255, 220, 0))
         d.text((8, im.height - 16), "portal azul · catéter naranja (semiautomático) · tráquea verde · carina verde brillante · hueso gris · Apoyo a la decisión, no diagnóstico",
                fill=(200, 200, 200))
@@ -5742,7 +5769,7 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
         if cascara is not None:
             rot_m = ndimage.rotate(cascara.astype(np.uint8) * 6, ang, axes=(0, 1), reshape=True, order=0, prefilter=False)
             im_m = _mezcla_capa(_render_etiquetas(rot, esp, colores), _render_etiquetas(rot_m, esp, {6: (255, 176, 0)}))
-            dm = ImageDraw.Draw(im_m)
+            dm = _lienzo(im_m)
             dm.text((8, 6), "%s · giro %.0f° · CON MODELO ILUSTRATIVO (ámbar): NO medido, dibujado a partir de fotos" % (titulo, ang), fill=(255, 176, 0))
             dm.text((8, im_m.height - 16), "ámbar = modelo de catálogo a escala 1:1, RMS %.1f mm sobre el metal · azul = titanio medido en el TC · Apoyo a la decisión, no diagnóstico"
                     % info_modelo["rms_mm"], fill=(200, 200, 200))
@@ -5756,7 +5783,7 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
             lab_sh = lab.copy()
             lab_sh[lab_sh == 1] = 0
             im2 = _render_etiquetas(lab_sh, esp, colores)
-            d2 = ImageDraw.Draw(im2)
+            d2 = _lienzo(im2)
             d2.text((8, 6), "%s · de frente, SIN hueso · portal azul · catéter naranja (semiautomático) · tráquea verde · carina verde brillante" % titulo, fill=(255, 220, 0))
             d2.text((8, im2.height - 16), "Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.", fill=(200, 200, 200))
             im2.save(os.path.join(dst, "reservorio3d_%s_sin_hueso.png" % serie))
