@@ -1,0 +1,11 @@
+{
+ "pieza": "cribado_pmid.py",
+ "estado_ficha": "completa",
+ "para": "Primera pasada barata sobre literatura publicada: por cada PMID, un modelo abierto (NaN) saca una ficha (diseño, pacientes, diana, si va de mama neuroendocrina) y al lado va el nivel de evidencia del registro (tier_evidencia.py). Entra por la puerta del borde que decide por procedencia (borde.egress_literatura): solo PMIDs y una tarea de lista fija.",
+ "cuando_si": "Para descartar y ordenar qué resúmenes merece leer Claude cuando hay muchos PMIDs (radar, vigilancia diaria, resultados de una búsqueda).",
+ "cuando_no": "Para afirmar nada de un artículo, para el nivel de evidencia (ese lo da tier_evidencia.py) o para cualquier texto que no sea un PMID: su caso, un informe o un resumen pegado no entran, y no deben entrar.",
+ "reemplaza": "Nada. Antes esa primera lectura la hacía Claude, porque el borde bloquea por contenido cualquier resumen con marcadores clínicos hacia un modelo abierto (52 de 52 bloqueados el 8-oct-2026).",
+ "test": "tests/test_cribado_pmid.py",
+ "alta": "2026-10-08",
+ "origen": "{{TITULAR}}, 8-oct-2026: propuso relajar la regla de «solo Claude» y aprobó esta forma estrecha de hacerlo («adelante con la vía PMID»)."
+}

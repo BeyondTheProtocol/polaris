@@ -65,21 +65,57 @@ def main():
     if not q:
         print('Uso: python3 tools/nan.py "tu pregunta"  ·  --listar para ver el catálogo')
         return
+    text, error = enviar_texto(model, q)
+    if error is BLOQUEADO:
+        return                      # el borde ya escribió el motivo en stderr
+    if error:
+        print(error); return
+    print(text if text.strip() else "(respuesta vacía)")
+
+
+BLOQUEADO = "bloqueado por el borde"
+
+
+def enviar_texto(model, q):
+    """Texto libre → NaN, SIEMPRE tras la puerta de texto libre del borde. Devuelve (texto, error);
+    si el borde lo niega, error es `BLOQUEADO` y no se toca ni la clave ni la red."""
     import borde  # 🔴 BORDE no-bypassable: GPUs de terceros = NO confiable
     if not borde.guard_cli(q, "nan"):
-        return
+        return None, BLOQUEADO
+    return _post(model, q)
+
+
+def enviar_literatura(model, pmid, tarea="ficha"):
+    """Vía PMID → NaN. Quien llama da un PMID y una clave de tarea; el prompt entero lo compone el
+    borde (`egress_literatura`: instrucción fija + resumen descargado del registro). Devuelve un
+    dict: ok, motivo, titulo, xml, texto, error. Si el borde lo niega no se toca la red."""
+    import borde  # 🔴 BORDE no-bypassable
+    ok, motivo, titulo, _resumen, xml, prompt = borde.egress_literatura(pmid, destino="nan",
+                                                                        tarea=tarea)
+    if not ok:
+        return {"ok": False, "motivo": motivo, "titulo": "", "xml": "", "texto": None,
+                "error": BLOQUEADO}
+    texto, error = _post(model, prompt)
+    return {"ok": error is None, "motivo": motivo, "titulo": titulo, "xml": xml, "texto": texto,
+            "error": error}
+
+
+def _post(model, prompt):
+    """La petición HTTP a NaN: (texto, error). Sin puerta propia; solo la llaman las dos funciones
+    de arriba, cada una DESPUÉS de su puerta del borde. No la llames desde fuera de este módulo:
+    para mandar algo a NaN se usa `enviar_texto` o `enviar_literatura`."""
     api_key = _clave()
     if not api_key:
-        print("Falta la clave de NaN: Llavero (btp-nan-api)."); return
-    body = {"model": model, "messages": [{"role": "user", "content": q}], "max_tokens": 8192}
+        return None, "Falta la clave de NaN: Llavero (btp-nan-api)."
+    body = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 8192}
     headers = {"Authorization": "Bearer " + api_key, "Content-Type": "application/json",
                "User-Agent": UA}
     try:
         text, usage = stream_chat(URL, body, headers)
     except urllib.error.HTTPError as e:
-        print(f"NaN API error {e.code}: {e.read().decode()[:500]}"); return
+        return None, f"NaN API error {e.code}: {e.read().decode()[:500]}"
     except Exception as e:
-        print("Error:", e); return
+        return None, "Error: %s" % e
     try:
         # Cuota plana: se apuntan los tokens; sin tarifa por token, el ledger deja `usd: null`.
         import gasto
@@ -88,7 +124,7 @@ def main():
                         (usage or {}).get("completion_tokens") or 0)
     except Exception:
         pass
-    print(text if text.strip() else "(respuesta vacía)")
+    return text or "", None
 
 
 if __name__ == "__main__":
