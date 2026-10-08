@@ -454,7 +454,7 @@ def procesa(agent, argv):
         _log(agent, "PROCESA-%s-rc%d" % (nombre, codigo), "")
         return codigo
     env = dict(os.environ, BTP_VENTANILLA="1")
-    if nombre in VIGILA_CUELGUE:
+    if _vigila(nombre, args):
         return _procesa_vigilado(agent, nombre, [interprete, script] + args, env)
     return subprocess.call([interprete, script] + args, env=env)
 
@@ -464,6 +464,14 @@ def procesa(agent, argv):
 # CPU y sin vigilante habría seguido así para siempre (deuda visor3d-nnunet-cuelgue-multiproceso).
 # Minutos sin gastar CPU → traza + matar el grupo + UN reintento; si se repite, código 98.
 VIGILA_CUELGUE = {"visor3d": 10}
+# Un servidor que espera visitas está al 0 % de CPU por diseño: no es un cuelgue. El 8-oct-2026
+# `visor3d sirve` murió dos veces a los 10 min (código 98) mientras nadie giraba la escena.
+SIN_VIGILAR = {"visor3d": {"sirve"}}
+
+
+def _vigila(nombre, args):
+    """¿Corre este procesador bajo el vigilante de cuelgues?"""
+    return nombre in VIGILA_CUELGUE and not (SIN_VIGILAR.get(nombre, set()) & set(args))
 CUELGUES_DIR = os.path.join(REPO, ".claude", "logs", "cuelgues")
 
 
