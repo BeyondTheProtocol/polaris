@@ -5605,7 +5605,7 @@ async function go(){esc=await (await fetch(c+'/escena.json')).json();document.ge
 document.getElementById('n').textContent=esc.nota;const l=document.getElementById('l');
 for(const m of esc.mallas){const d=document.createElement('div');const s=document.createElement('span');s.className='sw';s.style.background=m.color;d.append(s,m.nombre+(m.detalle?' · '+m.detalle:''));l.appendChild(d)}
 pinta()}
-let mod=false;const bm=document.getElementById('bm');
+let mod=q.get('modelo')==='1';const bm=document.getElementById('bm');
 function pinta(){const n=esc.vueltas.length;i=((i%n)+n)%n;const hay=esc.vueltas_modelo&&esc.vueltas_modelo.length===n;
 bm.style.display=hay?'block':'none';bm.textContent=(mod?'Quitar':'Superponer')+' modelo ilustrativo (tecla M) · NO medido';
 document.getElementById('im').src=c+'/'+((mod&&hay)?esc.vueltas_modelo:esc.vueltas)[i]}

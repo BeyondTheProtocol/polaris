@@ -198,7 +198,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
 print("\n[5] el visor: lo medido por defecto, el modelo solo con el botón")
 h = V._RESERVORIO_HTML
-check("let mod=false" in h, "el modelo arranca apagado")
+check("let mod=q.get('modelo')==='1'" in h, "el modelo arranca apagado salvo que la URL pida ?modelo=1")
 check("esc.vueltas_modelo" in h and "NO medido" in h, "el botón existe y dice que no es medido")
 check("(mod&&hay)?esc.vueltas_modelo:esc.vueltas" in h, "sin modelo en la escena se pintan las vistas medidas")
 check(all(v["origen"].startswith("dibujado a partir de fotos") for v in V.MODELO_PORT_CONOCIDO.values()),
