@@ -282,6 +282,7 @@ def handle_message(msg):
 
     def responder(text, **kw):
         kw.setdefault("reply_to", mid)
+        kw.setdefault("categoria", "respuesta")   # contestarle no gasta el cupo de avisos (8-oct-26)
         return salida.report_to_titular(text, **kw)
 
     if msg.get("kind") == "voice":

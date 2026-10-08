@@ -268,10 +268,13 @@ while true; do
           FB=("Listo 💜 Me ocupé de lo que me dejaste y ya está." "Hecho 💜 Lo de antes ya está resuelto." "Ya está 💜 Lo dejé arreglado.")
           msg="${FB[$((RANDOM % 3))]}"
         fi
-        "$PY" "$TOOLS/salida.py" report "$msg" >/dev/null 2>&1
+        # Si el encargo vino de un mensaje SUYO por Telegram, esto es su respuesta, no un aviso:
+        # no pasa por el cupo de avisos (8-oct-26: le escribió a Vega y la respuesta se aplazó).
+        case "$procedencia" in telegram*) cmd_rep="report-respuesta" ;; *) cmd_rep="report" ;; esac
+        "$PY" "$TOOLS/salida.py" "$cmd_rep" "$msg" >/dev/null 2>&1
       elif printf '%s' "${route:-}" | grep -qi 'rechaz'; then
         RJ=("Le he dado una vuelta a lo que me dejaste pero no me quedó claro del todo 💜 ¿Me lo cuentas con otras palabras?" "Lo he leído pero no acabo de pillar qué necesitas 💜 Dímelo de otra forma y voy." "Me he quedado a medias con lo que pedías 💜 ¿Me lo concretas un poco más?")
-        "$PY" "$TOOLS/salida.py" report "${RJ[$((RANDOM % 3))]}" >/dev/null 2>&1
+        "$PY" "$TOOLS/salida.py" report-respuesta "${RJ[$((RANDOM % 3))]}" >/dev/null 2>&1
       fi
     fi
     log "job $id OK [$tipo] (coste \$$usd, hoy \$$spent) $did"

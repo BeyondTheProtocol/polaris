@@ -1803,7 +1803,12 @@ def report_to_titular(text, *, channel="telegram", dry=False, urgente=False, voz
     # urgente=True no vale: urgente cambia también silencio nocturno/tono, y el parte
     # NO es una urgencia. El parte necesita su propia vía, exenta SOLO del cupo.
     es_parte = (categoria == "parte")
-    if not urgente and not es_parte and not dry and _presupuesto_agotado():
+    # BUG (8-oct-26, detectado en vivo): {{TITULAR}} le escribió a Vega y «no responde». Vega sí
+    # contestó, pero la respuesta cayó bajo el cupo y se fue al parte. Contestar a lo que ELLA
+    # acaba de preguntar no es un aviso: es la mitad de una conversación. Va exenta SOLO del
+    # cupo (el silencio nocturno y el HALT siguen mandando), igual que el parte.
+    es_respuesta = (categoria == "respuesta")
+    if not urgente and not es_parte and not es_respuesta and not dry and _presupuesto_agotado():
         _aplazar(text, fuente=fuente)
         n = len(str(text) if text is not None else "")
         _audit(channel, REPORT, None, "aplazado", "presupuesto diario agotado -> va al parte", n)
@@ -1878,12 +1883,14 @@ def main(argv):
         _cli_status()
         return 0
     cmd = argv[0]
-    if cmd in ("report", "report-dry", "report-urgente"):
+    if cmd in ("report", "report-dry", "report-urgente", "report-respuesta"):
         text = argv[1] if len(argv) > 1 else ""
         if not text:
             print("uso: salida.py report \"<texto>\"")
             return 2
-        res = report_to_titular(text, dry=(cmd == "report-dry"), urgente=(cmd == "report-urgente"))
+        # report-respuesta: contestación a un mensaje que {{TITULAR}} acaba de mandar (exenta del cupo).
+        res = report_to_titular(text, dry=(cmd == "report-dry"), urgente=(cmd == "report-urgente"),
+                               categoria=("respuesta" if cmd == "report-respuesta" else "humano"))
         print(json.dumps(res, ensure_ascii=False))
         return 0 if (res["delivered"] or res.get("dry") or res.get("retenido")) else 1
     if cmd == "reconciliar":
