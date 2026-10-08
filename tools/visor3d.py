@@ -5430,13 +5430,156 @@ def _render_etiquetas(lab, esp, colores, ancho=1000):
     return im.resize((ancho, int(im.height * esc * esp[2] / esp[0])), Image.LANCZOS)
 
 
+# ─── modelo ilustrativo del portal (8-oct-2026) ──────────────────────────────────────────
+# El portal de la escena es el METAL MEDIDO (umbral sobre el TC). Un modelo de catálogo enseña
+# lo que el umbral no ve (el pozo del septum, el vástago donde encaja el catéter), pero el único
+# publicado que encontramos está DIBUJADO A PARTIR DE FOTOS y su ficha dice que no vale como
+# referencia médica. Por eso nunca sustituye al metal: es una capa aparte, apagada al abrir,
+# a escala 1:1 (no se estira para que «encaje») y con el error del ajuste escrito al lado.
+MODELO_PORT_CONOCIDO = {
+    "4b3f529bb00f9276c6d9f9f56df72592a6462c16aba28ef139a927fb98edda7f": {
+        "nombre": "PowerPort (EDUCATION)", "autor": "Lurie Children's Hospital of Chicago",
+        "fuente": "printables.com/model/930793", "licencia": "CC BY",
+        "origen": "dibujado a partir de fotos; su ficha dice que no vale como referencia médica"},
+}
+
+
+def _stl_triangulos(ruta):
+    """STL binario → array (n, 3, 3) en las unidades del fichero (mm). Un STL ASCII aborta."""
+    import numpy as np
+    with open(ruta, "rb") as f:
+        b = f.read()
+    if len(b) < 84:
+        raise SystemExit("ABORTA: %s no es un STL binario" % os.path.basename(ruta))
+    n = int(np.frombuffer(b[80:84], "<u4")[0])
+    if 84 + 50 * n != len(b) or n == 0:
+        raise SystemExit("ABORTA: %s no es un STL binario (¿ASCII?)" % os.path.basename(ruta))
+    reg = np.frombuffer(b[84:], dtype=np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")]))
+    return reg["v"].astype(float)
+
+
+def _muestrea_triangulos(tri, n, rng):
+    """n puntos repartidos por área sobre la superficie de una sopa de triángulos."""
+    import numpy as np
+    area = np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1) / 2.0
+    i = rng.choice(len(tri), n, p=area / area.sum())
+    u, v = rng.random(n), rng.random(n)
+    fuera = u + v > 1.0
+    u[fuera], v[fuera] = 1.0 - u[fuera], 1.0 - v[fuera]
+    return tri[i, 0] + u[:, None] * (tri[i, 1] - tri[i, 0]) + v[:, None] * (tri[i, 2] - tri[i, 0])
+
+
+def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=40, semilla=0):
+    """Coloca una sopa de triángulos sobre una nube de puntos con un movimiento RÍGIDO (giro +
+    traslación, escala 1:1) por ICP sembrado en muchas orientaciones. Devuelve (R, t, info):
+    un punto p del modelo va a R @ p + t.
+
+    Un portal triangular casa casi igual girado 120°, y el error de superficie no distingue
+    esas soluciones. Lo que sí las distingue es un dato MEDIDO: por dónde sale el catéter.
+    Si se da `salida_mm` (un punto del catéter trazado, ya fuera del portal), entre los
+    ajustes con RMS a menos de un 15 % del mejor gana el que apunta su vástago hacia allí.
+    El vástago del modelo es su saliente: lo más lejano al centroide."""
+    import numpy as np
+    from scipy.spatial import cKDTree
+    from scipy.spatial.transform import Rotation
+    rng = np.random.default_rng(semilla)
+    pm = _muestrea_triangulos(tri, n, rng)
+    obj = np.asarray(objetivo_mm, float)
+    if len(obj) > n:
+        obj = obj[rng.choice(len(obj), n, replace=False)]
+    arbol = cKDTree(obj)
+    cm, co = pm.mean(0), obj.mean(0)
+    lejos = np.linalg.norm(pm - cm, axis=1)
+    vastago = pm[lejos >= np.percentile(lejos, 99.5)].mean(0)
+
+    def ejes(q):
+        e = np.linalg.svd(q - q.mean(0), full_matrices=False)[2]
+        if np.linalg.det(e) < 0:
+            e[2] *= -1
+        return e
+
+    em, eo = ejes(pm), ejes(obj)
+    candidatos = []
+    for g in Rotation.create_group("O").as_matrix():
+        for ang in range(0, 360, 40):
+            rot = eo.T @ g @ Rotation.from_euler("z", ang, degrees=True).as_matrix() @ em
+            t = co - rot @ cm
+            for _ in range(iteraciones):
+                d, i = arbol.query(pm @ rot.T + t)
+                ok = d <= np.percentile(d, 90)
+                a, b = pm[ok], obj[i[ok]]
+                ma, mb = a.mean(0), b.mean(0)
+                u, _s, vt = np.linalg.svd((a - ma).T @ (b - mb))
+                rot = vt.T @ np.diag([1.0, 1.0, np.sign(np.linalg.det(vt.T @ u.T))]) @ u.T
+                t = mb - rot @ ma
+            q = pm @ rot.T + t
+            dd = np.r_[arbol.query(q)[0], cKDTree(q).query(obj)[0]]
+            candidatos.append((float(np.sqrt((dd ** 2).mean())), float(np.percentile(dd, 95)), rot, t))
+    mejor_rms = min(c[0] for c in candidatos)
+    finalistas = [c for c in candidatos if c[0] <= mejor_rms * 1.15]
+
+    def angulo(c):
+        va = c[2] @ (vastago - cm)
+        vb = np.asarray(salida_mm, float) - (c[2] @ cm + c[3])
+        cos = float(va @ vb / (np.linalg.norm(va) * np.linalg.norm(vb) + 1e-9))
+        return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
+
+    elegido = min(finalistas, key=(lambda c: c[0]) if salida_mm is None else angulo)
+    info = {"escala": 1.0, "rms_mm": round(elegido[0], 2), "p95_mm": round(elegido[1], 2),
+            "mejor_rms_mm": round(mejor_rms, 2), "orientaciones_probadas": len(candidatos),
+            "vastago_vs_cateter_grados": None if salida_mm is None else round(angulo(elegido), 0),
+            "orientacion": "sin anclar (sin catéter)" if salida_mm is None
+            else "anclada a la salida del catéter trazado"}
+    return elegido[2], elegido[3], info
+
+
+def modelo_ilustrativo(portal, afin, esp, ruta_stl, salida_ijk=None, densidad=60.0):
+    """Capa ilustrativa del portal: el STL colocado rígidamente sobre el metal medido.
+    Devuelve (cascara_bool, triangulos_mm, info). La cáscara es la superficie del modelo
+    pasada a vóxeles de la escena (para las vistas); los triángulos van al PLY."""
+    import numpy as np
+    from scipy import ndimage
+    tri = _stl_triangulos(ruta_stl)
+    with open(ruta_stl, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    a = np.asarray(afin, float)
+    borde = portal & ~ndimage.binary_erosion(portal)
+    objetivo = np.argwhere(borde) @ a[:3, :3].T + a[:3, 3]
+    salida = None if salida_ijk is None else a[:3, :3] @ np.asarray(salida_ijk, float) + a[:3, 3]
+    rot, t, info = ajusta_modelo_rigido(tri, objetivo, salida)
+    tri_mm = tri @ rot.T + t
+    area = float((np.linalg.norm(np.cross(tri_mm[:, 1] - tri_mm[:, 0], tri_mm[:, 2] - tri_mm[:, 0]), axis=1) / 2.0).sum())
+    pts = _muestrea_triangulos(tri_mm, int(max(20000, area * densidad)), np.random.default_rng(1))
+    ijk = np.rint((pts - a[:3, 3]) @ np.linalg.inv(a[:3, :3]).T).astype(int)
+    dentro = np.all((ijk >= 0) & (ijk < np.array(portal.shape)), axis=1)
+    cascara = np.zeros(portal.shape, bool)
+    cascara[tuple(ijk[dentro].T)] = True
+    conocido = MODELO_PORT_CONOCIDO.get(sha)
+    info.update({"sha256": sha[:16], "triangulos": int(len(tri)),
+                 "fuera_de_escena_pct": round(100.0 * float((~dentro).mean()), 1),
+                 "procedencia": conocido or {"nombre": os.path.basename(ruta_stl),
+                                             "origen": "fichero no reconocido: procedencia sin verificar"},
+                 "aviso": "ILUSTRATIVO, NO MEDIDO. No sustituye al metal del TC."})
+    return cascara, tri_mm, info
+
+
+def _mezcla_capa(base, capa, alfa=0.45):
+    """Pinta `capa` (render de una sola etiqueta sobre negro) translúcida encima de `base`."""
+    import numpy as np
+    from PIL import Image
+    b = np.asarray(base, np.float32)
+    c = np.asarray(capa, np.float32)
+    m = (c.sum(axis=-1, keepdims=True) > 24.0) * alfa
+    return Image.fromarray(np.clip(b * (1.0 - m) + c * m, 0, 255).astype(np.uint8))
+
+
 _RESERVORIO_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Reservorio 3D</title>
 <style>html,body{margin:0;height:100%;background:#0b0b10;color:#ddd;font:14px/1.4 system-ui,sans-serif}
 #v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:ew-resize;user-select:none}
 #v img{max-width:100%;max-height:100%}#p{position:absolute;left:12px;top:12px;max-width:380px;background:rgba(0,0,0,.6);padding:10px 12px;border-radius:8px}
-#t{font-weight:600}#n{font-size:12px;color:#aaa;white-space:pre-wrap;margin-top:6px}#pie{position:absolute;left:12px;bottom:10px;font-size:12px;color:#999}
+#bm{display:none;margin-top:8px;background:#222;color:#ddd;border:1px solid #555;border-radius:6px;padding:4px 8px;cursor:pointer}#t{font-weight:600}#n{font-size:12px;color:#aaa;white-space:pre-wrap;margin-top:6px}#pie{position:absolute;left:12px;bottom:10px;font-size:12px;color:#999}
 .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}</style></head><body>
-<div id="v"><img id="im"></div><div id="p"><div id="t">Reservorio</div><div id="l"></div><div id="n"></div></div>
+<div id="v"><img id="im"></div><div id="p"><div id="t">Reservorio</div><div id="l"></div><button id="bm"></button><div id="n"></div></div>
 <div id="pie">Girar: arrastrar a los lados (o teclas ← →). Sin dependencias: 24 vistas pre-renderizadas en local. Apoyo a la decisión. No es diagnóstico. Requiere validación por Radiología.</div>
 <script>
 const q=new URLSearchParams(location.search);const c=q.get('escena')||'reservorio';let esc=null,i=0;
@@ -5444,22 +5587,30 @@ async function go(){esc=await (await fetch(c+'/escena.json')).json();document.ge
 document.getElementById('n').textContent=esc.nota;const l=document.getElementById('l');
 for(const m of esc.mallas){const d=document.createElement('div');const s=document.createElement('span');s.className='sw';s.style.background=m.color;d.append(s,m.nombre+(m.detalle?' · '+m.detalle:''));l.appendChild(d)}
 pinta()}
-function pinta(){const n=esc.vueltas.length;i=((i%n)+n)%n;document.getElementById('im').src=c+'/'+esc.vueltas[i]}
+let mod=false;const bm=document.getElementById('bm');
+function pinta(){const n=esc.vueltas.length;i=((i%n)+n)%n;const hay=esc.vueltas_modelo&&esc.vueltas_modelo.length===n;
+bm.style.display=hay?'block':'none';bm.textContent=(mod?'Quitar':'Superponer')+' modelo ilustrativo (tecla M) · NO medido';
+document.getElementById('im').src=c+'/'+((mod&&hay)?esc.vueltas_modelo:esc.vueltas)[i]}
+bm.onclick=e=>{e.stopPropagation();mod=!mod;pinta()};bm.onpointerdown=e=>e.stopPropagation();
 let x0=null;const v=document.getElementById('v');v.onpointerdown=e=>{x0=e.clientX};v.onpointerup=()=>{x0=null};
 v.onpointermove=e=>{if(x0===null)return;const d=e.clientX-x0;if(Math.abs(d)>12){i+=d>0?1:-1;x0=e.clientX;pinta()}};
-addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){i--;pinta()}if(e.key==='ArrowRight'){i++;pinta()}});go();
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){i--;pinta()}if(e.key==='ArrowRight'){i++;pinta()}if(e.key==='m'||e.key==='M'){mod=!mod;pinta()}});go();
 </script></body></html>
 """
 
 
-def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vueltas=24):
+def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vueltas=24, modelo_stl=None):
     """Escena 3D del reservorio en una serie sin contraste: portal (metal), catéter
     (semiautomático), tráquea + bronquios (aire), hueso de la región (umbral, sin etiquetar) y
     carina. Deja PLY + escena.json + 24 vistas pre-renderizadas (giro alrededor del eje
     cráneo-caudal) en <visor>/reservorio_<serie>/, más `reservorio.html` (sin dependencias:
     no hay three.js ni esbuild instalados y no se instala nada de terceros sin OK) y una
     imagen fija. Modelo conocido por la etiqueta del implante: PowerPort isp titanio REF
-    8708061, catéter 8 F (2,7 mm) Chronoflex; el radio del tubo es el nominal, no medido."""
+    8708061, catéter 8 F (2,7 mm) Chronoflex; el radio del tubo es el nominal, no medido.
+
+    `modelo_stl`: STL de un modelo de catálogo del portal. Se añade como capa ILUSTRATIVA
+    (`modelo_ilustrativo.ply` + un segundo juego de vistas con el modelo translúcido encima);
+    las vistas por defecto y el metal medido no cambian."""
     import numpy as np
     from scipy import ndimage
     from PIL import ImageDraw
@@ -5527,6 +5678,18 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
         if r:
             ply_binario(os.path.join(dst, nombre + ".ply"), *r)
             mallas.append(dict(nombre=nombre, fichero=nombre + ".ply", color=color, **extra))
+    cascara, info_modelo = None, None
+    if modelo_stl:
+        # salida del catéter: primer punto del trazo a más de 6 mm del metal (fuera del halo)
+        lejos_del_metal = ndimage.distance_transform_edt(~portal, sampling=esp)
+        fuera = [c for c in camino if lejos_del_metal[tuple(c)] > 6.0]
+        salida = None if not fuera else (fuera[0][0] - x0, fuera[0][1] - y0, fuera[0][2] - z0)
+        cascara, tri_mm, info_modelo = modelo_ilustrativo(por, afin_c, esp, modelo_stl, salida)
+        ply_binario(os.path.join(dst, "modelo_ilustrativo.ply"), tri_mm.reshape(-1, 3),
+                    np.arange(len(tri_mm) * 3).reshape(-1, 3))
+        mallas.append(dict(nombre="modelo ilustrativo", fichero="modelo_ilustrativo.ply", color="#ffb000",
+                           detalle="NO medido: %s; escala 1:1, RMS %.1f mm sobre el metal"
+                           % (info_modelo["procedencia"].get("origen", ""), info_modelo["rms_mm"])))
     if car is not None:
         esf = _bola_mm(sub.shape, (car[1] - x0, car[2] - y0, car[0] - z0), 3.0, esp)
         r = _malla(esf, afin_c, 0.5)
@@ -5546,7 +5709,7 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
     colores = {1: (200, 205, 215), 2: (150, 230, 150), 3: (255, 106, 61), 4: (143, 211, 255), 5: (57, 255, 138)}
     fecha = meta.get("fecha", "")
     titulo = "Reservorio · %s-%s-%s · serie %s" % (fecha[:4], fecha[4:6], fecha[6:], serie)
-    nombres = []
+    nombres, nombres_modelo = [], []
     for v in range(vueltas):
         ang = 360.0 * v / vueltas
         rot = ndimage.rotate(lab, ang, axes=(0, 1), reshape=True, order=0, prefilter=False)
@@ -5558,6 +5721,16 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
         nombre = "vuelta_%02d.png" % v
         im.save(os.path.join(dst, nombre))
         nombres.append(nombre)
+        if cascara is not None:
+            rot_m = ndimage.rotate(cascara.astype(np.uint8) * 6, ang, axes=(0, 1), reshape=True, order=0, prefilter=False)
+            im_m = _mezcla_capa(_render_etiquetas(rot, esp, colores), _render_etiquetas(rot_m, esp, {6: (255, 176, 0)}))
+            dm = ImageDraw.Draw(im_m)
+            dm.text((8, 6), "%s · giro %.0f° · CON MODELO ILUSTRATIVO (ámbar): NO medido, dibujado a partir de fotos" % (titulo, ang), fill=(255, 176, 0))
+            dm.text((8, im_m.height - 16), "ámbar = modelo de catálogo a escala 1:1, RMS %.1f mm sobre el metal · azul = titanio medido en el TC · Apoyo a la decisión, no diagnóstico"
+                    % info_modelo["rms_mm"], fill=(200, 200, 200))
+            nombre_m = "vuelta_%02d_modelo.png" % v
+            im_m.save(os.path.join(dst, nombre_m))
+            nombres_modelo.append(nombre_m)
         if v == 0:
             im.save(os.path.join(dst, "reservorio3d_%s.png" % serie))
             # y la misma vista SIN hueso: la clavícula y las costillas anteriores tapan el
@@ -5578,6 +5751,9 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
               "carina_fiable": bool(car[3].get("fiable")) if car else None,
               "portal_mm": [round(float(v), 1) for v in _mm_de(afin, idx.mean(0))],
               "espaciado_mm": [round(float(e), 3) for e in esp]}
+    if info_modelo:
+        escena["modelo"] = info_modelo
+        escena["vueltas_modelo"] = nombres_modelo
     json.dump(escena, open(os.path.join(dst, "escena.json"), "w"), ensure_ascii=False, indent=1)
     with open(os.path.join(_dir("visor"), "reservorio.html"), "w") as f:
         f.write(_RESERVORIO_HTML)
@@ -5585,7 +5761,7 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
 
 
 def _cmd_reservorio3d(a):
-    esc = reservorio3d(a.serie, a.punta, a.y_post, a.radio, a.vueltas)
+    esc = reservorio3d(a.serie, a.punta, a.y_post, a.radio, a.vueltas, a.modelo)
     print(json.dumps({k: v for k, v in esc.items() if k not in ("mallas", "vueltas")}, ensure_ascii=False, indent=1))
     print("mallas: %s" % ", ".join(m["nombre"] for m in esc["mallas"]))
     print("ver: http://127.0.0.1:8794/reservorio.html?escena=reservorio_%s · fija: reservorio_%s/reservorio3d_%s.png"
@@ -6424,6 +6600,8 @@ def main(argv=None):
     p3.add_argument("--y-post", dest="y_post", type=float, default=45.0, help="mm por detrás de la tráquea que entran en la escena")
     p3.add_argument("--radio", type=float, default=1.35, help="radio del tubo del catéter (8 F = 1,35 mm)")
     p3.add_argument("--vueltas", type=int, default=24)
+    p3.add_argument("--modelo", default=None, metavar="STL",
+                    help="STL de catálogo del portal: capa ilustrativa aparte (no sustituye al metal medido)")
     p3.set_defaults(fn=_cmd_reservorio3d)
     pmr = sub.add_parser("marcas", help="marcas de un radiólogo sobre un TC → esferas + procedencia")
     pmr.add_argument("revision", help="lesiones_55.json de la revisión")
