@@ -255,6 +255,11 @@ FAMILIAS = [
                          # análisis de las laminillas DFCI: ingesta, congelación, segmentación,
                          # registro, métricas, F3, H&E, capas del panel (2-oct-26)
                          "laminillas_",
+                         # plan «Vega al mando», Fase 2 (29-sep/1-oct-26): estado vivo del caso,
+                         # fuentes que se contradicen y promesas de terceros; y la comprobación de
+                         # que un informe es suyo. Caían en «otras» (asignadas el 8-oct-26).
+                         "estado_caso", "incongruencias_caso", "promesas_caso",
+                         "identidad_paciente",
                          "clinico", "centinela_ned")),
     ("la boca (avisos)", ("salida", "avisos", "notif", "enviar", "telegram",
                           "bot_", "report", "=digest")),
@@ -274,7 +279,10 @@ FAMILIAS = [
                             "soporte_cita",
                             "cribado_pmid",  # primera pasada barata de resúmenes por PMID (8-oct-26)
                             "cn_fetch",      # lee webs chinas geobloqueadas para investigar (13-sep)
-                            "cn.py", "cn_", # cn.py: buscar CUALQUIER cosa en la web china (20-sep)
+                            # cn.py: buscar CUALQUIER cosa en la web china (20-sep). «=cn» y no
+                            # «cn.py»: el nombre llega sin extensión, así que «cn.py» nunca casaba
+                            # y la tool caía en «otras» (8-oct-26).
+                            "=cn", "cn_",
                             "cde_fetch",     # el registro chino de ensayos, sin navegador (20-sep)
                             "onco")),        # grafo abierto de oncología en local (19-sep)
     ("salud del sistema", ("healthcheck", "vigia", "tiempo_sesiones", "tests_afectados", "salud", "errores",
@@ -287,9 +295,13 @@ FAMILIAS = [
                            "sonda_silencio",    # lo que arrancó y no dejó obra (21-sep)
                            "inventario",        # qué pieza está viva y cuál no (20-sep)
                            "=fichas",           # ficha por pieza, sin ficha no hay alta (25-sep)
-                           "estado_rutina")),   # al día / atrasada / rota (24-sep, PR #22)
+                           "estado_rutina",     # al día / atrasada / rota (24-sep, PR #22)
+                           "atascos",           # resumen diario de atascos (1-oct, Vega al mando F5)
+                           "colgados_stdin")),  # tools colgadas esperando stdin (22-sep)
     ("memoria y saber", ("archivar", "memoria", "cosecha", "espejo", "living",
-                         "cronica", "contexto_lazo", "continuity", "minador")),
+                         "cronica", "contexto_lazo", "continuity", "minador",
+                         # la continuidad se escribe sola al cerrar o compactar (29-sep-26)
+                         "continuidad_auto")),
     ("el día a día", ("seguimiento", "calendar", "cumbre", "tareas", "reservas",
                       "conserje", "bandeja", "pendientes", "ritmo", "rituales",
                       "anticipa", "triage", "vega_", "persecucion", "dedup",
@@ -300,7 +312,9 @@ FAMILIAS = [
                       # triaje de producción como `triage` y `vega_`, no una medida del sistema
                       "presorteo",
                       # Vega aprende y se adelanta (1/2-oct-26): perfil de trabajo y acciones con fecha
-                      "perfil_vega", "acciones_datadas")),
+                      "perfil_vega", "acciones_datadas",
+                      # quién aprueba qué y el registro de lo que aprueba Vega (1-oct-26)
+                      "aprobaciones")),
     ("dinero", ("coste", "cost_guard", "finanzas", "presupuesto", "pago",
                 "gasto")),
     ("git y ramas", ("git", "ramas", "deploy", "release", "worktree",
