@@ -5440,7 +5440,12 @@ MODELO_PORT_CONOCIDO = {
     "4b3f529bb00f9276c6d9f9f56df72592a6462c16aba28ef139a927fb98edda7f": {
         "nombre": "PowerPort (EDUCATION)", "autor": "Lurie Children's Hospital of Chicago",
         "fuente": "printables.com/model/930793", "licencia": "CC BY",
-        "origen": "dibujado a partir de fotos; su ficha dice que no vale como referencia médica"},
+        "origen": "dibujado a partir de fotos; su ficha dice que no vale como referencia médica",
+        # Dónde está el vástago EN ESTE FICHERO, medido sobre su malla el 8-oct-2026: un cilindro
+        # de 6,3 × 5,1 mm de sección constante entre x = 13 y x = 17,3 mm. El extremo opuesto
+        # (x = -15) es el vértice del triángulo, que queda MÁS lejos del centroide: por eso
+        # «el saliente más lejano» lo confundía y el modelo salía girado 180°.
+        "vastago": {"eje": 0, "desde_mm": 15.0}},
 }
 
 
@@ -5469,7 +5474,8 @@ def _muestrea_triangulos(tri, n, rng):
     return tri[i, 0] + u[:, None] * (tri[i, 1] - tri[i, 0]) + v[:, None] * (tri[i, 2] - tri[i, 0])
 
 
-def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=40, semilla=0):
+def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=40, semilla=0,
+                         vastago=None):
     """Coloca una sopa de triángulos sobre una nube de puntos con un movimiento RÍGIDO (giro +
     traslación, escala 1:1) por ICP sembrado en muchas orientaciones. Devuelve (R, t, info):
     un punto p del modelo va a R @ p + t.
@@ -5478,7 +5484,9 @@ def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=4
     esas soluciones. Lo que sí las distingue es un dato MEDIDO: por dónde sale el catéter.
     Si se da `salida_mm` (un punto del catéter trazado, ya fuera del portal), entre los
     ajustes con RMS a menos de un 15 % del mejor gana el que apunta su vástago hacia allí.
-    El vástago del modelo es su saliente: lo más lejano al centroide."""
+    `vastago` dice dónde está el vástago en el modelo ({"eje", "desde_mm"}: los puntos con esa
+    coordenada por encima del corte). Sin él se ESTIMA como el saliente más lejano al centroide,
+    que en un triángulo puede ser un vértice y no el vástago: la info lo declara."""
     import numpy as np
     from scipy.spatial import cKDTree
     from scipy.spatial.transform import Rotation
@@ -5489,8 +5497,15 @@ def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=4
         obj = obj[rng.choice(len(obj), n, replace=False)]
     arbol = cKDTree(obj)
     cm, co = pm.mean(0), obj.mean(0)
-    lejos = np.linalg.norm(pm - cm, axis=1)
-    vastago = pm[lejos >= np.percentile(lejos, 99.5)].mean(0)
+    if vastago:
+        del_vastago = pm[pm[:, vastago["eje"]] >= vastago["desde_mm"]]
+        if len(del_vastago) < 5:
+            raise SystemExit("ABORTA: el vástago declarado no existe en este modelo")
+        punta_vastago, vastago_como = del_vastago.mean(0), "declarado para este fichero"
+    else:
+        lejos = np.linalg.norm(pm - cm, axis=1)
+        punta_vastago = pm[lejos >= np.percentile(lejos, 99.5)].mean(0)
+        vastago_como = "ESTIMADO (saliente más lejano; puede ser un vértice)"
 
     def ejes(q):
         e = np.linalg.svd(q - q.mean(0), full_matrices=False)[2]
@@ -5519,7 +5534,7 @@ def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=4
     finalistas = [c for c in candidatos if c[0] <= mejor_rms * 1.15]
 
     def angulo(c):
-        va = c[2] @ (vastago - cm)
+        va = c[2] @ (punta_vastago - cm)
         vb = np.asarray(salida_mm, float) - (c[2] @ cm + c[3])
         cos = float(va @ vb / (np.linalg.norm(va) * np.linalg.norm(vb) + 1e-9))
         return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
@@ -5528,12 +5543,13 @@ def ajusta_modelo_rigido(tri, objetivo_mm, salida_mm=None, n=2500, iteraciones=4
     info = {"escala": 1.0, "rms_mm": round(elegido[0], 2), "p95_mm": round(elegido[1], 2),
             "mejor_rms_mm": round(mejor_rms, 2), "orientaciones_probadas": len(candidatos),
             "vastago_vs_cateter_grados": None if salida_mm is None else round(angulo(elegido), 0),
+            "vastago": vastago_como,
             "orientacion": "sin anclar (sin catéter)" if salida_mm is None
             else "anclada a la salida del catéter trazado"}
     return elegido[2], elegido[3], info
 
 
-def modelo_ilustrativo(portal, afin, esp, ruta_stl, salida_ijk=None, densidad=60.0):
+def modelo_ilustrativo(portal, afin, esp, ruta_stl, salida_ijk=None, densidad=60.0, vastago=None):
     """Capa ilustrativa del portal: el STL colocado rígidamente sobre el metal medido.
     Devuelve (cascara_bool, triangulos_mm, info). La cáscara es la superficie del modelo
     pasada a vóxeles de la escena (para las vistas); los triángulos van al PLY."""
@@ -5546,7 +5562,9 @@ def modelo_ilustrativo(portal, afin, esp, ruta_stl, salida_ijk=None, densidad=60
     borde = portal & ~ndimage.binary_erosion(portal)
     objetivo = np.argwhere(borde) @ a[:3, :3].T + a[:3, 3]
     salida = None if salida_ijk is None else a[:3, :3] @ np.asarray(salida_ijk, float) + a[:3, 3]
-    rot, t, info = ajusta_modelo_rigido(tri, objetivo, salida)
+    conocido = MODELO_PORT_CONOCIDO.get(sha)
+    rot, t, info = ajusta_modelo_rigido(tri, objetivo, salida,
+                                        vastago=vastago or (conocido or {}).get("vastago"))
     tri_mm = tri @ rot.T + t
     area = float((np.linalg.norm(np.cross(tri_mm[:, 1] - tri_mm[:, 0], tri_mm[:, 2] - tri_mm[:, 0]), axis=1) / 2.0).sum())
     pts = _muestrea_triangulos(tri_mm, int(max(20000, area * densidad)), np.random.default_rng(1))
@@ -5554,11 +5572,11 @@ def modelo_ilustrativo(portal, afin, esp, ruta_stl, salida_ijk=None, densidad=60
     dentro = np.all((ijk >= 0) & (ijk < np.array(portal.shape)), axis=1)
     cascara = np.zeros(portal.shape, bool)
     cascara[tuple(ijk[dentro].T)] = True
-    conocido = MODELO_PORT_CONOCIDO.get(sha)
     info.update({"sha256": sha[:16], "triangulos": int(len(tri)),
                  "fuera_de_escena_pct": round(100.0 * float((~dentro).mean()), 1),
-                 "procedencia": conocido or {"nombre": os.path.basename(ruta_stl),
-                                             "origen": "fichero no reconocido: procedencia sin verificar"},
+                 "procedencia": {k: v for k, v in conocido.items() if k != "vastago"} if conocido
+                 else {"nombre": os.path.basename(ruta_stl),
+                       "origen": "fichero no reconocido: procedencia sin verificar"},
                  "aviso": "ILUSTRATIVO, NO MEDIDO. No sustituye al metal del TC."})
     return cascara, tri_mm, info
 

@@ -9,6 +9,9 @@ geometría conocida de antemano:
     orientación entre las tres casi equivalentes la decide la salida del catéter, y el
     vástago recolocado apunta hacia ella;
   · sin catéter, el ajuste lo dice («sin anclar») en vez de callarlo;
+  · con un vástago CORTO (más cerca del centro que los vértices del triángulo, como en el STL
+    real) el saliente más lejano es un vértice: sin declarar el vástago la info dice ESTIMADO,
+    y declarándolo el modelo queda bien orientado (el 8-oct salió girado 180° por esto);
   · la escala no se toca aunque el modelo sea más grande que el metal;
   · un STL que no es el de procedencia conocida sale rotulado «sin verificar»;
   · un STL ASCII aborta;
@@ -77,11 +80,19 @@ def vastago(p):
 EJE_VASTAGO = np.array([0.0, -1.0, 0.0])
 
 
-def escribe_stl(ruta, escala=1.0):
+def vastago_corto(p):
+    """El mismo vástago, pero solo hasta 14 mm: los vértices del triángulo (18 mm) quedan más lejos."""
+    return vastago(p) & (p[..., 1] >= -14.0)
+
+
+def escribe_stl(ruta, escala=1.0, corto=False):
     g = np.mgrid[-24:24.01:0.5, -24:24.01:0.5, -10:10.01:0.5]
     p = np.moveaxis(g, 0, -1)
-    v, f, _n, _val = marching_cubes((cuerpo(p) | vastago(p)).astype(np.float32), 0.5, spacing=(0.5, 0.5, 0.5))
+    solido = cuerpo(p) | (vastago_corto(p) if corto else vastago(p))
+    v, f, _n, _val = marching_cubes(solido.astype(np.float32), 0.5, spacing=(0.5, 0.5, 0.5))
     tri = ((v + np.array([-24.0, -24.0, -10.0])) * escala)[f].astype("<f4")
+    if corto:
+        tri[..., :2] *= -1.0      # media vuelta en z: el vástago queda en +y, donde se puede declarar
     reg = np.zeros(len(tri), dtype=np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")]))
     reg["v"] = tri
     with open(ruta, "wb") as o:
@@ -143,6 +154,29 @@ with tempfile.TemporaryDirectory() as tmp:
     check(info2["orientacion"].startswith("sin anclar") and info2["vastago_vs_cateter_grados"] is None,
           "sin salida de catéter la orientación sale como «sin anclar»")
 
+    print("\n[2b] vástago corto: declarado se orienta bien; sin declarar, lo avisa")
+    corto = os.path.join(tmp, "corto.stl")
+    escribe_stl(corto, corto=True)
+    tri_c = V._stl_triangulos(corto)
+    es_vastago = tri_c[..., 1].min(axis=1) >= 11.0
+
+    def angulo_declarado(tri_mm_):
+        v = tri_mm_[es_vastago].reshape(-1, 3).mean(0) - tri_mm_.reshape(-1, 3).mean(0)
+        cos = float(v @ (R_REAL @ EJE_VASTAGO) / np.linalg.norm(v))
+        return float(np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))))
+
+    _c, tri_d, info_d = V.modelo_ilustrativo(portal, AFIN, ESP, corto, salida_ijk, vastago={"eje": 1, "desde_mm": 11.0})
+    check(angulo_declarado(tri_d) < 15.0, "vástago declarado → apunta a la salida real (%.0f°)" % angulo_declarado(tri_d))
+    check(info_d["vastago"].startswith("declarado") and info_d["vastago_vs_cateter_grados"] < 15.0,
+          "y la info dice que el vástago estaba declarado")
+    _c, _t, info_e = V.modelo_ilustrativo(portal, AFIN, ESP, corto, salida_ijk)
+    check(info_e["vastago"].startswith("ESTIMADO"), "sin declarar, la info dice que el vástago es ESTIMADO")
+    try:
+        V.modelo_ilustrativo(portal, AFIN, ESP, corto, salida_ijk, vastago={"eje": 1, "desde_mm": 99.0})
+        check(False, "un vástago declarado que no existe debería abortar")
+    except SystemExit as e:
+        check("vástago declarado no existe" in str(e), "un vástago declarado que no existe → ABORTA")
+
     print("\n[3] un modelo más grande que el metal NO se escala para que encaje")
     grande = os.path.join(tmp, "grande.stl")
     escribe_stl(grande, escala=1.3)
@@ -169,6 +203,8 @@ check("esc.vueltas_modelo" in h and "NO medido" in h, "el botón existe y dice q
 check("(mod&&hay)?esc.vueltas_modelo:esc.vueltas" in h, "sin modelo en la escena se pintan las vistas medidas")
 check(all(v["origen"].startswith("dibujado a partir de fotos") for v in V.MODELO_PORT_CONOCIDO.values()),
       "la procedencia conocida declara que el modelo sale de fotos")
+check(all("vastago" in v for v in V.MODELO_PORT_CONOCIDO.values()),
+      "todo modelo de procedencia conocida lleva su vástago declarado")
 
 print("\n[6] la mezcla translúcida no toca los píxeles sin modelo")
 from PIL import Image  # noqa: E402
