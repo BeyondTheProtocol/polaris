@@ -4071,7 +4071,7 @@ def _cmd_hoja(a):
 
 
 CARPETA_MARCA = {"higado": "Videos-Higado-3D", "mama": "Videos-Mama-3D",
-                 "esqueleto": "Esqueleto-3D"}
+                 "esqueleto": "Esqueleto-3D", "reservorio": "Videos-Reservorio-3D"}
 
 
 def _marca(*partes):
@@ -4515,6 +4515,182 @@ def _cmd_web(a):
                                         "centro": [round(float(c), 2) for c in xyz]})
     json.dump(escena, open(os.path.join(dst, "escena.json"), "w"), ensure_ascii=False, indent=1)
     print("total %.1f MB → %s" % (total / 1048576, os.path.relpath(dst, REPO)))
+    return 0
+
+
+# Cuánto de cada extremo del catéter se pinta como «medido» (trazo continuo): no es una
+# medida en sí, son los DOS PUNTOS leídos (portal y punta) más un tramo corto para que se vea
+# como ancla y no como un punto perdido en la escena. Todo lo demás del trayecto es la ruta de
+# coste de brillo entre esos dos puntos — interpolada por construcción, nunca medida punto a
+# punto — y se enseña discontinua. El valor no se toca sin volver a mirar `reservorio_*`.
+MEDIDO_MM = 8.0
+# Del catéter discontinuo: cuánto camino seguido se pinta y cuánto se salta, en mm de arco
+# geodésico (no anillos: `cateter.ply` no sale con anillos regulares de la reconstrucción
+# ad hoc de 21‑sep‑26, comprobado el 24‑sep‑26 — 2750 vértices no es múltiplo de
+# n_puntos=136). Fijo y pequeño para que el hueco se note a cualquier zoom.
+DASH_ON_MM, DASH_OFF_MM = 5.0, 3.0
+
+
+def _arco_geodesico(v, f, origen_mm):
+    """Distancia, POR LA SUPERFICIE del mesh (no en línea recta por el espacio: el tubo se
+    curva), de cada vértice al más cercano a `origen_mm`. Sirve de parámetro de arco cuando
+    la malla no tiene estructura de anillos regulares — y `cateter.ply` no la tiene: sale de
+    una reconstrucción ad hoc (sin código trazable, ver cabecera del fichero) que no dejó
+    ni el número de vértices por anillo. Devuelve (distancia por vértice, índice semilla)."""
+    import numpy as np
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import dijkstra
+    ai = np.concatenate([f[:, 0], f[:, 1], f[:, 2]])
+    bi = np.concatenate([f[:, 1], f[:, 2], f[:, 0]])
+    d = np.linalg.norm(v[ai] - v[bi], axis=1)
+    n = len(v)
+    g = coo_matrix((np.concatenate([d, d]), (np.concatenate([ai, bi]), np.concatenate([bi, ai]))),
+                   shape=(n, n)).tocsr()
+    origen = int(np.argmin(np.linalg.norm(v - np.asarray(origen_mm, float), axis=1)))
+    dist = dijkstra(g, indices=origen, directed=False)
+    return dist, origen
+
+
+def _submalla_por_mascara(v, f, mask):
+    """Sub-mesh de los vértices con `mask` a True: caras completas dentro de la máscara,
+    índices remapeados a partir de 0. Una cara que cruza la frontera de la máscara se
+    descarta entera — es justo eso lo que abre el hueco del trazo discontinuo."""
+    import numpy as np
+    usados = np.nonzero(mask)[0]
+    if len(usados) == 0:
+        return np.zeros((0, 3), dtype=float), np.zeros((0, 3), dtype=int)
+    remap = np.full(len(v), -1, dtype=int)
+    remap[usados] = np.arange(len(usados))
+    ok = mask[f[:, 0]] & mask[f[:, 1]] & mask[f[:, 2]]
+    return v[usados], remap[f[ok]]
+
+
+def _web_reservorio_fecha(carpeta, centro, con_modelo=False):
+    """Mallas + metadatos de UNA fecha del reservorio, listas para publicar: sin marca ni
+    modelo del dispositivo, sin hospital, catéter partido en medido (continuo, los dos
+    extremos leídos)/interpolado (discontinuo de verdad —huecos reales en la malla, no un
+    efecto de línea— en el tramo de en medio) y todo recentrado en `centro`."""
+    import numpy as np
+    d = _dir("visor", carpeta)
+    esc = json.load(open(os.path.join(d, "escena.json")))
+    info = esc["cateter"]
+    v, f = _lee_ply_caras(os.path.join(d, "cateter.ply"))
+    portal_mm = np.asarray(esc["portal_mm"], float)
+    punta_mm = np.asarray(info["punta_mm"], float)
+    # arco = distancia geodésica desde el extremo del PORTAL; el propio vértice más cercano a
+    # la punta marca el «total» de este trayecto sobre la malla (puede diferir un poco de
+    # longitud_mm, que es la cifra ya verificada y es la que se PUBLICA; esta solo corta la malla).
+    arco, _ = _arco_geodesico(v, f, portal_mm)
+    finito = np.isfinite(arco)
+    if finito.sum() < len(v) * 0.9:
+        raise SystemExit("ABORTA: %s tiene %d/%d vértices sin camino geodésico al portal "
+                         "(malla con piezas sueltas); revisar antes de publicar."
+                         % (carpeta, int((~finito).sum()), len(v)))
+    i_punta = int(np.argmin(np.linalg.norm(v - punta_mm, axis=1)))
+    total = float(arco[i_punta])
+    if total < 4 * MEDIDO_MM:
+        raise SystemExit("ABORTA: %s mide %.1f mm de camino, demasiado corto para separar "
+                         "%.0f mm medidos en cada extremo" % (carpeta, total, MEDIDO_MM))
+    piezas = {}
+    mask_medido = finito & ((arco <= MEDIDO_MM) | (arco >= total - MEDIDO_MM))
+    piezas["medido"] = _submalla_por_mascara(v, f, mask_medido)
+    # discontinuo de verdad: se recorta por bandas de arco, no por un shader de línea
+    periodo = DASH_ON_MM + DASH_OFF_MM
+    fase = (arco - MEDIDO_MM) % periodo
+    mask_interp = finito & (arco > MEDIDO_MM) & (arco < total - MEDIDO_MM) & (fase < DASH_ON_MM)
+    piezas["interpolado"] = _submalla_por_mascara(v, f, mask_interp)
+    for nombre in ("portal", "hueso", "traquea"):
+        ruta = os.path.join(d, nombre + ".ply")
+        if not os.path.exists(ruta):
+            continue
+        vp, fp = _lee_ply_caras(ruta)
+        if nombre in ("hueso", "traquea"):
+            # contexto, no protagonismo: sin decimar, el hueso solo sale a 3-5 MB por fecha
+            # (medido el 24-sep-26), demasiado para una pagina publica. 1.5 mm no cambia la
+            # silueta reconocible y corta el tamano a una fraccion.
+            vp, fp = _agrupa_vertices(vp, fp, 1.5)
+        piezas[nombre] = (vp, fp)
+    modelo = None
+    if con_modelo:
+        # Capa ILUSTRATIVA (8-oct-2026, petición de {{TITULAR}}): el modelo de catálogo colocado
+        # sobre el metal medido. Rompe a propósito el «sin marca ni modelo del dispositivo»
+        # de esta exportación: su licencia (CC BY) obliga a citar la obra, y el título la
+        # nombra. Por eso es opt-in y viaja con su procedencia; sin `--con-modelo` no sale.
+        ruta = os.path.join(d, "modelo_ilustrativo.ply")
+        if not os.path.exists(ruta) or not esc.get("modelo"):
+            raise SystemExit("ABORTA: %s no tiene modelo ilustrativo; regenera la escena con "
+                             "`reservorio3d … --modelo STL`" % carpeta)
+        m = esc["modelo"]
+        if "sin verificar" in m["procedencia"].get("origen", "") or not m["procedencia"].get("licencia"):
+            raise SystemExit("ABORTA: el modelo de %s no tiene procedencia ni licencia conocidas; "
+                             "no se publica" % carpeta)
+        piezas["modelo"] = _agrupa_vertices(*_lee_ply_caras(ruta), 0.05)
+        modelo = {"procedencia": m["procedencia"], "rms_mm": m["rms_mm"], "escala": m["escala"]}
+    return piezas, {
+        "fecha": esc["fecha"][:4] + "-" + esc["fecha"][4:6] + "-" + esc["fecha"][6:],
+        "longitud_mm": info["longitud_mm"],
+        "modelo": modelo,
+    }
+
+
+def _cmd_web_reservorio(a):
+    """Mallas del catéter del reservorio para la web pública (/reservorio): medido en los dos
+    extremos, interpolado (por coste de brillo, no punto a punto) en medio y marcado como tal
+    con la FORMA del trazo, no solo el color. Hueso y tráquea, de contexto. Va a borradores de
+    marca; a la web la sube un humano con su OK.
+
+    Cero DICOM, cero cabeceras, cero marca ni modelo del dispositivo, cero hospital: eso vive
+    en `_PRIVADO_CLINICO/.../escena.json` y esta función deliberadamente no lo copia."""
+    import numpy as np
+    fechas = {}
+    procedencias = []
+    # Destino EXPLÍCITO, sin pasar por _marca()/ORGANO: el origen vive bajo higado/
+    # (ahí se reconstruyó, junto al TC del hígado), pero el borrador de marca tiene su
+    # propia carpeta por CARPETA_MARCA["reservorio"] — mezclar los dos por el ORGANO
+    # global rompería uno de los dos (o no encuentra el origen, o no nombra el destino).
+    dst_raiz = os.path.join(REPO, "00_FUENTE-DE-VERDAD", "07 · Marca",
+                            CARPETA_MARCA["reservorio"], "web", a.lote)
+    for carpeta in a.carpetas:
+        d = _dir("visor", carpeta)
+        if not os.path.isdir(d):
+            raise SystemExit("ABORTA: no existe %s" % os.path.relpath(d, SALIDA_RAIZ))
+        v0, _ = _lee_ply_caras(os.path.join(d, "cateter.ply"))
+        centro = (v0.min(0) + v0.max(0)) / 2
+        piezas, meta = _web_reservorio_fecha(carpeta, centro, a.con_modelo)
+        sub = os.path.join(dst_raiz, meta["fecha"])
+        os.makedirs(sub, exist_ok=True)
+        total_kb = 0
+        mallas = {}
+        for nombre, (vv, ff) in piezas.items():
+            if len(vv) == 0:
+                continue
+            ruta = os.path.join(sub, nombre + ".ply")
+            ply_binario(ruta, np.round(vv - centro, 2), ff)
+            cab = open(ruta, "rb").read(400).split(b"end_header")[0]
+            if b"comment" in cab or b"obj_info" in cab:
+                raise SystemExit("ABORTA: %s lleva comentarios en la cabecera" % nombre)
+            total_kb += os.path.getsize(ruta) / 1024
+            mallas[nombre] = nombre + ".ply"
+        print("%s → %-9s %6.0f KB (%d piezas)" % (carpeta, meta["fecha"], total_kb, len(mallas)))
+        fechas[meta["fecha"]] = {"mallas": mallas, "longitud_mm": meta["longitud_mm"]}
+        if meta["modelo"]:
+            fechas[meta["fecha"]]["modelo_rms_mm"] = meta["modelo"]["rms_mm"]
+            procedencias.append(meta["modelo"]["procedencia"])
+    escena = {
+        "fechas": fechas,
+        "error_medida_mm": 5,
+        "error_diferencia_mm": 10,
+        "fuente": ("el trayecto sale del TC de cada fecha: los dos extremos (portal y punta) "
+                   "están leídos directamente en el corte; el tramo intermedio es la ruta de "
+                   "coste de brillo más probable entre ambos, no una medida punto a punto, y "
+                   "se dibuja discontinua por eso. Hueso y tráquea son solo referencia anatómica."),
+    }
+    if procedencias:
+        if any(p != procedencias[0] for p in procedencias):
+            raise SystemExit("ABORTA: las fechas llevan modelos de procedencia distinta")
+        escena["modelo"] = dict(procedencias[0], escala="1:1, sin ajustar al metal medido")
+    json.dump(escena, open(os.path.join(dst_raiz, "escena.json"), "w"), ensure_ascii=False, indent=1)
+    print("→", os.path.relpath(dst_raiz, REPO))
     return 0
 
 
@@ -6547,6 +6723,13 @@ def main(argv=None):
                      help="PLY (zona clínica) cuya caja centra las mallas en vez del hígado de la "
                           "carpeta: para sustituir UNA malla pública sin mover las demás")
     pwe.set_defaults(fn=_cmd_web)
+    pwr = sub.add_parser("web-reservorio",
+                         help="cateter del reservorio (medido/interpolado) para la web publica")
+    pwr.add_argument("carpetas", nargs="+", help="p.ej. reservorio_60691016 reservorio_b16cc64f")
+    pwr.add_argument("--lote", required=True, help="carpeta de salida del dia, p.ej. 2026-09-24")
+    pwr.add_argument("--con-modelo", dest="con_modelo", action="store_true",
+                     help="añade la capa ilustrativa del portal (nombra el modelo: su licencia obliga a citarlo)")
+    pwr.set_defaults(fn=_cmd_web_reservorio)
     pfo = sub.add_parser("focos", help="focos de realce de la resta: de ahí sale la semilla")
     pfo.add_argument("--raiz", dest="raices", action="append", required=True)
     pfo.add_argument("--pre", required=True, help="WATER pre-contraste del VIBRANT")
