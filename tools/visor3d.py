@@ -5644,6 +5644,33 @@ addEventListener('keydown',e=>{if(e.key==='ArrowLeft'){i--;pinta()}if(e.key==='A
 """
 
 
+def _componente_traquea(lab_a, esp, ref_ijk, carina_ijk=None):
+    """Etiqueta de la componente de aire que es la tráquea (0 si no hay ninguna).
+
+    Primero se busca JUNTO A LA CARINA: la componente con más vóxeles en una bola de 8 mm
+    centrada 10 mm por encima de ella, que es luz traqueal segura. Si no hay carina o ahí no
+    hay aire, vale la referencia antigua: la componente más cercana (< 12 mm) a `ref_ijk` en
+    su corte; el centroide puede caer en la pared y no en la luz, de ahí el radio.
+
+    La referencia antigua sola fallaba (8-oct-2026, serie del 24-mar): su (x, y) es el de la
+    carina pero su corte está 20 mm por encima del portal, y la tráquea baja inclinada hacia
+    atrás; a 8-10 cm de la carina ya se ha ido más de 12 mm y la escena salía sin tráquea."""
+    import numpy as np
+    if carina_ijk is not None:
+        arriba = (carina_ijk[0], carina_ijk[1], carina_ijk[2] + 10.0 / esp[2])
+        if 0 <= arriba[2] < lab_a.shape[2]:
+            en_bola = lab_a[_bola_mm(lab_a.shape, arriba, 8.0, esp)]
+            ks, cuenta = np.unique(en_bola[en_bola > 0], return_counts=True)
+            if len(ks):
+                return int(ks[np.argmax(cuenta)])
+    zs = int(ref_ijk[2])
+    cerca = _bola_mm(lab_a.shape, ref_ijk, 12.0, esp)
+    cerca[:, :, :zs] = False
+    cerca[:, :, zs + 1:] = False
+    ks = [int(v) for v in np.unique(lab_a[cerca]) if v]
+    return max(ks, key=lambda v: int((lab_a[:, :, zs] == v).sum())) if ks else 0
+
+
 def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vueltas=24, modelo_stl=None):
     """Escena 3D del reservorio en una serie sin contraste: portal (metal), catéter
     (semiautomático), tráquea + bronquios (aire), hueso de la región (umbral, sin etiquetar) y
@@ -5698,15 +5725,9 @@ def reservorio3d(serie, punta_xz_mm, y_post_mm=45.0, radio_cateter_mm=1.35, vuel
     aire = ndimage.binary_opening((sub < -800) & cu[sl], structure=_bola_estructura(esp, 4.0))
     lab_a, n = ndimage.label(aire)
     zs = int(min(sub.shape[2] - 1, max(0, z_p - z0 + 20.0 / esp[2])))
-    # componente de aire más cercana a la tráquea de referencia en ese corte (a < 12 mm): el
-    # centroide puede caer en la pared o en un vóxel de volumen parcial y no en la luz
-    k = 0
-    cerca = _bola_mm(sub.shape, (tx - x0, ty - y0, zs), 12.0, esp)
-    cerca[:, :, :zs] = False
-    cerca[:, :, zs + 1:] = False
-    ks = [int(v) for v in np.unique(lab_a[cerca]) if v]
-    if ks:
-        k = max(ks, key=lambda v: int((lab_a[:, :, zs] == v).sum()))
+    k = _componente_traquea(lab_a, esp, (tx - x0, ty - y0, zs),
+                            (car[1] - x0, car[2] - y0, car[0] - z0)
+                            if car is not None and car[3].get("fiable") else None)
     traq = (lab_a == k) if k else np.zeros(sub.shape, bool)
     halo = ndimage.binary_dilation(por, structure=_bola_estructura(esp, 5.0))
     hueso = hueso_grueso(np.where(halo, 40.0, sub), esp) & ~halo & ~tubo
