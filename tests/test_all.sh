@@ -141,6 +141,7 @@ runpy test_laminillas_n1_jaula.py # 2-oct · jaula vision.sb de la llamada HTTP 
 runpy test_laminillas_jaulas_secretos.py # 2-oct · ninguna jaula SBPL (×extras reales) abre secretos ni zona clínica: deny de secretos al FINAL, sandbox-exec con señuelos
 runpy test_nivel_salida.py   # 25-sep · P3 F1: nivel de cada salida EN SOMBRA (anota, no manda)
 runpy test_ok_envio_blindado.py
+runpy test_lote_envio.py   # 9-oct · una orden envía N DMs leídos: manifiesto en el transcript, 15 min, un uso por ítem, tope 10
 runpy test_correos_publicables.py
 runpy test_entrada_guard.py
 runpy test_audit_comites_uso.py

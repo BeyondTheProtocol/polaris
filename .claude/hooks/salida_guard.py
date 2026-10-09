@@ -49,6 +49,10 @@ try:
     import permiso_envio as P      # firma y comprobación del permiso (22-sep-26, hallazgo 3.1)
 except Exception:                   # sin ella ningún permiso vale: fail-closed para los envíos
     P = None
+try:
+    import lote_envio as L          # lote de DMs con una sola orden (9-oct-26)
+except Exception:                   # sin él no hay lotes: todo sigue de uno en uno
+    L = None
 
 # A DÓNDE puede llevar datos una orden (24-sep-26, auditoría 3.2). Se carga por ruta, sin tocar
 # sys.path. Si no carga, NADA con carga sale: fail-closed para los envíos, como el permiso.
@@ -2509,6 +2513,26 @@ def main():
             "hookEventName": "PreToolUse", "permissionDecision": "deny",
             "permissionDecisionReason": motivo, "additionalContext": motivo}}, ensure_ascii=False))
         return 0
+    # LOTE (9-oct-26): si ella dio UNA orden para N DMs ya leídos, un `browser_batch` que casa
+    # exactamente con un ítem pendiente pasa; cualquier otra cosa que teclee o suba mientras el lote
+    # vive se DENIEGA (también en bypass, donde un clic solo avisa). Lo demás sigue como siempre.
+    if L is not None and datos.get("session_id"):
+        r = L.decidir(datos)
+        if r and r[0] == "permitir":
+            _log("lote_permitido", tool, r[1])
+            _sombra(datos, "clic", "permitido")
+            return 0
+        if r:
+            motivo = ("🛑 Hay un LOTE de envíos abierto y esto no es uno de sus ítems pendientes: %s.\n\n"
+                      "Mientras el lote vive solo salen sus ítems, uno por `browser_batch` (navigate al "
+                      "hilo, [clic], type con el texto exacto, enviar). Si necesitas otra cosa, díselo a "
+                      "{{TITULAR}}: no lo rodees." % r[1])
+            _log("lote_denegado", tool, r[1])
+            _sombra(datos, "clic", "denegado")
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse", "permissionDecision": "deny",
+                "permissionDecisionReason": motivo, "additionalContext": motivo}}, ensure_ascii=False))
+            return 0
     que = _sale_fuera(tool, datos.get("tool_input"))
     if not que:
         _sombra(datos, None, "libre")

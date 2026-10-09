@@ -258,13 +258,26 @@ def usados_path():
 
 
 # ── la clave ─────────────────────────────────────────────────────────────────────────────────
-def _llavero_leer():
+def _llavero_estado():
+    """(valor|None, estado). estado: "ok" | "no-existe" | "ilegible".
+
+    Distingue dos casos que antes eran el mismo `None` (9-oct-26): la clave NO EXISTE (código 44,
+    `errSecItemNotFound`: hay que crearla) o EXISTE PERO NO SE PUEDE LEER (36, «User interaction is
+    not allowed»: Llavero bloqueado, típico de una sesión por SSH; también tiempo agotado o
+    cualquier otro fallo). En el segundo nunca se intenta crear: no arregla nada y, si el Llavero
+    se desbloquea luego, habría dos claves."""
     try:
         r = subprocess.run(["security", "find-generic-password", "-s", SERVICIO, "-w"],
                            capture_output=True, text=True, timeout=5)
-        return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
     except Exception:
-        return None
+        return None, "ilegible"
+    if r.returncode == 0:
+        return (r.stdout.strip(), "ok") if r.stdout.strip() else (None, "ilegible")
+    return None, ("no-existe" if r.returncode == 44 else "ilegible")
+
+
+def _llavero_leer():
+    return _llavero_estado()[0]
 
 
 def _llavero_crear():
@@ -291,19 +304,30 @@ def _state_aislado():
         return True
 
 
+def clave_estado(permitir_env=False, crear=False):
+    """(bytes|None, estado) con estado "ok" | "no-existe" | "ilegible". Como `clave`, pero dice POR
+    QUÉ no hay clave. Solo se crea cuando NO existe; si existe y no se puede leer, no se toca."""
+    if CLAVE_TEST:
+        return CLAVE_TEST, "ok"
+    if permitir_env and os.environ.get("BTP_OK_ENVIO_CLAVE"):
+        return os.environ["BTP_OK_ENVIO_CLAVE"].encode(), "ok"
+    if os.environ.get("BTP_OK_ENVIO_LLAVERO_ILEGIBLE"):      # solo para los tests
+        return None, "ilegible"
+    if os.environ.get("BTP_OK_ENVIO_SIN_LLAVERO"):
+        return None, "no-existe"
+    v, est = _llavero_estado()
+    if v is None and est == "no-existe" and crear and not _state_aislado():
+        v = _llavero_crear()
+        est = "ok" if v else "ilegible"
+    return (v.encode() if v else None), est
+
+
 def clave(permitir_env=False, crear=False):
     """bytes o None. `permitir_env` SOLO para los hooks: su entorno lo pone el harness, y los
     tests lo usan para no tocar el Llavero real. Una tool que lanza el agente (web_novedad,
     ok_envio.py) NO lo permite: ese entorno lo elige quien la lanza, y bastaría con
     `BTP_OK_ENVIO_CLAVE=x python3 tools/web_novedad.py` para firmar lo que quisiera."""
-    if CLAVE_TEST:
-        return CLAVE_TEST
-    if permitir_env and os.environ.get("BTP_OK_ENVIO_CLAVE"):
-        return os.environ["BTP_OK_ENVIO_CLAVE"].encode()
-    if os.environ.get("BTP_OK_ENVIO_SIN_LLAVERO"):
-        return None
-    v = _llavero_leer() or (_llavero_crear() if crear and not _state_aislado() else None)
-    return v.encode() if v else None
+    return clave_estado(permitir_env, crear)[0]
 
 
 def _canon(d):
@@ -551,9 +575,13 @@ def contexto(d):
             if _es_humano_encolado(e):
                 eventos.append(("h", e, solo_suyo(e["attachment"]["prompt"]) or ""))
                 continue
+            # El TEXTO de una línea lateral (isSidechain) no es lo que ella tenía delante (9-oct-26),
+            # pero un BORRADOR sí cuenta siempre: filtrarlo relajaría `cambios` (un update_draft
+            # de un subagente tras su OK tiene que seguir frenando el envío).
             if e.get("type") == "assistant":
+                lateral = bool(e.get("isSidechain"))
                 for b in (e.get("message") or {}).get("content") or []:
-                    if isinstance(b, dict) and b.get("type") == "text":
+                    if isinstance(b, dict) and b.get("type") == "text" and not lateral:
                         eventos.append(("t", b.get("text") or ""))
                     if (isinstance(b, dict) and b.get("type") == "tool_use"
                             and _DRAFT.search(b.get("name", "")) and isinstance(b.get("input"), dict)):
@@ -604,6 +632,7 @@ def contexto(d):
     return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(texto)},
                       "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
                       "cambios": [e for _, e in cambios], "alcance": alcance(texto),
+                      "visto_textos": visto,
                       "prs_suyos": _prs(texto), "prs_vistos": _prs("\n".join(visto)),
                       "shas_vistos": _shas(texto + "\n" + "\n".join(visto))}
 

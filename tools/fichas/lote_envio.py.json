@@ -1,0 +1,11 @@
+{
+ "pieza": "lote_envio.py",
+ "estado_ficha": "completa",
+ "para": "deja que UNA orden de {{TITULAR}} envíe N DMs de LinkedIn (máx. 10) que ella leyó en el chat: manifiesto en el transcript, permiso de lote firmado de 15 min, un uso por ítem, y el guard solo deja pasar el browser_batch que casa con un ítem pendiente.",
+ "cuando_si": "ella va a leer varias respuestas a DMs de LinkedIn ya existentes y a dar un único «envíalos». Genera el bloque con `python3 tools/lote_envio.py render items.json` y pégalo tal cual en tu mensaje.",
+ "cuando_no": "correo, primer contacto (médicos, laboratorios, prensa), cualquier texto con dato clínico, adjuntos, otras redes o una selección parcial («solo el 2»): eso va de uno en uno con el permiso de siempre.",
+ "reemplaza": "pedir una orden de envío por cada DM; no reemplaza permiso_envio.py, convive con él.",
+ "test": "tests/test_lote_envio.py",
+ "alta": "2026-10-09",
+ "origen": "plan envío de DMs por lote con una sola orden (9-oct-26), aprobado por {{TITULAR}}"
+}

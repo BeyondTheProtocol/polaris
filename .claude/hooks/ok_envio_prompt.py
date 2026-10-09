@@ -45,12 +45,32 @@ def main():
         return 0                     # sin la librería no hay permiso: los envíos siguen parados
     if not P.es_orden(prompt):
         return 0
-    k = P.clave(permitir_env=True, crear=True)
+    k, estado = P.clave_estado(permitir_env=True, crear=True)
     if not k:
-        aviso = ("⚠️ {{TITULAR}} ha pedido un envío, pero no se ha podido abrir el permiso: no hay clave "
-                 "de firma en el Llavero (`btp-ok-envio-mac`). El freno de salida sigue CERRADO. "
+        # Dos fallos distintos (9-oct-26): decirlos igual mandaba a buscar una clave que existe.
+        causa = ("no hay clave de firma en el Llavero (`btp-ok-envio-mac`): hay que crearla"
+                 if estado == "no-existe" else
+                 "la clave de firma EXISTE en el Llavero (`btp-ok-envio-mac`) pero esta sesión no puede "
+                 "LEERLA (Llavero bloqueado o sesión remota por SSH, `security` da el código 36): no la "
+                 "crees de nuevo")
+        aviso = ("⚠️ {{TITULAR}} ha pedido un envío, pero no se ha podido abrir el permiso: " + causa + ". "
+                 "El freno de salida sigue CERRADO. "
                  "Díselo tal cual y deja el envío a un clic en borrador; no lo rodees.")
     else:
+        # LOTE (9-oct-26): si en lo que tenía delante hay un manifiesto de lote y su orden manda
+        # enviarlo todo, se abre el permiso de LOTE y NO el de un solo uso (este no vale para correo,
+        # Bash ni gh). Sin manifiesto, todo sigue exactamente igual que antes.
+        lote, aviso_lote = False, None
+        try:
+            import lote_envio as L
+            lote, aviso_lote = L.intentar_abrir(prompt, datos.get("session_id"), datos.get("prompt_id"),
+                                                datos.get("transcript_path"), k)
+        except Exception:
+            lote, aviso_lote = False, None
+        if lote:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit", "additionalContext": aviso_lote}}, ensure_ascii=False))
+            return 0
         try:
             P.emitir(prompt, datos.get("session_id"), datos.get("prompt_id"),
                      datos.get("transcript_path"), k)
@@ -76,6 +96,8 @@ def main():
             aviso = ("🔓 {{TITULAR}} ha pedido PROGRAMAR una tarea en este mensaje: el freno queda abierto "
                      "para **UNA** llamada, 10 minutos, y SOLO para crear, lanzar o cambiar una tarea "
                      "programada. No vale para enviar, publicar ni nada más.")
+    if k and aviso_lote:
+        aviso = aviso + "\n\n" + aviso_lote
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit", "additionalContext": aviso}}, ensure_ascii=False))
     return 0

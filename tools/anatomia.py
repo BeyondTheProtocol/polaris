@@ -213,7 +213,7 @@ FAMILIAS = [
                           # la válvula del guard de salida: permiso de un solo uso que solo
                           # nace del mensaje de {{TITULAR}} (21-sep-26), firmado y ligado a ese
                           # mensaje desde el 22-sep-26 (`permiso_envio`)
-                          "ok_envio", "permiso_envio",
+                          "ok_envio", "permiso_envio", "lote_envio",
                           "decision_alto_riesgo",
                           # los señuelos del tripwire de exfiltración (24-sep-26)
                           "canarios",
