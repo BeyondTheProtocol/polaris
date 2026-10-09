@@ -57,9 +57,10 @@ ADAPTADORES
     trazos), comprueba que los píxeles son los mismos y deja el mapa caso → fichero N1 en
     `<dir>/n1.json`; sin ese mapa, `responder` lanza `FueraDeN1`. Los PNG de una revisión de capas
     ya viven en N1 y van tal cual. El CLI pone `avisar` (el aviso del primer envío es opt-in).
-  · `claude:` — INTERFAZ que lanza `AdaptadorPendiente` antes de tocar la red: Claude por API no
-    tiene adaptador en vision_n1 (en el panel entra como `transcrito`, que es como lo usa el
-    tribunal).
+  · `claude[:claude-opus-5-5]` — por `vision_n1` como Gemini (adaptador del 8-oct-26, modelo
+    fijado, clave cedida `btp-anthropic-api-prestada`); sin su entrada en la auditoría de casa
+    base y su `trust-cloud vision-n1:claude`, `ProveedorNoListo`. Su calibración es PROPIA: la que
+    Claude pasó como `transcrito` (dentro de la sesión) no habilita a `claude:` por API.
   · `medgemma[:google/medgemma-4b-it]` — LOCAL (`medgemma_local.py`, transformers en MPS, sin red,
     pesos del commit sellado en `laminillas_stack/pesos.json` con sha256): hoy «gated» y sin pesos,
     así que `comprueba()` lanza `PendienteDeAcceso` («pendiente de acceso») y `modelos` lo marca así.
@@ -523,8 +524,8 @@ class FueraDeN1(AdaptadorPendiente):
 
 
 PROVEEDORES_EXTERNOS = ("claude", "gemini")
-CONECTADOS = ("gemini",)            # con adaptador escrito en tools/vision_n1.py
-MODELO_EXTERNO_DEFECTO = {"gemini": "gemini-3.1-pro-preview"}
+CONECTADOS = ("claude", "gemini")   # con adaptador escrito en tools/vision_n1.py (claude: 8-oct-26)
+MODELO_EXTERNO_DEFECTO = {"claude": "claude-opus-5-5", "gemini": "gemini-3.1-pro-preview"}
 N1_MAPA = "n1.json"
 _RE_MPP_PREGUNTA = re.compile(r"\bat ([0-9]+(?:\.[0-9]+)?) micrometres per pixel")
 MODELOS_APAGADOS = {"gemini-3-pro-preview": "apagado el 9-mar-2026; el vigente es gemini-3.1-pro-preview",
@@ -706,13 +707,13 @@ def _auditoria_casa_base(proveedor):
 
 class Externo:
     """Claude o Gemini por la boca autorizada, `tools/vision_n1.py`; este arnés no habla con
-    ninguna API. Gemini está conectado: `comprueba()` exige las condiciones de la auditoría (casa
+    ninguna API. Los dos están conectados (Claude, desde el 8-oct-26, con su propia entrada de
+    auditoría y su propio `trust-cloud vision-n1:claude`): `comprueba()` exige las condiciones de la auditoría (casa
     base) y `vision_n1.listo` (Puerta, confianza tecleada); `responder(prompt, ruta_png, esquema)`
     lleva la imagen a su fichero N1 (la ruta misma si ya vive en N1; si no, el mapa de `a-n1`) y
     delega en `vision_n1.enviar`, que vuelve a pasar TODAS las guardas, avisa del primer envío
     (`avisar`, opt-in: lo pone el CLI), sella y llama. Una guarda que cierra es `ProveedorNoListo`
-    (para la pasada); un error del proveedor se anota como error del adaptador y se reintenta.
-    Claude: interfaz pendiente."""
+    (para la pasada); un error del proveedor se anota como error del adaptador y se reintenta."""
     local = False
 
     def __init__(self, proveedor, modelo="", avisar=False, transporte=None):
@@ -722,7 +723,7 @@ class Externo:
         if modelo in MODELOS_APAGADOS:
             raise ValueError("%s: %s" % (modelo, MODELOS_APAGADOS[modelo]))
         if proveedor in MODELO_EXTERNO_DEFECTO and modelo != MODELO_EXTERNO_DEFECTO[proveedor]:
-            raise ValueError("%s: el modelo está fijado en %s (auditoría del 2-oct-26)" % (
+            raise ValueError("%s: el modelo está fijado en %s (el de su adaptador en vision_n1)" % (
                 proveedor, MODELO_EXTERNO_DEFECTO[proveedor]))
         self.proveedor, self.modelo = proveedor, modelo
         self.avisar, self.transporte = bool(avisar), transporte

@@ -60,6 +60,24 @@ condiciones»; nota archivada «laminillas-auditoría-de-la-api-de-gemini-para-e
     (`BTP_TEST_BATTERY=1`) el transporte real y la clave real se niegan: los tests inyectan
     transporte y clave falsos.
 
+ADAPTADOR CLAUDE (8-oct-26; plan archivado «plan-adaptador-de-claude-por-api-en-vision_n1»):
+  · modelo FIJADO `claude-opus-5-5` (otro id, PuertaCerrada);
+  · `POST https://api.anthropic.com/v1/messages` con cada PNG en un bloque `image` base64
+    (`image/png`) y el prompt en un bloque de texto al final. El cuerpo sale de una lista blanca
+    (`model`, `max_tokens`, `output_config`, `messages`): ni `system`, ni `tools`, ni caché, ni
+    esquema de salida, ni `fallbacks`. Sin `fallbacks` a propósito: la guía de la API lo recomienda
+    por defecto, pero un relevo callado a otro modelo falsearía la calibración;
+  · `output_config.effort` «high» explícito (el de por defecto del modelo es «medium»); `thinking`
+    sin mandar: en este modelo va siempre encendido y no admite apagarse;
+  · `stop_reason` «refusal» o «max_tokens» = ErrorProveedor (no se interpreta una respuesta a medias);
+  · la clave `btp-anthropic-api-prestada` (cedida por un tercero para la investigación, con tope
+    de gasto), por `_secrets.get` en el momento del envío y en la cabecera `x-api-key`. NO es
+    `btp-anthropic-api`, la de `ia.py`: este adaptador no la toca;
+  · CONDICIÓN de la auditoría: la misma regla que Gemini, con la entrada `claude` de
+    `auditorias.json` de casa base. Sin ella no envía, aunque haya `trust-cloud` y clave. La
+    auditoría tiene que mirar la retención y el registro de la organización DUEÑA de la clave;
+  · mismo transporte: HTTPS sin proxies, solo a `api.anthropic.com`, por el hijo en `vision.sb`.
+
 JAULA `vision.sb` (plan, «F1. Jaulas»; 2-oct-26). La llamada HTTP de vision_n1 Y de nube_n1 la hace
 un HIJO: `sandbox-exec -f vision.sb` + Python de /opt/homebrew en modo aislado (`-I -S`) con su
 código en `-c` (no lee nada del repo). La jaula: red sí; lee solo `~/Laminillas-N1/` y el
@@ -87,13 +105,18 @@ LÍMITES DECLARADOS:
   · Los nombres de campo de la API (`inlineData`, `mediaResolution`, `responseMimeType`) son los
     del REST v1beta según la auditoría y mi conocimiento; no he hecho ninguna llamada real (no hay
     trust-cloud ni condiciones). La primera llamada real los confirma o los tumba con un 400.
-  · Claude y MedGemma no van por aquí: Claude por API no tiene adaptador; MedGemma corre en LOCAL
-    (`tools/panel_vision/medgemma_local.py`), sin salir del Mac.
+  · Claude: los nombres de campo (`output_config.effort`, bloques `image` base64, `stop_reason`,
+    `usage`) son los de la guía de la API cargada en la sesión del 8-oct-26; no he hecho ninguna
+    llamada real. El tope de 20 MB por petición es el de Gemini, no uno verificado de Anthropic. No
+    sé si el clasificador de seguridad declina imágenes de histología: lo dirá la calibración.
+  · MedGemma no va por aquí: corre en LOCAL (`tools/panel_vision/medgemma_local.py`), sin salir
+    del Mac.
 
 Uso:
   python3 tools/vision_n1.py comprobar --destino vision-n1:gemini --prompt "…" <fichero N1>…
   python3 tools/vision_n1.py estado    --destino vision-n1:gemini
   python3 tools/vision_n1.py enviar    --destino vision-n1:gemini --prompt "…" <fichero N1>…
+  (lo mismo con --destino vision-n1:claude)
 """
 import argparse
 import base64
@@ -124,6 +147,15 @@ GEMINI_URL = "https://%s/v1beta/models/%%s:generateContent" % GEMINI_HOST
 GEMINI_SERVICIO_CLAVE = "btp-gemini-api"
 GEMINI_MAX_PETICION = 20 * 1000 * 1000          # inline: toda la petición ≤20 MB (auditoría)
 GEMINI_MEDIA_RESOLUTION = "MEDIA_RESOLUTION_HIGH"
+
+CLAUDE_MODELO = "claude-opus-5-5"
+CLAUDE_HOST = "api.anthropic.com"
+CLAUDE_URL = "https://%s/v1/messages" % CLAUDE_HOST
+CLAUDE_VERSION = "2023-06-01"                    # cabecera anthropic-version
+CLAUDE_SERVICIO_CLAVE = "btp-anthropic-api-prestada"   # la clave cedida; NUNCA btp-anthropic-api (la de ia.py)
+CLAUDE_MAX_PETICION = 20 * 1000 * 1000           # el mismo tope que Gemini: el de Anthropic, sin verificar
+CLAUDE_MAX_TOKENS = 16000                        # el razonamiento cuenta dentro; sin streaming
+CLAUDE_EFFORT = "high"
 AUDITORIAS_REL = ("tools", "panel_vision", "auditorias.json")
 VEREDICTOS_APTOS = ("apto", "apto con condiciones")
 
@@ -209,8 +241,8 @@ def exigir_condiciones(proveedor, modelo):
         raise PuertaCerrada("auditoría de '%s' hecha para %r, no para %r: no se envía"
                             % (proveedor, ent.get("modelo"), modelo))
     if ent.get("condiciones_cumplidas") is not True:
-        raise PuertaCerrada("auditoría de '%s': condiciones_cumplidas no es true (pago y logging de AI "
-                            "Studio sin confirmar por {{TITULAR}}): no se envía, aunque haya trust-cloud"
+        raise PuertaCerrada("auditoría de '%s': condiciones_cumplidas no es true (las condiciones de su "
+                            "auditoría, sin confirmar por {{TITULAR}}): no se envía, aunque haya trust-cloud"
                             % proveedor)
     return ent
 
@@ -589,7 +621,67 @@ def gemini_respuesta(status, crudo, clave=None):
     return texto, uso
 
 
+# ── Claude ─────────────────────────────────────────────────────────────────────────────────
+def claude_cuerpo(modelo, prompt, ficheros):
+    """(url, bytes del cuerpo JSON) de una petición a Messages. Solo PNG, en bloques `image` base64
+    antes del texto. Lista blanca de claves: ni `system`, ni `tools`, ni `fallbacks` (un relevo a
+    otro modelo falsearía la calibración: el modelo va fijado), ni caché, ni esquema de salida."""
+    partes = []
+    for f in ficheros:
+        if not f["nombre"].lower().endswith(".png"):
+            raise PuertaCerrada("%s: a Claude solo van PNG (image/png en base64)" % f["nombre"])
+        partes.append({"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                                   "data": base64.b64encode(f["datos"]).decode("ascii")}})
+    partes.append({"type": "text", "text": prompt})
+    cuerpo = {"model": modelo, "max_tokens": CLAUDE_MAX_TOKENS,
+              "output_config": {"effort": CLAUDE_EFFORT},
+              "messages": [{"role": "user", "content": partes}]}
+    return CLAUDE_URL, json.dumps(cuerpo, ensure_ascii=True, separators=(",", ":")).encode("ascii")
+
+
+def claude_cabeceras(clave):
+    return {"Content-Type": "application/json", "anthropic-version": CLAUDE_VERSION, "x-api-key": clave}
+
+
+def claude_respuesta(status, crudo, clave=None):
+    """(texto, uso) de una respuesta de Messages; ErrorProveedor si no hay texto útil. Una negativa
+    (`stop_reason: refusal`) o un corte por `max_tokens` son errores: fail-closed, no se interpreta
+    un JSON a medias ni se releva a otro modelo."""
+    try:
+        obj = json.loads(crudo.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, AttributeError):
+        obj = None
+    if status != 200:
+        err = (obj or {}).get("error") if isinstance(obj, dict) else None
+        msg = err.get("message") if isinstance(err, dict) else None
+        raise ErrorProveedor("Claude HTTP %s: %s" % (status, _limpia(msg or "", clave, 300)))
+    if not isinstance(obj, dict):
+        raise ErrorProveedor("Claude: respuesta que no es JSON")
+    parada = obj.get("stop_reason")
+    if parada == "refusal":
+        det = obj.get("stop_details") if isinstance(obj.get("stop_details"), dict) else {}
+        raise ErrorProveedor("Claude declinó la petición (%s)" % str(det.get("category"))[:60])
+    if parada == "max_tokens":
+        raise ErrorProveedor("Claude: respuesta cortada por max_tokens (%d)" % CLAUDE_MAX_TOKENS)
+    bloques = obj.get("content") if isinstance(obj.get("content"), list) else []
+    texto = "".join(b.get("text", "") for b in bloques
+                    if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str))
+    if not texto.strip():
+        raise ErrorProveedor("Claude: sin texto (stop_reason=%s)" % str(parada)[:40])
+    u = obj.get("usage") if isinstance(obj.get("usage"), dict) else {}
+    uso = {k: u.get(k) for k in ("input_tokens", "output_tokens", "cache_creation_input_tokens",
+                                 "cache_read_input_tokens") if isinstance(u.get(k), int)}
+    return texto, uso
+
+
 ADAPTADORES = {
+    "claude": {"modelo": CLAUDE_MODELO, "servicio": CLAUDE_SERVICIO_CLAVE, "host": CLAUDE_HOST,
+               "cabecera_clave": "x-api-key",
+               "max_peticion": CLAUDE_MAX_PETICION, "cuerpo": claude_cuerpo,
+               "cabeceras": claude_cabeceras, "respuesta": claude_respuesta,
+               "config": {"endpoint": "messages", "anthropic_version": CLAUDE_VERSION,
+                          "effort": CLAUDE_EFFORT, "max_tokens": CLAUDE_MAX_TOKENS,
+                          "thinking": "defecto", "fallbacks": "no"}},
     "gemini": {"modelo": GEMINI_MODELO, "servicio": GEMINI_SERVICIO_CLAVE, "host": GEMINI_HOST,
                "cabecera_clave": "x-goog-api-key",
                "max_peticion": GEMINI_MAX_PETICION, "cuerpo": gemini_cuerpo,
