@@ -150,7 +150,7 @@ GEMINI_MEDIA_RESOLUTION = "MEDIA_RESOLUTION_HIGH"
 
 CLAUDE_MODELO = "claude-opus-5-5"
 CLAUDE_HOST = "api.anthropic.com"
-CLAUDE_URL = "https://%s/v1/messages" % CLAUDE_HOST
+CLAUDE_URL = "https://api.anthropic.com/v1/messages"   # literal: test_fuga exime esta cadena exacta
 CLAUDE_VERSION = "2023-06-01"                    # cabecera anthropic-version
 CLAUDE_SERVICIO_CLAVE = "btp-anthropic-api-prestada"   # la clave cedida; NUNCA btp-anthropic-api (la de ia.py)
 CLAUDE_MAX_PETICION = 20 * 1000 * 1000           # el mismo tope que Gemini: el de Anthropic, sin verificar
