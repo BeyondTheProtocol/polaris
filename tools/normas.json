@@ -120,6 +120,78 @@
       }
     },
     {
+      "slug": "feedback-encargo-a-la-cola-cabe-en-25-turnos",
+      "que": "Un encargo a la cola tiene 25 turnos: una pregunta por job, media página de respuesta, sin archivar; y `--criticidad critico` NO es un mando de presupuesto, es un freno clínico",
+      "clase": "lint-doc",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 9-oct-26 por auto-mejora, el mismo día que la aprendió a su costa (encargo `af32c3fecc` muerto a los 26 turnos, 15 minutos después de encolarlo). Clase `lint-doc` porque SÍ se puede comprobar sobre el dato sin criterio: el propio `cola.py enqueue` puede medir el tamaño y la cantidad de verbos imperativos del prompt y avisar antes de aceptarlo, o un test puede mirar qué proporción de los jobs de `failed/` murió por `error_max_turns`. El número está en `tools/run_agent.sh:276` (TURNOS_DEF=25, y 60 solo para `critico`)."
+    },
+    {
+      "slug": "feedback-dia-de-la-semana-calculado-no-escrito",
+      "que": "El día de la semana en un mensaje a {{TITULAR}} (sobre todo citas médicas) se DERIVA de la fecha ISO con weekday(), nunca se escribe de memoria",
+      "clase": "salida",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "RE-AÑADIDA el 9-oct-26. El Mejoras-log del 8-oct ya declaraba esta entrada como añadida y verificada (293→294), pero el cambio nunca llegó a commitearse y se perdió: hoy `git log -S` no encuentra ningún commit que haya contenido este slug. Ver la deuda `lo-que-el-lazo-escribe-sin-commitear-se-pierde`. Un día de la semana equivocado en una cita puede costarle la cita, así que es candidata a mecanismo real en gate_salida.py: cazar un nombre de día junto a una fecha ISO y recalcularlo."
+    },
+    {
+      "slug": "feedback-aviso-condicionado-no-parte-de-estado",
+      "que": "Si pide «avísame cuando X», se responde UNA confirmación de que queda armado y después SILENCIO hasta que X ocurra; un parte diciendo que X todavía no ha pasado es ruido",
+      "clase": "salida",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 9-oct-26 por auto-mejora. Clase `salida` porque se detecta en el texto antes de entregarlo: un parte cuyo contenido es «X sigue sin pasar» sobre un aviso armado. Hermana de la deuda cerrada `vega-ruido-33-al-dia`: la forma de matar un aviso es repetirlo mientras no hay noticia."
+    },
+    {
+      "slug": "feedback-cola-recover-reencola-todo-lo-fallido",
+      "que": "`cola.py recover` sin argumentos NO es una consulta: reencola TODOS los trabajos de failed/ (hasta 50). Para mirar la cola se usa `status` o `list`",
+      "clase": "bloqueo",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 9-oct-26 por auto-mejora. La puse primero como `auditable: true` por adelantarme al mecanismo que propongo, y `tests/test_normas_registro.py::test_las_de_fase_0_no_se_cuentan_como_mecanizadas` la tumbó con razón: sin mecanismo escrito no hay nada que auditar, y declararlo sería falso verde. Corregido en la misma pasada. Es de clase `bloqueo`, no `contexto`: se puede IMPEDIR de verdad con un hook PreToolUse que rechace `cola.py recover` sin `patron`/`desde`/`--dry-run`, y hoy mismo hay 18 trabajos en failed/, así que un `recover` a secas dispararía 18 encargos de golpe. Es la clase de norma que merece mecanismo duro antes que memoria."
+    },
+    {
+      "slug": "feedback-log-tecnico-tambien-se-verifica",
+      "que": "Un «aplicado y verificado» que dejó escrito una sesión anterior en Mejoras-log.md no es prueba: la sesión siguiente lo coteja contra el estado real antes de darlo por bueno",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": false,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 9-oct-26 por auto-mejora, y en la misma pasada se cobró su primera víctima: la entrada del 8-oct decía haber registrado `feedback-dia-de-la-semana-calculado-no-escrito` en este fichero y no estaba. Clase `contexto` porque exige criterio (no hay hook que sepa qué afirmación de un log hay que recotejar), pero el caso particular SÍ es mecanizable y es la propuesta: un test que compare lo que el último asiento del log declara aplicado contra el estado real del fichero que nombra."
+    },
+    {
+      "slug": "feedback-contactar-a-sus-medicas-se-dosifica",
+      "que": "Escribir a sus médicas (Mafalda, {{CONTACTO}}) se PROPONE y se espera su sí; nunca borrador por iniciativa propia ni «escríbele a X» como cierre",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": true,
+      "aplicable": false,
+      "auditable": false,
+      "repetida": true,
+      "nota": "9-oct-26, auto-mejora. HEREDADA: la lección canónica vive en el almacén de memoria del proyecto -Users-polaris (feedback-no-proponer-escribir-a-mafalda, 8-oct; feedback-no-cerrar-siempre-escribe-a-contacto, 14-ago) y las sesiones de ~/claudecode NO cargan ese almacén; esta entrada es el puente. Clase contexto porque hoy depende de criterio: el borrador no se crea hasta su sí, y eso no hay hook que lo impida sin bloquear también los borradores legítimos. Candidato a subir a clase salida con un check en gate_salida.py que cace «escríbele a X» en el Siguiente: y el nombre de una médica suya en un borrador no autorizado."
+    },
+    {
       "slug": "feedback-no-repetir-disclaimers-muro",
       "que": "No repetirle los disclaimers del muro (ya se los sabe)",
       "clase": "salida",
