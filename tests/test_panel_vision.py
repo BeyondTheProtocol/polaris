@@ -335,28 +335,30 @@ class _CasaBase:
 
 class Externos(unittest.TestCase):
     def test_lanzan_pendiente_sin_red(self):
-        """Claude: interfaz pendiente. Gemini: conectado, pero sin `condiciones_cumplidas: true` en
-        la auditoría de casa base cierra ANTES de importar vision_n1 (ni socket, ni estado)."""
+        """Claude (8-oct-26) y Gemini: conectados, pero sin `condiciones_cumplidas: true` en la
+        auditoría de casa base PARA ESE proveedor cierran ANTES de importar vision_n1 (ni socket, ni
+        estado). Una auditoría de Gemini no abre a Claude."""
         self.assertEqual(C.PROVEEDORES_EXTERNOS, ("claude", "gemini"))
+        self.assertEqual(C.CONECTADOS, ("claude", "gemini"))
         importado_antes = "vision_n1" in sys.modules
         sin_condiciones = {"veredicto": "apto con condiciones", "modelo": "gemini-3.1-pro-preview",
                            "condiciones_cumplidas": False}
-        for p, modelo in (("claude", "modelo-x"), ("gemini", "")):
-            a = C.adaptador(p + ":" + modelo)
+        for p in ("claude", "gemini"):
+            a = C.adaptador(p)
             self.assertEqual(a.destino, "vision-n1:" + p)
             self.assertFalse(a.local)
             for aud in (None, sin_condiciones):
                 with _CasaBase(aud), _SinRed() as red:
-                    with self.assertRaises(C.AdaptadorPendiente) as cm:
+                    with self.assertRaises(C.ProveedorNoListo) as cm:
                         a.comprueba()
                     self.assertIsInstance(cm.exception, NotImplementedError)
                     self.assertIn("vision_n1", str(cm.exception))
                     self.assertIn("legal-burocracia", str(cm.exception))
-                    if p == "claude":
-                        with self.assertRaises(NotImplementedError):
-                            a.responder("p", "/no/existe.png", C.esquema_respuesta("nucleos"))
                 self.assertEqual(red.intentos, [], p)
-        self.assertEqual("vision_n1" in sys.modules, importado_antes)   # gemini cerró sin importarlo
+        self.assertEqual("vision_n1" in sys.modules, importado_antes)   # cerraron sin importarlo
+        with self.assertRaises(ValueError):
+            C.adaptador("claude:modelo-x")                            # modelo fijado
+        self.assertEqual(C.adaptador("claude").modelo, "claude-opus-5-5")
         with self.assertRaises(ValueError):
             C.adaptador("gemini:modelo-x")                            # modelo fijado (auditoría 2-oct)
         self.assertEqual(C.adaptador("gemini").destino, "vision-n1:gemini")
@@ -1079,7 +1081,9 @@ class Conjunto(unittest.TestCase):
     def test_cli(self):
         d = self.copia()
         with _SinRed():
-            self.assertEqual(C.main(["correr", "--dir", d, "--modelo", "claude:opus"]), 3)
+            self.assertEqual(C.main(["correr", "--dir", d, "--modelo", "claude:opus"]), 2)   # modelo fijado
+            with _CasaBase():                                           # sin auditoría de claude: no listo
+                self.assertEqual(C.main(["correr", "--dir", d, "--modelo", "claude"]), 3)
             self.assertEqual(C.main(["correr", "--dir", d, "--modelo", "ollama:x:1b-cloud"]), 3)
             self.assertEqual(C.main(["correr", "--dir", d, "--modelo", "ollama:x", "--host", "http://10.0.0.1:11434"]), 3)
         self.assertEqual(C.main(["generar", "--dir", d, "--n", "1", "--lado", "320"]), 2)

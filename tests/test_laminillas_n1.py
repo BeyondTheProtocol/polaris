@@ -842,11 +842,12 @@ class Base(unittest.TestCase):
         return [json.loads(ln) for ln in _lee(self.log_salida, "r").splitlines() if ln.strip()]
 
     def condiciones(self, cumplidas=True, modelo="gemini-3.1-pro-preview", veredicto="apto con condiciones",
-                    donde=None):
-        """auditorias.json de la casa base falsa (o de `donde`) con la entrada de Gemini."""
+                    donde=None, proveedor="gemini"):
+        """auditorias.json de la casa base falsa (o de `donde`) con la entrada de `proveedor` y
+        ninguna otra (por defecto, Gemini)."""
         d = os.path.join(donde or self.casa_tools, "panel_vision")
         os.makedirs(d, exist_ok=True)
-        self._json(os.path.join(d, "auditorias.json"), {"gemini": {
+        self._json(os.path.join(d, "auditorias.json"), {proveedor: {
             "veredicto": veredicto, "modelo": modelo, "condiciones_cumplidas": cumplidas}})
 
     def cuenta(self, proyecto="11111111-2222-4333-8444-555555555555", **extra):
@@ -2838,6 +2839,104 @@ class Vision(Base):
         self.assertEqual(len(self.avisos()), 1)                     # el segundo no avisa
         self.assertEqual(len(self.eventos("vision_n1_envio")), 2)
 
+    # ── Claude por API (8-oct-26) ──
+    CLAUDE_OK = ("T = Transporte(crudo=_j.dumps({'type': 'message', 'model': 'claude-opus-5-5', "
+                 "'stop_reason': 'end_turn', 'content': [{'type': 'thinking', 'thinking': ''}, "
+                 "{'type': 'text', 'text': RESPUESTA}], 'usage': {'input_tokens': 1480, "
+                 "'output_tokens': 310}}).encode())\n")
+
+    def _claude(self, rutas, antes=None, **kw):
+        return self._envia(rutas, antes=self.CLAUDE_OK if antes is None else antes,
+                           destino="vision-n1:claude", **kw)
+
+    def test_claude_envia_con_todas_las_guardas_y_en_orden(self):
+        """Con confianza tecleada, la auditoría de `claude` cumplida y clave: UNA petición a Messages
+        con el modelo fijado, el PNG canónico en un bloque image base64 y el prompt al final; nada
+        más en el cuerpo (ni system, ni tools, ni fallbacks, ni thinking); la clave solo en
+        x-api-key; el aviso antes del sello y el sello antes de la llamada; ni clave ni texto en la
+        cadena."""
+        self.confia("vision-n1:claude")
+        self.condiciones(proveedor="claude", modelo="claude-opus-5-5")
+        v = self._claude([self.png])
+        self.assertEqual(v["r"], '{"hay_error": false, "tipo": null, "cuadrante": null}')
+        (ll,) = v["llamadas"]
+        self.assertEqual(ll["url"], "https://api.anthropic.com/v1/messages")
+        self.assertEqual(ll["cab"], {"Content-Type": "application/json", "anthropic-version": "2023-06-01",
+                                     "x-api-key": "clave-falsa-GEMINI-0123456789"})
+        self.assertEqual(set(ll["cuerpo"]), {"model", "max_tokens", "output_config", "messages"})
+        self.assertEqual(ll["cuerpo"]["model"], "claude-opus-5-5")
+        self.assertEqual(ll["cuerpo"]["output_config"], {"effort": "high"})
+        (msg,) = ll["cuerpo"]["messages"]
+        self.assertEqual(msg["role"], "user")
+        img, txt = msg["content"]
+        self.assertEqual((img["type"], img["source"]["type"], img["source"]["media_type"]),
+                         ("image", "base64", "image/png"))
+        self.assertEqual(base64.b64decode(img["source"]["data"]), _lee(self.png))       # canónico
+        self.assertEqual(txt, {"type": "text", "text": "Review the Ki67 overlay"})
+        self.assertEqual(ll["sellados"], 1)                         # sellado ANTES de la llamada
+        self.assertEqual(len(self.avisos()), 1)
+        seq = {}
+        for e in self.eventos():
+            seq.setdefault(e["evento"], e["seq"])
+        self.assertLess(seq["n1_aviso_primer_envio"], seq["vision_n1_envio"])
+        self.assertLess(seq["vision_n1_envio"], seq["vision_n1_respuesta"])
+        env = self.eventos("vision_n1_envio")[-1]
+        self.assertEqual((env["proveedor"], env["modelo"], env["endpoint"]),
+                         ("claude", "claude-opus-5-5", "messages"))
+        self.assertEqual(self.eventos("vision_n1_respuesta")[-1]["uso"],
+                         {"input_tokens": 1480, "output_tokens": 310})
+        cadena = json.dumps(self.eventos())
+        self.assertNotIn("clave-falsa", cadena)
+        self.assertNotIn("hay_error", cadena)
+
+    def test_claude_sin_su_auditoria_o_con_otro_modelo_no_sale(self):
+        """El adaptador escrito no abre nada por sí solo: la auditoría de Gemini no vale para
+        Claude, ni una de Claude hecha para otro modelo, ni una sin condiciones cumplidas; y el
+        modelo va fijado."""
+        self.confia("vision-n1:claude")
+        self.condiciones()                                           # solo Gemini
+        self.assertIn("sin auditoría", self._claude([self.png])["r"])
+        self.condiciones(proveedor="claude", modelo="claude-opus-5")
+        self.assertIn("hecha para", self._claude([self.png])["r"])
+        self.condiciones(proveedor="claude", modelo="claude-opus-5-5", cumplidas=False)
+        self.assertIn("condiciones_cumplidas", self._claude([self.png])["r"])
+        self.condiciones(proveedor="claude", modelo="claude-opus-5-5")
+        v = self._claude([self.png], modelo="claude-sonnet-5-5")
+        self.assertIn("fijado", v["r"])
+        self.assertEqual(v["llamadas"], [])
+        self.assertEqual((self.avisos(), self.eventos("vision_n1_envio")), ([], []))
+
+    def test_claude_negativa_corte_y_error_http_son_errores_sin_clave(self):
+        """`refusal` y `max_tokens` no devuelven texto (fail-closed, sin relevo a otro modelo); un
+        error HTTP que repite la clave sale limpio; todo queda sellado como respuesta con error."""
+        self.confia("vision-n1:claude")
+        self.condiciones(proveedor="claude", modelo="claude-opus-5-5")
+        casos = [("{'stop_reason': 'refusal', 'stop_details': {'type': 'refusal', 'category': 'bio'}, "
+                  "'content': []}", 200, "declinó la petición (bio)"),
+                 ("{'stop_reason': 'max_tokens', 'content': [{'type': 'text', 'text': 'a medias'}]}",
+                  200, "cortada por max_tokens"),
+                 ("{'stop_reason': 'end_turn', 'content': [{'type': 'thinking', 'thinking': 'x'}]}",
+                  200, "sin texto"),
+                 ("{'type': 'error', 'error': {'type': 'authentication_error', "
+                  "'message': 'invalid x-api-key ' + CLAVE}}", 401, "Claude HTTP 401")]
+        for cuerpo, status, motivo in casos:
+            v = self._claude([self.png], antes="T = Transporte(status=%d, crudo=_j.dumps(%s).encode())\n"
+                             % (status, cuerpo))
+            self.assertTrue(v["r"].startswith("ERROR"), (motivo, v["r"]))
+            self.assertIn(motivo, v["r"])
+            self.assertNotIn("clave-falsa", v["r"])
+            self.assertEqual(len(v["llamadas"]), 1, motivo)
+        self.assertNotIn("clave-falsa", json.dumps(self.eventos()))
+        self.assertEqual(len([e for e in self.eventos("vision_n1_respuesta") if e.get("error")]), len(casos))
+
+    def test_claude_lee_la_clave_cedida_y_nunca_la_de_ia(self):
+        """El servicio del Llavero es el de la clave cedida; el adaptador no nombra la de ia.py."""
+        v = self.codigo("import vision_n1 as V\n"
+                        "print(json.dumps([V.ADAPTADORES['claude']['servicio'], V.ADAPTADORES['claude']['host'],"
+                        " V.ADAPTADORES['claude']['cabecera_clave'], sorted(V.HOSTS)]))")
+        self.assertEqual(v, ["btp-anthropic-api-prestada", "api.anthropic.com", "x-api-key",
+                             ["api.anthropic.com", "generativelanguage.googleapis.com"]])
+
     def test_sin_confianza_sin_clave_o_sin_aviso_no_sale(self):
         self.condiciones()
         v = self._envia([self.png])
@@ -2864,6 +2963,7 @@ class Vision(Base):
     def test_png_no_canonico_nombre_no_opaco_modelo_y_tipo_no_salen(self):
         self.confia("vision-n1:gemini")
         self.confia("vision-n1:claude")
+        self.confia("vision-n1:qwen")
         self.condiciones()
         from PIL import PngImagePlugin
         info = PngImagePlugin.PngInfo()
@@ -2875,7 +2975,8 @@ class Vision(Base):
         casos = [([self.colar_en_n1("P-X__x8__mpp2.0000.png", buf.getvalue())], {}, "chunk"),
                  ([self.colar_en_n1("24B0001043.png", _lee(self.png))], {}, "nombre N1"),
                  ([self.png], {"modelo": "gemini-2.5-pro"}, "fijado"),
-                 ([self.png], {"destino": "vision-n1:claude"}, "sin escribir"),
+                 ([self.png], {"destino": "vision-n1:claude"}, "sin auditoría"),   # adaptador sí; auditoría no
+                 ([self.png], {"destino": "vision-n1:qwen"}, "sin escribir"),
                  ([os.path.join(self.n1, "P-KI67-t.csv")], {}, "solo van PNG")]
         for rutas, kw, motivo in casos:
             v = self._envia(rutas, **kw)
