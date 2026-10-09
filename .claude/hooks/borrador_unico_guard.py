@@ -103,10 +103,21 @@ def _destinatarios(ti):
 
 
 def clave(ti):
-    """Identidad del correo: el hilo si se sabe; si no, destinatario + asunto normalizado."""
+    """Identidad del correo: el hilo si se sabe; si no, el mensaje al que responde; si no,
+    destinatario + asunto normalizado.
+
+    RESPONDER A UN MENSAJE NUEVO ES OTRO CORREO (9-oct-26). El guard no ve lo que ella envía
+    desde Gmail: un borrador enviado seguía en la libreta, y la respuesta a la contestación del
+    otro («RE: …», mismo destinatario, mismo asunto sin prefijo) se denegaba como duplicado
+    aunque en Borradores no hubiera nada (pasó con la respuesta a Cairn Health). Con
+    `replyToMessageId` la clave es ese mensaje: dos borradores para responder al MISMO mensaje
+    siguen siendo un duplicado; uno para responder a un mensaje posterior, no."""
     hilo = ti.get("threadId") or ti.get("thread_id") or ti.get("thread")
     if hilo:
         return "hilo:%s" % hilo
+    resp = ti.get("replyToMessageId") or ti.get("reply_to_message_id")
+    if resp:
+        return "resp:%s" % resp
     return "asunto:%s|%s" % (_destinatarios(ti), _norm_asunto(ti.get("subject")))
 
 
@@ -202,7 +213,8 @@ def main():
             "   Si es una RESPUESTA dentro de un hilo, borra y crea con `replyToMessageId`:\n"
             "   `update_draft` saca el borrador del hilo.\n"
             "   Si de verdad son dos correos distintos: BTP_BORRADOR_OK=1.\n"
-            % ("menos de una hora" if dias < 0.05 else "%.0f día(s)" % max(dias, 1)))
+            % ("menos de una hora" if dias < 0.05 else
+               "%.0f hora(s)" % (dias * 24) if dias < 1 else "%.0f día(s)" % dias))
         return 2
 
     libro[k] = {"ts": ahora, "veces": 1}

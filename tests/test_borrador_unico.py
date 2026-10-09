@@ -149,6 +149,25 @@ check("update_draft con solo draftId refresca SU entrada, sin clave vacía",
 check("respuesta ilegible en PostToolUse → PASA y no apunta nada",
       _post(CREATE, {"to": "z@x.example", "subject": "otro"}, "basura") == 0)
 
+# ── responder a un mensaje NUEVO del mismo hilo no es un duplicado (9-oct-26, Cairn Health) ──
+# Ella envió el primer borrador desde Gmail (el guard no lo ve); el otro contestó; la respuesta
+# a esa contestación tiene el mismo destinatario y el mismo asunto sin prefijo.
+_reset()
+C1 = {"to": ["contacto@cairn.example"], "subject": "Re: your message (structural reading)"}
+check("primer correo, sin replyToMessageId → PASA", _rc(CREATE, C1)[0] == 0)
+C2 = dict(C1, subject="RE: your message (structural reading)", replyToMessageId="m-nuevo")
+check("respuesta a un mensaje posterior (replyToMessageId) → PASA aunque el asunto coincida",
+      _rc(CREATE, C2)[0] == 0)
+check("otro borrador para responder a ESE MISMO mensaje → DENIEGA", _rc(CREATE, C2)[0] == 2)
+check("responder a un tercer mensaje del hilo → PASA",
+      _rc(CREATE, dict(C2, replyToMessageId="m-tercero"))[0] == 0)
+check("sin replyToMessageId, mismo destinatario y asunto → sigue DENEGANDO",
+      _rc(CREATE, C1)[0] == 2)
+_reset()
+_rc(CREATE, C1)
+check("el aviso da la antigüedad en horas, no «1 día» para algo de hace minutos",
+      "día" not in _rc(CREATE, C1)[1].split("\n")[0])
+
 for desc, ok in casos:
     print(("  ✅ " if ok else "  ❌ ") + desc)
 shutil.rmtree(_TMP, ignore_errors=True)
