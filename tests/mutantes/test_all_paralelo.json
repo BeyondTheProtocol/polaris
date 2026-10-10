@@ -1,0 +1,76 @@
+{
+  "_por_que": "Cada entrada es una defensa del modo paralelo de tests/test_all.sh (10-oct-26). Si al quitarla test_all_paralelo sigue verde, esa defensa no está cubierta: una suite que se acelera a costa de decir otra cosa es peor que una lenta.",
+  "objetivo": "tests/test_all.sh",
+  "test": [
+    "python3",
+    "tests/test_all_paralelo.py"
+  ],
+  "env": "BTP_SUITE",
+  "mutaciones": [
+    {
+      "etiqueta": "serie: sin cronómetro (el bug de la fusión perdida)",
+      "viejo": "  _tiempos+=\"$((SECONDS-_t0)) $2\"$'\\n'\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "paralelo: sin cronómetro",
+      "viejo": "    _tiempos+=\"$_t $_n\"$'\\n'; _suma=$((_suma+_t))",
+      "nuevo": "    _suma=$((_suma+_t))"
+    },
+    {
+      "etiqueta": "paralelo: un trabajo muerto no cuenta (fail-open)",
+      "viejo": "fail=$((fail+1)); continue",
+      "nuevo": "continue"
+    },
+    {
+      "etiqueta": "paralelo: los rojos no suman al contador",
+      "viejo": "    [ \"$_r\" -eq 1 ] && fail=$((fail+1))\n    [ \"$_r\" -eq 2 ] && skip=$((skip+1))\n  done",
+      "nuevo": "    [ \"$_r\" -eq 2 ] && skip=$((skip+1))\n  done"
+    },
+    {
+      "etiqueta": "paralelo: las saltadas no se cuentan",
+      "viejo": "    [ \"$_r\" -eq 2 ] && skip=$((skip+1))\n  done",
+      "nuevo": "    :\n  done"
+    },
+    {
+      "etiqueta": "SOLO_SERIE ignorada (todo al pool)",
+      "viejo": "*\" $_n \"*) echo \"$_i $_l\" >> \"$_w/serie\";; *)",
+      "nuevo": "*)"
+    },
+    {
+      "etiqueta": "el pool corre en serie (-P 1)",
+      "viejo": "xargs -L1 -P \"$JOBS\" bash",
+      "nuevo": "xargs -L1 -P 1 bash"
+    },
+    {
+      "etiqueta": "SOLO_SERIE corre en paralelo",
+      "viejo": "xargs -L1 -P 1 bash",
+      "nuevo": "xargs -L1 -P \"$JOBS\" bash"
+    },
+    {
+      "etiqueta": "el log del rojo de un .py pierde el stderr",
+      "viejo": "cat \"$_o\" \"$_e\" > \"$ROJO_DIR/rojo-$_n.log\" 2>/dev/null",
+      "nuevo": "cp \"$_o\" \"$ROJO_DIR/rojo-$_n.log\" 2>/dev/null"
+    },
+    {
+      "etiqueta": "rc 77 deja de ser «saltada»",
+      "viejo": "  if [ $_rc -eq 77 ]; then rm -f \"$_o\" \"$_e\"; return 2; fi\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "la salida del paralelo sale en orden de llegada, no de declaración",
+      "viejo": "    cat \"$_w/$_i.out\"; _r=$(cat \"$_w/$_i.rc\"); _t=$(cat \"$_w/$_i.t\")",
+      "nuevo": "    _r=$(cat \"$_w/$_i.rc\"); _t=$(cat \"$_w/$_i.t\"); tail -r \"$_w/$_i.out\""
+    },
+    {
+      "etiqueta": "LARGAS ignorada (las gordas no van primero)",
+      "viejo": "  if [ -s \"$_w/gordas\" ]; then cat \"$_w/gordas\" \"$_w/pool\" > \"$_w/pool2\"; mv \"$_w/pool2\" \"$_w/pool\"; fi\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "BTP_JOBS baja a las baterías",
+      "viejo": "  unset BTP_JOBS\n",
+      "nuevo": ""
+    }
+  ]
+}

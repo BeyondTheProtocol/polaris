@@ -89,5 +89,70 @@ class Seleccion(unittest.TestCase):
         T.cambiados()
 
 
+class PuertaDeFusion(unittest.TestCase):
+    """10-oct-26 · la puerta por impacto: lo que puede romper el muro SIN que un grafo lo vea exige
+    la suite COMPLETA; el resto, afectadas + núcleo fijo. Aquí se fija que tocar el muro sigue
+    disparando la suite entera, con los ficheros REALES del repo (no solo con ejemplos)."""
+
+    REALES = T.baterias()
+
+    def test_cualquier_hook_real_exige_la_completa(self):
+        carpeta = os.path.join(ROOT, ".claude", "hooks")
+        hooks = sorted(os.listdir(carpeta))
+        self.assertGreater(len(hooks), 20, "no vio los hooks: el test pasaría en vacío")
+        for h in hooks:
+            r = T.puerta([".claude/hooks/" + h], self.REALES, GrafoFalso({}))
+            self.assertEqual(r["veredicto"], "COMPLETA", h)
+            self.assertEqual(r["seleccion"], self.REALES, h)
+
+    def test_cada_tool_que_un_hook_usa_exige_la_completa(self):
+        muro = T.tools_de_hooks()
+        self.assertGreater(len(muro), 20, "tools_de_hooks() salió casi vacío: pasaría en vacío")
+        for need in ("tools/salida.py", "tools/_secrets.py", "tools/lector_clinico.py",
+                     "tools/permiso_envio.py"):
+            self.assertIn(need, muro, "ya no se ve que un hook use %s" % need)
+        for t in sorted(muro):
+            self.assertEqual(T.puerta([t], self.REALES, GrafoFalso({}))["veredicto"], "COMPLETA", t)
+
+    def test_settings_runner_y_ayudantes_exigen_la_completa(self):
+        for f in (".claude/settings.json", ".claude/settings.local.json", "tests/test_all.sh",
+                  "tests/_entorno.py", "tools/tests_afectados.py", "tools/normas.json",
+                  "tools/config/politica_aprobacion.json"):
+            self.assertEqual(T.puerta([f], self.REALES, GrafoFalso({}))["veredicto"], "COMPLETA", f)
+
+    def test_un_cambio_ajeno_al_muro_es_rapida_y_lleva_el_nucleo(self):
+        r = T.puerta(["tools/viajes_precios.py", "README.md"], self.REALES, GrafoFalso({}),
+                     muro_tools=set())
+        self.assertEqual(r["veredicto"], "RAPIDA")
+        self.assertTrue(T.nucleo_muro(self.REALES) <= r["seleccion"])
+        self.assertIn("test_fuga.sh", r["seleccion"])
+        self.assertNotEqual(r["seleccion"], self.REALES, "la rápida no puede ser la completa")
+
+    def test_solo_documentacion_es_rapida_con_solo_el_nucleo(self):
+        r = T.puerta(["README.md"], self.REALES, GrafoFalso({}), muro_tools=set())
+        self.assertEqual(r["veredicto"], "RAPIDA")
+        self.assertEqual(r["seleccion"], T.nucleo_muro(self.REALES))
+
+    def test_constitucion_reglas_y_agentes_exigen_la_completa(self):
+        """Hueco hallado al medir (10-oct): un .md no tiene dependientes en el grafo, así que tocar
+        CLAUDE.md o una regla caía en RAPIDA con solo el núcleo y no corría test_constitucion_*."""
+        for f in ("CLAUDE.md", ".claude/rules/clinico.md", ".claude/agents/tecnico.md",
+                  ".claude/skills/a11y/SKILL.md"):
+            self.assertEqual(T.puerta([f], self.REALES, GrafoFalso({}))["veredicto"], "COMPLETA", f)
+        self.assertEqual(T.puerta(["README.md"], self.REALES, GrafoFalso({}),
+                                  muro_tools=set())["veredicto"], "RAPIDA")
+
+    def test_mezcla_basta_un_fichero_del_muro(self):
+        r = T.puerta(["README.md", "tools/viajes_precios.py", ".claude/hooks/muro_guard.py"],
+                     self.REALES, GrafoFalso({}))
+        self.assertEqual(r["veredicto"], "COMPLETA")
+
+    def test_el_cli_dice_la_primera_linea(self):
+        import subprocess
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tests_afectados.py"), "--puerta"],
+                             capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL).stdout
+        self.assertIn(out.splitlines()[0], ("COMPLETA", "RAPIDA"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

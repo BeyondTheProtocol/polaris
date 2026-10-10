@@ -21,6 +21,9 @@ Cambios solo en `.md`, memorias o docs: ninguna batería.
 
 Uso: python3 tools/tests_afectados.py [--base master]   → nombres de batería, uno por línea
      (con «TODO» en la primera línea si hay que correrlo todo).
+     python3 tools/tests_afectados.py --puerta           → la PUERTA DE FUSIÓN por impacto (10-oct-26,
+     propuesta): primera línea «COMPLETA» (con los motivos como comentarios `# …`) o «RAPIDA» (y debajo
+     las afectadas + el núcleo fijo del muro). No cambia `--cambiados`.
 """
 import os
 import subprocess
@@ -101,8 +104,92 @@ def afectados(ficheros, disponibles, grafo=None):
     return False, sel
 
 
+# ── PUERTA DE FUSIÓN POR IMPACTO (10-oct-26, propuesta) ──────────────────────────────────────
+# `--cambiados` sirve para ITERAR. La puerta decide si un cambio puede fusionar sin la suite
+# entera. Regla: lo que PUEDE romper el muro sin que ningún grafo lo vea exige la completa. El
+# resto, las afectadas + un núcleo fijo del muro. La completa corre además cada noche sobre casa
+# base (la rutina se propone aparte, no se instala aquí).
+#
+# FICHEROS FIJOS que exigen la completa, además de todo lo de `.claude/hooks/` y `settings*`:
+_PUERTA_COMPLETA_FIJOS = (
+    "tests/test_all.sh", "tools/tests_afectados.py", "tools/dependencias.py", "tools/mutantes.py",
+    "tools/normas.json", "tools/deuda.py", "tools/cerrar_sesion.py", "tools/git_mutex.py",
+    "tools/ramas.py", "tools/salida.py", "tools/enruta.py", "tools/deid.py", "tools/codigo_rojo.py",
+)
+
+
+def tools_de_hooks(raiz=RAIZ):
+    """tools/*.py que los hooks importan o citan por ruta: la parte de tools/ que ES el muro.
+    Se calcula, no se lista a mano: un hook que empieza a usar una tool la mete en el muro solo."""
+    import re
+    existentes = {f[:-3] for f in os.listdir(os.path.join(raiz, "tools")) if f.endswith(".py")}
+    carpeta = os.path.join(raiz, ".claude", "hooks")
+    hallados = set()
+    for nombre in sorted(os.listdir(carpeta)) if os.path.isdir(carpeta) else []:
+        try:
+            texto = open(os.path.join(carpeta, nombre), encoding="utf-8", errors="replace").read()
+        except Exception:
+            continue
+        for m in re.finditer(r"tools/([A-Za-z0-9_]+)\.py", texto):
+            hallados.add(m.group(1))
+        for m in re.finditer(r"^\s*(?:import|from)\s+([A-Za-z0-9_]+)", texto, re.M):
+            hallados.add(m.group(1))
+    return {"tools/%s.py" % n for n in hallados & existentes}
+
+
+def exige_completa(ficheros, muro_tools=None):
+    """[(fichero, motivo)] de los cambios que obligan a la suite COMPLETA antes de fusionar."""
+    if muro_tools is None:
+        muro_tools = tools_de_hooks()
+    motivos = []
+    for f in ficheros:
+        base = os.path.basename(f)
+        if f.startswith(".claude/hooks/"):
+            motivos.append((f, "hook del muro"))
+        elif f.startswith(".claude/") and base.startswith("settings"):
+            motivos.append((f, "settings del harness"))
+        elif f in _PUERTA_COMPLETA_FIJOS:
+            motivos.append((f, "runner, gate o herramienta que decide qué se prueba"))
+        elif f in muro_tools:
+            motivos.append((f, "tool que usa un hook del muro"))
+        elif f == "CLAUDE.md" or f.startswith((".claude/rules/", ".claude/agents/", ".claude/skills/")):
+            # Son .md: el grafo no los ve y «solo documentación» no corre nada, pero los LEEN tests
+            # (constitución, frontmatter de agentes, coherencia de modelos) y el harness los carga.
+            motivos.append((f, "constitución, reglas, agentes o skills: los leen tests y el harness"))
+        elif f.startswith("tests/") and base.startswith("_"):
+            motivos.append((f, "ayudante compartido por muchas baterías"))
+        elif f.startswith("tools/config/") or (f.startswith("tools/launchd/") and f.endswith(".json")):
+            motivos.append((f, "política o registro que el muro lee"))
+    return motivos
+
+
+def nucleo_muro(disponibles):
+    """Núcleo fijo del muro: corre SIEMPRE en la puerta rápida, lo haya tocado el cambio o no."""
+    return {b for b in disponibles if b.startswith(_MURO_PREFIJOS)}
+
+
+def puerta(ficheros, disponibles, grafo=None, muro_tools=None):
+    """{'veredicto': 'COMPLETA'|'RAPIDA', 'motivos': [...], 'seleccion': set}"""
+    motivos = exige_completa(ficheros, muro_tools)
+    if motivos:
+        return {"veredicto": "COMPLETA", "motivos": motivos, "seleccion": set(disponibles)}
+    _todo, sel = afectados(ficheros, disponibles, grafo)
+    return {"veredicto": "RAPIDA", "motivos": [], "seleccion": sel | nucleo_muro(disponibles)}
+
+
 def main(argv):
     base = argv[argv.index("--base") + 1] if "--base" in argv else "master"
+    if "--puerta" in argv:
+        r = puerta(cambiados(base), baterias())
+        if r["veredicto"] == "COMPLETA":
+            print("COMPLETA")
+            for f, m in r["motivos"]:
+                print("# %s: %s" % (f, m))
+        else:
+            print("RAPIDA")
+            for b in sorted(r["seleccion"]):
+                print(b)
+        return 0
     todo, sel = afectados(cambiados(base), baterias())
     if todo:
         print("TODO")

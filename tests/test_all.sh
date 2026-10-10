@@ -34,35 +34,146 @@ test_chrome_headless_cierra.py"
 # Cronómetro por batería (26-sep-26): una medición de 7 días dio ~35 h-sesión bloqueadas en
 # 473 pasadas de test_all (mediana 4,0 min). Al final se imprimen las 10 más lentas: el dato para
 # saber qué test adelgazar. No cambia ni el resultado ni el código de salida.
+# 10-oct-26: el cronómetro llevaba DESAPARECIDO desde una fusión (la línea `_tiempos+=` se perdió y
+# el bloque de las 10 más lentas imprimía vacío sin que nadie lo notara). Vuelve, con test
+# (test_all_paralelo.py).
 _tiempos=""
 _salta() { [ -n "$BTP_PORTABLE" ] || return 1
            case " $(echo $SOLO_CASA_BASE) " in *" $1 "*) return 0;; esac; return 1; }
-run() { _fuera "$1" && return 0; _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; bash "$ROOT/tests/$1" >/tmp/t.$$ 2>&1; local rc=$?; tail -1 /tmp/t.$$;
-        [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
-        [ $rc -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
-                           echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
-# El nombre del test que se pone ROJO se DICE (27/7/26). Antes runpy solo incrementaba el contador:
-# la batería acababa en "❌ 1 batería(s) con fallos" sin decir cuál, y había que ir a mano fichero a
-# fichero. Con el log guardado, además, el fallo se puede mirar después (importa para los flakes).
-runpy() { _fuera "$1" && return 0; _salta "$1" && { echo "── $1 ── (solo casa base)"; skip=$((skip+1)); return 0; }; echo "── $1 ──"; "$PY" "$ROOT/tests/$1" >/tmp/t.$$ 2>/tmp/t.$$.err; local rc=$?; tail -1 /tmp/t.$$;
-          [ $rc -eq 77 ] && { skip=$((skip+1)); return 0; }
-          # stderr va al log del rojo (22-sep-26): `unittest` escribe AHÍ el fallo, y sin esto el
-          # paso «Qué falló exactamente» del CI público salía vacío con test_web_lint en rojo.
-          [ $rc -ne 0 ] && { fail=$((fail+1)); cat /tmp/t.$$ /tmp/t.$$.err > "$ROJO_DIR/rojo-$1.log" 2>/dev/null;
-                             echo "  🔴 ROJO: $1 (rc=$rc · log: $ROJO_DIR/rojo-$1.log)"; }; }
+
+# _corre <run|py> <batería> — UNA batería con todo lo suyo: cabecera, última línea y log del rojo
+# (en `py`, stdout+stderr: `unittest` escribe AHÍ el fallo, 22-sep-26; en `run`, ambos mezclados).
+# El nombre del test que se pone ROJO se DICE (27/7/26) y su log se guarda para mirarlo después.
+# Devuelve 0 verde · 1 rojo · 2 saltada (rc 77 o solo-casa-base). Los temporales son ÚNICOS
+# (mktemp): antes eran /tmp/t.$$, que dos trabajos del mismo proceso se habrían pisado.
+_corre() {
+  local _k="$1" _n="$2" _o _e _rc
+  _salta "$_n" && { echo "── $_n ── (solo casa base)"; return 2; }
+  echo "── $_n ──"
+  _o=$(mktemp "${TMPDIR:-/tmp}/t.XXXXXX"); _e="$_o.err"
+  if [ "$_k" = "py" ]; then "$PY" "$ROOT/tests/$_n" >"$_o" 2>"$_e"; else bash "$ROOT/tests/$_n" >"$_o" 2>&1; fi
+  _rc=$?
+  tail -1 "$_o"
+  if [ $_rc -eq 77 ]; then rm -f "$_o" "$_e"; return 2; fi
+  if [ $_rc -ne 0 ]; then
+    if [ "$_k" = "py" ]; then cat "$_o" "$_e" > "$ROJO_DIR/rojo-$_n.log" 2>/dev/null
+    else cp "$_o" "$ROJO_DIR/rojo-$_n.log" 2>/dev/null; fi
+    echo "  🔴 ROJO: $_n (rc=$_rc · log: $ROJO_DIR/rojo-$_n.log)"
+    rm -f "$_o" "$_e"; return 1
+  fi
+  rm -f "$_o" "$_e"; return 0
+}
+
+# Modo trabajador (lo lanza _vacia_cola, nunca a mano): corre UNA batería y deja su bloque de
+# salida, su código y su tiempo en la carpeta de la ejecución. El padre decide qué cuenta como rojo.
+if [ "$1" = "--worker" ]; then
+  # BTP_JOBS NO baja a las baterías: test_all_rojo_dir.py y test_all_stdin_cerrado.py ejecutan la
+  # cabecera de este script y, heredándolo, ENCOLABAN en vez de correr (2 falsos rojos en la 1ª pasada).
+  unset BTP_JOBS
+  _w="$2"; _i="$3"; _t0=$SECONDS
+  _corre "$4" "$5" > "$_w/$_i.out" 2>&1; _r=$?
+  echo "$((SECONDS-_t0))" > "$_w/$_i.t"; echo "$_r" > "$_w/$_i.rc"
+  [ "$_r" -eq 1 ] && echo "🔴 (en vivo) $5" >&2
+  exit 0
+fi
+
+# Paralelismo (10-oct-26, prototipo): BTP_JOBS=N o --jobs N. Por defecto 1 = serie, idéntico a
+# siempre. Con N>1 las baterías se ENCOLAN y se corren N a la vez, salvo las de SOLO_SERIE, que van
+# después una a una con la máquina libre. La salida sale en el MISMO orden de siempre, al final.
+JOBS="${BTP_JOBS:-1}"; _COLA=()
+# Comparten estado real (git del repo, Llavero, procesos del sistema, relojes, ficheros fijos) o miden
+# tiempos/carga: en paralelo darían rojos intermitentes. Lista medida, no supuesta (ver la nota del plan).
+SOLO_SERIE="test_fuga.sh test_halt.sh test_anatomia.py test_anatomia_al_dia.py test_contrato_asiento.py
+test_cosecha_panel.py test_githooks_base.py test_healthcheck.py test_cascada_clinica.py"
+# · fuga/halt: el cierre de sesión ya midió (26-sep) que test_fuga.sh se pone rojo con 4 a la vez.
+# · anatomia, contrato_asiento, cosecha_panel, githooks_base, healthcheck: SOLO corren de verdad en casa
+#   base; en un worktree saltan (rc 77), así que NINGUNA pasada de prueba las vio en paralelo. Sin
+#   evidencia, serie. Si la rutina nocturna las pasa 10 noches en paralelo sin rojo, se sacan de aquí.
+# · cascada_clinica: crea 00_FUENTE-DE-VERDAD/ en la raíz y eso decide si saltan otras (acopla el orden).
+# Las más lentas medidas el 10-oct-26 (≥ 40 s, ~1 núcleo cada una): arrancan primero en el pool.
+LARGAS="test_laminillas.py test_laminillas_n1.py test_laminillas_piloto_b.py test_anatomia_tecnica.py
+test_anatomia_push.py test_laminillas_piloto_congela.py test_laminillas_f3.py test_visor3d_modelo_port.py
+test_dispatcher.sh test_visor3d_cuelgue.py test_laminillas_capas.py test_laminillas_1bis.py
+test_correos_publicables.py test_deid_eval.py test_laminillas_valis.py test_panel_vision.py"
+_lanza() {   # <run|py> <batería>
+  _fuera "$2" && return 0
+  if [ "$JOBS" -gt 1 ]; then _COLA+=("$1 $2"); return 0; fi
+  local _t0=$SECONDS _r
+  _corre "$1" "$2"; _r=$?
+  _tiempos+="$((SECONDS-_t0)) $2"$'\n'
+  [ $_r -eq 1 ] && fail=$((fail+1))
+  [ $_r -eq 2 ] && skip=$((skip+1))
+  return 0
+}
+run()   { _lanza run "$1"; }
+runpy() { _lanza py "$1"; }
+
+# Corre lo encolado (solo con JOBS>1) y lo reproduce en orden: salida, rojos, saltos y tiempos
+# acaban donde acabarían en serie. FAIL-CLOSED: un trabajo que murió sin dejar código cuenta ROJO.
+_vacia_cola() {
+  [ "$JOBS" -gt 1 ] && [ "${#_COLA[@]}" -gt 0 ] || return 0
+  local _w _i=0 _l _n _t _r _pared=$SECONDS _suma=0
+  _w=$(mktemp -d "${TMPDIR:-/tmp}/par.XXXXXX"); : > "$_w/pool"; : > "$_w/serie"
+  # Las gordas, primero (LPT): una de 440 s que arranca la última alarga la pasada entera 440 s más.
+  for _l in "${_COLA[@]}"; do
+    _i=$((_i+1)); _n="${_l#* }"
+    case " $(echo $SOLO_SERIE) " in *" $_n "*) echo "$_i $_l" >> "$_w/serie";; *)
+      case " $(echo $LARGAS) " in *" $_n "*) echo "$_i $_l" >> "$_w/gordas";; *) echo "$_i $_l" >> "$_w/pool";; esac;; esac
+  done
+  if [ -s "$_w/gordas" ]; then cat "$_w/gordas" "$_w/pool" > "$_w/pool2"; mv "$_w/pool2" "$_w/pool"; fi
+  BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P "$JOBS" bash "$ROOT/tests/test_all.sh" --worker "$_w" < "$_w/pool"
+  BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P 1 bash "$ROOT/tests/test_all.sh" --worker "$_w" < "$_w/serie"
+  _i=0
+  for _l in "${_COLA[@]}"; do
+    _i=$((_i+1)); _n="${_l#* }"
+    if [ ! -f "$_w/$_i.rc" ]; then
+      echo "── $_n ──"; echo "  🔴 ROJO: $_n (sin resultado: el trabajo murió antes de acabar)"; fail=$((fail+1)); continue
+    fi
+    cat "$_w/$_i.out"; _r=$(cat "$_w/$_i.rc"); _t=$(cat "$_w/$_i.t")
+    _tiempos+="$_t $_n"$'\n'; _suma=$((_suma+_t))
+    [ "$_r" -eq 1 ] && fail=$((fail+1))
+    [ "$_r" -eq 2 ] && skip=$((skip+1))
+  done
+  echo "⚙️  paralelo: $JOBS trabajos · ${#_COLA[@]} baterías · pared $((SECONDS-_pared))s frente a ${_suma}s de suma en serie"
+  case "$_w" in */par.*) rm -r "$_w";; esac
+}
 
 # --cambiados (26-sep-26): solo las baterías que tocan los ficheros cambiados de la rama
 # (tools/tests_afectados.py). Es para comprobar sobre la marcha sin esperar 10+ minutos, con
 # varias sesiones a la vez en la misma máquina. NO vale para fusionar a casa base: el resumen lo
 # dice y no escribe «TODO EN VERDE». Test: test_tests_afectados.py.
 CAMBIADOS=""; SELECCION=""; fuera=0
-if [ "$1" = "--cambiados" ]; then
+_pide_cambiados=""; _pide_puerta=""; PUERTA=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --cambiados) _pide_cambiados=1;;
+    --puerta) _pide_puerta=1;;
+    --jobs|-j) JOBS="$2"; shift;;
+    --jobs=*) JOBS="${1#--jobs=}";;
+  esac
+  shift
+done
+case "$JOBS" in ''|*[!0-9]*) JOBS=1;; esac
+[ "$JOBS" -ge 1 ] || JOBS=1
+if [ -n "$_pide_cambiados" ]; then
   _sel=$("$PY" "$ROOT/tools/tests_afectados.py")
   if [ "$(echo "$_sel" | head -1)" != "TODO" ]; then
     CAMBIADOS=1; SELECCION=" $(echo $_sel) "
     echo "⚡ MODO --cambiados: $(echo "$_sel" | grep -c .) batería(s) afectada(s). Antes de fusionar, la suite completa."
   else
     echo "⚡ --cambiados: se tocó test_all.sh, así que va la suite completa."
+  fi
+fi
+# --puerta (10-oct-26, propuesta): la puerta de fusión por impacto (tools/tests_afectados.py --puerta).
+# COMPLETA (se tocó un hook, el runner o una tool del muro) → corre la suite entera, como siempre.
+# RAPIDA → las afectadas + el núcleo fijo del muro; el resumen NO dice «TODO EN VERDE».
+if [ -n "$_pide_puerta" ]; then
+  _sel=$("$PY" "$ROOT/tools/tests_afectados.py" --puerta)
+  if [ "$(echo "$_sel" | head -1)" = "COMPLETA" ]; then
+    echo "🚪 PUERTA: COMPLETA. Motivo:"; echo "$_sel" | grep '^#' | sed 's/^# /   /'
+  else
+    CAMBIADOS=1; PUERTA=1; SELECCION=" $(echo "$_sel" | grep -v '^RAPIDA$' | tr '\n' ' ') "
+    echo "🚪 PUERTA: RAPIDA · $(echo "$_sel" | grep -vc '^RAPIDA$') batería(s) (afectadas + núcleo del muro)."
   fi
 fi
 _fuera() { [ -n "$CAMBIADOS" ] || return 1; case "$SELECCION" in *" $1 "*) return 1;; esac; fuera=$((fuera+1)); return 0; }
@@ -105,6 +216,7 @@ runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numéric
 runpy test_gate_citas.py
 runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU carpeta (deuda test-all-log-rojo-tmp-compartido)
 runpy test_all_stdin_cerrado.py   # 25-sep · la suite cierra stdin: ningún test hereda un pipe que no se cierra
+runpy test_all_paralelo.py   # 10-oct · BTP_JOBS: serie y paralelo dicen lo mismo, fail-closed, SOLO_SERIE, cronómetro (campaña de mutantes: tests/mutantes/test_all_paralelo.json, a mano o de noche: ~8 min)
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
@@ -540,6 +652,8 @@ runpy test_session_start_lazo.py      # 25-sep · el lazo no lanza el drenaje de
 # pasada de tests le mandó 14 mensajes de verdad. Para engancharlos hace falta antes un modo
 # dry/fixture; hasta entonces se corren a mano.
 
+_vacia_cola   # con BTP_JOBS>1 aquí corre todo lo encolado; en serie no hace nada
+
 # Meta-check: que este runner no se vuelva a quedar atrás solo.
 if [ -z "$CAMBIADOS" ]; then
 echo "── meta: tests no invocados ──"
@@ -564,7 +678,9 @@ echo
 # Un SKIP no es ni verde ni rojo: es «necesita algo que aquí no está» (ver tests/_entorno.py).
 # Se dice aparte para que el número de rojos signifique lo que parece.
 [ "$skip" -gt 0 ] && echo "⏭️  $skip batería(s) saltada(s): falta el contenido, el estado vivo, los overlays locales o el lazo (HALT activo)"
-if [ -n "$CAMBIADOS" ]; then
+if [ -n "$PUERTA" ]; then
+  [ "$fail" -eq 0 ] && echo "✅ PUERTA RAPIDA en verde: afectadas + núcleo del muro ($fuera batería(s) fuera). NO es «todo en verde»: la suite completa la cubre la rutina nocturna sobre casa base." || echo "❌ $fail batería(s) con fallos (puerta rápida) · logs: $ROJO_DIR"
+elif [ -n "$CAMBIADOS" ]; then
   [ "$fail" -eq 0 ] && echo "✅ PARCIAL en verde: $fuera batería(s) no se corrieron (--cambiados). NO es «todo en verde»: antes de fusionar, la suite completa." || echo "❌ $fail batería(s) con fallos (parcial, --cambiados) · logs: $ROJO_DIR"
 else
 [ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos · logs de ESTA ejecución: $ROJO_DIR"
