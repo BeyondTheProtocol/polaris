@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""scite_guard.py — lo que sale a scite pasa por el muro (PreToolUse, matcher `mcp__scite__.*`).
+"""scite_guard.py — lo que sale a un buscador de evidencia pasa por el muro (PreToolUse, matcher de `_evidencia.matcher()`).
+
+AMPLIADO (10-oct-2026). Reconocía a scite por el prefijo `mcp__scite__`, y los conectores de
+claude.ai llegan como `mcp__<uuid>__…`: el Scite conectado, Elicit, Consensus, Scholar Gateway,
+PubMed, bioRxiv y Clinical Trials salían sin que nadie mirase los argumentos. Ahora la herramienta
+se reconoce con `_evidencia.familia()` (por servidor o por nombre inconfundible) y todas pasan por
+la misma política. Elicit no se veta entero: su veredicto es solo-local, vale para buscar
+literatura; lo que se deniega es subirle ficheros. El nombre del fichero y del log se quedan como
+estaban para no romper el rodaje ni los lanzadores.
 
 POR QUÉ EXISTE (26-sep-2026, hallazgo A1 del prompt-audit, plan aprobado por {{TITULAR}}). Las reglas
 de qué puede salir a scite (`.claude/rules/scite-mcp.md`) solo existían como texto, y ese texto no
@@ -33,11 +41,9 @@ import os
 import sys
 import time
 
-ESCRIBE = {
-    "create_collection", "update_collection", "delete_collection",
-    "add_dois_to_collection", "remove_dois_from_collection",
-    "create_collection_note", "update_collection_note", "delete_collection_note",
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _evidencia  # noqa: E402
+
 UMBRAL_SENAS = 3
 
 
@@ -75,11 +81,11 @@ def textos(x):
             yield from textos(v)
 
 
-def veredicto(tool, ti):
+def veredicto(tool, ti, fam="scite"):
     """(deniega, motivo). Puro salvo el sello que ya hace borde.egress_cientifico."""
-    corto = tool.split("__")[-1]
-    if corto in ESCRIBE:
-        return True, "escribe colecciones de scite (los agentes solo las leen)"
+    motivo = _evidencia.escribe(tool, fam)
+    if motivo:
+        return True, motivo
     junto = "\n".join(t for t in textos(ti) if t and t.strip())
     if not junto.strip():
         return False, "sin texto"
@@ -87,7 +93,7 @@ def veredicto(tool, ti):
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__)))), "tools"))
     import borde
-    ok, motivo = borde.egress_cientifico(junto, destino="scite")
+    ok, motivo = borde.egress_cientifico(junto, destino=fam)
     if not ok:
         return True, motivo
     n, senas = borde.senas_caso(junto)
@@ -118,7 +124,7 @@ def _salida(decision, razon, contexto=None):
     print(json.dumps(out, ensure_ascii=False))
 
 
-AYUDA = ("A scite solo sale terminología: genes, fármacos, histologías, DOI, NCT, sin nada del caso "
+AYUDA = ("A un buscador de evidencia solo sale terminología: genes, fármacos, histologías, DOI, NCT, sin nada del caso "
          "(nombre, fechas, NHC, variantes exactas) y nunca 3 señas juntas (edad, histología, "
          "receptores, variante, línea). Reformula la consulta en genérico. Los prompts "
          "`fact-check-claim` y `systematic-review-screen` no se usan desde agentes. "
@@ -128,17 +134,19 @@ AYUDA = ("A scite solo sale terminología: genes, fármacos, histologías, DOI, 
 def main():
     data = json.loads(sys.stdin.read() or "{}")
     tool = data.get("tool_name") or ""
-    if not tool.startswith("mcp__scite__"):
+    fam = _evidencia.familia(tool)
+    if not fam:
         return 0
     ti = data.get("tool_input") or {}
     try:
-        deniega, motivo = veredicto(tool, ti)
-    except Exception as e:  # reconocida como scite: un fallo interno no deja salir nada
+        deniega, motivo = veredicto(tool, ti, fam)
+    except Exception as e:  # reconocida como evidencia: un fallo interno no deja salir nada
         if modo() == "sombra":
             _log(tool, "error-sombra", repr(e)[:120], ti)
             return 0
         _log(tool, "deny", "error interno: %r" % (e,), ti)
-        _salida("deny", "scite_guard falló por dentro (%r): no dejo salir la consulta." % (e,))
+        _salida("deny", "scite_guard falló por dentro (%r): no dejo salir la consulta a %s."
+                % (e, fam))
         return 0
     if not deniega:
         _log(tool, "allow", motivo, ti)
@@ -148,11 +156,15 @@ def main():
         return 0
     if modo() == "sombra":
         _log(tool, "habria-denegado", motivo, ti)
-        _salida("allow", "scite_guard en rodaje", "⚠️ scite_guard (rodaje, aún no bloquea) habría "
-                "DENEGADO esta llamada: %s. %s" % (motivo, AYUDA))
+        # Solo contexto, sin `permissionDecision`: un "allow" aprobaría la llamada saltándose el
+        # aviso de permiso, justo en las que el guard habría parado (10-oct-26).
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": "⚠️ scite_guard (rodaje, aún no bloquea) habría DENEGADO esta "
+                                 "llamada a %s: %s. %s" % (fam, motivo, AYUDA)}}, ensure_ascii=False))
         return 0
     _log(tool, "deny", motivo, ti)
-    _salida("deny", "MURO ⛔ scite: %s. %s" % (motivo, AYUDA))
+    _salida("deny", "MURO ⛔ %s: %s. %s" % (fam, motivo, AYUDA))
     return 0
 
 

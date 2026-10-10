@@ -253,6 +253,19 @@ def prueba_deny():
             break
 
 
+def prueba_todos_con_plazo():
+    """Ningún hook de settings.json se queda sin `timeout`, sea del evento que sea (10-oct-26:
+    ok_envio_prompt en UserPromptSubmit y entrada_guard en PostToolUse no lo declaraban, y
+    `hooks_registrados` solo recorre PreToolUse y Stop)."""
+    print("── todo hook declara su plazo")
+    s = json.load(open(os.path.join(ROOT, ".claude", "settings.json"), encoding="utf-8"))
+    sin = ["%s · %s" % (evento, os.path.basename((h.get("command") or "").split()[-1]))
+           for evento, grupos in (s.get("hooks") or {}).items()
+           for m in grupos or [] for h in m.get("hooks") or []
+           if not isinstance(h.get("timeout"), (int, float))]
+    check(not sin, "settings.json: todos los hooks con timeout explícito (sin él: %s)" % (sin or "—"))
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="test-watchdog-")
     try:
@@ -261,6 +274,7 @@ def main():
         prueba_hooks(limite, tmp)
         prueba_gate(tmp)
         prueba_deny()
+        prueba_todos_con_plazo()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if fallos:

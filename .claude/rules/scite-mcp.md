@@ -8,6 +8,8 @@ paths:
 ---
 
 > **Freno (26-sep-26):** `.claude/hooks/scite_guard.py` aplica esta regla en cada llamada `mcp__scite__*` (colecciones, `borde.egress_cientifico`, tres señas) y `tools/scite_mcp.py` la misma en el lazo. Arranca en modo sombra (`tools/state/scite_guard_modo`); pasar a `bloquea` es OK de {{TITULAR}}. Los prompts `fact-check-claim` y `systematic-review-screen` no los ve ningún hook.
+>
+> **Ampliado (10-oct-26):** el mismo guard cubre ya los conectores de claude.ai, que llegan como `mcp__<uuid>__…` y antes salían sin mirar: Scite conectado, Elicit, Consensus, Scholar Gateway, PubMed, bioRxiv y Clinical Trials. La lista vive en `.claude/hooks/_evidencia.py`; conector nuevo de evidencia → se añade ahí y a `tests/test_scite_guard.py`. A Elicit se le puede buscar literatura genérica; subirle ficheros se deniega.
 
 # Scite por MCP: qué puede salir y qué no
 

@@ -70,7 +70,8 @@
           },
           {
             "type": "command",
-            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/ok_envio_prompt.py"
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/ok_envio_prompt.py",
+            "timeout": 10
           }
         ]
       }
@@ -121,8 +122,8 @@
         ]
       },
       {
-        "_comment": "Lo que sale a scite pasa por el muro (26-sep-26, hallazgo A1 del prompt-audit, plan aprobado por {{TITULAR}}). Las reglas de .claude/rules/scite-mcp.md tienen paths: y no se cargan al llamar a scite; nadie miraba los argumentos en interactivo (en el lazo muro_guard ya deniega todo MCP). Deniega escribir colecciones, pasa los textos por borde.egress_cientifico (misma politica que tools/scite_mcp.py) y deniega 3+ senas del caso juntas (borde.senas_caso). Arranca en modo SOMBRA (tools/state/scite_guard_modo): apunta y avisa sin bloquear; pasar a 'bloquea' es OK de {{TITULAR}}. Log sin texto crudo. Escotilla: BTP_SCITE_OK=1.",
-        "matcher": "mcp__scite__.*",
+        "_comment": "Lo que sale a scite pasa por el muro (26-sep-26, hallazgo A1 del prompt-audit, plan aprobado por {{TITULAR}}). Las reglas de .claude/rules/scite-mcp.md tienen paths: y no se cargan al llamar a scite; nadie miraba los argumentos en interactivo (en el lazo muro_guard ya deniega todo MCP). Deniega escribir colecciones, pasa los textos por borde.egress_cientifico (misma politica que tools/scite_mcp.py) y deniega 3+ senas del caso juntas (borde.senas_caso). Arranca en modo SOMBRA (tools/state/scite_guard_modo): apunta y avisa sin bloquear; pasar a 'bloquea' es OK de {{TITULAR}}. Log sin texto crudo. Escotilla: BTP_SCITE_OK=1. AMPLIADO 10-oct-26: la matcher pasa de mcp__scite__.* a la que genera _evidencia.matcher() (servidores de evidencia + nombres inconfundibles; estrecha para no arrancar en cada MCP) porque los conectores de claude.ai llegan como mcp__<uuid>__… (Scite conectado, Elicit, Consensus, Scholar Gateway, PubMed, bioRxiv, Clinical Trials salian sin mirar). Quien decide si la herramienta es de evidencia es _evidencia.familia(); biomcp entra tambien.",
+        "matcher": "mcp__(2b889bc6-e3f1-498b-bc68-58ad91fadea3|2f62c1c8-d0b5-4cb4-9cbf-8dd48a783cf1|572eb2c5-1ab7-49e0-9551-fe96bcbb5f2d|94719adc-11f1-487e-b7fd-68ec3a3b8b7c|b08b78ef-28ae-4b17-baf9-5cfd6efef4b0|biomcp|c3041ca0-441e-42c5-9506-d697a7a03413|fd386fb4-6a93-4061-9ba4-c645c3668c05|scite)__.*|mcp__.*__(add_dois_to_collection|bibliography|citation_graph|citation_report|create_collection|create_collection_note|create_systematic_review|delete_collection|delete_collection_file|delete_collection_note|import_library_files|lookup_article_by_citation|read_fulltext|remove_dois_from_collection|report_citations|search_articles|search_by_eligibility|search_literature|search_papers|search_preprints|search_published_preprints|semanticSearch|send_agent_session_message|stage_file_upload|stage_library_upload|update_collection|update_collection_note|upload_collection_file)",
         "hooks": [
           {
             "type": "command",
@@ -260,7 +261,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/entrada_guard.py"
+            "command": "$(d=\"${CLAUDE_PROJECT_DIR}\"; [ -d \"$d/.claude/hooks\" ] || d=\"$HOME/claudecode\"; printf %s \"$d\")/.claude/hooks/entrada_guard.py",
+            "timeout": 10
           }
         ]
       }

@@ -33,6 +33,12 @@ import sys
 import unicodedata
 from datetime import datetime
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import _evidencia
+except ImportError:  # este guard solo avisa: sin el módulo sigue con la regex de siempre
+    _evidencia = None
+
 # Herramientas por las que entra texto de fuera. El muro no mira las que solo tocan disco local:
 # el riesgo no es leer un fichero nuestro, es tragarse lo que ha escrito un tercero.
 TOOLS_EXTERNAS = re.compile(
@@ -104,6 +110,11 @@ def _texto_de(datos):
 def _es_externa(datos):
     tool = datos.get("tool_name") or ""
     if TOOLS_EXTERNAS.search(tool):
+        return True
+    # Conectores de evidencia de claude.ai: llegan como mcp__<uuid>__… y la regex de arriba solo
+    # los ve si la herramienta se llama search_* (10-oct-26: read_fulltext, citation_report o el
+    # `search` de Consensus entraban sin mirar).
+    if _evidencia is not None and _evidencia.familia(tool):
         return True
     if tool == "Bash":
         cmd = (datos.get("tool_input") or {}).get("command", "")
