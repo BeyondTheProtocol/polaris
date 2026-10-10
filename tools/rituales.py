@@ -84,12 +84,16 @@ def main(argv):
         print(txt)
         return 0
     try:
+        import errores
         import salida
-        salida.report_to_titular(txt)
-        print("[enviado] " + cmd)
+        llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(txt))
     except Exception as e:
         print("[rituales] no se pudo enviar: %s" % e, file=sys.stderr)
         return 1
+    if not llega:     # antes imprimía «[enviado]» y salía 0 aunque salida lo frenara (10-oct-26)
+        print("[rituales] %s NO llegó (%s: %s)" % (cmd, estado, motivo), file=sys.stderr)
+        return 1
+    print(("[enviado] " if estado == "entregado" else "[en camino: %s] " % estado) + cmd)
     return 0
 
 

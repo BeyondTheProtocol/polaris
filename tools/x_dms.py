@@ -154,7 +154,13 @@ def _do_watch(handle, notify, max_results):
             seen = set()
     first = not os.path.exists(wf)
     new = [m for m in theirs if m["id"] not in seen]
-    json.dump({"ids": sorted(m["id"] for m in theirs), "updated": int(time.time())}, open(wf, "w"))
+
+    def _marcar_vistos():
+        json.dump({"ids": sorted(m["id"] for m in theirs), "updated": int(time.time())}, open(wf, "w"))
+    # Si se va a AVISAR de mensajes nuevos, se marcan vistos solo cuando el aviso llegue: este vigía no guarda
+    # digest, así que marcarlos antes y fallar el envío perdía el mensaje para siempre (10-oct-26).
+    if not (notify and new and not first):
+        _marcar_vistos()
 
     if first:
         print("👁️  vigía @%s armado (línea base: %d mensajes suyos previos)" % (handle, len(theirs)))
@@ -173,8 +179,14 @@ def _do_watch(handle, notify, max_results):
             for m in sorted(new, key=lambda x: x["ts"]):
                 body += "«%s»\n\n" % (m["text"][:600] or "(sin texto)")
             body += "(respondes TÚ desde X; yo solo te aviso)"
-            salida.report_to_titular(body)
-            print("[avisado por Telegram]")
+            import errores
+            llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(body))
+            if llega:
+                _marcar_vistos()
+                print("[avisado por Telegram]" if estado == "entregado" else "[aviso en camino: %s]" % estado)
+            else:
+                print("[notify] el aviso NO llegó (%s: %s); sigue sin marcar, se reintenta en la próxima pasada"
+                      % (estado, motivo), file=sys.stderr)
         except Exception as e:
             print("[notify] no se pudo enviar: %s" % e, file=sys.stderr)
     return 0
@@ -269,8 +281,13 @@ def main():
                            " 🎯" if any(m["id"] == lm["id"] for lm, _ in leads) else "")
                 for m in sorted(new, key=lambda x: -x["ts"])[:12])
             body += "\n\nDigest completo: _cajita/x_dms/digest-%s.md" % today
-            salida.report_to_titular(body)
-            print("[avisado por Telegram]")
+            import errores
+            llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(body))
+            if llega:   # el digest y el raw ya están en disco: nada se pierde si NO llega, pero el parte no miente
+                print("[avisado por Telegram]" if estado == "entregado" else "[aviso en camino: %s]" % estado)
+            else:
+                print("[notify] el aviso NO llegó (%s: %s); el digest sigue en %s" % (estado, motivo, OUT_DIR),
+                      file=sys.stderr)
         except Exception as e:
             print("[notify] no se pudo enviar: %s" % e, file=sys.stderr)
     return 0

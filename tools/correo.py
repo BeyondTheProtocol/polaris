@@ -492,6 +492,28 @@ def reclamar_aviso(remitente_email, asunto, horas=18):
         return True
 
 
+def liberar_aviso(remitente_email, asunto):
+    """Deshace `reclamar_aviso` para este correo (mismo flock). Se llama cuando el aviso NO llegó (HALT, fallo de
+    red…): el sello de «avisado» solo vale si el aviso llegó o está en camino por una cola fiable. Sin esto, el
+    segundo ciclo veía la clave reclamada, daba el correo por avisado y el correo urgente se perdía (10-oct-26).
+    Devuelve True si había algo que liberar."""
+    _ensure()
+    with open(AVISOS + ".lock", "w") as lk:
+        try:
+            fcntl.flock(lk, fcntl.LOCK_EX)
+        except Exception:
+            pass
+        try:
+            with open(AVISOS, encoding="utf-8") as f:
+                data = json.load(f) or {}
+        except Exception:
+            return False
+        if data.pop(_aviso_key(remitente_email, asunto), None) is None:
+            return False
+        _write_atomic(AVISOS, data)
+        return True
+
+
 # ── Anti-duplicados de BORRADORES (¿ya generé respuesta para ESTE hilo?) ─────────
 # Distinto del ledger de avisos (que expira por TTL): un borrador ya dejado en Gmail no
 # "caduca" — sigue ahí hasta que {{TITULAR}} lo envíe o lo borre. Por eso esto NO purga por

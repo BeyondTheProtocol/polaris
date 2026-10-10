@@ -43,7 +43,13 @@ salud.HC = hc.HC
 salud.ACUSES = os.path.join(hc.HC, "acuses.json")
 
 _sent = []
-salida.report_to_titular = lambda *a, **k: (_sent.append(a[0] if a else ""), {"ok": True})[1]
+# Devuelve lo que devuelve la salida REAL (dict con el estado): entregado, u operativo si la categoría lo es.
+# Desde el 10-oct-26 _emitir_si_cambia LEE ese dict (un aviso aplazado/bloqueado no cuenta como avisado).
+def _resultado_salida(k):
+    if k.get("categoria") == "operativo":
+        return {"delivered": False, "blocked": False, "reason": "operativo (fake)", "operativo": True}
+    return {"delivered": True, "blocked": False, "reason": "entregado (fake)"}
+salida.report_to_titular = lambda *a, **k: (_sent.append(a[0] if a else ""), _resultado_salida(k))[1]
 cost_guard.check_before_job = lambda *a, **k: (True, "test con saldo", 0.0)
 
 _pass = 0

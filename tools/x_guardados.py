@@ -330,8 +330,13 @@ def cmd_fetch(notify, show_all, max_results):
                 "• @%s: %s" % (t["handle"] or "?", (t["text"][:120] or "(sin texto)").replace("\n", " "))
                 for t in sorted(new, key=lambda x: -x.get("ts", 0))[:8])
             body += "\n\nLos cosecha auto-mejora: python3 tools/x_guardados.py listar"
-            salida.report_to_titular(body)
-            print("[avisado por Telegram]")
+            import errores
+            llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(body))
+            if llega:   # el store y SEEN ya están en disco: nada se pierde si NO llega, pero el parte no miente
+                print("[avisado por Telegram]" if estado == "entregado" else "[aviso en camino: %s]" % estado)
+            else:
+                print("[notify] el aviso NO llegó (%s: %s); los guardados siguen en el store" % (estado, motivo),
+                      file=sys.stderr)
         except Exception as e:
             print("[notify] no se pudo enviar: %s" % e, file=sys.stderr)
     return 0

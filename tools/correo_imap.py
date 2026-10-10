@@ -388,6 +388,110 @@ def _entry(uid, h, cuenta=None):
     }
 
 
+# ── Cola de avisos urgentes PENDIENTES (10-oct-26) ─────────────────────────────────────────────
+# Antes: `procesar` reclamaba el aviso en el ledger, llamaba a `avisar` DESCARTANDO el resultado y avanzaba
+# `last_uid`. Con HALT (20 avisos `urgente:ned`, 13-jul → 17-sep) o un fallo de red, el correo urgente no se
+# avisaba NUNCA: el uid ya estaba pasado y la clave del ledger ya reclamada. Ahora un aviso que no llega
+# (a) libera su reclamo y (b) se apunta aquí, en un fichero propio por cuenta; cada pasada reintenta SIN
+# reprocesar el buzón, con espera entre intentos y como UN solo aviso agrupado (el cupo diario es 3: N correos
+# acumulados no pueden ser N avisos al levantar el HALT).
+PEND_ESPERA_S = int(os.environ.get("BTP_AVISOS_PEND_ESPERA_S", "300"))   # entre intentos de la cola
+PEND_MAX = 200          # tope de lo guardado (el más viejo cede el sitio; se dice por stderr, no en silencio)
+PEND_LISTA = 8          # cuántos correos se nombran en el aviso agrupado (el resto, «y N más»)
+
+
+def _pend_path(seen_path):
+    base, _ext = os.path.splitext(seen_path)
+    return base + "-avisos-pendientes.json"
+
+
+def _pend_cargar(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        if isinstance(d, dict) and isinstance(d.get("items"), list):
+            return d
+    except Exception:
+        pass
+    return {"items": [], "ultimo_intento": 0}
+
+
+def _pend_guardar(path, d):
+    correo._ensure()
+    correo._write_atomic(path, d)
+
+
+def _llega(res):
+    import errores
+    return errores.aviso_en_camino(res)[0]
+
+
+def _pend_anotar(path, e):
+    """Apunta un correo urgente cuyo aviso no llegó (idempotente por uid/message_id)."""
+    d = _pend_cargar(path)
+    tid = e["message_id"] or str(e["uid"])
+    if any(i.get("tid") == tid for i in d["items"]):
+        return
+    d["items"].append({"tid": tid, "uid": e["uid"], "remitente": e["remitente"],
+                       "remitente_email": e["remitente_email"], "asunto": e["asunto"],
+                       "ned": bool(e["ned_critico"]), "desde": time.time()})
+    if len(d["items"]) > PEND_MAX:
+        sys.stderr.write("correo_imap: cola de avisos pendientes llena (%d); cede el más viejo\n" % PEND_MAX)
+        d["items"] = d["items"][-PEND_MAX:]
+    d["ultimo_intento"] = max(d.get("ultimo_intento", 0), time.time())
+    _pend_guardar(path, d)
+
+
+def _texto_pendientes(items):
+    if len(items) == 1:
+        i = items[0]
+        return "📬 Correo nuevo de %s: «%s». Está en tu bandeja." % (i["remitente"], i["asunto"])
+    lista = "\n".join("· %s: «%s»" % (i["remitente"], i["asunto"]) for i in items[:PEND_LISTA])
+    if len(items) > PEND_LISTA:
+        lista += "\n… y %d más (están en tu bandeja)." % (len(items) - PEND_LISTA)
+    return "📬 Mientras no pude avisarte llegaron %d correos urgentes:\n%s" % (len(items), lista)
+
+
+def _reintentar_pendientes(path, avisar, ahora=None):
+    """Reintenta la cola como UN aviso. Devuelve cuántos correos quedaron avisados. Respeta la espera entre
+    intentos. Re-reclama cada correo en el ledger: si otro avisador (centinela, daemon LLM) ya lo avisó, se
+    descarta de la cola sin duplicar."""
+    d = _pend_cargar(path)
+    if not d["items"]:
+        return 0
+    ahora = ahora if ahora is not None else time.time()
+    if ahora - float(d.get("ultimo_intento", 0)) < PEND_ESPERA_S:
+        return 0
+    reclamados, ya_avisados = [], []
+    for i in d["items"]:
+        try:
+            ok = correo.reclamar_aviso(i["remitente_email"], i["asunto"])
+        except Exception:
+            ok = True
+        (reclamados if ok else ya_avisados).append(i)
+    llego = False
+    if reclamados:
+        try:
+            llego = _llega(avisar(_texto_pendientes(reclamados), any(i["ned"] for i in reclamados)))
+        except Exception:
+            llego = False
+    if reclamados and not llego:
+        for i in reclamados:                      # no llegó: se libera el reclamo y se reintenta más tarde
+            try:
+                correo.liberar_aviso(i["remitente_email"], i["asunto"])
+            except Exception:
+                pass
+        d["items"] = reclamados
+        d["ultimo_intento"] = ahora
+        d["intentos"] = int(d.get("intentos", 0)) + 1
+        _pend_guardar(path, d)
+        return 0
+    for i in reclamados:
+        correo.registrar("aviso-imap", i["tid"], motivo="urgente:%s:cola" % ("ned" if i["ned"] else "cita"))
+    _pend_guardar(path, {"items": [], "ultimo_intento": ahora})
+    return len(reclamados)
+
+
 def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_path=None,
              cuenta=None):
     """Núcleo determinista. `mb` es un buzón (real o simulado). Devuelve un resumen.
@@ -436,13 +540,27 @@ def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_
             if not (dry or correo.reclamar_aviso(e["remitente_email"], e["asunto"])):
                 continue
             texto = "📬 Correo nuevo de %s: «%s». Está en tu bandeja." % (e["remitente"], e["asunto"])
+            llego = False
             try:
-                avisar(texto, e["ned_critico"])   # rompe silencio nocturno solo si NED-crítico
-                correo.registrar("aviso-imap", e["message_id"] or str(e["uid"]),
-                                 motivo="urgente:%s" % ("ned" if e["ned_critico"] else "cita"))
-                avisos += 1
+                # rompe silencio nocturno solo si NED-crítico. El resultado SE LEE: `salida` no lanza cuando
+                # bloquea (HALT) o aplaza, devuelve un dict (ver errores.aviso_en_camino).
+                llego = _llega(avisar(texto, e["ned_critico"]))
+                if llego:
+                    correo.registrar("aviso-imap", e["message_id"] or str(e["uid"]),
+                                     motivo="urgente:%s" % ("ned" if e["ned_critico"] else "cita"))
+                    avisos += 1
             except Exception:
-                pass
+                llego = False
+            if not llego and not dry:
+                # No llegó: se libera el reclamo (si no, nadie volvería a avisar de este correo) y se apunta
+                # para reintentarlo sin reprocesar el buzón, aunque `last_uid` avance.
+                try:
+                    correo.liberar_aviso(e["remitente_email"], e["asunto"])
+                except Exception:
+                    pass
+                _pend_anotar(_pend_path(seen_path), e)
+        if not dry:
+            avisos += _reintentar_pendientes(_pend_path(seen_path), avisar)
 
     nuevo_last = max([e["uid"] for e in entradas] + [last_uid]) if entradas else last_uid
     buzon = {"actualizado": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),

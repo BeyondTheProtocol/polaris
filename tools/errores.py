@@ -149,6 +149,22 @@ def _estado_entrega(res):
     return "no_entregado", motivo
 
 
+# API PÚBLICA para los demás llamantes de `salida.report_to_titular` / `alerta_critica` (10-oct-26): una sola
+# forma de leer «¿le llegó?», no una copia por fichero. `ESTADOS_EN_CAMINO` = el aviso ya está entregado o
+# esperando una salida que SÍ ocurrirá (el parte diario, el resumen de la mañana): no hay que reenviarlo.
+# Cualquier otro estado (bloqueado, no_entregado, desconocido, dry, error) significa que NO llegó ni llegará.
+estado_entrega = _estado_entrega
+ESTADOS_EN_CAMINO = frozenset(("entregado", "aplazado", "retenido"))
+
+
+def aviso_en_camino(res, categoria="humano"):
+    """(en_camino, estado, motivo) de lo que devolvió `salida`. `en_camino` es True si el aviso llegó o llegará
+    solo (ver ESTADOS_EN_CAMINO). Un `operativo` (guardado en el log) solo cuenta si la `categoria` pedida ES
+    operativa (su destino es el log, no el chat): para un aviso humano, que caiga en el log NO es avisar."""
+    estado, motivo = _estado_entrega(res)
+    return (estado in ESTADOS_EN_CAMINO or (categoria == "operativo" and estado == "operativo")), estado, motivo
+
+
 def _avisar_detalle(texto, *, critico=False):
     """Manda el aviso por el choke-point (respeta HALT) y devuelve LA VERDAD:
     {'entregado': bool, 'estado': str, 'motivo': str}. Fail-soft: una excepción es estado «error», no entregado.

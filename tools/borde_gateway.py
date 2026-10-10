@@ -255,7 +255,11 @@ def _avisar_puerta_caida(motivo):
         else:
             txt = ("⚠️ La puerta de Polaris (Vivir) no pudo contestarte ahora mismo (%s). Lo estoy "
                    "mirando para que no te vuelva a pasar." % (motivo or "sin cerebro disponible"))
-        salida.report_to_titular(txt, voz="sobria")    # respeta silencio nocturno (no es código rojo)
+        import errores
+        llega, _estado, _motivo = errores.aviso_en_camino(
+            salida.report_to_titular(txt, voz="sobria"))   # respeta silencio nocturno (no es código rojo)
+        if not llega:
+            return    # no llegó (HALT, fallo): NO se arranca el cooldown, el próximo 503 lo vuelve a intentar
         os.makedirs(GW_DIR, exist_ok=True)
         tmp = st + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:

@@ -33,7 +33,7 @@ enviados = []
 salida.send = lambda *a, **k: (enviados.append((a, k)) or salida._result(True, False, "entregado (falso)"))
 salida._presupuesto_agotado = lambda: True
 salida._en_silencio = lambda cfg=None: False
-salida._aplazar = lambda text, fuente="": None
+salida._aplazar = lambda text, fuente="": True   # desde el 10-oct _aplazar devuelve True si ESCRIBIÓ (False = no pudo → bloqueado)
 
 r = salida.report_to_titular("aviso de rutina")
 ok(r.get("aplazado") and not enviados, "1: con el cupo agotado, el aviso normal se aplaza (%s)" % r)

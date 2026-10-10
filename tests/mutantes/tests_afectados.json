@@ -49,8 +49,8 @@
     },
     {
       "etiqueta": "el cierre ignora los import perezosos (dentro de funciones)",
-      "viejo": "        if isinstance(nodo, ast.Import):",
-      "nuevo": "        if False:"
+      "viejo": "        if isinstance(nodo, ast.Import):\n            nombres |= {a.name.split(",
+      "nuevo": "        if False:\n            nombres |= {a.name.split("
     },
     {
       "etiqueta": "los hooks ya no mandan (cualquier .claude/ es seguro)",

@@ -316,10 +316,31 @@ def _nct_ids_vigilados():
     return ids
 
 
+# Correos cuyo aviso `detectar()` RECLAMÓ en el ledger compartido (correo.reclamar_aviso) en esta pasada:
+# [remitente_email, asunto, texto]. `run()` libera los reclamos de los avisos que no llegaron; si no, el ciclo
+# siguiente veía la clave reclamada, daba el correo por avisado y lo sellaba: el correo NED se perdía (10-oct-26).
+_RECLAMOS = []
+
+
+def _liberar_reclamos(texto_llegados=()):
+    """Libera en el ledger los correos reclamados cuyo aviso NO llegó (texto no está en `texto_llegados`)."""
+    try:
+        import correo
+    except Exception:
+        return
+    for rem, asu, texto in list(_RECLAMOS):
+        if texto not in texto_llegados:
+            try:
+                correo.liberar_aviso(rem, asu)
+            except Exception:
+                pass
+
+
 # ── decisión + aviso ─────────────────────────────────────────────────────────────
 def detectar():
     """Devuelve (avisos, estado_actual). `avisos` = lista de (tipo, texto) NED-críticos NUEVOS
     (vacía en la primera pasada). `estado_actual` = lo que hay que sellar como visto."""
+    del _RECLAMOS[:]
     mark = _cargar_mark()
     primera = not mark.get("ts")
     vistos_mail = set(mark.get("emails_avisados") or [])
@@ -361,11 +382,13 @@ def detectar():
             # mensaje. El sellado de `emails_avisados` ocurre igual (emails_sellar cubre todo
             # `criticos`), así que no reintentamos aunque nos saltemos el aviso. Fix 3/7: doble aviso
             # («📬 Correo nuevo…» + «📩 Oye, te ha escrito…») del mismo correo (Elizabeth Vega/BIO121619).
+            texto_aviso = None
             if rem_email:
                 try:
                     import correo
                     if not correo.reclamar_aviso(rem_email, asu):
                         continue
+                    _RECLAMOS.append([rem_email, asu, None])   # run() lo LIBERA si el aviso no llega
                 except Exception:
                     pass   # fail-open: si no alcanzo el ledger, prefiero avisar de más que callar lo NED-crítico
             quien = _nombre_remitente(rem)
@@ -374,8 +397,10 @@ def detectar():
                 cola = " sobre «%s»" % asu_limpio[:MAX_ASUNTO]
             else:
                 cola = ""
-            avisos.append(("correo",
-                           "📩 Oye, te ha escrito %s%s. Vale la pena verlo." % (quien, cola)))
+            texto_aviso = "📩 Oye, te ha escrito %s%s. Vale la pena verlo." % (quien, cola)
+            if _RECLAMOS and _RECLAMOS[-1][2] is None and _RECLAMOS[-1][:2] == [rem_email, asu]:
+                _RECLAMOS[-1][2] = texto_aviso
+            avisos.append(("correo", texto_aviso))
 
         # --- Señal 2: cambio de foco ---
         if foco_hash and foco_prev is not None and foco_hash != foco_prev:
@@ -495,13 +520,30 @@ def run(dry=False):
     """Detecta lo NED-crítico nuevo, AVISA (salida.report_to_titular, urgente=False) y sella visto.
     Devuelve la lista de (tipo, texto) avisada."""
     avisos, estado = detectar()
+    if dry:
+        _liberar_reclamos()      # dry no avisa: que el reclamo de detectar() no deje el correo como «avisado»
     if not dry and avisos:
+        llegados = set()
         try:
+            import errores
             import salida
+            # «Sellar visto» solo si TODOS los avisos llegaron o llegarán solos (entregado / aplazado al parte).
+            # Antes se sellaba aunque salida los frenara (HALT, envío fallido): una señal NED-crítica se daba por
+            # avisada sin que {{TITULAR}} la viera (10-oct-26). Si alguno no llega, no se sella y se reintenta entero.
+            # Además se LIBERAN los reclamos del ledger de los correos no avisados: `detectar()` los reclamó
+            # (correo.reclamar_aviso) ANTES de enviar y, sin liberar, el ciclo siguiente los daba por avisados.
             for _tipo, texto in avisos:
-                salida.report_to_titular(texto, urgente=False, fuente="centinela")
+                llega, est_ent, motivo = errores.aviso_en_camino(
+                    salida.report_to_titular(texto, urgente=False, fuente="centinela"))
+                if not llega:
+                    sys.stderr.write("centinela: el aviso NO llegó (%s: %s); NO sello y libero el reclamo.\n"
+                                     % (est_ent, motivo))
+                    _liberar_reclamos(llegados)
+                    return avisos
+                llegados.add(texto)
         except Exception as e:
             sys.stderr.write("centinela: no pude avisar (%r); NO sello para reintentar.\n" % e)
+            _liberar_reclamos(llegados)
             return avisos          # no sellar si la salida falló → reintenta en el próximo ciclo
     if not dry:
         _guardar_mark(estado)

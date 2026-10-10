@@ -336,7 +336,13 @@ def _avisar_tarea_nueva(hilo):
             import salida
             icono = hilo.get("icono") or CATEGORIA_ICONO.get((hilo.get("categoria") or "").lower(), "📌")
             texto = "%s Tarea nueva: %s" % (icono, hilo.get("titulo", "?"))
-            salida.report_to_titular(texto, urgente=True, voz="sobria")
+            import errores
+            llega, estado, motivo = errores.aviso_en_camino(
+                salida.report_to_titular(texto, urgente=True, voz="sobria"))
+            if not llega:     # no llegó: NO se sella `ultimo_aviso`, así el hilo no figura como avisado (nada lo
+                              # reintenta solo: este hook corre una vez, al crear la tarea)
+                sys.stderr.write("seguimiento: el aviso de tarea nueva NO llegó (%s: %s)\n" % (estado, motivo))
+                return
         else:
             os.makedirs(AVISOS_DIR, exist_ok=True)
             rec = {"id": hilo.get("id"), "titulo": hilo.get("titulo", "?"),

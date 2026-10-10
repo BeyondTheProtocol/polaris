@@ -372,8 +372,13 @@ def main():
                            " 🎯" if any(m["id"] == lm["id"] for lm, _ in leads) else "")
                 for m in sorted(new, key=lambda x: -x["ts"])[:12])
             body += "\n\nDigest completo: _cajita/ig_dms/digest-%s.md" % today
-            salida.report_to_titular(body)
-            print("[avisado por Telegram]")
+            import errores
+            llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(body))
+            if llega:   # el digest y el raw ya están en disco: nada se pierde si NO llega, pero el parte no miente
+                print("[avisado por Telegram]" if estado == "entregado" else "[aviso en camino: %s]" % estado)
+            else:
+                print("[notify] el aviso NO llegó (%s: %s); el digest sigue en %s" % (estado, motivo, OUT_DIR),
+                      file=sys.stderr)
         except Exception as e:
             print("[notify] no se pudo enviar: %s" % e, file=sys.stderr)
     return 0

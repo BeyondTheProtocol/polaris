@@ -109,9 +109,12 @@ def main():
 
     # ── aviso a {{TITULAR}} (fail-LOUD con anti-spam) — envío CAPTURADO, nunca toca la red ──
     import types
+    # salida REAL devuelve un dict: _avisar_a_titular lo LEE desde el 10-oct-26 (aplazado/bloqueado no cuentan como avisado)
+    _ENTREGADO = {"delivered": True, "blocked": False, "reason": "entregado (fake)"}
+    _OPERATIVO = {"delivered": False, "blocked": False, "reason": "operativo (fake)", "operativo": True}
     enviados = []
     fake = types.ModuleType("salida")
-    fake.report_to_titular = lambda text, **kw: enviados.append(text)
+    fake.report_to_titular = lambda text, **kw: (enviados.append(text), (_OPERATIVO if kw.get("categoria") == "operativo" else _ENTREGADO))[1]
     sys.modules["salida"] = fake                      # _avisar hace `import salida` → coge este
     vigia.ALERTA_STATE = os.path.join(_TMP, "vigia", "last_alert_test.json")
     try:
@@ -166,7 +169,8 @@ def main():
     # el reintento en curso NO molesta a {{TITULAR}}; el escalado SÍ, con categoría 'humano'
     del enviados[:]
     captura_cat = []
-    fake.report_to_titular = lambda text, **kw: (enviados.append(text), captura_cat.append(kw.get("categoria")))
+    fake.report_to_titular = lambda text, **kw: (enviados.append(text), captura_cat.append(kw.get("categoria")),
+                                            (_OPERATIVO if kw.get("categoria") == "operativo" else _ENTREGADO))[2]
     vigia.ALERTA_STATE = os.path.join(_TMP, "vigia", "last_alert_hc.json")
     try:
         os.remove(vigia.ALERTA_STATE)

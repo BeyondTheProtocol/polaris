@@ -23,7 +23,7 @@ import seguimiento                  # noqa: E402
 import salida                       # noqa: E402
 
 _sent = []
-salida.report_to_titular = lambda text, **k: _sent.append(text)
+salida.report_to_titular = lambda text, **k: (_sent.append(text), {"delivered": True, "blocked": False, "reason": "entregado (fake)"})[1]
 
 # Controlables deterministas (el centinela los llama vía `import` → mismo objeto módulo).
 correo.es_ned_critico = lambda sender="", subject="": "BIOPSIA" in (sender + subject).upper()

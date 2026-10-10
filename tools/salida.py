@@ -1345,19 +1345,23 @@ def flush_silencio():
     except Exception:
         files = []
     items = []
+    leidos = {}          # ruta -> bytes leídos (para borrar SOLO lo que entró en el resumen, y solo si se entrega)
     for fn in sorted(files):
         p = os.path.join(d, fn)
         try:
-            with open(p, encoding="utf-8") as fh:
-                for ln in fh:
-                    try:
-                        items.append(json.loads(ln))
-                    except Exception:
-                        pass
-            os.remove(p)
+            with open(p, "rb") as fh:
+                datos = fh.read()
+            leidos[p] = datos
+            for ln in datos.decode("utf-8", "ignore").splitlines():
+                try:
+                    items.append(json.loads(ln))
+                except Exception:
+                    pass
         except Exception:
             pass
     if not items:
+        for p, datos in leidos.items():      # solo basura ilegible: nada que entregar, se limpia
+            _quitar_leido(p, datos)
         return _result(False, False, "nada retenido")
     _n = len(items)
     _cosa = "cosa" if _n == 1 else "cosas"
@@ -1369,7 +1373,31 @@ def flush_silencio():
     cuerpo = "\n".join("· %s" % (str(it.get("texto") or "")[:200]) for it in items[:30])
     if len(items) > 30:
         cuerpo += "\n… y %d más (las tienes en la bandeja)." % (len(items) - 30)
-    return send("telegram", REPORT, None, cab + cuerpo, urgente=True)
+    res = send("telegram", REPORT, None, cab + cuerpo, urgente=True)
+    # El buffer se borra SOLO tras entregar (antes se borraba ANTES de enviar: con HALT o un fallo de red
+    # el resumen de la mañana se perdía entero). Si no se entregó, se queda para el siguiente intento.
+    if res.get("delivered"):
+        for p, datos in leidos.items():
+            _quitar_leido(p, datos)
+    return res
+
+
+def _quitar_leido(path, datos):
+    """Quita de `path` los bytes `datos` que ya se entregaron, conservando lo que se haya añadido después
+    (los escritores añaden con O_APPEND sin candado). Si el fichero ya no empieza por esos bytes, no toca nada."""
+    try:
+        with open(path, "rb") as fh:
+            actual = fh.read()
+        if not actual.startswith(datos):
+            return
+        resto = actual[len(datos):]
+        if resto.strip():
+            with open(path, "wb") as fh:
+                fh.write(resto)
+        else:
+            os.remove(path)
+    except Exception as e:
+        sys.stderr.write("salida: no pude limpiar lo retenido de %s (%r)\n" % (path, e))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1542,7 +1570,11 @@ def _aplazar(text, fuente=""):
     """Guarda el aviso para el parte diario. NO se pierde: se agrupa.
 
     La primera vez de cada día manda UN mensaje corto avisando de que a partir de ahí
-    agrupa, para que el silencio no se lea como que el sistema se ha muerto."""
+    agrupa, para que el silencio no se lea como que el sistema se ha muerto.
+
+    Devuelve True SOLO si el aviso quedó ESCRITO en disco. Antes tragaba la excepción y
+    quien llamaba contestaba «aplazado» (= «llegará con el parte») sobre una cola que no
+    había guardado nada (10-oct-26): el aviso se perdía dándose por en camino."""
     try:
         dir_apl = os.path.join(STATE, "aplazados")
         os.makedirs(dir_apl, exist_ok=True)
@@ -1551,14 +1583,19 @@ def _aplazar(text, fuente=""):
         rec = {"ts": _now_iso(), "fuente": str(fuente), "texto": str(text)}
         linea = (json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8")
         _con_candado(path, "a+b", lambda fh: _anexar_linea(fh, linea))
-        if primero:
+    except Exception as e:
+        sys.stderr.write("salida: NO pude aplazar el aviso (%r)\n" % (e,))
+        return False
+    if primero:
+        try:                                  # el aviso ya está guardado: que este mensaje falle no lo invalida
             send(TELEGRAM, REPORT, None,
                  "Te he mandado ya %d avisos hoy, así que el resto lo agrupo en el parte "
                  "para no ser pesada. Si algo urge de verdad, te escribo igual."
                  % TOPE_AVISOS_DIA,
                  urgente=True, voz="calida", fuente="portero-de-ruido")
-    except Exception:
-        pass
+        except Exception:
+            pass
+    return True
 
 
 def aplazados_de_hoy():
@@ -1809,8 +1846,10 @@ def report_to_titular(text, *, channel="telegram", dry=False, urgente=False, voz
     # cupo (el silencio nocturno y el HALT siguen mandando), igual que el parte.
     es_respuesta = (categoria == "respuesta")
     if not urgente and not es_parte and not es_respuesta and not dry and _presupuesto_agotado():
-        _aplazar(text, fuente=fuente)
         n = len(str(text) if text is not None else "")
+        if not _aplazar(text, fuente=fuente):
+            _audit(channel, REPORT, None, "bloqueado", "presupuesto agotado y NO pude aplazar al parte", n)
+            return _result(False, True, "presupuesto de avisos agotado y no pude guardarlo para el parte")
         _audit(channel, REPORT, None, "aplazado", "presupuesto diario agotado -> va al parte", n)
         return _result(False, False, "aplazado al parte diario (presupuesto de avisos agotado)",
                        extra={"aplazado": True})

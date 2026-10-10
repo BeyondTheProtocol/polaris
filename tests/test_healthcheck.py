@@ -27,7 +27,13 @@ _exige_cola_aislada()
 hc.HC = os.path.join(_TMP, "hc")
 os.makedirs(hc.HC, exist_ok=True)
 _sent = []
-salida.report_to_titular = lambda *a, **k: _sent.append(a[0] if a else "")
+# Devuelve lo que devuelve la salida REAL (dict con el estado): entregado, u operativo si la categoría lo es.
+# Desde el 10-oct-26 _emitir_si_cambia LEE ese dict (un aviso aplazado/bloqueado no cuenta como avisado).
+def _resultado_salida(k):
+    if k.get("categoria") == "operativo":
+        return {"delivered": False, "blocked": False, "reason": "operativo (fake)", "operativo": True}
+    return {"delivered": True, "blocked": False, "reason": "entregado (fake)"}
+salida.report_to_titular = lambda *a, **k: (_sent.append(a[0] if a else ""), _resultado_salida(k))[1]
 # 18-sep-26 (deuda `test-healthcheck-poluciona-cola-real`, detectada 3 veces): redirigir
 # BTP_STATE_DIR y hc.HC NO basta. healthcheck calcula `STATE = REPO/tools/state` al importarse y
 # `_encolar_investigacion` escribe por el modulo `cola`, asi que cada pasada de tests metia jobs
@@ -1214,7 +1220,7 @@ def deuda_dedup_tests():
     # Aislado del contador global `_sent` (lo comprueba, por cuenta exacta, el bloque de _emitir_si_
     # cambia más abajo en main()): swap temporal del mock de salida, restaurado al salir.
     _orig_report = salida.report_to_titular
-    salida.report_to_titular = lambda *a, **k: None
+    salida.report_to_titular = lambda *a, **k: _resultado_salida(k)
 
     clave = "zz_persistente_demo_dedup"
     A = [clave]

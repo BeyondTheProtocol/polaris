@@ -219,6 +219,12 @@ runpy test_cola_diario.py
 runpy test_entorno_cola_aislada.py
 runpy test_tools_no_sombrea_stdlib.py
 runpy test_healthcheck_drift_plists.py
+runpy test_healthcheck_entrega.py   # 10-oct · _emitir_si_cambia lee el resultado de salida: aplazado/retenido llegan, bloqueado NO se da por avisado, reintento sin inflar el libro, sin «Resuelto» fantasma
+runpy test_entrega_real_avisos.py   # 10-oct · los llamantes de salida LEEN el resultado antes de marcar «avisado» (reservas, digest, estado_caso, centinela, vigia, seguimiento, boca muda…)
+runpy test_aviso_resultado_leido.py   # 10-oct · lint: ningún tools/*.py descarta el resultado de report_to_titular/alerta_critica sin estar en la lista cerrada con motivo
+runpy test_aviso_en_camino.py   # 10-oct · errores.aviso_en_camino: la tabla única de «¿le llegó el aviso?» (aplazado/retenido sí; bloqueado/fallo/ilegible/dry no; operativo solo en categoría operativa)
+runpy test_correo_urgente_reintento.py   # 10-oct · un correo urgente cuyo aviso no llegó (HALT/red) se vuelve a avisar: poller + centinela reales, agrupado, sin duplicar
+runpy test_salida_cola_honesta.py   # 10-oct · _aplazar no dice «aplazado» si no escribió; flush_silencio borra el buffer solo tras entregar
 runpy test_prueba_entregable.py
 runpy test_dispatcher_env_turnos.py
 runpy test_enruta.py
@@ -541,6 +547,10 @@ echo "── mutantes: tests/mutantes/errores_entrega.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/errores_entrega.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-errores-entrega.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes errores_entrega (log: $ROJO_DIR/rojo-mutantes-errores-entrega.log)"; }
+echo "── mutantes: tests/mutantes/aviso_en_camino.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/aviso_en_camino.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-aviso-en-camino.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes aviso_en_camino (log: $ROJO_DIR/rojo-mutantes-aviso-en-camino.log)"; }
 echo "── mutantes: tests/mutantes/rojos_conocidos.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/rojos_conocidos.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-rojos-conocidos.log" 2>/dev/null;

@@ -191,7 +191,7 @@ def main():
     #     salida.report_to_titular si HAY algo (silencio real, no un "sin novedades").
     enviados = []
     orig_report = salida.report_to_titular
-    salida.report_to_titular = lambda text, **kw: enviados.append((text, kw)) or {"ok": True}
+    salida.report_to_titular = lambda text, **kw: enviados.append((text, kw)) or {"delivered": True, "blocked": False, "reason": "entregado (fake)"}
     try:
         # ya no queda nada nuevo (todo lo de arriba quedó marcado visto) → no debe llamar.
         ok, texto = ct.enviar_digest_intradia()

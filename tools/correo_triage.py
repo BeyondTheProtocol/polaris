@@ -282,6 +282,15 @@ def digest_intradia(cuentas=None, max_items=6, marcar=True):
     `marcar=True`: persiste los ids devueltos en el ledger para no repetirlos en la
     siguiente pasada (idempotente: llamar dos veces seguidas sin barrer entremedias da
     vacío la segunda vez). `marcar=False` es para --dry (mirar sin consumir)."""
+    texto, ids, vistos = _digest_calcula(cuentas, max_items)
+    if texto and marcar:
+        _guardar_digest_visto(vistos | ids)
+    return texto
+
+
+def _digest_calcula(cuentas, max_items):
+    """(texto, ids de los candidatos, ya vistos) SIN tocar el ledger. Así quien envía puede marcar DESPUÉS de
+    comprobar que el aviso llegó (ver enviar_digest_intradia)."""
     r = resumen(cuentas)
     ya_avisados = {_digest_id(m) for m in
                   (r["ned_critico"] + r["otros_urgentes"] + r["esperando_firma"])}
@@ -289,7 +298,7 @@ def digest_intradia(cuentas=None, max_items=6, marcar=True):
     candidatos = [m for m in r["personas_no_urgentes"]
                  if _digest_id(m) not in ya_avisados and _digest_id(m) not in vistos]
     if not candidatos:
-        return ""
+        return "", set(), vistos
     elegidos = candidatos[:max_items]
     L = ["📬 Correo nuevo (no urgente):"]
     for m in elegidos:
@@ -297,9 +306,7 @@ def digest_intradia(cuentas=None, max_items=6, marcar=True):
     resto = len(candidatos) - len(elegidos)
     if resto > 0:
         L.append("   …y %d más." % resto)
-    if marcar:
-        _guardar_digest_visto(vistos | {_digest_id(m) for m in candidatos})
-    return "\n".join(L)
+    return "\n".join(L), {_digest_id(m) for m in candidatos}, vistos
 
 
 def enviar_digest_intradia(cuentas=None, dry=False):
@@ -314,13 +321,22 @@ def enviar_digest_intradia(cuentas=None, dry=False):
     función NO LLAMA a report_to_titular en absoluto (silencio real, no un mensaje vacío).
     `dry=True`: calcula el digest SIN marcar como visto y SIN enviar — para probar el
     cableado sin dejar huella. Devuelve (enviado:bool, texto:str)."""
-    texto = digest_intradia(cuentas=cuentas, marcar=not dry)
+    texto, ids, vistos = _digest_calcula(cuentas, 6)
     if not texto:
         return False, ""
     if dry:
         return False, texto   # no se envía en dry, pero se ve qué habría dicho
+    import errores
     import salida
-    salida.report_to_titular(texto, urgente=False)
+    # Los correos se marcan «vistos» SOLO si el aviso llegó o llegará solo (entregado, o aplazado al parte).
+    # Antes se marcaban ANTES de enviar y se devolvía True aunque salida lo frenara (HALT, fallo): esos
+    # correos no volvían a aparecer en ningún digest y {{TITULAR}} no llegó a saber de ellos (10-oct-26).
+    llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(texto, urgente=False))
+    if not llega:
+        sys.stderr.write("correo_triage: el digest NO llegó (%s: %s); no marco los correos, se reintenta\n"
+                         % (estado, motivo))
+        return False, texto
+    _guardar_digest_visto(vistos | ids)
     return True, texto
 
 
@@ -643,8 +659,10 @@ def main(argv):
         enviado, texto = enviar_digest_intradia(dry=dry)
         if enviado:
             print("✅ digest enviado:\n%s" % texto)
-        elif texto:
+        elif texto and dry:
             print("(DRY, no enviado) habría dicho:\n%s" % texto)
+        elif texto:
+            print("⚠️ digest NO enviado (salida no lo entregó); los correos siguen sin marcar, se reintenta.\n%s" % texto)
         else:
             print("(nada nuevo que merezca digest — no se manda nada)")
         return 0

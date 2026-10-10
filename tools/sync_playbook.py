@@ -184,15 +184,23 @@ def _marca_intento():
 
 
 def _alerta(msg, dry):
-    """Avisa a {{TITULAR}} de un conflicto. En dry solo imprime; respeta HALT vía salida.py."""
+    """Avisa a {{TITULAR}} de un conflicto. En dry solo imprime; respeta HALT vía salida.py.
+    Devuelve True si el aviso llegó o llegará solo (entregado / aplazado al parte); False si no (10-oct-26:
+    quien marca «ya avisé» debe mirarlo, no darlo por hecho)."""
     if dry:
         print("  (dry) AVISARÍA a {{TITULAR}}: " + msg)
-        return
+        return False
     try:
+        import errores
         import salida
-        salida.report_to_titular(msg, categoria="humano", urgente=False, voz="calida")
+        llega, estado, motivo = errores.aviso_en_camino(
+            salida.report_to_titular(msg, categoria="humano", urgente=False, voz="calida"))
+        if not llega:
+            print("  (el aviso NO llegó: %s: %s)" % (estado, motivo))
+        return llega
     except Exception as e:  # noqa: BLE001 — nunca romper por el canal de aviso
         print("  (no se pudo enviar el aviso: %s)" % e)
+        return False
 
 
 def nudge_frescura(dias, dry, local_path=None):
@@ -246,13 +254,13 @@ def nudge_frescura(dias, dry, local_path=None):
     msg = ("📋 El playbook del caso (ESTADO-ACTUAL.md) lleva **%d días** sin cambios. Si hay novedades "
            "(citas, resultados, decisiones), un repaso rápido lo mantiene fresco para el parte diario." % int(edad_dias))
     print("→ NUDGE de frescura (%.1f días)." % edad_dias)
-    _alerta(msg, dry)
-    if not dry:
+    llego = _alerta(msg, dry)
+    if not dry and llego:      # «ya avisé hoy» solo si el aviso llegó o llegará solo
         os.makedirs(SYNC_DIR, exist_ok=True)
         with open(LAST_NUDGE, "w", encoding="utf-8") as f:
             f.write(hoy + "\n")
-    _audit({"accion": "nudge_frescura", "edad_dias": round(edad_dias, 1), "dias_umbral": dias})
-    return {"estado": "nudge_enviado", "edad_dias": round(edad_dias, 1)}
+    _audit({"accion": "nudge_frescura", "edad_dias": round(edad_dias, 1), "dias_umbral": dias, "llego": bool(llego)})
+    return {"estado": "nudge_enviado" if (llego or dry) else "nudge_no_llego", "edad_dias": round(edad_dias, 1)}
 
 
 # ─── lógica principal ───────────────────────────────────────────────────────────

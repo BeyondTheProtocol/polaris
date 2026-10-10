@@ -298,6 +298,19 @@ def _firma(rep):
     return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
 
+def _olvidar_aviso(firma):
+    """Deshace el sello de `_debe_avisar` cuando el aviso NO llegó: el próximo ciclo vuelve a intentarlo."""
+    seen = _load_json(SEEN, {})
+    if isinstance(seen, dict) and seen.pop(firma, None) is not None:
+        try:
+            tmp = SEEN + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(seen, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, SEEN)
+        except Exception:
+            pass
+
+
 def _debe_avisar(firma):
     seen = _load_json(SEEN, {})
     if not isinstance(seen, dict):
@@ -336,11 +349,15 @@ def _avisar(rep):
     if n_prop:
         partes.append("dejé %d cosa(s) para que las revisemos" % n_prop)
     txt = "Puse al día el seguimiento del viaje y las reservas: " + " y ".join(partes) + "."
+    llega = False
     try:
+        import errores
         import salida
-        salida.report_to_titular(txt)
+        llega = errores.aviso_en_camino(salida.report_to_titular(txt))[0]
     except Exception:
         pass
+    if not llega:
+        _olvidar_aviso(_firma(rep))    # `_debe_avisar` ya selló el cooldown ANTES de enviar: se deshace (10-oct-26)
 
 
 def main(argv):

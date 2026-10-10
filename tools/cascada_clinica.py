@@ -769,12 +769,26 @@ def propagate(propuesta, *, dry=True, reindex=False, avisar=False, ahora=None):
             except Exception:
                 texto = ("Cambio clinico detectado en la cascada. El detalle NO sale de "
                          "la maquina: abre la ficha para verlo.")
-            salida.report_to_titular(texto, urgente=(nivel == "rojo"))
-            informe["pasos"].append("aviso enviado a {{TITULAR}} (urgente=%s)" % (nivel == "rojo"))
+            _anotar_aviso(informe, salida.report_to_titular(texto, urgente=(nivel == "rojo")), nivel == "rojo")
         except Exception as e:
             informe["pasos"].append("aviso: no se pudo enviar (%r)" % e)
 
     return informe
+
+
+def _anotar_aviso(informe, resultado_salida, urgente):
+    """Deja en el informe lo que PASÓ con el aviso a {{TITULAR}}, no que la llamada no lanzara (10-oct-26): con HALT
+    o un envío fallido el aviso no sale, y un informe que dice «enviado» sin serlo deja creer que ya lo sabe.
+    Si no llegó, `revisar_humano` = True. Solo toca el INFORME: ningún dato clínico ni el maestro."""
+    import errores  # noqa: E402
+    llega, estado, motivo = errores.aviso_en_camino(resultado_salida)
+    if llega:
+        informe["pasos"].append("aviso a {{TITULAR}}: %s (urgente=%s)" % (
+            "entregado" if estado == "entregado" else "en camino (%s)" % estado, urgente))
+    else:
+        informe["revisar_humano"] = True
+        informe["pasos"].append("aviso a {{TITULAR}}: NO LLEGÓ (%s: %s) — AVISAR a mano" % (estado, motivo))
+    return llega
 
 
 def resumen_llano(informe, veredicto, afectados, nivel, motivo_rojo):

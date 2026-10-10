@@ -295,12 +295,22 @@ def avisar(dry=False):
             lineas.append("   %s" % e["url"])
     texto = "\n".join(lineas)
     if not dry:
+        # «avisado» solo si el aviso LLEGÓ o llegará solo (entregado, o aplazado al parte). Antes se marcaba
+        # siempre, incluso con HALT, con un envío fallido o con una excepción: la reserva dejaba de avisarse
+        # sin que {{TITULAR}} la hubiera visto (10-oct-26, deuda entrega-dada-por-hecha-sin-mirar-resultado-de-salida).
+        llega = False
         try:
             sys.path.insert(0, os.path.join(REPO, "tools"))
+            import errores
             import salida
-            salida.report_to_titular(texto)
-        except Exception:
-            pass  # best-effort: el aviso nunca rompe el flujo (igual criterio que el resto del motor)
+            llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(texto))
+            if not llega:
+                sys.stderr.write("reservas: el aviso NO llegó (%s: %s); se reintenta en la próxima pasada\n"
+                                 % (estado, motivo))
+        except Exception as exc:
+            sys.stderr.write("reservas: no pude avisar (%r); se reintenta en la próxima pasada\n" % (exc,))
+        if not llega:
+            return (texto, 0)        # nada se marca; el aviso nunca rompe el flujo
         for e in pendientes:
             e["avisado"] = True
         _write_atomic(RESERVAS, data)

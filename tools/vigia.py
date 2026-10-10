@@ -460,7 +460,13 @@ def _avisar_a_titular(nuevas):
         # revisando ni curando el lazo → eso SÍ requiere a {{TITULAR}} (regla de oro: lo que no se
         # auto-arregla y necesita acción de ella escala a "humano"). El resto sigue operativo.
         cat = "humano" if any(a.get("escalar_humano") for a in avisables) else "operativo"
-        salida.report_to_titular(texto, categoria=cat, fuente="vigia")
+        import errores
+        llega, estado, motivo = errores.aviso_en_camino(
+            salida.report_to_titular(texto, categoria=cat, fuente="vigia"), cat)
+        if not llega:
+            # No llegó (HALT, fallo de envío): NO se marca como avisado, el siguiente ciclo lo reintenta.
+            sys.stderr.write("vigia: el aviso NO llegó (%s: %s); se reintenta\n" % (estado, motivo))
+            return False
     except Exception:
         return False                           # fail-soft: no romper el ciclo si el choke-point no está
     try:                                       # guarda SOLO al enviar: referencia = último avisado

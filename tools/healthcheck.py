@@ -1900,6 +1900,43 @@ ACUSE_VENTANA_H = ALERTA_COOLDOWN_H   # un acuse 'en_arreglo' deja de silenciar 
                                        # se inventa un plazo nuevo: si algo lleva "en ello" 12h sin
                                        # cerrarse, vuelve a escalar como si nadie lo hubiera visto).
 
+def _escalar_boca_muda(bm_alertas, sello, chk):
+    """Grita por `alerta_critica` (salta send()) que la boca está muda y pone el sello diario («no repetir el
+    grito»). El sello se pone SOLO si el grito salió: `alerta_critica` devuelve un dict y NO lanza si el envío
+    falla. Antes se sellaba igual y, con la boca rota (justo el caso que este guardián vigila), no se volvía a
+    gritar en todo el día (10-oct-26). Devuelve True si se gritó y selló."""
+    try:
+        import salida as _sal
+        _gritos = [_sal.alerta_critica("\U0001f6a8 " + _txt) for _k, _txt in bm_alertas]
+        # `any`, no `all`: si UN grito salió, {{TITULAR}} ya sabe que la boca está muda; exigir todos repetiría el que
+        # sí salió cada ciclo por el canal de socorro (salta HALT y silencio nocturno).
+        if any(isinstance(_g, dict) and _g.get("delivered") for _g in _gritos):
+            os.makedirs(os.path.dirname(sello), exist_ok=True)
+            open(sello, "w").close()
+            return True
+        chk["boca_muda_escalada_error"] = "alerta_critica NO entregada: %r" % (
+            [(_g or {}).get("reason") if isinstance(_g, dict) else _g for _g in _gritos],)
+    except Exception as e2:
+        chk["boca_muda_escalada_error"] = "%r" % e2
+    return False
+
+
+def _llegara(res, categoria="humano"):
+    """(llega, estado, motivo): ¿el aviso que acabo de pedir a `salida` le LLEGA a {{TITULAR}}? (10-oct-26)
+
+    Antes se daba por avisado todo lo que no lanzaba excepción. `report_to_titular` devuelve un dict que
+    distingue: entregado · aplazado al parte (cupo diario agotado) · retenido (silencio nocturno) ·
+    operativo (log) · bloqueado (HALT, sin chat_id, fallo de envío) · dry. La clasificación es la de
+    `errores.aviso_en_camino` (una sola, no se duplica). Regla:
+      · entregado / aplazado / retenido → llega (aplazado y retenido salen solos con el parte y con el
+        resumen de las 08:00): se da por avisado y NO se repite cada ciclo (anti-spam intacto).
+      · `operativo` → llega solo si la categoría ES operativa (su destino es el log, no el chat).
+      · cualquier otro (bloqueado, fallo, resultado ilegible) → NO llegó: no se marca como avisado, así
+        el siguiente ciclo lo reintenta y el «✅ Resuelto» nunca anuncia lo que ella no llegó a ver."""
+    import errores as _err
+    return _err.aviso_en_camino(res, categoria)
+
+
 def _emitir_si_cambia(alertas, categoria="humano"):
     """Envía el aviso de salud por el choke-point SOLO si hay un problema NUEVO o si ya pasó la
     ventana de recordatorio (ALERTA_COOLDOWN_H). Un problema persistente avisa UNA vez y se recuerda
@@ -1944,7 +1981,9 @@ def _emitir_si_cambia(alertas, categoria="humano"):
 
     Clave anti-FLAPPING: el estado se guarda SOLO al ENVIAR, así el conjunto de referencia es el
     último AVISADO. Un agente que oscila dentro/fuera de ese conjunto NO vuelve a disparar el digest.
-    Devuelve True si envió. Determinista y testeable.
+    Devuelve True si el aviso está AVISADO de verdad (entregado, o aplazado/retenido y por tanto en camino);
+    False si no había nada que avisar o si el aviso NO llegó (HALT, fallo de envío): en ese caso el estado
+    no se toca y el siguiente ciclo lo reintenta (ver `_llegara`). Determinista y testeable.
 
     (Bug 24/6: firmaba el texto completo → números volátiles cambiaban la firma cada ciclo → spam.
      Bug 26/6: mismo problema con dead-man días + dispatcher minutos + disco GB + seguimiento días.)"""
@@ -2014,10 +2053,14 @@ def _emitir_si_cambia(alertas, categoria="humano"):
             os.remove(pend_path)
     except Exception:
         pass
+    resuelto_ok = True
     if cerradas and categoria == "humano":
         etiquetas = [prev_textos.get(c, c) for c in cerradas]
-        salida.report_to_titular("✅ Resuelto: " + "; ".join(etiquetas),
-                                categoria=categoria, fuente="healthcheck")
+        resuelto_ok, _est_r, _mot_r = _llegara(salida.report_to_titular(
+            "✅ Resuelto: " + "; ".join(etiquetas), categoria=categoria, fuente="healthcheck"), categoria)
+        if not resuelto_ok:
+            sys.stderr.write("healthcheck: el «Resuelto» NO llegó (%s: %s); se reintenta en el próximo ciclo\n"
+                             % (_est_r, _mot_r))
 
     # La PURGA va fuera del `== "humano"`, por el mismo motivo que la remisión de deuda de abajo:
     # ese filtro decide si se manda un Telegram, no si la condición dejó de cumplirse. Atada al
@@ -2044,6 +2087,11 @@ def _emitir_si_cambia(alertas, categoria="humano"):
                 _deuda.remitir(c, "healthcheck: la condición dejó de detectarse en 2 lecturas")
         except Exception:
             pass
+
+    if not resuelto_ok:
+        # El «Resuelto» no salió: NO se confirma el cierre. El estado (claves avisadas) y el fichero de
+        # pendientes quedan como están, así que el próximo ciclo vuelve a ver `cerradas` y lo reintenta.
+        return False
 
     if not claves:
         # Solo se resetea state_path del todo cuando YA NO quedan ausencias pendientes de confirmar
@@ -2086,7 +2134,10 @@ def _emitir_si_cambia(alertas, categoria="humano"):
     NO_AL_LIBRO = {"deuda_escalada"}
     try:
         import deuda as _deuda
-        for clave in nuevas:
+        # `nuevas_libro`: si el aviso anterior NO llegó (HALT/fallo), `nuevas` sigue igual el ciclo siguiente;
+        # sin esta memoria cada reintento llamaría a `visto()` y un solo incidente inflaría el contador
+        # (el mismo bug de 1241x, por otra puerta). Lo ya anotado en un intento fallido se recuerda en el estado.
+        for clave in nuevas - set(prev.get("en_libro", [])):
             if clave in NO_AL_LIBRO:
                 continue
             it = _deuda._cargar().get(_deuda.normalizar_clave(clave))
@@ -2110,7 +2161,10 @@ def _emitir_si_cambia(alertas, categoria="humano"):
     # ilegible), la nota lo dice en llano en vez de prometer lo que no va a pasar.
     if categoria == "humano" and _salud:
         for clave in nuevas:
-            if _salud.get(clave) is None:
+            _ac = _salud.get(clave)
+            # …o un acuse «anotado; sin ejecutor» de un ciclo anterior (HALT): si el aviso NO llegó y se reintenta,
+            # el lazo puede haber vuelto; se reintenta el encolado en vez de repetir «no tengo ejecutor» (10-oct-26).
+            if _ac is None or (_ac.get("por") == "healthcheck" and str(_ac.get("nota") or "").startswith("anotado")):
                 job_id = _encolar_investigacion(clave, textos_por_clave.get(clave, clave))
                 nota = ("investigando (job %s encolado)" % job_id) if job_id else \
                        "anotado; sin ejecutor ahora mismo, lo retomo en cuanto el lazo vuelva"
@@ -2166,9 +2220,27 @@ def _emitir_si_cambia(alertas, categoria="humano"):
         return False                           # nada nuevo y dentro de la ventana → silencio (anti-flapping)
     if not textos_finales:
         return bool(cerradas and categoria == "humano")
-    salida.report_to_titular("🩺 Revisión de salud del lazo:\n- " + "\n- ".join(textos_finales),
-                            categoria=categoria, fuente="healthcheck")
-    try:                                       # guarda SOLO al enviar: referencia = último avisado
+    llega, _est, _mot = _llegara(salida.report_to_titular(
+        "🩺 Revisión de salud del lazo:\n- " + "\n- ".join(textos_finales),
+        categoria=categoria, fuente="healthcheck"), categoria)
+    if not llega:
+        # NO llegó (HALT, fallo de envío…): {{TITULAR}} no lo ha visto, así que NO se marca como avisado. Se
+        # conserva la referencia anterior (claves, textos, ts → ni se reinicia el cooldown ni se inventa un
+        # «Resuelto» de algo que no vio) y solo se apunta lo ya anotado en el libro de deuda.
+        sys.stderr.write("healthcheck: el aviso de salud NO llegó (%s: %s); se reintenta en el próximo ciclo\n"
+                         % (_est, _mot))
+        try:
+            with open(state_path, "w", encoding="utf-8") as f:
+                # Los cierres ya anunciados (el «Resuelto» sí llegó) salen de la referencia: si se quedaran,
+                # el próximo ciclo los volvería a anunciar.
+                _json.dump({"ts": prev.get("ts", 0), "claves": sorted(prev_claves - set(cerradas)),
+                            "textos": {k: v for k, v in prev_textos.items() if k not in cerradas},
+                            "en_libro": sorted(set(prev.get("en_libro", [])) | set(nuevas))},
+                           f, ensure_ascii=False)
+        except Exception:
+            pass
+        return False
+    try:                                       # guarda SOLO al avisar: referencia = último avisado
         with open(state_path, "w", encoding="utf-8") as f:
             _json.dump({"ts": now, "claves": sorted(claves), "textos": textos_por_clave},
                        f, ensure_ascii=False)
@@ -3823,14 +3895,7 @@ def run():
             sello = os.path.join(STATE, "hc", "boca_muda-%s.flag"
                                  % __import__("datetime").datetime.now().strftime("%Y-%m-%d"))
             if not os.path.exists(sello):
-                try:
-                    import salida as _sal
-                    for _k, _txt in bm_alertas:
-                        _sal.alerta_critica("\U0001f6a8 " + _txt)
-                    os.makedirs(os.path.dirname(sello), exist_ok=True)
-                    open(sello, "w").close()
-                except Exception as e2:
-                    chk["boca_muda_escalada_error"] = "%r" % e2
+                _escalar_boca_muda(bm_alertas, sello, chk)
         alertas.extend(bm_alertas)
     except Exception as e:
         chk["boca_muda_error"] = "%r" % e

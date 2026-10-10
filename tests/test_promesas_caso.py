@@ -167,7 +167,7 @@ ok(not pc.pasar(responder=modelo_correo)["nuevas"], "el correo no se duplica")
 import estado_caso as ec  # noqa: E402
 import salida  # noqa: E402
 avisos = []
-salida.report_to_titular = lambda texto, **k: avisos.append(texto)
+salida.report_to_titular = lambda texto, **k: (avisos.append(texto), {"delivered": True, "blocked": False, "reason": "entregado (fake)"})[1]   # el dict real: estado_caso lo LEE desde el 10-oct-26
 ec.actualizar(avisar=True)
 md = open(ec._estado_path(), encoding="utf-8").read()
 ok("Prometido en los chats del caso" in md and "enviar el informe" in md, "estado lista la promesa")

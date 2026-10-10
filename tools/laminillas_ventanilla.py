@@ -374,10 +374,14 @@ def _aviso_memoria(nombre, motivo, gordos, dry=False):
     lista = "; ".join("%s %.1f GB" % (c[2][:30], c[0]) for c in (gordos or [])[:5])
     texto = ("Las laminillas esperan memoria para «%s» desde hace 15 min (%s). Lo que más ocupa: "
              "%s. Si puedes, cierra Chrome o WhatsApp; sigo esperando." % (nombre, motivo, lista))
+    import errores
     import salida
     r = salida.report_to_titular(texto, dry=dry, voz="sobria", fuente="laminillas_ventanilla")
-    with open(AVISO_SELLO, "w") as f:
-        f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
+    # El sello anti-spam (6 h) arranca SOLO si el aviso llegó o llegará solo (entregado / aplazado al parte). Antes
+    # se sellaba siempre: con HALT o un envío fallido, {{TITULAR}} no se enteraba en 6 h de que las laminillas esperan (10-oct-26).
+    if dry or errores.aviso_en_camino(r)[0]:
+        with open(AVISO_SELLO, "w") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S"))
     return r
 
 

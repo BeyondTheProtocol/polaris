@@ -148,6 +148,22 @@ def _promesas(hoy):
         return []
 
 
+def _aviso_llega(texto):
+    """True si el aviso llegó a {{TITULAR}} o llegará solo (entregado / aplazado al parte). Si `salida` lo frena
+    (HALT, fallo de envío) o ni se puede llamar, False: quien llama NO debe marcar nada como avisado."""
+    try:
+        import errores
+        import salida
+        llega, estado, motivo = errores.aviso_en_camino(salida.report_to_titular(texto, voz="sobria"))
+        if not llega:
+            sys.stderr.write("estado_caso: el aviso NO llegó (%s: %s); se reintenta en la próxima pasada\n"
+                             % (estado, motivo))
+        return llega
+    except Exception as exc:
+        sys.stderr.write("estado_caso: no pude avisar (%r); se reintenta en la próxima pasada\n" % (exc,))
+        return False
+
+
 def actualizar(avisar=False):
     eventos = _leer_eventos()
     hilos = seguimiento.load_seguimiento().get("hilos", [])
@@ -157,6 +173,7 @@ def actualizar(avisar=False):
         marca = {}
     ultimo = marca.get("ultimo_ts", "")
     nuevos = [e for e in eventos if str(e.get("ts", "")) > ultimo]
+    propuestas_avisadas = True    # False = el aviso de las propuestas NO llegó: no se avanza `ultimo_ts` (se reproponen)
     propuestas = []
     for e in nuevos:
         for h in casar(e, _esperas(hilos)):
@@ -169,11 +186,7 @@ def actualizar(avisar=False):
         lineas = ["📥 Ha llegado algo que se estaba esperando. ¿Cierro la espera?"]
         for p in propuestas[:5]:
             lineas.append("   · «%s» → espera «%s»" % (p["informe"][:70], p["titulo"][:70]))
-        try:
-            import salida
-            salida.report_to_titular("\n".join(lineas), voz="sobria")
-        except Exception:
-            pass
+        propuestas_avisadas = _aviso_llega("\n".join(lineas))
     # Promesa vencida sin cumplir = «informe que falta» (Fase 2). Un aviso por promesa, nunca más.
     avisadas = set(marca.get("promesas_avisadas", []))
     vencidas = [p for p, dias in _promesas(date.today()) if dias > 0 and not p.get("sin_aviso")
@@ -184,14 +197,12 @@ def actualizar(avisar=False):
             import promesas_caso
             lineas.append("   · %s, vencía el %s" % (promesas_caso.texto_sin_pii(p)[:90], p.get("vence", "")))
         lineas.append("Si ya llegó: python3 tools/promesas_caso.py --cumplida <id>")
-        try:
-            import salida
-            salida.report_to_titular("\n".join(lineas), voz="sobria")
+        # «avisada» solo si el aviso llegó o llegará solo: antes se marcaba aunque salida lo frenara (HALT, fallo)
+        # y la promesa vencida no volvía a avisarse nunca (10-oct-26).
+        if _aviso_llega("\n".join(lineas)):
             marca["promesas_avisadas"] = sorted(avisadas | {p["id"] for p in vencidas})
-        except Exception:
-            pass
     if nuevos or marca.get("promesas_avisadas", []) != sorted(avisadas):
-        if nuevos:
+        if nuevos and propuestas_avisadas:
             marca["ultimo_ts"] = max(str(e.get("ts", "")) for e in nuevos)
         os.makedirs(os.path.dirname(_marca_path()), exist_ok=True)
         with open(_marca_path(), "w", encoding="utf-8") as fh:

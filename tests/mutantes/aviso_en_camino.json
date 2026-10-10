@@ -1,0 +1,32 @@
+{
+  "_por_que": "Defensas de errores.aviso_en_camino (la unica clasificacion de 'le llego el aviso?' que usan healthcheck y los demas llamantes de salida): aplazado/retenido llegan, bloqueado/fallo/ilegible/dry no, operativo solo en categoria operativa (10-oct-26).",
+  "objetivo": "tools/errores.py",
+  "test": ["python3", "tests/test_aviso_en_camino.py"],
+  "env": "BTP_ERRORES_MODULO",
+  "mutaciones": [
+    {"etiqueta": "el aplazado ya no cuenta como en camino (re-spam cada ciclo)",
+     "viejo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\"))",
+     "nuevo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"retenido\"))"},
+    {"etiqueta": "el retenido ya no cuenta como en camino",
+     "viejo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\"))",
+     "nuevo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\"))"},
+    {"etiqueta": "un dry cuenta como en camino",
+     "viejo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\"))",
+     "nuevo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\", \"dry\"))"},
+    {"etiqueta": "un operativo cuenta como en camino para un aviso humano",
+     "viejo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\"))",
+     "nuevo": "ESTADOS_EN_CAMINO = frozenset((\"entregado\", \"aplazado\", \"retenido\", \"operativo\"))"},
+    {"etiqueta": "la categoria operativa deja de aceptar el log operativo",
+     "viejo": "(categoria == \"operativo\" and estado == \"operativo\")",
+     "nuevo": "False"},
+    {"etiqueta": "el operativo se acepta en cualquier categoria",
+     "viejo": "(categoria == \"operativo\" and estado == \"operativo\")",
+     "nuevo": "(estado == \"operativo\")"},
+    {"etiqueta": "un bloqueado en categoria operativa cuenta como en camino",
+     "viejo": "(categoria == \"operativo\" and estado == \"operativo\")",
+     "nuevo": "(categoria == \"operativo\")"},
+    {"etiqueta": "aviso_en_camino ignora el estado y da siempre True",
+     "viejo": "return (estado in ESTADOS_EN_CAMINO or",
+     "nuevo": "return (True or"}
+  ]
+}
