@@ -141,20 +141,21 @@
       "aplicable": true,
       "auditable": true,
       "repetida": false,
-      "nota": "RE-AÑADIDA el 9-oct-26 (el cambio del 8-oct no llegó a commitearse; ver la deuda `lo-que-el-lazo-escribe-sin-commitear-se-pierde`). 10-oct-26: mecanizada en AVISO con `dia_semana_mal` (datetime, sin LLM): el día de la semana pegado a una fecha («jueves 8 de octubre», «2026-10-09, jueves») o a hoy/mañana/pasado mañana se recalcula con weekday(). Test: tests/test_gate_dia_semana.py. Parcial: no comprueba «el jueves» a secas ni «el jueves de la semana que viene». Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+      "nota": "RE-AÑADIDA el 9-oct-26. El Mejoras-log del 8-oct ya declaraba esta entrada como añadida y verificada (293→294), pero el cambio nunca llegó a commitearse y se perdió: hoy `git log -S` no encuentra ningún commit que haya contenido este slug. Ver la deuda `lo-que-el-lazo-escribe-sin-commitear-se-pierde`. Un día de la semana equivocado en una cita puede costarle la cita, así que es candidata a mecanismo real en gate_salida.py: cazar un nombre de día junto a una fecha ISO y recalcularlo. · 10-oct-26: mecanizada en AVISO con `dia_semana_mal` (datetime, sin LLM). Dos sesiones lo escribieron a la vez; se reconcilió con casos: quedó el nombre y el registro de `dia_semana_mal` con el cuerpo más completo. Recalcula con weekday() el día pegado a una fecha («jueves 8 de octubre», «viernes 2026-10-09», «2026-10-09, jueves», «9 de octubre (viernes)», «jueves 8/10») o a hoy/mañana/pasado mañana/ayer. Sin año compara con las ocurrencias a menos de 330 días de hoy. No mira lo entrecomillado con «», ni código, ni «esta/por la mañana lunes», ni un «lunes 12» sin mes. Tests: tests/test_gate_dia_semana.py y tests/test_gate_dia_y_aviso.py (`BTP_HOY` o `g._hoy` fijan el hoy). Replay 30 d / 4.264 turnos: 0 disparos y ningún acierto real (el fallo del 8-oct no está en los transcripts). Parcial: no ve un día sin fecha ni hoy/mañana al lado. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
       "modo": "aviso"
     },
     {
       "slug": "feedback-aviso-condicionado-no-parte-de-estado",
       "que": "Si pide «avísame cuando X», se responde UNA confirmación de que queda armado y después SILENCIO hasta que X ocurra; un parte diciendo que X todavía no ha pasado es ruido",
       "clase": "salida",
-      "mecanismo": "",
+      "mecanismo": "parcial: .claude/hooks/gate_salida.py::aviso_sin_novedad",
       "fresca": true,
       "heredada": false,
       "aplicable": true,
-      "auditable": false,
+      "auditable": true,
       "repetida": false,
-      "nota": "Clasificada el 9-oct-26 por auto-mejora. Clase `salida` porque se detecta en el texto antes de entregarlo: un parte cuyo contenido es «X sigue sin pasar» sobre un aviso armado. Hermana de la deuda cerrada `vega-ruido-33-al-dia`: la forma de matar un aviso es repetirlo mientras no hay noticia. · 10-oct-26 (S15): no cabe en un check de salida sin falsos positivos. Lo que hay que frenar es un parte «X sigue sin pasar» sobre una vigilancia armada, y eso exige saber que existe esa vigilancia (estado de Vega, no el texto de la respuesta: «todavía no ha respondido» es una contestación legítima si ella pregunta directamente). El caso origen fue una respuesta de Vega (inferencia: por un canal que no pasa por este hook Stop de sesión). Mecanismo real pendiente: el chequeo del emisor, en la deuda `vega-sin-novedad-hook-mecanismo`."
+      "nota": "Clasificada el 9-oct-26 por auto-mejora. Clase `salida` porque se detecta en el texto antes de entregarlo: un parte cuyo contenido es «X sigue sin pasar» sobre un aviso armado. Hermana de la deuda cerrada `vega-ruido-33-al-dia`: la forma de matar un aviso es repetirlo mientras no hay noticia. · 10-oct-26: otra sesión la dejó como «no cabe» (S15: exige saber que hay una vigilancia armada, estado de Vega); esta la mecaniza en AVISO, parcial, usando el último mensaje suyo como señal de vigilancia armada (`SUYOS[-1]` = «avísame cuando/en cuanto/si…» sin pregunta). Salta si la respuesta es un parte corto (≤600 caracteres) de «sin novedades / aún no / nadie ha respondido». No salta si la vigilancia se ha roto (credenciales, sin acceso, error), si hay señal nueva («salvo X, que ha respondido») ni si ella pregunta. SIN ACIERTO REAL TODAVÍA: replay 30 d / 4.264 turnos, 0 disparos; el caso del 8-oct fue de Vega, por un canal que no pasa por este hook Stop de sesión (inferencia), así que en Vega no hay cobertura. Solo cubre sesiones de Claude Code donde ella arma el aviso en su último mensaje. El mecanismo en el emisor sigue pendiente en `vega-sin-novedad-hook-mecanismo`. Test: tests/test_gate_dia_y_aviso.py. Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+      "modo": "aviso"
     },
     {
       "slug": "feedback-cola-recover-reencola-todo-lo-fallido",
@@ -3647,6 +3648,42 @@
       "auditable": false,
       "repetida": false,
       "nota": "5-oct-26: antipatrón propio del lazo de auto-mejora. 4 entregables reales del pipeline de vacuna (comite-medico y consejero-precision, 25-sep y 1-oct) quedaron marcados sin-entregable y enterrados en queue/failed porque la prueba declarada era tipo deuda y el entregable era una nota archivada. Mecanismo pendiente: deuda prueba-entregable-sin-tipo-nota (añadir tipo nota a prueba_entregable.py + triaje de failed/ que separe alertas auto-generadas de encargos con intención)."
+    },
+    {
+      "slug": "feedback-pase-de-voz-ligero-en-textos-cortos",
+      "que": "El pase de voz-titular va ligero (effort low, sin releer el perfil) en DMs y respuestas de 1-3 frases; completo en posts públicos, correos y anuncios",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 10-oct-26. Contexto: es una decisión de cómo lanzar un sub-agente (esfuerzo y qué le dejo abrir), y el gate solo ve el texto de la respuesta y los nombres de las tools del turno, no los parámetros del Agent. Un check que mirase solo «voz-titular lanzado» no distingue ligero de completo ni si el texto era corto: daría falso verde. Lo que sí está mecanizado es que el borrador pase por voz-titular (`borrador_sin_voz`, norma feedback-comentarios-siempre-voz-titular). Sin garantía, y se dice así."
+    },
+    {
+      "slug": "feedback-plan-vivo-evoluciona-en-la-practica",
+      "que": "Un plan aprobado en marcha lo ajusto yo según lo que vea trabajando (secuencia, criterio de parada, reparto) y se lo cuento después con la inferencia marcada y una entrada fechada en el plan vivo",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 10-oct-26. Contexto: es un permiso de autonomía y un modo de trabajar, no un patrón en una respuesta. El incumplimiento («te presento tres cambios como opciones a elegir») es indistinguible por forma de una pregunta legítima de alcance o de una decisión que sí es suya (clínica, hacia fuera, gasto), y hay que saber si el plan estaba aprobado y en ejecución. Cualquier regex daría falso verde o ruido. Sin garantía, y se dice así."
+    },
+    {
+      "slug": "feedback-pruebas-del-ensayo-ya-las-valoro-su-equipo",
+      "que": "Las pruebas que pide y lee su propio equipo (cribado de un ensayo, control previo a una dosis) se dan por valoradas; no se le presentan como «no consta si se valoró» ni se montan preguntas de «¿lo visteis?»",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 10-oct-26 tras valorar una regla de salida sobre la frase «no consta si se valoró». No cabe por forma: lo que hace falta saber es quién pidió la prueba y si después hubo dosis, inclusión o alta, y eso no está en la respuesta. La misma frase es correcta para pruebas de terceros (otro centro, un paciente de un paper) y para «no tenemos el documento». En un replay de 30 días (4.264 turnos) la frase literal no aparece ni una vez (0 aciertos reales que medir) y «consta … no he visto que se hiciera» sí aparece, en un uso legítimo. Con 0 positivos medibles y falsos positivos previsibles, el check sería ruido o falso verde. Sin garantía, y se dice así; el recordatorio queda en la memoria y en el recall."
     }
   ]
 }

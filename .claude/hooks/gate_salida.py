@@ -1453,75 +1453,137 @@ def frase_inventada(t, tools=None):
             "WhatsApp). Si es inventada, quítala, o díselo al entregar." % faltan[0][:120])
 
 
+_DIAS_SEMANA = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
+_MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+          "octubre", "noviembre", "diciembre")
+_RE_DIA = r"(lunes|martes|miercoles|jueves|viernes|sabado|domingo)"
+_RE_MES = r"(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)"
+# Cada patrón captura (día, d, m, a) con grupos nombrados; el año es opcional.
+_FECHAS_CON_DIA = (
+    re.compile(_RE_DIA + r"\s*,?\s*(?:el\s+|dia\s+)?(?P<d>\d{1,2})\s+de\s+" + _RE_MES.replace("(", "(?P<m>", 1)
+               + r"(?:\s+(?:de|del)\s+(?P<a>\d{4}))?"),
+    re.compile(_RE_DIA + r"\s*,?\s*(?P<a>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})"),
+    re.compile(_RE_DIA + r"\s*,?\s*(?P<d>\d{1,2})/(?P<m>\d{1,2})(?:/(?P<a>\d{2,4}))?(?![\d/]|\s+(?:de|del)\s+(?:los|las|la|el)\b)"),
+    # fecha primero y el día entre paréntesis: «9 de octubre (viernes)», «2026-10-09 (viernes)»
+    re.compile(r"(?P<d>\d{1,2})\s+de\s+" + _RE_MES.replace("(", "(?P<m>", 1)
+               + r"(?:\s+(?:de|del)\s+(?P<a>\d{4}))?\s*\(\s*" + _RE_DIA + r"\s*\)"),
+    re.compile(r"(?P<a>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})\s*[(,]\s*" + _RE_DIA + r"\s*\)?"),
+)
+# Sin coma ni «el» entre medias: «mañana, el martes se cae» (replay 30 d) son dos cláusulas, no
+# «mañana = martes». Solo la forma pegada («mañana viernes», «hoy es jueves»).
+_RE_RELATIVO = re.compile(r"(?<!la )(?<!esta )(?<!de )(?<!tarde )(?<!noche )\b(hoy|manana|pasado manana|ayer)\s+"
+                          r"(?:es\s+|fue\s+|sera\s+)?" + _RE_DIA + r"\b")
+_REL_OFFSET = {"hoy": 0, "manana": 1, "pasado manana": 2, "ayer": -1}
+
+
 def _hoy():
-    """Fecha de referencia de «hoy»/«mañana». Aparte para que tests y replay la fijen."""
+    """Hoy. `BTP_HOY=AAAA-MM-DD` lo fija (tests y replay)."""
     import datetime
+    v = os.environ.get("BTP_HOY")
+    if v:
+        try:
+            return datetime.date.fromisoformat(v)
+        except ValueError:
+            pass
     return datetime.date.today()
 
 
-_DIAS_SEM = {"lunes": 0, "martes": 1, "miércoles": 2, "miercoles": 2, "jueves": 3, "viernes": 4,
-             "sábado": 5, "sabado": 5, "domingo": 6}
-_MESES = {"enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
-          "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11,
-          "diciembre": 12, "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6, "jul": 7,
-          "ago": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dic": 12}
-_RE_DIA = "(" + "|".join(sorted(_DIAS_SEM, key=len, reverse=True)) + ")"
-_RE_MES = "(" + "|".join(sorted(_MESES, key=len, reverse=True)) + ")"
-_NOMBRE_DIA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-
-
-def _fecha_cercana(d, m, y=None):
-    """date de d/m; sin año, el año que la deja más cerca de hoy. None si no existe."""
-    import datetime
-    hoy = _hoy()
-    cands = [y] if y else [hoy.year - 1, hoy.year, hoy.year + 1]
-    out = []
-    for a in cands:
-        try:
-            out.append(datetime.date(a, m, d))
-        except ValueError:
-            continue
-    return min(out, key=lambda f: abs((f - hoy).days)) if out else None
+def _plano(s):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
 
 
 def dia_semana_mal(t, tools=None):
-    """feedback-dia-de-la-semana-calculado-no-escrito — el día de la semana junto a una fecha (o a
-    «hoy»/«mañana») tiene que cuadrar con el calendario. Determinista: `datetime`, sin LLM. Caza el
-    caso del 8-oct-26 («mañana jueves» siendo jueves → mañana era viernes). Parcial: solo cuando el
-    día y la fecha van pegados; «el jueves» a secas, o «el jueves de la semana que viene», no se
-    comprueban. Sin año, la fecha se toma en el año que la deja más cerca de hoy."""
+    """feedback-dia-de-la-semana-calculado-no-escrito — el nombre del día se DERIVA de la fecha,
+    no se escribe de memoria (8-oct-26: «mañana jueves» cuando mañana era viernes; en una cita
+    médica eso cuesta la cita). Caza un día de la semana pegado a una fecha concreta («jueves 8 de
+    octubre», «viernes 2026-10-09», «9 de octubre (viernes)», «jueves 8/10») o a hoy/mañana/ayer y
+    lo recalcula con el calendario. Sin año explícito se compara con las ocurrencias de esa fecha a
+    menos de 330 días de hoy y basta que una cuadre (no canta por una fecha histórica bien escrita;
+    si ninguna cae en esa ventana, no opina). No
+    mira lo entrecomillado con «», ni código. Una fecha con día y sin mes («lunes 12») no se
+    comprueba: sin mes no hay calendario contra el que contrastarla."""
     import datetime
-    x = _sin_bloques(t).lower()
     hoy = _hoy()
-    malos = []
-
-    def _mira(dia, fecha, tal):
-        if fecha and _DIAS_SEM[dia] != fecha.weekday():
-            malos.append("«%s» no cuadra: %s es %s." % (tal, fecha.isoformat(),
-                                                         _NOMBRE_DIA[fecha.weekday()]))
-
-    for m in re.finditer(r"\b%s,?\s+(?:día\s+)?(\d{1,2})\s+de\s+%s(?:\s+de\s+(\d{4}))?\b"
-                         % (_RE_DIA, _RE_MES), x):
-        _mira(m.group(1), _fecha_cercana(int(m.group(2)), _MESES[m.group(3)],
-                                         int(m.group(4)) if m.group(4) else None), m.group(0))
-    for m in re.finditer(r"\b%s,?\s+(\d{4})-(\d{2})-(\d{2})\b" % _RE_DIA, x):
-        _mira(m.group(1), _fecha_cercana(int(m.group(4)), int(m.group(3)), int(m.group(2))),
-              m.group(0))
-    for m in re.finditer(r"(\d{4})-(\d{2})-(\d{2})\s*[(,]\s*%s\b" % _RE_DIA, x):
-        _mira(m.group(4), _fecha_cercana(int(m.group(3)), int(m.group(2)), int(m.group(1))),
-              m.group(0))
-    for m in re.finditer(r"\b(hoy|pasado mañana|mañana)\s+(?:es\s+|,\s*)?%s\b" % _RE_DIA, x):
-        off = {"hoy": 0, "mañana": 1, "pasado mañana": 2}[m.group(1)]
-        _mira(m.group(2), hoy + datetime.timedelta(days=off), m.group(0))
-    if malos:
-        return ("Día de la semana que no cuadra con el calendario: %s Calcúlalo con weekday() de la "
-                "fecha, no de memoria." % " ".join(malos[:2]))
+    x = _plano(re.sub(r"«[^»]*»", " ", _sin_bloques(t)))
+    for rx in _FECHAS_CON_DIA:
+        for m in rx.finditer(x):
+            g_ = m.groupdict()
+            dicho = next((v for v in m.groups() if v in _DIAS_SEMANA), None)
+            try:
+                d = int(g_["d"])
+                mes = g_["m"]
+                mes = int(mes) if mes.isdigit() else (_MESES.index(mes.replace("setiembre", "septiembre")) + 1)
+                a = g_.get("a")
+                if a:
+                    a = int(a) + (2000 if len(a) == 2 else 0)
+                    reales = {datetime.date(a, mes, d)}
+                else:
+                    reales = set()
+                    for aa in (hoy.year - 1, hoy.year, hoy.year + 1):
+                        try:
+                            f = datetime.date(aa, mes, d)
+                        except ValueError:
+                            continue
+                        if abs((f - hoy).days) <= 330:
+                            reales.add(f)
+            except (ValueError, KeyError):
+                continue
+            if not reales or any(_DIAS_SEMANA[f.weekday()] == dicho for f in reales):
+                continue
+            f = min(reales, key=lambda r: abs((r - hoy).days))
+            return ("«%s»: el %s-%s-%s cae en %s, no en %s. El día de la semana se calcula de la "
+                    "fecha (weekday()), no se escribe de memoria." % (
+                        m.group(0).strip(), f.year, "%02d" % f.month, "%02d" % f.day,
+                        _DIAS_SEMANA[f.weekday()], dicho))
+    for m in _RE_RELATIVO.finditer(x):
+        f = hoy + datetime.timedelta(days=_REL_OFFSET[m.group(1)])
+        if _DIAS_SEMANA[f.weekday()] != m.group(2):
+            return ("«%s»: %s es %s (%s), no %s. El día de la semana se calcula de la fecha, no se "
+                    "escribe de memoria." % (m.group(0).strip(), m.group(1), _DIAS_SEMANA[f.weekday()],
+                                             f.isoformat(), m.group(2)))
     return None
 
 
+_RE_ARMA = re.compile(r"\bav[ií]sa(?:me|rme|r)\b", re.I)
+_RE_ARMA_COND = re.compile(r"\b(cuando|en cuanto|si)\b", re.I)
+_RE_SIN_NOVEDAD = re.compile(r"(sin (?:novedad(?:es)?|respuestas?|noticias)|nada nuevo|\b(?:a[uú]n|todav[ií]a) "
+                             r"(?:no|nadie|ning)|nadie (?:ha|han) (?:respondido|contestado|escrito)|"
+                             r"no (?:ha|han) (?:respondido|contestado|escrito|llegado) (?:nadie|nada|todav))", re.I)
+_RE_VIGILANCIA_ROTA = re.compile(r"(no (?:puedo|he podido|consigo) (?:vigilar|mirar|acceder|leer|comprobar)|"
+                                 r"caducad|\bca[ií]d[oa]\b|bloquead|sin acceso|fall[oó]|\berror\b)", re.I)
+_RE_SENAL_NUEVA = re.compile(r"\b(?:salvo|excepto|pero)\b.{0,80}\b(?:ha|han) (?:respondido|contestado|escrito|llegado)", re.I | re.S)
+_MAX_PARTE = 600
+
+
+def aviso_sin_novedad(t, tools=None):
+    """feedback-aviso-condicionado-no-parte-de-estado — tras «avísame cuando X» se confirma UNA vez y
+    luego silencio; un parte que dice que X todavía no ha pasado es ruido (8-oct-26: «sin
+    respuestas a correos de hoy»). Salta si su último mensaje es un «avísame cuando/si…» (sin
+    pregunta: si ella pregunta «¿ha pasado ya?», se contesta) y la respuesta, corta (un parte, no
+    un informe), dice «sin novedades / aún no / nadie ha respondido». No salta si la vigilancia
+    misma se ha roto (eso SÍ se avisa: «no puedo vigilar» no es «sin novedad») ni si hay una señal
+    nueva («salvo X, que ha respondido»). Necesita `SUYOS` (sus mensajes): sin ellos, no opina."""
+    if not SUYOS:
+        return None
+    suyo = SUYOS[-1] or ""
+    if "?" in suyo or not (_RE_ARMA.search(suyo) and _RE_ARMA_COND.search(suyo)):
+        return None
+    x = _sin_fences(t).strip()
+    if len(x) > _MAX_PARTE:
+        return None
+    m = _RE_SIN_NOVEDAD.search(x)
+    if not m or _RE_VIGILANCIA_ROTA.search(x) or _RE_SENAL_NUEVA.search(x):
+        return None
+    return ("Te pidió «avísame cuando…» y le das un parte de que todavía no ha pasado («%s»). Confirma "
+            "UNA vez que queda armado y calla hasta que ocurra; solo se habla antes si la vigilancia "
+            "se rompe o hay señal nueva." % m.group(0))
+
+
 # Checks que corren aunque la respuesta sea corta: «hecho» sin haber lanzado al comité es
-# justo el incumplimiento, y el mínimo de caracteres lo dejaba pasar.
-SIN_MINIMO = {"enrutado_incumplido"}
+# justo el incumplimiento, y el mínimo de caracteres lo dejaba pasar. Los dos nuevos son partes
+# de una línea por naturaleza («mañana jueves a las 9», «sin novedades»).
+SIN_MINIMO = {"enrutado_incumplido", "dia_semana_mal", "aviso_sin_novedad"}
 
 
 CHECKS = {
@@ -1565,6 +1627,7 @@ CHECKS = {
     "lola_sin_nota": lola_sin_nota,
     "frase_inventada": frase_inventada,
     "dia_semana_mal": dia_semana_mal,
+    "aviso_sin_novedad": aviso_sin_novedad,
 }
 
 
