@@ -113,6 +113,14 @@ DEFAULT_PRECIOS = {
                           "cache_write_1h": 4.0},
     "claude-sonnet-4-6": {"input": 3.0,  "output": 15.0, "cache_read": 0.3,  "cache_write": 3.75,
                           "cache_write_1h": 6.0},
+    # 10-oct-2026: Haiku 5.5 (faltaba y se tarifaba a cero). Cifras LEÍDAS hoy en
+    # https://platform.claude.com/docs/en/about-claude/pricing (fila «Haiku 5.5, prompts hasta
+    # 100.000 tokens»): input 0,10 / 5m 0,125 / 1h 0,20 / lectura 0,01 / output 0,50 USD por MTok.
+    # OJO: esa página fija OTRA tarifa para peticiones con prompt > 100.000 tokens (input 0,50,
+    # 5m 0,625, 1h 1, lectura 0,05, output 2,50), contado con caché. `price_for` no modela tramos:
+    # aquí va solo el tramo corto, así que las peticiones largas se INFRATARIFAN (5x). Deuda aparte.
+    "claude-haiku-5-5":  {"input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write": 0.125,
+                          "cache_write_1h": 0.20},
     "claude-haiku-4-5":  {"input": 1.0,  "output": 5.0,  "cache_read": 0.1,  "cache_write": 1.25,
                           "cache_write_1h": 2.0},
     "grok-4.3":          {"input": 3.0,  "output": 15.0, "cache_read": 0.75, "cache_write": 3.0},
