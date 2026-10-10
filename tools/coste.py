@@ -249,6 +249,11 @@ def scan(files):
             fh = open(f)
         except Exception:
             continue
+        # Una respuesta del modelo ocupa VARIAS líneas del transcript (una por bloque: pensamiento,
+        # texto, cada llamada a herramienta) y todas repiten el `usage` del mensaje entero. Sumar
+        # línea a línea lo contaba 2 veces de media y hasta 7 (medido el 10-oct-26). Se cuenta una
+        # vez por `message.id`, con el último `usage` visto, que es el definitivo.
+        vistos, sueltos = {}, []
         with fh:
             for line in fh:
                 try:
@@ -263,9 +268,15 @@ def scan(files):
                 if model == "<synthetic>":
                     continue
                 day = (r.get("timestamp") or "")[:10] or "????-??-??"
-                add(por_modelo[model], u)
-                add(por_dia[day], u)
-                add(por_sesion[f"{day} {sid}"], u)
+                mid = msg.get("id")
+                if mid:
+                    vistos[mid] = (model, vistos[mid][1] if mid in vistos else day, u)
+                else:
+                    sueltos.append((model, day, u))
+        for model, day, u in list(vistos.values()) + sueltos:
+            add(por_modelo[model], u)
+            add(por_dia[day], u)
+            add(por_sesion[f"{day} {sid}"], u)
     return por_modelo, por_dia, por_sesion
 
 

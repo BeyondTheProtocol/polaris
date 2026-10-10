@@ -91,6 +91,21 @@ def main():
           "hoy_tok_worktrees" in src and "hoy_tok_casa_base" in src)
     del time
 
+    # 10-oct-26: una respuesta ocupa varias líneas con el MISMO usage; se cuenta una vez por id.
+    import json as _json
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "s.jsonl")
+        u = {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 100}
+        filas = [{"timestamp": "2026-10-10T10:00:00Z", "message": {"id": "m1", "model": "claude-x", "usage": u}}] * 3
+        filas.append({"timestamp": "2026-10-10T10:01:00Z",
+                      "message": {"id": "m2", "model": "claude-x", "usage": dict(u, output_tokens=7)}})
+        filas.append({"timestamp": "2026-10-10T10:02:00Z", "message": {"model": "claude-x", "usage": u}})
+        open(f, "w").write("\n".join(_json.dumps(x) for x in filas) + "\n")
+        pm, pd, _ps = coste.scan([f])
+        check("tres líneas del mismo mensaje cuentan una vez (cache_read %d)" % pm["claude-x"]["cache_read"],
+              pm["claude-x"]["cache_read"] == 300 and pm["claude-x"]["output"] == 17)
+        check("y el día sigue saliendo", pd["2026-10-10"]["input"] == 30)
+
     print("test_coste_repo: %d OK, %d fallos" % (_pass, _fail))
     return 1 if _fail else 0
 
