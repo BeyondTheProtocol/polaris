@@ -67,44 +67,12 @@ def _lineas_transcript(path):
         return []
 
 
-# Lo que dice el resultado de una llamada que un guard del muro NO dejó ejecutar. Solo estas marcas:
-# otro error (un fichero que no existe, un comando que falla) no prueba que no se abriera nada.
-MARCAS_DENEGACION = ("clinico_guard.py", "MURO \u26d4")
-
-
-def _ids_denegados(lineas):
-    """`tool_use_id` de las llamadas que un guard del muro denegó: no se ejecutaron, así que no
-    abrieron nada (10-oct-26: un `Read` denegado sobre una ruta clínica marcaba la sesión)."""
-    ids = set()
-    for ln in lineas:
-        if '"tool_result"' not in ln or '"is_error"' not in ln:
-            continue
-        try:
-            d = json.loads(ln)
-        except Exception:
-            continue
-        contenido = (d.get("message") or {}).get("content")
-        if d.get("type") != "user" or not isinstance(contenido, list):
-            continue
-        for x in contenido:
-            if not (isinstance(x, dict) and x.get("type") == "tool_result" and x.get("is_error")):
-                continue
-            cuerpo = x.get("content")
-            texto = cuerpo if isinstance(cuerpo, str) else json.dumps(cuerpo, ensure_ascii=False)
-            if any(m in texto for m in MARCAS_DENEGACION) and x.get("tool_use_id"):
-                ids.add(x["tool_use_id"])
-    return ids
-
-
-def _entradas_de_tools(lineas, omitir_denegadas=False):
+def _entradas_de_tools(lineas):
     """Los `input` de las herramientas que se USARON de verdad (tool_use del asistente).
 
     Solo eso (11-sep-26). Antes se buscaba texto suelto en la línea, y bastaba con que yo
     ESCRIBIERA «lector_clinico» explicando el sistema, o que saliera en el `cat` de un fichero,
-    para declarar clínica una sesión que no había abierto nada clínico.
-
-    `omitir_denegadas`: salta las llamadas que un guard del muro no dejó ejecutar."""
-    denegadas = _ids_denegados(lineas) if omitir_denegadas else set()
+    para declarar clínica una sesión que no había abierto nada clínico."""
     for ln in lineas:
         if '"tool_use"' not in ln:
             continue
@@ -117,32 +85,7 @@ def _entradas_de_tools(lineas, omitir_denegadas=False):
             continue
         for x in contenido:
             if isinstance(x, dict) and x.get("type") == "tool_use":
-                if x.get("id") in denegadas:
-                    continue
                 yield x.get("name") or "", x.get("input") or {}
-
-
-def _bash_abre_clinico(cmd, zonas_clinicas):
-    """¿Esta orden de Bash abre material clínico? Juzga con LA MISMA tokenización que el guard
-    (`clinico_guard._juzgables` + `rutas_clinicas_en_tokens`): cuerpos de heredoc fuera, patrones
-    de grep fuera. Antes el comando ENTERO se trataba como una ruta, y bastaba con que un heredoc
-    nombrara una carpeta clínica (p. ej. al añadir reglas `deny` a settings.json) para marcar la
-    sesión (10-oct-26). Si el guard no se puede cargar o falla, se vuelve al chequeo viejo de
-    cadena entera: ante la duda, que siga convocando."""
-    if USO_CLINICO.search(cmd):
-        return True
-    try:
-        sys.path.insert(0, AQUI)
-        import clinico_guard
-        if clinico_guard.ZC is None:
-            raise RuntimeError("sin zonas_clinicas")
-        _subs, resto = clinico_guard._juzgables(cmd)
-        return any(clinico_guard.ZC.rutas_clinicas_en_tokens(sub) for sub in resto)
-    except Exception:
-        try:
-            return bool(zonas_clinicas and zonas_clinicas.es_ruta_clinica(cmd[:400]))
-        except Exception:
-            return False
 
 
 def _contexto_clinico(lineas):
@@ -155,27 +98,21 @@ def _contexto_clinico(lineas):
     except Exception:
         zonas_clinicas = None
 
-    for _nombre, entrada in _entradas_de_tools(lineas, omitir_denegadas=True):
-        cmd = entrada.get("command")
-        if isinstance(cmd, str) and _bash_abre_clinico(cmd, zonas_clinicas):
-            return True
-        if zonas_clinicas is None:
-            continue
-        # Se usa `es_ruta_clinica` (un path suelto) y no `rutas_clinicas_en_tokens`, que espera
-        # una lista de tokens ya troceada y devuelve vacío con un path entero.
-        for campo in ("file_path", "notebook_path", "path"):
+    for _nombre, entrada in _entradas_de_tools(lineas):
+        for campo in ("file_path", "command", "pattern", "path"):
             valor = entrada.get(campo)
             if not isinstance(valor, str):
                 continue
+            # EJECUTAR la ventanilla, no nombrarla: un commit o un `deuda.py abrir "…"` que
+            # hablan de ella no han abierto nada (visto en la prueba real del 11-sep-26).
+            if campo == "command" and USO_CLINICO.search(valor):
+                return True
+            if zonas_clinicas is None:
+                continue
+            # Se usa `es_ruta_clinica` (un path suelto) y no `rutas_clinicas_en_tokens`, que espera
+            # una lista de tokens ya troceada y devuelve vacío con un path entero.
             try:
                 if zonas_clinicas.es_ruta_clinica(valor[:400]):
-                    return True
-            except Exception:
-                continue
-        patron = entrada.get("pattern")      # Grep/Glob: lo mismo que mira el guard
-        if isinstance(patron, str):
-            try:
-                if zonas_clinicas.es_patron_clinico(patron[:400]):
                     return True
             except Exception:
                 continue
