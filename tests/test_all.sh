@@ -484,6 +484,7 @@ runpy test_tests_afectados.py   # 26-sep · test_all --cambiados elige bien las 
 runpy test_activar_daemon.py
 runpy test_activar_daemon_deshabilitado.py
 runpy test_plists_home.py
+runpy test_plists_parsean.py   # 10-oct · todo plist lo lee el parser de activar_daemon (un «--» en un comentario XML lo tumbaba) y --dry de la nocturna sale 0
 runpy test_correo_cuenta_principal.py
 runpy test_vigia.py
 runpy test_anatomia.py
