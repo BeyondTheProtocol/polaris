@@ -131,18 +131,42 @@ def _debe_avisar(clave):
     return True
 
 
-def _avisar(texto, *, critico=False):
-    """Manda el aviso por el choke-point (respeta HALT). Fail-soft."""
+def _estado_entrega(res):
+    """(estado, motivo) de lo que `salida` hizo de verdad con un aviso. NO es lo mismo «no lanzó excepción» que «llegó»:
+    `report_to_titular` devuelve un dict y distingue entregado de aplazado al parte (presupuesto diario agotado), guardado
+    en el log operativo, retenido por el silencio nocturno, simulado (dry) o frenado (HALT, sin chat_id…).
+    Estados: entregado · aplazado · operativo · retenido · dry · bloqueado · no_entregado · desconocido."""
+    if not isinstance(res, dict):
+        return "desconocido", "salida no devolvió un resultado legible (%r)" % (type(res).__name__,)
+    motivo = str(res.get("reason") or "")
+    if res.get("delivered"):
+        return "entregado", motivo
+    for clave, estado in (("aplazado", "aplazado"), ("operativo", "operativo"), ("retenido", "retenido"), ("dry", "dry")):
+        if res.get(clave):
+            return estado, motivo
+    if res.get("blocked"):
+        return "bloqueado", motivo
+    return "no_entregado", motivo
+
+
+def _avisar_detalle(texto, *, critico=False):
+    """Manda el aviso por el choke-point (respeta HALT) y devuelve LA VERDAD:
+    {'entregado': bool, 'estado': str, 'motivo': str}. Fail-soft: una excepción es estado «error», no entregado.
+    (10-oct-26: antes se daba por entregado todo aviso que no lanzaba excepción; un aviso aplazado al parte por el
+    presupuesto diario figuraba como `avisado: True` y {{TITULAR}} no recibía nada.)"""
     try:
         import salida
-        if critico:
-            salida.alerta_critica(texto)
-        else:
-            salida.report_to_titular(texto)
-        return True
+        res = salida.alerta_critica(texto) if critico else salida.report_to_titular(texto)
+        estado, motivo = _estado_entrega(res)
+        return {"entregado": estado == "entregado", "estado": estado, "motivo": motivo}
     except Exception as exc:
         sys.stderr.write("errores: no pude avisar: %r\n" % (exc,))
-        return False
+        return {"entregado": False, "estado": "error", "motivo": repr(exc)}
+
+
+def _avisar(texto, *, critico=False):
+    """Compatibilidad: True SOLO si `salida` lo entregó de verdad (no si quedó aplazado, en log, retenido o frenado)."""
+    return _avisar_detalle(texto, critico=critico)["entregado"]
 
 
 _TEXTO = {
@@ -163,7 +187,8 @@ def registrar(origen, error, severidad=None, *, job="error", detalle="",
     severidad  — una de SEVERIDADES; si None se infiere (nunca GOAL automático)
     escalar    — si False, solo clasifica+traza (útil en tests/uso programático)
 
-    Devuelve un dict {severidad, origen, error_type, recurrente, avisado, accion}.
+    Devuelve un dict {severidad, origen, error_type, recurrente, avisado, entrega, accion}. `avisado` es True SOLO si
+    `salida` lo ENTREGÓ; `entrega` dice el estado real (entregado/aplazado/operativo/retenido/bloqueado/antispam/error…).
     NUNCA lanza: registrar un error no puede romper al que llama.
     """
     try:
@@ -185,6 +210,7 @@ def registrar(origen, error, severidad=None, *, job="error", detalle="",
         recurrente = veces >= RECURRENTE_N
         pol = POLITICA[sev]
         avisado = False
+        entrega, entrega_motivo = None, ""          # qué pasó DE VERDAD con el aviso (ver _estado_entrega)
 
         if escalar:
             if pol["aviso"] == "codigo_rojo":          # GOAL: PARA TODO
@@ -193,6 +219,7 @@ def registrar(origen, error, severidad=None, *, job="error", detalle="",
                     codigo_rojo.trigger("Error GOAL en %s" % origen,
                                         detalle or str(error))
                     avisado = True
+                    entrega = "codigo_rojo"
                 except Exception as exc:
                     sys.stderr.write("errores: fallo al disparar codigo_rojo: %r\n" % (exc,))
             elif pol["aviso"] == "siempre" or (pol["aviso"] == "recurrente" and recurrente):
@@ -202,11 +229,15 @@ def registrar(origen, error, severidad=None, *, job="error", detalle="",
                     texto = "🩺 %s — %s%s.\n%s" % (
                         _TEXTO.get(sev, "Error"), origen, extra,
                         (detalle or str(error))[:300])
-                    avisado = _avisar(texto)
+                    det = _avisar_detalle(texto)
+                    avisado, entrega, entrega_motivo = det["entregado"], det["estado"], det["motivo"]
+                else:
+                    entrega, entrega_motivo = "antispam", "mismo aviso dentro de la ventana anti-spam: no se reenvía"
 
         return {"severidad": sev, "origen": origen, "error_type": error_type,
                 "recurrente": recurrente, "veces_hoy": veces,
-                "avisado": avisado, "reintentar": pol["reintentar"]}
+                "avisado": avisado, "entrega": entrega, "entrega_motivo": entrega_motivo,
+                "reintentar": pol["reintentar"]}
     except Exception as exc:   # blindaje total: ni el propio errores.py rompe al llamante
         sys.stderr.write("errores: fallo interno al registrar: %r\n" % (exc,))
         return {"severidad": "desconocida", "origen": origen, "avisado": False,

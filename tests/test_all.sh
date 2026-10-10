@@ -499,6 +499,7 @@ runpy test_ciclo_agentes.py
 runpy test_presencia_cc.py
 runpy test_anatomia_push.py
 runpy test_errores.py
+runpy test_errores_entrega.py   # 10-oct · errores.registrar dice la VERDAD: avisado solo si salida lo ENTREGÓ (aplazado/operativo/retenido/bloqueado no cuentan)
 runpy test_rc_turnos_agotados.py
 runpy test_auto_mejora_turnos.py
 runpy test_cola_turnos.py
@@ -534,6 +535,10 @@ echo "── mutantes: tests/mutantes/caso_publico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-caso-publico.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes caso_publico (log: $ROJO_DIR/rojo-mutantes-caso-publico.log)"; }
+echo "── mutantes: tests/mutantes/errores_entrega.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/errores_entrega.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-errores-entrega.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes errores_entrega (log: $ROJO_DIR/rojo-mutantes-errores-entrega.log)"; }
 echo "── mutantes: tests/mutantes/rojos_conocidos.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/rojos_conocidos.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-rojos-conocidos.log" 2>/dev/null;

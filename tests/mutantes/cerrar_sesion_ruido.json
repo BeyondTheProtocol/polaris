@@ -39,13 +39,13 @@
     },
     {
       "etiqueta": "no avisa",
-      "viejo": "        c[\"avisado\"] = bool(avisar(texto, bool(muro_rojas)))",
-      "nuevo": "        c[\"avisado\"] = None"
+      "viejo": "        est = avisar(texto, bool(muro_rojas))",
+      "nuevo": "        est = \"no_entregado\""
     },
     {
       "etiqueta": "el aviso del muro no es urgente",
-      "viejo": "bool(avisar(texto, bool(muro_rojas)))",
-      "nuevo": "bool(avisar(texto, False))"
+      "viejo": "        est = avisar(texto, bool(muro_rojas))",
+      "nuevo": "        est = avisar(texto, False)"
     },
     {
       "etiqueta": "una roja del muro sin línea base no avisa",
@@ -101,6 +101,16 @@
       "etiqueta": "el cierre no llama a verificar_tras_fusion",
       "viejo": "        rojas_base, clasif, accs = verificar_tras_fusion(head_antes, rama)\n",
       "nuevo": "        rojas_base, clasif, accs = [], None, []\n"
+    },
+    {
+      "etiqueta": "J: un aviso aplazado se da por entregado",
+      "viejo": "        c[\"entrega\"], c[\"avisado\"] = est, est == \"entregado\"",
+      "nuevo": "        c[\"entrega\"], c[\"avisado\"] = \"entregado\", True"
+    },
+    {
+      "etiqueta": "J: _avisar_fusion devuelve entregado si no lanza",
+      "viejo": "        return errores._estado_entrega(res)[0]",
+      "nuevo": "        return \"entregado\""
     }
   ]
 }

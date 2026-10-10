@@ -1,0 +1,61 @@
+{
+  "_por_que": "Defensas de errores.registrar contra dar por entregado un aviso que salida aplazó, guardó en log, retuvo o frenó (10-oct-26).",
+  "objetivo": "tools/errores.py",
+  "test": [
+    "python3",
+    "tests/test_errores_entrega.py"
+  ],
+  "env": "BTP_ERRORES_MODULO",
+  "mutaciones": [
+    {
+      "etiqueta": "un aviso no entregado cuenta como entregado",
+      "viejo": "return {\"entregado\": estado == \"entregado\", \"estado\": estado, \"motivo\": motivo}",
+      "nuevo": "return {\"entregado\": True, \"estado\": estado, \"motivo\": motivo}"
+    },
+    {
+      "etiqueta": "el aplazado al parte no se distingue",
+      "viejo": "for clave, estado in ((\"aplazado\", \"aplazado\"), (\"operativo\", \"operativo\"),",
+      "nuevo": "for clave, estado in ((\"operativo\", \"operativo\"),"
+    },
+    {
+      "etiqueta": "el log operativo no se distingue",
+      "viejo": "(\"operativo\", \"operativo\"), (\"retenido\", \"retenido\"),",
+      "nuevo": "(\"retenido\", \"retenido\"),"
+    },
+    {
+      "etiqueta": "el silencio nocturno no se distingue",
+      "viejo": "(\"retenido\", \"retenido\"), (\"dry\", \"dry\")",
+      "nuevo": "(\"dry\", \"dry\")"
+    },
+    {
+      "etiqueta": "un bloqueo (HALT) no se distingue",
+      "viejo": "    if res.get(\"blocked\"):\n        return \"bloqueado\", motivo\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "un resultado ilegible cuenta como entregado",
+      "viejo": "return \"desconocido\", \"salida no devolvió un resultado legible (%r)\" % (type(res).__name__,)",
+      "nuevo": "return \"entregado\", \"\""
+    },
+    {
+      "etiqueta": "registrar da avisado=True siempre que no lance",
+      "viejo": "avisado, entrega, entrega_motivo = det[\"entregado\"], det[\"estado\"], det[\"motivo\"]",
+      "nuevo": "avisado, entrega, entrega_motivo = True, det[\"estado\"], det[\"motivo\"]"
+    },
+    {
+      "etiqueta": "el anti-spam finge que avisó",
+      "viejo": "entrega, entrega_motivo = \"antispam\", \"mismo aviso dentro de la ventana anti-spam: no se reenvía\"",
+      "nuevo": "entrega, entrega_motivo = \"entregado\", \"\""
+    },
+    {
+      "etiqueta": "una excepción al avisar cuenta como entregado",
+      "viejo": "return {\"entregado\": False, \"estado\": \"error\", \"motivo\": repr(exc)}",
+      "nuevo": "return {\"entregado\": True, \"estado\": \"error\", \"motivo\": repr(exc)}"
+    },
+    {
+      "etiqueta": "_avisar (bool) siempre True",
+      "viejo": "    return _avisar_detalle(texto, critico=critico)[\"entregado\"]",
+      "nuevo": "    return True"
+    }
+  ]
+}

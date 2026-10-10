@@ -72,11 +72,12 @@ def casa(tmp, rompe=("test_dep.py",), siempre_roja=(), baseline=None, deudas=Non
     return base, wt, estado
 
 
-def cierra(base, wt, estado):
+def cierra(base, wt, estado, extra=None):
     sumidero = os.path.join(estado, "avisos.jsonl")
     env = dict(os.environ, BTP_REPO=base, BTP_GIT_BASE_OK="1", BTP_STATE_DIR=estado, BTP_CIERRE_AVISO_A=sumidero)
     for k in ("CLAUDECODE", "BTP_CIERRE_SIN_VERIFICAR"):
         env.pop(k, None)
+    env.update(extra or {})
     p = subprocess.run([sys.executable, TOOL, "--apply", "--no-poda"], cwd=wt, env=env, capture_output=True,
                        text=True, timeout=300, stdin=subprocess.DEVNULL)
     avisos = [json.loads(l) for l in open(sumidero)] if os.path.exists(sumidero) else []
@@ -111,6 +112,15 @@ check(linea and "1 NUEVA(S) por esta fusión (test_dep.py)" in linea[0] and "1 y
       "la línea de RESUMEN (la de una línea) lo dice: %r" % (linea[:1],))
 check("LAS ROMPIÓ ESTA FUSIÓN" in out and "ya estaban rojas antes de fusionar (no son de esta rama): test_previa.py" in out, "y separa lo que rompió de lo que ya estaba")
 check(lb and sorted(lb["rojas"]) == ["test_dep.py", "test_previa.py"], "deja la línea base nueva para la próxima fusión")
+
+print("1b) el aviso quedó APLAZADO al parte: el cierre NO dice que se envió")
+tmp = tempfile.mkdtemp(prefix="ruido_")
+base, wt, est = casa(tmp, rompe=("test_dep.py",), baseline={"sha": "HEAD", "rojas": []})
+out, avisos, libro, lb = cierra(base, wt, est, extra={"BTP_CIERRE_AVISO_ESTADO": "aplazado"})
+accion = [l for l in out.splitlines() if "aviso:" in l]
+check(accion and "NO ENTREGADO (aplazado)" in accion[0] and "aviso: entregado" not in accion[0],
+      "dice «NO ENTREGADO (aplazado)» y no «entregado»: %r" % (accion[:1],))
+check("casa-base-roja-test_dep.py" in libro, "y la deuda se abre igual (el aviso aplazado no la sustituye)")
 
 print("2) la que rompe es del NÚCLEO DEL MURO → aviso inmediato")
 tmp = tempfile.mkdtemp(prefix="ruido_")
@@ -165,6 +175,53 @@ open(os.path.join(base, "tests", "test_ok.py"), "w").write("import sys\nSKIP = 7
 out, avisos, libro, lb = cierra(base, wt, est)
 check(not avisos and not libro and "CASA BASE ROJA" not in out, "ni deuda ni aviso")
 check(lb is not None and lb["rojas"] == [], "y la línea base queda limpia (sin rojas)")
+
+print("7) _avisar_fusion devuelve el estado REAL (con una `salida` falsa)")
+import importlib.util
+import types
+_prev = {k: os.environ.get(k) for k in ("BTP_REPO", "BTP_STATE_DIR", "BTP_CIERRE_AVISO_A", "BTP_CIERRE_AVISO_ESTADO")}
+_r7 = tempfile.mkdtemp(prefix="ruido_aviso_")
+os.makedirs(os.path.join(_r7, "estado"))
+for _k in ("BTP_CIERRE_AVISO_A", "BTP_CIERRE_AVISO_ESTADO"):
+    os.environ.pop(_k, None)
+os.environ["BTP_REPO"], os.environ["BTP_STATE_DIR"] = _r7, os.path.join(_r7, "estado")
+_v = {"v": None}
+_m = types.ModuleType("salida")
+
+
+def _rep(texto, **kw):
+    if isinstance(_v["v"], Exception):
+        raise _v["v"]
+    return _v["v"]
+_m.report_to_titular = _rep
+_salida_prev, _err_prev = sys.modules.get("salida"), sys.modules.pop("errores", None)
+sys.modules["salida"] = _m
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+try:
+    _spec = importlib.util.spec_from_file_location("cs7", TOOL)
+    CS = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(CS)
+    _v["v"] = {"delivered": False, "blocked": False, "reason": "aplazado", "aplazado": True}
+    check(CS._avisar_fusion("t", False) == "aplazado", "salida aplazó el aviso → «aplazado», no «entregado»")
+    _v["v"] = {"delivered": True, "blocked": False, "reason": "entregado"}
+    check(CS._avisar_fusion("t", True) == "entregado", "salida lo entregó → «entregado»")
+    _v["v"] = {"delivered": False, "blocked": True, "reason": "HALT"}
+    check(CS._avisar_fusion("t", True) == "bloqueado", "HALT → «bloqueado»")
+    _v["v"] = RuntimeError("caída")
+    check(CS._avisar_fusion("t", False) == "error", "salida lanza → «error»")
+finally:
+    sys.modules.pop("errores", None)
+    if _err_prev is not None:
+        sys.modules["errores"] = _err_prev
+    if _salida_prev is not None:
+        sys.modules["salida"] = _salida_prev
+    else:
+        sys.modules.pop("salida", None)
+    for _k, _x in _prev.items():
+        if _x is None:
+            os.environ.pop(_k, None)
+        else:
+            os.environ[_k] = _x
 
 if fallos:
     print("\n❌ %d fallo(s)" % len(fallos))

@@ -34,9 +34,19 @@ Uso:
   python3 tools/suite_nocturna.py --sembrar --solo-aviso   # SOLO el aviso de prueba, sin correr la suite
   python3 tools/suite_nocturna.py condiciones     # ¿se cumplen las tres condiciones? rc 0 = sí
   python3 tools/suite_nocturna.py confirmar-sembrado <código>   # el del aviso; exige un prompt HUMANO que lo contenga
+AVISO DE UN ROJO DEL MURO A LAS 03:00 — COMPORTAMIENTO ACTUAL (10-oct-26, tal cual es, comprobado en el código y en la config):
+  va por `errores.registrar(OPERATIVO)` → `salida.report_to_titular(texto)` NO urgente. Eso respeta (a) el presupuesto diario del
+  portero de ruido (`TOPE_AVISOS_DIA`, 3 avisos entregados por día natural): agotado, el aviso queda «aplazado al parte»;
+  (b) el silencio nocturno, que hoy NO existe: {{TITULAR}} lo quitó el 29/6/26 (`tools/state/notif/config.json`:
+  silencio_inicio == silencio_fin == 0, «Vega/avisos pueden llegar de noche»); y (c) el anti-spam de 12 h de `errores`.
+  Consecuencia: a las 03:00 el contador del día acaba de reiniciarse, así que el aviso llega AL MOMENTO salvo que ya
+  hubiera 3 entregados entre las 00:00 y las 03:00 (o HALT). `historial.jsonl` guarda el estado real en `entrega_muro` y
+  `avisado_muro` es True solo si se entregó. Si volviera una ventana de silencio, quedaría «retenido» hasta el resumen de las 08:00.
+  Opciones para cerrar el hueco del cupo agotado (decisión de {{TITULAR}}, no se fuerza): ver la nota de la tanda.
 Stdlib pura. Determinista, $0.
 """
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -96,24 +106,43 @@ def leer_historial():
     return out
 
 
+def _estado(res):
+    """(estado, motivo) de lo que `salida` hizo de verdad (la clasificación vive en errores._estado_entrega)."""
+    import errores
+    return errores._estado_entrega(res)
+
+
 def avisar(texto, muro=False, sembrado=False):
-    """Aviso a {{TITULAR}} por el sistema nervioso de errores (severidad OPERATIVO = «aviso siempre», sin
-    código rojo ni parada: que un rojo del muro justifique parar todo lo decide ella). Devuelve el
-    dict de `errores.registrar` ({'avisado': bool, ...}) o {'avisado': False, 'error': ...}.
-    BTP_SUITE_NOCTURNA_AVISO_A=<fichero>: en vez de avisar, escribe aquí la alerta (para los tests)."""
+    """Aviso a {{TITULAR}}. Devuelve LA VERDAD: {'avisado': bool, 'estado': str, 'motivo': str}; `avisado` es True SOLO si
+    `salida` lo ENTREGÓ (no si quedó aplazado al parte, en el log operativo, retenido por el silencio nocturno o frenado).
+
+    · El aviso de un rojo del MURO va por `errores.registrar(OPERATIVO)`: respeta el presupuesto diario de avisos (3/día), el
+      silencio nocturno (hoy sin ventana: lo quitó {{TITULAR}} el 29/6) y el anti-spam de 12 h. A las 03:00 el contador del día es
+      nuevo, así que normalmente llega al momento; con el cupo agotado queda «aplazado al parte» y `avisado` es False.
+    · El aviso SEMBRADO (una prueba que ella pidió) va por la vía legítima del portero de ruido para «contestar a lo
+      que ella acaba de pedir»: `categoria="respuesta"`, exenta SOLO del presupuesto (el silencio nocturno y el HALT
+      siguen mandando). No es urgente y no se salta nada por la puerta de atrás.
+    BTP_SUITE_NOCTURNA_AVISO_A=<fichero>: en vez de avisar, escribe aquí la alerta (para los tests); con
+    BTP_SUITE_NOCTURNA_AVISO_ESTADO=<estado> simula que `salida` la dejó en ese estado (por defecto «entregado»)."""
     sumidero = os.environ.get("BTP_SUITE_NOCTURNA_AVISO_A")
     if sumidero:
+        estado = os.environ.get("BTP_SUITE_NOCTURNA_AVISO_ESTADO") or "entregado"
         with open(sumidero, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"texto": texto, "muro": muro, "sembrado": sembrado}, ensure_ascii=False) + "\n")
-        return {"avisado": True, "sumidero": True}
+            f.write(json.dumps({"texto": texto, "muro": muro, "sembrado": sembrado, "estado": estado}, ensure_ascii=False) + "\n")
+        return {"avisado": estado == "entregado", "estado": estado, "motivo": "sumidero de pruebas"}
     try:
+        if sembrado:
+            import salida
+            res = salida.report_to_titular(texto, categoria="respuesta", voz="sobria", fuente="suite_nocturna_sembrado")
+            estado, motivo = _estado(res)
+            return {"avisado": estado == "entregado", "estado": estado, "motivo": motivo}
         import errores
-        return errores.registrar(origen="suite_nocturna", error=texto, severidad=errores.OPERATIVO,
-                                 job="suite_nocturna_muro" if muro else "suite_nocturna",
-                                 detalle=texto[:1200]) or {"avisado": False}
+        r = errores.registrar(origen="suite_nocturna", error=texto, severidad=errores.OPERATIVO,
+                              job="suite_nocturna_muro" if muro else "suite_nocturna", detalle=texto[:1200]) or {}
+        return {"avisado": bool(r.get("avisado")), "estado": r.get("entrega") or "desconocido", "motivo": r.get("entrega_motivo", "")}
     except Exception as e:   # noqa: BLE001
         sys.stderr.write("suite_nocturna: no pude avisar: %r\n" % e)
-        return {"avisado": False, "error": repr(e)}
+        return {"avisado": False, "estado": "error", "motivo": repr(e)}
 
 
 def _deuda(clave, que, muro):
@@ -169,23 +198,33 @@ def repetir_sola(bateria):
 
 
 # ── el rojo sembrado y su confirmación ───────────────────────────────────────────────────
+def _hash_codigo(codigo, sal):
+    """PBKDF2-HMAC-SHA256 con 300.000 vueltas (lento a propósito; `hashlib.scrypt` no existe en el Python del sistema): el código
+    NO se guarda en claro, y con 8 hex (4,3·10^9 posibilidades) probarlos todos son años de CPU. Límite: no es una garantía
+    criptográfica contra un adversario con tiempo, es que un agente no lo lea de pasada del estado."""
+    return hashlib.pbkdf2_hmac("sha256", str(codigo).encode(), bytes.fromhex(sal), 300000).hex()
+
+
 def _sembrar(hoy):
-    """Manda el aviso de prueba (el camino de «batería del muro en rojo») y apunta el código de confirmación.
-    El código solo viaja en el aviso que recibe {{TITULAR}}: confirmarlo exige que ELLA lo teclee en una sesión."""
+    """Manda el aviso de prueba (el camino de «batería del muro en rojo») y apunta el código de confirmación SOLO como hash
+    salado (PBKDF2). Cada llamada genera un código NUEVO: un sembrado anterior queda invalidado. El código solo viaja en el
+    aviso que recibe {{TITULAR}}; confirmarlo exige que ELLA lo teclee en una sesión. Devuelve {'avisado','estado','motivo'}:
+    `avisado` es True solo si el aviso se ENTREGÓ (si quedó aplazado al parte, no cuenta)."""
     import secrets
-    nonce = secrets.token_hex(3)
-    a = avisar("[SEMBRADO A PROPÓSITO, NO ES UN FALLO REAL] Prueba de la suite nocturna: así te llegaría el aviso de que una "
+    nonce = secrets.token_hex(4)
+    sal = secrets.token_hex(8)
+    r = avisar("[SEMBRADO A PROPÓSITO, NO ES UN FALLO REAL] Prueba de la suite nocturna: así te llegaría el aviso de que una "
                "batería del muro ha salido roja. Para confirmar que lo has recibido, escribe en la sesión de Claude Code "
                "este código: %s" % nonce, muro=True, sembrado=True)
-    avisado = bool(a.get("avisado"))
     try:
         os.makedirs(DIR, exist_ok=True)
         with open(SEMBRADO, "w", encoding="utf-8") as f:
             json.dump({"fecha": hoy.isoformat(), "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                       "avisado": avisado, "nonce": nonce, "confirmado": None}, f, ensure_ascii=False)
+                       "avisado": r["avisado"], "entrega": r["estado"], "entrega_motivo": r["motivo"],
+                       "sal": sal, "nonce_hash": _hash_codigo(nonce, sal), "confirmado": None}, f, ensure_ascii=False)
     except Exception:
         pass
-    return avisado
+    return r
 
 
 def _prueba_humana(nonce, desde_ts):
@@ -292,7 +331,7 @@ def pasada(hoy=None, sembrar=False):
     if not runner_ok:
         a = avisar("La suite nocturna NO pudo completarse: %s. Sin pasada de verdad no hay red de seguridad esta noche."
                    % entrada["error"], muro=False)
-        entrada["avisado"] = bool(a.get("avisado"))
+        entrada["avisado"], entrada["entrega"] = a["avisado"], a["estado"]
         entrada["estado"] = "fallo"
         _heartbeat("fallo", corrio=True, error=entrada["error"])
         _historial(entrada)
@@ -355,7 +394,8 @@ def pasada(hoy=None, sembrar=False):
 
     # el rojo sembrado a propósito: prueba el camino del aviso de punta a punta, sin deuda
     if sembrar:
-        entrada["avisado"] = _sembrar(hoy)
+        r_sem = _sembrar(hoy)
+        entrada["avisado"], entrada["entrega"] = r_sem["avisado"], r_sem["estado"]
 
     # aviso a {{TITULAR}} la PRIMERA noche si hay muro en rojo (no espera a que la deuda escale)
     if muro_rojos:
@@ -364,7 +404,7 @@ def pasada(hoy=None, sembrar=False):
                    "no he parado nada (eso lo decides tú). Detalle en %s"
                    % (hoy.isoformat(), ", ".join(muro_rojos),
                       "(Salió roja y verde al repetirla sola: intermitente.) " if solo_flaky else "", rojos), muro=True)
-        entrada["avisado_muro"] = bool(a.get("avisado"))
+        entrada["avisado_muro"], entrada["entrega_muro"] = a["avisado"], a["estado"]
 
     hay_rojo = entrada["nuevos"] or entrada["flaky"] or entrada["sin_log"]
     entrada["estado"] = "rojo_muro" if muro_rojos else ("rojo_nuevo" if hay_rojo else "ok")
@@ -445,11 +485,15 @@ def condiciones(ahora=None):
         s = json.load(open(SEMBRADO, encoding="utf-8"))
     except Exception:
         s = None
-    prueba = _prueba_humana((s or {}).get("nonce"), (s or {}).get("ts")) if s and s.get("confirmado") else None
-    out.append(("C2", bool(s and s.get("avisado") and s.get("confirmado") and prueba),
+    conf = (s or {}).get("confirmado") or {}
+    codigo_ok = bool(s and conf.get("codigo") and s.get("sal") and s.get("nonce_hash")
+                     and _hash_codigo(conf["codigo"], s["sal"]) == s["nonce_hash"])
+    prueba = _prueba_humana(conf.get("codigo"), s.get("ts")) if codigo_ok else None
+    entregado = bool(s and s.get("avisado") is True and s.get("entrega") == "entregado")
+    out.append(("C2", bool(entregado and codigo_ok and prueba),
                 "rojo sembrado: %s" % ("sin sembrar (python3 tools/suite_nocturna.py --sembrar --solo-aviso)" if not s else
-                                       "aviso enviado=%s, confirmado=%s, prueba de un prompt HUMANO con el código=%s"
-                                       % (bool(s.get("avisado")), bool(s.get("confirmado")), bool(prueba)))))
+                                       "entrega del aviso=%s (debe ser «entregado»), código confirmado coincide=%s, prueba de un prompt HUMANO con el código=%s"
+                                       % (s.get("entrega") or ("sin dato" if "entrega" not in s else None), codigo_ok, bool(prueba)))))
     return out
 
 
@@ -472,10 +516,18 @@ def main(argv):
         except Exception:
             print("no hay rojo sembrado: corre antes `--sembrar --solo-aviso`")
             return 2
-        if not sem.get("nonce") or codigo != sem["nonce"]:
+        if not (sem.get("nonce_hash") and sem.get("sal")):
+            print("este sembrado es de una versión anterior (el código estaba en claro en el estado): queda INVALIDADO. "
+                  "Genera uno nuevo con `--sembrar --solo-aviso`.")
+            return 2
+        if sem.get("entrega") != "entregado":
+            print("el aviso sembrado NO llegó a {{TITULAR}} (estado: %s). Un aviso aplazado no se confirma: repite el sembrado "
+                  "cuando pueda entregarse." % (sem.get("entrega") or "sin dato"))
+            return 2
+        if not codigo or _hash_codigo(codigo, sem["sal"]) != sem["nonce_hash"]:
             print("el código no es el del aviso sembrado: tiene que ser el que recibió {{TITULAR}} en su aviso")
             return 2
-        prueba = _prueba_humana(sem["nonce"], sem.get("ts"))
+        prueba = _prueba_humana(codigo, sem.get("ts"))
         if not prueba:
             print("NO hay un prompt HUMANO posterior al aviso que contenga el código. Esto no lo confirma un agente: "
                   "{{TITULAR}} tiene que escribir el código en una sesión de Claude Code. Pídeselo y repite.")
@@ -487,10 +539,16 @@ def main(argv):
         print("confirmado (prompt humano en %s)" % prueba[0])
         return 0
     if "--sembrar" in argv and "--solo-aviso" in argv:
-        avisado = _sembrar(_hoy())
-        print(json.dumps({"sembrado": True, "avisado": avisado, "siguiente": "{{TITULAR}} teclea el código en una sesión; "
-                          "luego `confirmar-sembrado <código>`"}, ensure_ascii=False))
-        return 0 if avisado else 1
+        r = _sembrar(_hoy())
+        if r["estado"] == "aplazado":
+            msg = "APLAZADO al parte, NO entregado: no se ha confirmado nada (%s)" % r["motivo"]
+        elif r["avisado"]:
+            msg = "entregado: {{TITULAR}} debe teclear el código en una sesión; luego `confirmar-sembrado <código>`"
+        else:
+            msg = "NO entregado (estado: %s; %s)" % (r["estado"], r["motivo"])
+        sys.stderr.write("suite_nocturna: aviso sembrado " + msg + "\n")
+        print(json.dumps({"sembrado": True, "avisado": r["avisado"], "entrega": r["estado"], "mensaje": msg}, ensure_ascii=False))
+        return 0 if r["avisado"] else 1
     rc, entrada = pasada(sembrar="--sembrar" in argv)
     print(json.dumps(entrada, ensure_ascii=False))
     return rc

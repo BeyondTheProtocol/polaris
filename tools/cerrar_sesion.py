@@ -672,20 +672,24 @@ def clasifica_rojas(rojas, pre_sha, linea_base, deudas, nocturna):
 
 
 def _avisar_fusion(texto, urgente):
-    """Aviso por el canal de salud del sistema (el mismo que healthcheck: salida.report_to_titular, categoría
-    «humano»). `urgente` salta el silencio nocturno. BTP_CIERRE_AVISO_A=<fichero>: sumidero para los tests."""
+    """Aviso por el canal de salud del sistema (el mismo que healthcheck: salida.report_to_titular, categoría «humano»).
+    `urgente` salta el silencio nocturno. Devuelve el ESTADO REAL de la entrega (entregado, aplazado, retenido, operativo,
+    bloqueado, error…), no «no lanzó excepción» (10-oct-26: un aviso aplazado al parte por el presupuesto diario se daba por
+    enviado). BTP_CIERRE_AVISO_A=<fichero>: sumidero para los tests (BTP_CIERRE_AVISO_ESTADO simula el estado)."""
     sumidero = os.environ.get("BTP_CIERRE_AVISO_A")
     if sumidero:
+        estado = os.environ.get("BTP_CIERRE_AVISO_ESTADO") or "entregado"
         with open(sumidero, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"texto": texto, "urgente": urgente}, ensure_ascii=False) + "\n")
-        return True
+            f.write(json.dumps({"texto": texto, "urgente": urgente, "estado": estado}, ensure_ascii=False) + "\n")
+        return estado
     try:
+        import errores
         import salida
-        salida.report_to_titular(texto, categoria="humano", urgente=urgente, voz="sobria", fuente="cerrar_sesion")
-        return True
+        res = salida.report_to_titular(texto, categoria="humano", urgente=urgente, voz="sobria", fuente="cerrar_sesion")
+        return errores._estado_entrega(res)[0]
     except Exception as e:  # noqa: BLE001
         sys.stderr.write("cerrar_sesion: no pude avisar de la casa base roja: %r\n" % e)
-        return False
+        return "error"
 
 
 def hacer_ruido(rojas, pre_sha, post_sha, rama, linea_base=None, deudas=None, nocturna=None,
@@ -702,7 +706,7 @@ def hacer_ruido(rojas, pre_sha, post_sha, rama, linea_base=None, deudas=None, no
         visto = visto or (lambda clave, nota: deuda.visto(clave, nota))
     avisar = avisar or _avisar_fusion
     c = clasifica_rojas(rojas, pre_sha, linea_base, deudas, nocturna)
-    c.update(abiertas=[], avisado=None)
+    c.update(abiertas=[], avisado=None, entrega=None)
     corto = (post_sha or "")[:9]
     for b in c["previas"]:
         clave = next((k for k in _claves_previas(b) if k in deudas), None)
@@ -734,7 +738,10 @@ def hacer_ruido(rojas, pre_sha, post_sha, rama, linea_base=None, deudas=None, no
                     "ENTRE ELLAS HAY BATERÍAS DEL MURO (%s). " % ", ".join(muro_rojas) if muro_rojas else "",
                     "Antes de fusionar estaban en verde. " if c["nuevas"] else "No hay línea base previa: no sé si ya estaban rojas. ",
                     ", ".join("casa-base-roja-" + b for b in a_avisar)))
-        c["avisado"] = bool(avisar(texto, bool(muro_rojas)))
+        est = avisar(texto, bool(muro_rojas))
+        if isinstance(est, bool):                      # un `avisar` inyectado que solo dice sí/no
+            est = "entregado" if est else "no_entregado"
+        c["entrega"], c["avisado"] = est, est == "entregado"
     partes = []
     if c["nuevas"]:
         partes.append("%d NUEVA(S) por esta fusión (%s)" % (len(c["nuevas"]), ", ".join(c["nuevas"])))
@@ -767,7 +774,8 @@ def verificar_tras_fusion(pre_sha, rama):
             clasif = hacer_ruido(rojas, pre_sha, post, rama)
             acciones.append("casa base roja → %s · deuda: %s · aviso: %s" % (
                 clasif["resumen"], ", ".join(clasif["abiertas"]) or "ninguna nueva",
-                {True: "enviado", False: "NO se pudo enviar", None: "no hacía falta"}[clasif["avisado"]]))
+                "no hacía falta" if clasif["entrega"] is None else
+                ("entregado" if clasif["avisado"] else "NO ENTREGADO (%s)" % clasif["entrega"])))
         guardar_linea_base(post, rojas)
     except Exception as e:  # noqa: BLE001  registrar y avisar no puede deshacer la fusión ni tumbar el cierre
         acciones.append("‼️ casa base roja: NO pude abrir la deuda / avisar (%s: %s)" % (type(e).__name__, e))

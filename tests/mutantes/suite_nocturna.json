@@ -73,11 +73,6 @@
       "nuevo": "x.get(\"corrio\")]"
     },
     {
-      "etiqueta": "el sembrado vale sin confirmar",
-      "viejo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\"))",
-      "nuevo": "bool(s and s.get(\"avisado\"))"
-    },
-    {
       "etiqueta": "la condición A no mira lo que dice la puerta",
       "viejo": "primera == \"COMPLETA\" and hay_test",
       "nuevo": "True"
@@ -119,18 +114,63 @@
     },
     {
       "etiqueta": "I: el código no hace falta que coincida",
-      "viejo": "        if not sem.get(\"nonce\") or codigo != sem[\"nonce\"]:",
+      "viejo": "        if not codigo or _hash_codigo(codigo, sem[\"sal\"]) != sem[\"nonce_hash\"]:",
       "nuevo": "        if False:"
     },
     {
       "etiqueta": "I: condiciones no re-verifica la prueba humana (vale lo escrito en el JSON)",
-      "viejo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\") and prueba)",
-      "nuevo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\"))"
+      "viejo": "    out.append((\"C2\", bool(entregado and codigo_ok and prueba),",
+      "nuevo": "    out.append((\"C2\", bool(entregado and codigo_ok),"
     },
     {
       "etiqueta": "I: --solo-aviso corre la pasada completa",
       "viejo": "    if \"--sembrar\" in argv and \"--solo-aviso\" in argv:",
       "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "J: el código se guarda en claro en sembrado.json",
+      "viejo": "\"sal\": sal, \"nonce_hash\": _hash_codigo(nonce, sal), \"confirmado\": None}",
+      "nuevo": "\"sal\": sal, \"nonce_hash\": _hash_codigo(nonce, sal), \"nonce\": nonce, \"confirmado\": None}"
+    },
+    {
+      "etiqueta": "J: un aviso aplazado se confirma",
+      "viejo": "        if sem.get(\"entrega\") != \"entregado\":",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "J: C2 acepta un aviso aplazado",
+      "viejo": "    entregado = bool(s and s.get(\"avisado\") is True and s.get(\"entrega\") == \"entregado\")",
+      "nuevo": "    entregado = bool(s and s.get(\"avisado\"))"
+    },
+    {
+      "etiqueta": "J: C2 no comprueba el hash del código",
+      "viejo": "                     and _hash_codigo(conf[\"codigo\"], s[\"sal\"]) == s[\"nonce_hash\"])",
+      "nuevo": "                     )"
+    },
+    {
+      "etiqueta": "J: un sembrado antiguo (código en claro) sigue valiendo",
+      "viejo": "        if not (sem.get(\"nonce_hash\") and sem.get(\"sal\")):",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "J: --solo-aviso no dice «aplazado»",
+      "viejo": "            msg = \"APLAZADO al parte, NO entregado: no se ha confirmado nada (%s)\" % r[\"motivo\"]",
+      "nuevo": "            msg = \"entregado\""
+    },
+    {
+      "etiqueta": "J: el historial guarda «avisado» en vez del estado real del aviso del muro",
+      "viejo": "        entrada[\"avisado_muro\"], entrada[\"entrega_muro\"] = a[\"avisado\"], a[\"estado\"]",
+      "nuevo": "        entrada[\"avisado_muro\"], entrada[\"entrega_muro\"] = True, \"entregado\""
+    },
+    {
+      "etiqueta": "J: el sembrado no usa la categoría «respuesta» (cae en el presupuesto)",
+      "viejo": "categoria=\"respuesta\", voz=\"sobria\", fuente=\"suite_nocturna_sembrado\")",
+      "nuevo": "voz=\"sobria\", fuente=\"suite_nocturna_sembrado\")"
+    },
+    {
+      "etiqueta": "J: el sembrado se cuela como urgente",
+      "viejo": "categoria=\"respuesta\", voz=\"sobria\", fuente=\"suite_nocturna_sembrado\")",
+      "nuevo": "categoria=\"respuesta\", urgente=True, voz=\"sobria\", fuente=\"suite_nocturna_sembrado\")"
     }
   ]
 }
