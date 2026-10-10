@@ -12,7 +12,7 @@
        (lunes 06:30). Paralelo (6 trabajos) de lunes a sabado; los DOMINGOS en serie + campanas de
        mutantes. Rojo nuevo -> deuda; rojo del muro -> aviso a {{TITULAR}} esa misma noche. Latido:
        heartbeat/suite-nocturna.json. Se enciende SOLO desde casa base:
-       python3 tools/activar_daemon.py com.btp.suite-nocturna --kick -->
+       python3 tools/activar_daemon.py com.btp.suite-nocturna (y la opcion kick para lanzar la primera pasada ya) -->
   <key>ProgramArguments</key><array>
     <string>/Users/polaris/claudecode/.venv/bin/python</string>
     <string>/Users/polaris/claudecode/tools/suite_nocturna.py</string>

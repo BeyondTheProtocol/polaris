@@ -69,8 +69,11 @@ def salud_tests():
     def clear():
         for f in os.listdir(hb_dir):
             os.remove(os.path.join(hb_dir, f))
-        hb_iso("centinela-ned", "ok", 0.1)  # 3er daemon (cadencia 0.5h) que estos casos no ejercitan → fresco/sano
-        hb_iso("bot-telegram", "ok", 0.01)  # 4º daemon (cadencia 4min) idem → fresco/sano por defecto
+        # Los daemons que estos casos no ejercitan, frescos y sanos: TODOS los declarados (no una lista a mano:
+        # `backup` y `suite-nocturna` se añadieron después y dejaban «sin señal» donde se esperaba []).
+        for d_ in hc.VEGA_DAEMONS:
+            if d_["agente"] not in ("asistente", "calendar-sync"):
+                hb_iso(d_["agente"], "ok", 0.001)
 
     def hb_iso(agente, est, edad_h=1.0):   # formato run_agent (ISO-Z, UTC)
         ts = (datetime.datetime.utcnow() - datetime.timedelta(hours=edad_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -149,6 +152,86 @@ def salud_tests():
        "tope local → aviso de tope, NO de crédito")
 
     clear()  # deja el sandbox limpio para no contaminar otros asserts
+
+
+def gracia_tests():
+    """10-oct-26 · un daemon DECLARADO pero aún sin encender no es «sin señal» (suite-nocturna). Causa de 1 de los
+    3 rojos de test_healthcheck tras fusionar la nocturna: con su latido ausente + los dos «sin señal» que ya había
+    en el caso del bot, se llegaba a UMBRAL_CASCADA_LATIDOS (3) y las alertas individuales colapsaban en
+    «fallo de lectura». Aísla launchd con un directorio de plists temporal: no depende del estado real."""
+    import json
+    import datetime
+    import cost_guard
+
+    print("-- gracia: declarada pero aún sin encender --")
+    hb_dir = os.path.join(_TMP, "hb_gracia")
+    os.makedirs(hb_dir, exist_ok=True)
+    la_dir = tempfile.mkdtemp(prefix="hc_launchagents_")
+    hc.HB_DIR, hc.LAUNCH_AGENTS_DIR = hb_dir, la_dir
+    cost_guard.check_before_job = lambda *a, **k: (True, "test con saldo", 0.0)
+    plist = os.path.join(la_dir, "com.btp.suite-nocturna.plist")
+
+    def hb_iso(agente, est, edad_h):
+        ts = (datetime.datetime.utcnow() - datetime.timedelta(hours=edad_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        json.dump({"agente": agente, "ts": ts, "estado": est}, open(os.path.join(hb_dir, agente + ".json"), "w"))
+
+    def todos_frescos_menos(*fuera):
+        for f in os.listdir(hb_dir):
+            os.remove(os.path.join(hb_dir, f))
+        for d_ in hc.VEGA_DAEMONS:
+            if d_["agente"] not in fuera:
+                hb_iso(d_["agente"], "ok", 0.001)
+
+    def instala(horas):
+        open(plist, "w").write("<plist/>")
+        t_ = __import__("time").time() - horas * 3600
+        os.utime(plist, (t_, t_))
+
+    def quita():
+        if os.path.exists(plist):
+            os.remove(plist)
+
+    def claves():
+        al, info = hc._salud_daemons()
+        return [a[0] for a in al], info
+
+    d = next(x_ for x_ in hc.VEGA_DAEMONS if x_["agente"] == "suite-nocturna")
+    ok(d.get("plist") == "com.btp.suite-nocturna", "la vigilancia de suite-nocturna declara su plist")
+
+    todos_frescos_menos("suite-nocturna"); quita()
+    c, info = claves()
+    ok("daemon_suite-nocturna_sin_senal" not in c and info["suite-nocturna"].get("gracia") is True,
+       "plist NO instalado y sin latido → gracia, sin alerta")
+    ok(c == [], "y no ensucia con ninguna otra alerta (%s)" % c)
+
+    todos_frescos_menos("suite-nocturna"); instala(1)
+    c, info = claves()
+    ok("daemon_suite-nocturna_sin_senal" not in c and info["suite-nocturna"].get("gracia") is True,
+       "instalado hace 1 h y sin latido → aún le queda margen: gracia")
+
+    todos_frescos_menos("suite-nocturna"); instala(100)
+    c, info = claves()
+    ok("daemon_suite-nocturna_sin_senal" in c, "instalado hace 100 h y SIN latido → SÍ alerta (la rutina debe estar viva)")
+
+    todos_frescos_menos(); instala(100)
+    c, info = claves()
+    ok(c == [], "instalado hace 100 h CON latido fresco → todo sano, sin alertas")
+
+    todos_frescos_menos("suite-nocturna"); quita()
+    hb_iso("suite-nocturna", "fallo", 1)
+    c, _ = claves()
+    ok("daemon_suite-nocturna_fallo" in c, "la gracia es solo para la AUSENCIA de latido: un latido en «fallo» sí alerta")
+
+    # la cascada: tres «sin señal» de daemons que SÍ deben latir siguen colapsando; el declarado sin encender no cuenta
+    todos_frescos_menos("suite-nocturna", "backup", "bot-telegram"); quita()
+    c, info = claves()
+    ok("vigia_lectura_latidos" not in c and "daemon_backup_sin_senal" in c and "daemon_bot-telegram_sin_senal" in c,
+       "dos «sin señal» reales + el declarado sin encender NO llegan al umbral de la cascada")
+    todos_frescos_menos("suite-nocturna", "backup", "bot-telegram", "centinela-ned"); quita()
+    c, info = claves()
+    ok("vigia_lectura_latidos" in c, "tres «sin señal» reales SÍ colapsan en el aviso de lectura (la regla de la cascada sigue)")
+
+    hc.HB_DIR = os.path.join(_TMP, "hb")
 
 
 def rutinas_ned_tests():
@@ -265,7 +348,10 @@ def bot_telegram_autofix_tests():
     def clear():
         for f in os.listdir(hb_dir):
             os.remove(os.path.join(hb_dir, f))
-        hb_iso("asistente", "ok", 1); hb_iso("calendar-sync", "ok", 1); hb_iso("centinela-ned", "ok", 0.1)
+        hb_iso("asistente", "ok", 1); hb_iso("calendar-sync", "ok", 1)
+        for d_ in hc.VEGA_DAEMONS:      # el resto, frescos (el bot lo ejercita cada caso)
+            if d_["agente"] not in ("asistente", "calendar-sync", "bot-telegram"):
+                hb_iso(d_["agente"], "ok", 0.001)
 
     def txt(a):
         return a[1] if isinstance(a, tuple) else a
@@ -1176,6 +1262,7 @@ def main():
     import json
     import time as _time
     salud_tests()
+    gracia_tests()
     rutinas_ned_tests()
     bot_telegram_autofix_tests()
     gateway_tests()

@@ -153,8 +153,36 @@ VEGA_DAEMONS = (
     # 10-oct-26: la suite completa de noche (03:00) sobre casa base. tools/suite_nocturna.py late tras cada
     # pasada (estados ok / rojo_nuevo / rojo_muro / fallo). 27 h = diario con margen. Sin esta vigilancia
     # la red de seguridad que sustituye a «suite completa antes de fusionar» podría morir sin que nadie lo vea.
-    {"agente": "suite-nocturna", "label": "la suite completa de noche (03:00)", "cadencia_h": 27, "agentico": False},
+    # `plist`: declarada pero aún sin encender (o recién encendida) NO es «sin señal» (ver _en_gracia_sin_latido).
+    {"agente": "suite-nocturna", "label": "la suite completa de noche (03:00)", "cadencia_h": 27, "agentico": False,
+     "plist": "com.btp.suite-nocturna"},
 )
+# Dónde launchd tiene los plists cargados. Constante para que los tests no dependan del estado real de launchd.
+LAUNCH_AGENTS_DIR = os.path.expanduser("~/Library/LaunchAgents")
+
+
+def _en_gracia_sin_latido(d, ahora=None):
+    """True si un daemon SIN ningún latido aún no tiene por qué haber latido (10-oct-26).
+
+    POR QUÉ: `suite-nocturna` se declara en VEGA_DAEMONS al fusionar su código, pero se enciende después y de
+    uno en uno (launchd es singleton). Entre medias, «sin señal» era un falso positivo que le llegaba a
+    {{TITULAR}}, y con otros dos mudos a la vez colapsaba en «fallo de lectura» (UMBRAL_CASCADA_LATIDOS) y
+    rompía los tests. Una entrada que declara `plist`:
+      · plist NO instalado en ~/Library/LaunchAgents → aún no se ha encendido: no hay nada que vigilar;
+      · instalado hace menos que su `cadencia_h` → todavía no le ha tocado latir: gracia;
+      · instalado hace más y sin latido → SÍ es «sin señal»: la rutina debe estar viva y no lo está.
+    Si no se puede leer el plist, NO se calla (se avisa). Sin `plist` declarado, nunca hay gracia."""
+    pl = d.get("plist")
+    if not pl:
+        return False
+    ruta = os.path.join(LAUNCH_AGENTS_DIR, pl + ".plist")
+    try:
+        if not os.path.exists(ruta):
+            return True
+        edad_h = ((ahora if ahora is not None else time.time()) - os.path.getmtime(ruta)) / 3600.0
+    except OSError:
+        return False
+    return edad_h < d["cadencia_h"]
 # Estados de heartbeat que NO son problema: ok + el salto frugal de la centralita/gate + la pausa
 # nocturna (todos normales, no gastan ni indican fallo).
 ESTADOS_HB_SANOS = {"ok", "gate_sin_novedad", "ok_sin_novedad", "centralita", "reanudado",
@@ -2759,6 +2787,9 @@ def _salud_daemons():
             _cuarentena_heartbeat(agente)
             alertas.append(("daemon_%s_corrupto" % agente,
                             "Reseteé un fichero de estado ilegible de %s (se regenera solo)." % d["label"]))
+            continue
+        if edad_h is None and _en_gracia_sin_latido(d):
+            info[agente]["gracia"] = True      # declarada y aún sin encender / recién encendida: no es «sin señal»
             continue
         sano = est in ESTADOS_HB_SANOS
         fresco = edad_h is not None and edad_h <= d["cadencia_h"]
