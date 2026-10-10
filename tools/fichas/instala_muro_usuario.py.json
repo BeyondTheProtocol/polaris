@@ -1,0 +1,11 @@
+{
+ "pieza": "instala_muro_usuario.py",
+ "estado_ficha": "completa",
+ "para": "lleva el muro mínimo (clinico_guard, salida_guard, scite_guard, entrada_guard) a los ajustes de usuario de Claude Code y regenera los lanzadores de ~/.claude/hooks, para que una sesión abierta fuera de ~/claudecode no corra sin frenos.",
+ "cuando_si": "tras añadir, renombrar o cambiar el comando de un hook en .claude/settings.json de casa base; tras fusionar un hook nuevo; cuando tests/test_instala_muro_usuario.py avisa de deriva.",
+ "cuando_no": "para añadir hooks propios de claudecode (enrutado, plan, worktree): esos se quedan en el settings del proyecto. No escribe comandos nuevos, solo copia los de casa base.",
+ "reemplaza": "los 29 lanzadores de ~/.claude/hooks hechos a mano el 2-oct-26, sin generador ni test.",
+ "test": "tests/test_instala_muro_usuario.py",
+ "alta": "2026-10-10",
+ "origen": "plan «Claude a punto para Polaris», paso 7 (aprobado por {{TITULAR}} el 10-oct-26); propuesta de consejero-arquitectura."
+}
