@@ -1,0 +1,31 @@
+{
+  "_por_que": "Defensas de test_all.sh al integrar la lista de rojos conocidos (10-oct-26).",
+  "objetivo": "tests/test_all.sh",
+  "test": [
+    "python3",
+    "tests/test_rojos_conocidos.py"
+  ],
+  "env": "BTP_SUITE",
+  "mutaciones": [
+    {
+      "etiqueta": "sin RESUMEN del clasificador se asume que todo es conocido",
+      "viejo": "''|*[!0-9]*) _k=0;; esac\n  [ \"$_k\" -le",
+      "nuevo": "''|*[!0-9]*) _k=$fail;; esac\n  [ \"$_k\" -le"
+    },
+    {
+      "etiqueta": "los conocidos no restan del código de salida",
+      "viejo": "  fail=$((fail-CONOCIDOS))\n",
+      "nuevo": "  :\n"
+    },
+    {
+      "etiqueta": "con conocidos abiertos se dice «TODO EN VERDE»",
+      "viejo": "elif [ \"$fail\" -eq 0 ] && [ \"$CONOCIDOS\" -gt 0 ]; then",
+      "nuevo": "elif false; then"
+    },
+    {
+      "etiqueta": "el clasificador no se invoca",
+      "viejo": "&& [ -f \"$ROOT/tests/_rojos_conocidos.py\" ] &&",
+      "nuevo": "&& false &&"
+    }
+  ]
+}

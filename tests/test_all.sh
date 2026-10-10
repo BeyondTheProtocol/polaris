@@ -1,6 +1,20 @@
 #!/bin/bash
 # test_all.sh — corre toda la batería del sistema (muro + lazo P1) en verde o falla.
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# COPIA FIJA (10-oct-26). bash lee un script POR TROZOS, a medida que lo ejecuta: si alguien lo reescribe EN SITIO
+# (un editor, `cat >`, un script; git no, git crea un inodo nuevo) con la pasada en marcha, bash sigue leyendo desde un
+# desplazamiento que ya no corresponde y ejecuta dos veces un trozo (resultados y rojos DUPLICADOS) o se salta otro.
+# Así que al arrancar se copia a un temporal propio de la ejecución y se re-ejecuta desde ahí, conservando ROOT; los
+# trabajadores del modo paralelo usan la MISMA copia. Si no se puede copiar, sigue desde el original (como antes).
+# Las variables de la copia no bajan a las baterías (una que lance otra suite no se confunde). Test: test_all_copia_fija.py.
+_ROOT_FIJA="$BTP_TEST_ALL_ROOT"; _COPIA="$BTP_TEST_ALL_COPIA"; _DUENA="$BTP_TEST_ALL_DUENA"
+unset BTP_TEST_ALL_ROOT BTP_TEST_ALL_COPIA BTP_TEST_ALL_DUENA
+if [ -n "$_ROOT_FIJA" ]; then ROOT="$_ROOT_FIJA"; else ROOT="$(cd "$(dirname "$0")/.." && pwd)"; fi
+if [ -z "$_COPIA" ] && [ -f "$0" ]; then
+  _c=$(mktemp "${TMPDIR:-/tmp}/test_all.XXXXXX" 2>/dev/null) && cp "$0" "$_c" 2>/dev/null &&
+    BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_c" BTP_TEST_ALL_DUENA=1 exec "${BASH:-bash}" "$_c" "$@"
+  [ -n "$_c" ] && rm -f "$_c"
+fi
+[ -n "$_DUENA" ] && trap 'rm -f "$_COPIA"' EXIT
 PY=/usr/bin/python3; [ -x "$PY" ] || PY=python3
 fail=0
 skip=0
@@ -121,8 +135,9 @@ _vacia_cola() {
       case " $(echo $LARGAS) " in *" $_n "*) echo "$_i $_l" >> "$_w/gordas";; *) echo "$_i $_l" >> "$_w/pool";; esac;; esac
   done
   if [ -s "$_w/gordas" ]; then cat "$_w/gordas" "$_w/pool" > "$_w/pool2"; mv "$_w/pool2" "$_w/pool"; fi
-  BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P "$JOBS" bash "$ROOT/tests/test_all.sh" --worker "$_w" < "$_w/pool"
-  BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P 1 bash "$ROOT/tests/test_all.sh" --worker "$_w" < "$_w/serie"
+  local _yo="${_COPIA:-$ROOT/tests/test_all.sh}"      # los trabajadores corren la MISMA copia fija, no el fichero vivo
+  BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_yo" BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P "$JOBS" bash "$_yo" --worker "$_w" < "$_w/pool"
+  BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_yo" BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P 1 bash "$_yo" --worker "$_w" < "$_w/serie"
   _i=0
   for _l in "${_COLA[@]}"; do
     _i=$((_i+1)); _n="${_l#* }"
@@ -230,7 +245,10 @@ runpy test_gate_escalera.py   # 25-sep · escalera del gate con listón numéric
 runpy test_gate_citas.py
 runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU carpeta (deuda test-all-log-rojo-tmp-compartido)
 runpy test_all_stdin_cerrado.py   # 25-sep · la suite cierra stdin: ningún test hereda un pipe que no se cierra
+runpy test_all_copia_fija.py   # 10-oct · reescribir test_all.sh EN SITIO a mitad de una pasada no la corrompe (se ejecuta desde una copia fija)
 runpy test_all_paralelo.py   # 10-oct · BTP_JOBS: serie y paralelo dicen lo mismo, fail-closed, SOLO_SERIE, cronómetro (campaña de mutantes: tests/mutantes/test_all_paralelo.json, a mano o de noche: ~8 min)
+runpy test_suite_nocturna.py   # 10-oct · la suite de noche sobre casa base: avisa el muro la 1ª noche, deuda, flaky, latido y las 3 condiciones para cambiar la norma (campaña de mutantes: tests/mutantes/suite_nocturna.json, domingos de noche)
+runpy test_rojos_conocidos.py   # 10-oct · «sin rojos NUEVOS»: deuda, dueño, caducidad ≤ 14 d, firma exacta y núcleo del muro VETADO sin el OK de {{TITULAR}}
 runpy test_all_puerta.py   # 10-oct · la puerta FALLA CERRADA: selector roto/vacío/desconocido → suite completa; el meta-check corre también en la rápida
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
@@ -321,6 +339,7 @@ runpy test_instala_muro_usuario.py   # 10-oct · el muro mínimo llega a las car
 runpy test_cerrar_sesion_conflicto.py
 runpy test_cerrar_sesion_poda_viva.py   # 25-sep · no podar el worktree de una sesión viva (le apagaba el muro)
 runpy test_cerrar_sesion_verifica_base.py   # 26-sep · tras fusionar, corre en casa base lo que el worktree salta
+runpy test_cerrar_sesion_ruido.py   # 10-oct · F: una fusión que deja roja una batería de casa base abre deuda, avisa (urgente si es del muro) y no culpa a la rama de lo que ya estaba (campaña de mutantes: tests/mutantes/cerrar_sesion_ruido.json, domingos de noche)
 runpy test_run_agent_casa_master.py
 runpy test_ff_al_abrir.py
 runpy test_mini.py
@@ -513,6 +532,10 @@ echo "── mutantes: tests/mutantes/caso_publico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-caso-publico.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes caso_publico (log: $ROJO_DIR/rojo-mutantes-caso-publico.log)"; }
+echo "── mutantes: tests/mutantes/rojos_conocidos.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/rojos_conocidos.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-rojos-conocidos.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes rojos_conocidos (log: $ROJO_DIR/rojo-mutantes-rojos-conocidos.log)"; }
 echo "── mutantes: tests/mutantes/tests_afectados.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/tests_afectados.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-tests-afectados.log" 2>/dev/null;
@@ -664,6 +687,19 @@ runpy test_radar_reintentos.py     # 21-sep · un fallo de red pasajero no deja 
 runpy test_session_start_topologia.py  # 24-sep · el HALT del código rojo no hace creer al mini que es el Air
 runpy test_session_start_lazo.py      # 25-sep · el lazo no lanza el drenaje de reels (sesión de IG)
 
+# ── Huérfanos registrados el 10-oct-26 ────────────────────────────────────────────────────────
+# El meta-check de abajo llevaba rojo con estos 8 tests escritos y en verde que nadie corría. Se
+# comprobaron UNO A UNO antes de engancharlos (los 8 salen rc 0 y están aislados con BTP_STATE_DIR /
+# BTP_HALT_FILES / mocks: ninguno toca estado vivo ni dispara nada de verdad).
+runpy test_codigo_rojo_excepciones.py   # 2-oct · una decisión deliberada de {{TITULAR}} no vuelve a parar el sistema (MURO: código rojo)
+runpy test_backup_latido.py             # 2-oct · backup.sh late «ok» solo con copia hecha
+runpy test_cerrar_sesion_registra_vega.py   # 1-oct · cada fusión queda en el registro de aprobaciones de Vega
+runpy test_session_start_vega.py        # 1-oct · la sesión arranca con la visión de Vega
+runpy test_vega_vision_fusiones.py      # 1-oct · la visión de Vega ve las fusiones
+runpy test_cribado_pmid.py              # la vía PMID del borde: solo un PMID, solo a destinos de la lista, HALT y canario cortan (MURO, egress)
+runpy test_nan.py                       # 8-oct · cliente de NaN Community y su entrada en el registro, sin red
+runpy test_x_guardados_etiquetas.py     # 1-oct · las palabras clave de los guardados casan por palabra, no dentro de otras
+
 # ⛔ NO añadir aquí (a propósito, no por olvido): test_avisos_origen.py, test_casa_estilo.py,
 # test_observatorio.py, test_salida.py, test_tablero.py y test_triage.py importan `salida` SIN
 # exportar BTP_TEST_BATTERY, así que meterlos en la batería le mandaría Telegram REAL a {{TITULAR}}.
@@ -681,7 +717,7 @@ _huerf=""
 for _f in "$ROOT"/tests/test_*.py "$ROOT"/tests/test_*.sh; do
   _b=$(basename "$_f")
   case "$_b" in test_avisos_origen.py|test_casa_estilo.py|test_observatorio.py|test_salida.py|test_tablero.py|test_triage.py) continue;; esac
-  grep -q "$_b" "$ROOT/tests/test_all.sh" || _huerf="$_huerf $_b"
+  grep -q "$_b" "${_COPIA:-$ROOT/tests/test_all.sh}" || _huerf="$_huerf $_b"
 done
 if [ -n "$_huerf" ]; then
   echo "❌ tests escritos que NADIE corre:$_huerf"
@@ -698,10 +734,25 @@ echo
 # Un SKIP no es ni verde ni rojo: es «necesita algo que aquí no está» (ver tests/_entorno.py).
 # Se dice aparte para que el número de rojos signifique lo que parece.
 [ "$skip" -gt 0 ] && echo "⏭️  $skip batería(s) saltada(s): falta el contenido, el estado vivo, los overlays locales o el lazo (HALT activo)"
+# ROJOS CONOCIDOS (10-oct-26): lo registrado en tests/rojos_conocidos.json con deuda abierta, dueño,
+# caducidad <= 14 días y la misma firma de fallo NO cuenta para el código de salida; se nombra igual.
+# Falla cerrado: si el clasificador no contesta con su línea RESUMEN, todo sigue siendo rojo nuevo.
+CONOCIDOS=0
+if [ "$fail" -gt 0 ] && [ -f "$ROOT/tests/_rojos_conocidos.py" ] && ls "$ROJO_DIR"/rojo-*.log >/dev/null 2>&1; then
+  _plus=""; [ -z "$CAMBIADOS" ] && _plus="--completa"
+  _clas=$("$PY" "$ROOT/tests/_rojos_conocidos.py" clasifica "$ROJO_DIR" $_plus 2>&1)
+  echo "$_clas" | grep -v '^RESUMEN'
+  _k=$(echo "$_clas" | sed -n 's/^RESUMEN conocidos=\([0-9][0-9]*\) nuevos=.*/\1/p' | head -1)
+  case "$_k" in ''|*[!0-9]*) _k=0;; esac
+  [ "$_k" -le "$fail" ] && CONOCIDOS=$_k
+  fail=$((fail-CONOCIDOS))
+fi
 if [ -n "$PUERTA" ]; then
   [ "$fail" -eq 0 ] && echo "✅ PUERTA RAPIDA en verde: afectadas + núcleo del muro ($fuera batería(s) fuera). NO es «todo en verde»: la suite completa la cubre la rutina nocturna sobre casa base." || echo "❌ $fail batería(s) con fallos (puerta rápida) · logs: $ROJO_DIR"
 elif [ -n "$CAMBIADOS" ]; then
   [ "$fail" -eq 0 ] && echo "✅ PARCIAL en verde: $fuera batería(s) no se corrieron (--cambiados). NO es «todo en verde»: antes de fusionar, la suite completa." || echo "❌ $fail batería(s) con fallos (parcial, --cambiados) · logs: $ROJO_DIR"
+elif [ "$fail" -eq 0 ] && [ "$CONOCIDOS" -gt 0 ]; then
+echo "✅ SIN ROJOS NUEVOS: $CONOCIDOS rojo(s) CONOCIDO(S) con deuda (arriba). NO es «TODO EN VERDE»: con un conocido abierto no se puede decir."
 else
 [ "$fail" -eq 0 ] && echo "✅✅ TODO EN VERDE (muro + lazo P1)" || echo "❌ $fail batería(s) con fallos · logs de ESTA ejecución: $ROJO_DIR"
 fi

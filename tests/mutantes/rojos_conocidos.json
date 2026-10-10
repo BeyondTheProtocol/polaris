@@ -1,0 +1,61 @@
+{
+  "_por_que": "Cada entrada es una condición de consejero-arquitectura sobre la lista de rojos conocidos (10-oct-26). Si al quitarla test_rojos_conocidos sigue verde, un rojo nuevo puede colarse como conocido.",
+  "objetivo": "tests/_rojos_conocidos.py",
+  "test": [
+    "python3",
+    "tests/test_rojos_conocidos.py"
+  ],
+  "env": "BTP_ROJOS_MODULO",
+  "mutaciones": [
+    {
+      "etiqueta": "la firma no se compara (cualquier fallo vale como el registrado)",
+      "viejo": "if sorted(_norm_linea(x) for x in e[\"firma\"]) == firma:",
+      "nuevo": "if True:"
+    },
+    {
+      "etiqueta": "una entrada caducada sigue valiendo",
+      "viejo": "    if caduca < hoy:\n        p.append(\"CADUCADA el %s\" % e[\"caduca\"])\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "no se limita la caducidad a 14 días",
+      "viejo": "    if (caduca - desde).days > MAX_DIAS:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "no se exige deuda abierta",
+      "viejo": "    if norm not in deudas:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "el veto del muro desaparece",
+      "viejo": "    if es_muro(e[\"bateria\"]):\n        ok = e.get(\"ok_titular\")",
+      "nuevo": "    if False:\n        ok = e.get(\"ok_titular\")"
+    },
+    {
+      "etiqueta": "el OK de {{TITULAR}} no necesita su cita",
+      "viejo": "len(str(ok.get(\"cita\", \"\")).strip()) >= 10",
+      "nuevo": "True"
+    },
+    {
+      "etiqueta": "el OK de {{TITULAR}} no necesita fecha",
+      "viejo": "isinstance(ok, dict) and ok.get(\"fecha\") and len(",
+      "nuevo": "isinstance(ok, dict) and len("
+    },
+    {
+      "etiqueta": "un fichero ilegible vale como «sin entradas, todo bien»",
+      "viejo": "        return [], \"fichero ilegible: %s\" % ex",
+      "nuevo": "        return [], None"
+    },
+    {
+      "etiqueta": "no se comprueba que la batería exista",
+      "viejo": "    if e[\"bateria\"] not in baterias:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "el veto usa solo test_fuga (no todos los prefijos del muro)",
+      "viejo": "        return tuple(tests_afectados._MURO_PREFIJOS)",
+      "nuevo": "        return (\"test_fuga\",)"
+    }
+  ]
+}

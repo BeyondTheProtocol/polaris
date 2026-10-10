@@ -1,0 +1,101 @@
+{
+  "_por_que": "Cada entrada es una defensa del ruido de cerrar_sesion (punto F, 10-oct-26): que una fusión que deja roja una batería abra deuda, avise, no culpe a la rama de lo que ya estaba y lo diga en el resumen. Si al quitarla test_cerrar_sesion_ruido sigue verde, el cierre puede volver a callar.",
+  "objetivo": "tools/cerrar_sesion.py",
+  "test": [
+    "python3",
+    "tests/test_cerrar_sesion_ruido.py"
+  ],
+  "env": "BTP_CIERRE_TOOL",
+  "mutaciones": [
+    {
+      "etiqueta": "todo rojo con línea base fresca ya no es «nuevo» (nunca se atribuye)",
+      "viejo": "        elif fresca:\n            res[\"nuevas\"].append(b)",
+      "nuevo": "        elif False:\n            res[\"nuevas\"].append(b)"
+    },
+    {
+      "etiqueta": "se atribuye a la rama aunque no haya línea base fiable",
+      "viejo": "        elif fresca:\n            res[\"nuevas\"].append(b)",
+      "nuevo": "        elif True:\n            res[\"nuevas\"].append(b)"
+    },
+    {
+      "etiqueta": "la línea base no cuenta como «ya estaba»",
+      "viejo": "conocida = ((linea_base is not None and b in linea_base.get(\"rojas\", [])) or b in nocturna",
+      "nuevo": "conocida = (False or b in nocturna"
+    },
+    {
+      "etiqueta": "la nocturna no cuenta como «ya estaba»",
+      "viejo": "or b in nocturna\n",
+      "nuevo": "\n"
+    },
+    {
+      "etiqueta": "la deuda abierta no cuenta como «ya estaba»",
+      "viejo": "                    or any(k in deudas for k in _claves_previas(b)))",
+      "nuevo": "                    or False)"
+    },
+    {
+      "etiqueta": "una línea base de otro punto vale como fresca",
+      "viejo": "    fresca = bool(linea_base) and linea_base.get(\"sha\") == pre_sha",
+      "nuevo": "    fresca = bool(linea_base)"
+    },
+    {
+      "etiqueta": "no avisa",
+      "viejo": "        c[\"avisado\"] = bool(avisar(texto, bool(muro_rojas)))",
+      "nuevo": "        c[\"avisado\"] = None"
+    },
+    {
+      "etiqueta": "el aviso del muro no es urgente",
+      "viejo": "bool(avisar(texto, bool(muro_rojas)))",
+      "nuevo": "bool(avisar(texto, False))"
+    },
+    {
+      "etiqueta": "una roja del muro sin línea base no avisa",
+      "viejo": "    a_avisar = list(c[\"nuevas\"]) + [b for b in c[\"sin_atribuir\"] if _es_muro_bateria(b)]",
+      "nuevo": "    a_avisar = list(c[\"nuevas\"])"
+    },
+    {
+      "etiqueta": "el aviso culpa también a las que ya estaban",
+      "viejo": "    a_avisar = list(c[\"nuevas\"]) + [b for b in c[\"sin_atribuir\"] if _es_muro_bateria(b)]",
+      "nuevo": "    a_avisar = list(c[\"nuevas\"]) + list(c[\"previas\"]) + [b for b in c[\"sin_atribuir\"] if _es_muro_bateria(b)]"
+    },
+    {
+      "etiqueta": "no abre deuda",
+      "viejo": "            abrir(\"casa-base-roja-%s\" % b, que, muro)",
+      "nuevo": "            pass"
+    },
+    {
+      "etiqueta": "la deuda no se marca muro",
+      "viejo": "        muro = _es_muro_bateria(b)\n        if b in c[\"nuevas\"]:",
+      "nuevo": "        muro = False\n        if b in c[\"nuevas\"]:"
+    },
+    {
+      "etiqueta": "las previas no hacen «visto» en su deuda",
+      "viejo": "        if clave:\n            visto(clave,",
+      "nuevo": "        if False:\n            visto(clave,"
+    },
+    {
+      "etiqueta": "no deja línea base para la próxima fusión",
+      "viejo": "            guardar_linea_base(post, rojas_base)",
+      "nuevo": "            pass"
+    },
+    {
+      "etiqueta": "el resumen de una línea no lo dice",
+      "viejo": "        linea += \" · \" + cl[\"resumen\"]",
+      "nuevo": "        pass"
+    },
+    {
+      "etiqueta": "el cierre no llama a hacer_ruido",
+      "viejo": "                clasif = hacer_ruido(rojas_base, head_antes, post, rama)",
+      "nuevo": "                clasif = None"
+    },
+    {
+      "etiqueta": "compara contra el commit equivocado (el de después de fusionar)",
+      "viejo": "                clasif = hacer_ruido(rojas_base, head_antes, post, rama)",
+      "nuevo": "                clasif = hacer_ruido(rojas_base, post, post, rama)"
+    },
+    {
+      "etiqueta": "el aviso no dice que estaban en verde antes de fusionar",
+      "viejo": "\"Antes de fusionar estaban en verde. \" if c[\"nuevas\"] else",
+      "nuevo": "\"\" if c[\"nuevas\"] else"
+    }
+  ]
+}

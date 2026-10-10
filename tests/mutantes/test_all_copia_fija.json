@@ -1,0 +1,37 @@
+{
+  "_por_que": "Cada entrada es una defensa de la copia fija de test_all.sh (10-oct-26). Si al quitarla test_all_copia_fija sigue verde, reescribir el script en sitio a mitad de una pasada vuelve a corromperla.",
+  "_nota": "No hay mutación sobre el meta-check contra la copia: con un fichero nuevo sin registrar a mitad de pasada el resultado es el mismo con copia o sin ella (equivalente).",
+  "objetivo": "tests/test_all.sh",
+  "test": [
+    "python3",
+    "tests/test_all_copia_fija.py"
+  ],
+  "env": "BTP_SUITE",
+  "mutaciones": [
+    {
+      "etiqueta": "no se re-ejecuta desde la copia",
+      "viejo": "exec \"${BASH:-bash}\" \"$_c\" \"$@\"",
+      "nuevo": "true"
+    },
+    {
+      "etiqueta": "ROOT sale del temporal, no de la raíz real",
+      "viejo": "if [ -n \"$_ROOT_FIJA\" ]; then ROOT=\"$_ROOT_FIJA\";",
+      "nuevo": "if false; then ROOT=\"$_ROOT_FIJA\";"
+    },
+    {
+      "etiqueta": "las variables de la copia bajan a las baterías",
+      "viejo": "unset BTP_TEST_ALL_ROOT BTP_TEST_ALL_COPIA BTP_TEST_ALL_DUENA\n",
+      "nuevo": "true\n"
+    },
+    {
+      "etiqueta": "el temporal no se borra al acabar",
+      "viejo": "[ -n \"$_DUENA\" ] && trap 'rm -f \"$_COPIA\"' EXIT\n",
+      "nuevo": "true\n"
+    },
+    {
+      "etiqueta": "los trabajadores del paralelo leen el fichero vivo (no la copia)",
+      "viejo": "xargs -L1 -P \"$JOBS\" bash \"$_yo\" --worker",
+      "nuevo": "xargs -L1 -P \"$JOBS\" bash \"$ROOT/tests/test_all.sh\" --worker"
+    }
+  ]
+}

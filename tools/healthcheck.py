@@ -150,6 +150,10 @@ VEGA_DAEMONS = (
     # 2-oct-26: la copia de seguridad (04:30). backup.sh solo late con copia hecha; dos noches sin
     # copia (disco sin montar, permiso, restic roto) y el latido envejece → aviso.
     {"agente": "backup", "label": "la copia de seguridad (04:30)", "cadencia_h": 49, "agentico": False},
+    # 10-oct-26: la suite completa de noche (03:00) sobre casa base. tools/suite_nocturna.py late tras cada
+    # pasada (estados ok / rojo_nuevo / rojo_muro / fallo). 27 h = diario con margen. Sin esta vigilancia
+    # la red de seguridad que sustituye a «suite completa antes de fusionar» podría morir sin que nadie lo vea.
+    {"agente": "suite-nocturna", "label": "la suite completa de noche (03:00)", "cadencia_h": 27, "agentico": False},
 )
 # Estados de heartbeat que NO son problema: ok + el salto frugal de la centralita/gate + la pausa
 # nocturna (todos normales, no gastan ni indican fallo).

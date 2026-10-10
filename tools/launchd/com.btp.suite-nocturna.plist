@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.suite-nocturna</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <!-- SUITE COMPLETA DE NOCHE sobre casa base (10-oct-26, plan de aceleracion de test_all.sh). Cubre lo
+       que la puerta de fusion por impacto ya no corre en cada fusion. DETERMINISTA, $0 (python directo,
+       NO run_agent.sh). 03:00: hueco entre git-barrido, backup (04:30), seguridad-sweep (06:00) y evals
+       (lunes 06:30). Paralelo (6 trabajos) de lunes a sabado; los DOMINGOS en serie + campanas de
+       mutantes. Rojo nuevo -> deuda; rojo del muro -> aviso a {{TITULAR}} esa misma noche. Latido:
+       heartbeat/suite-nocturna.json. Se enciende SOLO desde casa base:
+       python3 tools/activar_daemon.py com.btp.suite-nocturna --kick -->
+  <key>ProgramArguments</key><array>
+    <string>/Users/polaris/claudecode/.venv/bin/python</string>
+    <string>/Users/polaris/claudecode/tools/suite_nocturna.py</string>
+  </array>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/suite-nocturna.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/suite-nocturna.err</string>
+</dict></plist>

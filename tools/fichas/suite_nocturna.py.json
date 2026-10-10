@@ -1,0 +1,11 @@
+{
+ "pieza": "suite_nocturna.py",
+ "estado_ficha": "completa",
+ "para": "Corre la suite COMPLETA (tests/test_all.sh) cada noche sobre casa base, clasifica los rojos (conocidos/nuevos), repite cada nuevo solo para separar flakes, abre deuda, avisa a {{TITULAR}} la primera noche si es una bateria del muro, deja latido y dice con `condiciones` si se cumplen las tres condiciones para cambiar la norma de fusion.",
+ "cuando_si": "Cada noche (launchd, 03:00) y a mano con `condiciones` o `--sembrar`. Es la red que cubre lo que la puerta de fusion por impacto ya no corre en cada fusion.",
+ "cuando_no": "No sustituye a `evals` (arnes de agentes), a `seguridad_sweep_daemon` (barrido de seguridad) ni al CI publico (subconjunto portable en Linux). No corre desde un worktree.",
+ "reemplaza": "nada: es una red nueva. No sustituye a evals, a seguridad_sweep_daemon ni al CI publico.",
+ "test": "tests/test_suite_nocturna.py",
+ "alta": "2026-10-10",
+ "origen": "Plan de aceleracion de test_all.sh (10-oct-26), punto 3, con la revision de consejero-arquitectura."
+}

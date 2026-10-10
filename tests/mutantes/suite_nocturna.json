@@ -1,0 +1,91 @@
+{
+  "_por_que": "Cada entrada es una defensa de la suite nocturna (10-oct-26) y de su comprobador de las tres condiciones para cambiar la norma. Si al quitarla test_suite_nocturna sigue verde, la red puede callar o dar por cumplida una condición que no se cumple.",
+  "objetivo": "tools/suite_nocturna.py",
+  "test": [
+    "python3",
+    "tests/test_suite_nocturna.py"
+  ],
+  "env": "BTP_SUITE_NOCTURNA_TOOL",
+  "mutaciones": [
+    {
+      "etiqueta": "un rojo del muro no avisa la primera noche",
+      "viejo": "    if muro_rojos:\n        solo_flaky",
+      "nuevo": "    if False:\n        solo_flaky"
+    },
+    {
+      "etiqueta": "nunca se repite sola (todo rojo es persistente)",
+      "viejo": "        if repetir_sola(b):",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "la repetición en solitario siempre dice «roja»",
+      "viejo": "        return p.returncode in (0, 77)",
+      "nuevo": "        return False"
+    },
+    {
+      "etiqueta": "corre desde un worktree",
+      "viejo": "if \"/.claude/worktrees/\" in real and not",
+      "nuevo": "if False and not"
+    },
+    {
+      "etiqueta": "ignora el HALT",
+      "viejo": "    if halt_activo():",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "un runner colgado/roto no avisa ni marca «fallo»",
+      "viejo": "    if not runner_ok:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "no abre deuda",
+      "viejo": "        deuda.abrir(clave, que, ned=\"alto\" if muro else \"medio\", muro=muro, dueno=\"suite-nocturna\")",
+      "nuevo": "        pass"
+    },
+    {
+      "etiqueta": "ninguna batería es del muro",
+      "viejo": "        return _rojos_conocidos.es_muro(bateria)",
+      "nuevo": "        return False"
+    },
+    {
+      "etiqueta": "los rojos nuevos no se detectan",
+      "viejo": "        nuevos = [n for n, _m in r[\"nuevos\"]]",
+      "nuevo": "        nuevos = []"
+    },
+    {
+      "etiqueta": "las noches no tienen que ser seguidas",
+      "viejo": "            if (ds[i] - ds[i - 1]).days == 1:",
+      "nuevo": "            if True:"
+    },
+    {
+      "etiqueta": "la racha no tiene que llegar a ayer/hoy",
+      "viejo": "        if (ahora.date() - ds[-1]).days > 1:\n            seguidas = 0            # la racha tiene que llegar a ayer u hoy",
+      "nuevo": "        pass"
+    },
+    {
+      "etiqueta": "el latido puede ser viejo",
+      "viejo": "seguidas >= 3 and edad_h is not None and edad_h <= 30",
+      "nuevo": "seguidas >= 3"
+    },
+    {
+      "etiqueta": "una noche en «fallo» cuenta como noche buena",
+      "viejo": "x.get(\"corrio\") and x.get(\"estado\") != \"fallo\"]",
+      "nuevo": "x.get(\"corrio\")]"
+    },
+    {
+      "etiqueta": "el sembrado vale sin confirmar",
+      "viejo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\"))",
+      "nuevo": "bool(s and s.get(\"avisado\"))"
+    },
+    {
+      "etiqueta": "la condición A no mira lo que dice la puerta",
+      "viejo": "primera == \"COMPLETA\" and hay_test",
+      "nuevo": "True"
+    },
+    {
+      "etiqueta": "la condición B no exige el veto",
+      "viejo": "veta and registrado and fich",
+      "nuevo": "registrado and fich"
+    }
+  ]
+}

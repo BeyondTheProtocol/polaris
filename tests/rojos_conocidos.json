@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "_para_que": "Rojos CONOCIDOS de la suite: cuentan como conocidos (no como nuevos) solo con deuda abierta, dueno, caducidad <= 14 dias y la firma completa del fallo. Detalle y condiciones: tests/_rojos_conocidos.py. Editar este fichero exige la suite COMPLETA. Las baterias del nucleo del muro (test_fuga*, test_halt*, test_gate*, test_muro*...) estan VETADAS salvo `ok_titular` {fecha, cita}.",
+  "_como_se_anade": "1) python3 tools/deuda.py abrir \"<clave>\" \"<que es>\"  2) python3 tests/_rojos_conocidos.py proponer <carpeta de rojos de la pasada>  3) pegar la entrada con la clave de deuda, dueno y caduca (max 14 dias).",
+  "entradas": []
+}

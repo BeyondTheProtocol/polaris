@@ -314,6 +314,7 @@ def cerrar(apply=False, scope=None, podar=True):
     # ¿Hay algo que fusionar? (commits propios tras el commit anterior)
     n = _commits_propios(wt, base) if apply else (p["commits_propios_antes"] + (1 if p["sin_commitear"] else 0))
     fusionado = False
+    head_antes = None   # HEAD de casa base justo ANTES de fusionar (línea base de F)
     if n > 0:
         if apply:
             # (c) FUSIÓN a casa base — SINGLETON: candado COMPARTIDO "git-mutex" (mismo que la poda
@@ -370,10 +371,21 @@ def cerrar(apply=False, scope=None, podar=True):
         acciones.append("fusión: nada propio que fusionar")
 
     rojas_base = None
+    clasif = None
     if apply and fusionado and not os.environ.get("BTP_CIERRE_SIN_VERIFICAR"):
         rojas_base, corridas = _verificar_en_casa_base()
         acciones.append("casa base: %d batería(s) que en el worktree se saltan, corridas allí → %s"
                         % (corridas, ("ROJAS: " + ", ".join(rojas_base)) if rojas_base else "en verde"))
+        try:
+            post = _git(["rev-parse", "HEAD"], BASE)[1].strip()
+            if rojas_base:
+                clasif = hacer_ruido(rojas_base, head_antes, post, rama)
+                acciones.append("casa base roja → %s · deuda: %s · aviso: %s" % (
+                    clasif["resumen"], ", ".join(clasif["abiertas"]) or "ninguna nueva",
+                    {True: "enviado", False: "NO se pudo enviar", None: "no hacía falta"}[clasif["avisado"]]))
+            guardar_linea_base(post, rojas_base)
+        except Exception as e:  # noqa: BLE001  registrar y avisar no puede deshacer la fusión ni tumbar el cierre
+            acciones.append("‼️ casa base roja: NO pude abrir la deuda / avisar (%s: %s)" % (type(e).__name__, e))
     if apply and fusionado:
         acciones.append(_registrar_en_vega(rama, base, rojas_base))
 
@@ -470,7 +482,7 @@ def cerrar(apply=False, scope=None, podar=True):
         acciones.append("poda: omitida (--no-poda)")
 
     return dict(p, aplicado=apply, fusionado=fusionado, podado=podado, acciones=acciones,
-                rojas_casa_base=rojas_base)
+                rojas_casa_base=rojas_base, rojas_clasificadas=clasif)
 
 
 def _sesion_viva_en(wt):
@@ -578,6 +590,173 @@ def _verificar_en_casa_base(tope_s=600):
     return [n for n, ok in res if not ok and not uno(n)[1]], len(candidatos)
 
 
+# ── F (10-oct-26): una fusión que deja ROJA una batería HACE RUIDO ───────────────────────────────
+# Hasta hoy, si tras fusionar una batería de casa base salía roja, el cierre solo lo IMPRIMÍA: quien no
+# leyera esa línea no se enteraba, y la deuda no se abría. Ahora (1) abre deuda estable por batería,
+# (2) avisa por el canal de salud (salida.report_to_titular, el mismo que healthcheck) y de forma
+# INMEDIATA si es del núcleo del muro, y (3) lo deja en el resumen de una línea. NO revierte ni bloquea.
+# Y no culpa a la rama de lo que ya estaba: se compara con la LÍNEA BASE anterior a la fusión.
+STATE = os.environ.get("BTP_STATE_DIR") or os.path.join(BASE, "tools", "state")
+LINEA_BASE = os.path.join(STATE, "cerrar_sesion", "rojas_casa_base.json")
+_MURO_RESPALDO = ("test_muro", "test_salida_guard", "test_ok_envio", "test_permiso", "test_gate", "test_fuga",
+                  "test_halt", "test_clinico", "test_casa_base", "test_singleton", "test_rama_vista",
+                  "test_launch_loopback", "test_copy_web", "test_token_rotacion", "test_regla_en_accion",
+                  "test_entrada_guard", "test_canario_muro", "test_worktree_guard", "test_enrutado")
+
+
+def _es_muro_bateria(nombre):
+    """¿Es del núcleo del muro? Los mismos prefijos que la puerta de fusión; si no se pueden importar, la
+    copia (nunca MENOS vetos)."""
+    try:
+        import tests_afectados
+        return str(nombre).startswith(tuple(tests_afectados._MURO_PREFIJOS))
+    except Exception:  # noqa: BLE001
+        return str(nombre).startswith(_MURO_RESPALDO)
+
+
+def leer_linea_base():
+    """{'sha','fecha','rojas'} de la última verificación en casa base, o None."""
+    try:
+        with open(LINEA_BASE, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) and isinstance(d.get("rojas"), list) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def guardar_linea_base(sha, rojas):
+    """Lo que quedó rojo en casa base tras esta fusión = la línea base de la PRÓXIMA. Atómico, fail-soft."""
+    try:
+        import datetime
+        os.makedirs(os.path.dirname(LINEA_BASE), exist_ok=True)
+        tmp = LINEA_BASE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"sha": sha, "fecha": datetime.datetime.now().isoformat(timespec="seconds"),
+                       "rojas": sorted(rojas or [])}, f, ensure_ascii=False)
+        os.replace(tmp, LINEA_BASE)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _rojas_de_la_nocturna():
+    """Baterías que la última pasada nocturna ya daba por rojas (nuevas, flaky o conocidas)."""
+    try:
+        with open(os.path.join(STATE, "suite_nocturna", "historial.jsonl"), encoding="utf-8") as f:
+            ult = [json.loads(l) for l in f if l.strip()][-1]
+        return set(ult.get("nuevos", [])) | set(ult.get("flaky", [])) | set(ult.get("conocidos", []))
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _deudas_abiertas():
+    try:
+        import deuda
+        return set(deuda.abiertas())
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _claves_previas(bateria):
+    return ("casa-base-roja-%s" % bateria, "suite-nocturna-%s" % bateria, "suite-nocturna-flaky-%s" % bateria)
+
+
+def clasifica_rojas(rojas, pre_sha, linea_base, deudas, nocturna):
+    """Reparte las rojas de casa base tras la fusión:
+      · previas        — ya estaban rojas (línea base, deuda abierta o la nocturna): NO son de esta rama;
+      · nuevas         — la línea base es de justo antes de esta fusión y la batería NO estaba roja: la rompió esta fusión;
+      · sin_atribuir   — no hay línea base fiable (no existe o es de otro punto de casa base): no se culpa a nadie.
+    """
+    fresca = bool(linea_base) and linea_base.get("sha") == pre_sha
+    res = {"nuevas": [], "previas": [], "sin_atribuir": [],
+           "linea_base": "fresca" if fresca else ("desfasada" if linea_base else "sin")}
+    for b in sorted(rojas or []):
+        conocida = ((linea_base is not None and b in linea_base.get("rojas", [])) or b in nocturna
+                    or any(k in deudas for k in _claves_previas(b)))
+        if conocida:
+            res["previas"].append(b)
+        elif fresca:
+            res["nuevas"].append(b)
+        else:
+            res["sin_atribuir"].append(b)
+    return res
+
+
+def _avisar_fusion(texto, urgente):
+    """Aviso por el canal de salud del sistema (el mismo que healthcheck: salida.report_to_titular, categoría
+    «humano»). `urgente` salta el silencio nocturno. BTP_CIERRE_AVISO_A=<fichero>: sumidero para los tests."""
+    sumidero = os.environ.get("BTP_CIERRE_AVISO_A")
+    if sumidero:
+        with open(sumidero, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"texto": texto, "urgente": urgente}, ensure_ascii=False) + "\n")
+        return True
+    try:
+        import salida
+        salida.report_to_titular(texto, categoria="humano", urgente=urgente, voz="sobria", fuente="cerrar_sesion")
+        return True
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write("cerrar_sesion: no pude avisar de la casa base roja: %r\n" % e)
+        return False
+
+
+def hacer_ruido(rojas, pre_sha, post_sha, rama, linea_base=None, deudas=None, nocturna=None,
+                abrir=None, visto=None, avisar=None):
+    """Abre deuda, avisa y devuelve {'nuevas','previas','sin_atribuir','abiertas','avisado','resumen'}.
+    `abrir/visto/avisar` se pueden inyectar (tests); por defecto, tools/deuda.py y el canal de salud."""
+    linea_base = leer_linea_base() if linea_base is None else linea_base
+    deudas = _deudas_abiertas() if deudas is None else deudas
+    nocturna = _rojas_de_la_nocturna() if nocturna is None else nocturna
+    if abrir is None or visto is None:
+        import deuda
+        abrir = abrir or (lambda clave, que, muro: deuda.abrir(
+            clave, que, ned="alto" if muro else "medio", muro=muro, dueno="cierre-de-sesion"))
+        visto = visto or (lambda clave, nota: deuda.visto(clave, nota))
+    avisar = avisar or _avisar_fusion
+    c = clasifica_rojas(rojas, pre_sha, linea_base, deudas, nocturna)
+    c.update(abiertas=[], avisado=None)
+    corto = (post_sha or "")[:9]
+    for b in c["previas"]:
+        clave = next((k for k in _claves_previas(b) if k in deudas), None)
+        if clave:
+            visto(clave, "sigue roja tras la fusión de %s (%s): ya estaba, no es de esta rama" % (rama, corto))
+    for b in c["nuevas"] + c["sin_atribuir"]:
+        muro = _es_muro_bateria(b)
+        if b in c["nuevas"]:
+            que = ("La batería %s pasó de VERDE a ROJA en casa base con la fusión de la rama %s (commit %s, sobre %s). "
+                   "La línea base anterior a la fusión la daba en verde. Se corre en casa base porque en un worktree se "
+                   "salta (rc 77). No se ha revertido nada." % (b, rama, corto, (pre_sha or "?")[:9]))
+        else:
+            que = ("La batería %s está ROJA en casa base tras la fusión de la rama %s (commit %s). NO hay línea base "
+                   "fiable de antes de fusionar (%s): no se sabe si ya estaba roja, así que NO se atribuye a la rama. "
+                   "No se ha revertido nada." % (b, rama, corto,
+                                                 "no existe" if c["linea_base"] == "sin" else "es de otro punto de casa base"))
+        try:
+            abrir("casa-base-roja-%s" % b, que, muro)
+            c["abiertas"].append("casa-base-roja-%s" % b)
+        except Exception as e:  # noqa: BLE001
+            sys.stderr.write("cerrar_sesion: no pude abrir la deuda de %s: %r\n" % (b, e))
+    # aviso: las NUEVAS siempre; las sin atribuir solo si son del muro (una roja del muro en casa base se oye)
+    a_avisar = list(c["nuevas"]) + [b for b in c["sin_atribuir"] if _es_muro_bateria(b)]
+    if a_avisar:
+        muro_rojas = [b for b in a_avisar if _es_muro_bateria(b)]
+        texto = ("Una fusión a casa base (rama %s, commit %s) deja en ROJO: %s. %s%sNo he revertido ni bloqueado nada. "
+                 "Deuda abierta: %s."
+                 % (rama, corto, ", ".join(a_avisar),
+                    "ENTRE ELLAS HAY BATERÍAS DEL MURO (%s). " % ", ".join(muro_rojas) if muro_rojas else "",
+                    "Antes de fusionar estaban en verde. " if c["nuevas"] else "No hay línea base previa: no sé si ya estaban rojas. ",
+                    ", ".join("casa-base-roja-" + b for b in a_avisar)))
+        c["avisado"] = bool(avisar(texto, bool(muro_rojas)))
+    partes = []
+    if c["nuevas"]:
+        partes.append("%d NUEVA(S) por esta fusión (%s)" % (len(c["nuevas"]), ", ".join(c["nuevas"])))
+    if c["previas"]:
+        partes.append("%d ya estaban rojas" % len(c["previas"]))
+    if c["sin_atribuir"]:
+        partes.append("%d sin línea base previa, no se atribuyen" % len(c["sin_atribuir"]))
+    c["resumen"] = "casa base roja: " + " · ".join(partes) if partes else ""
+    return c
+
+
 def _una_linea(r):
     if r.get("error"):
         return "⚠️ cierre: " + r["error"]
@@ -588,10 +767,22 @@ def _una_linea(r):
              % (modo, r.get("rama", "?"), n_cambios,
                 "fusionado a casa base" if r.get("fusionado") else "sin fusión",
                 n_docs, "podado" if r.get("podado") else "intacto"))
+    cl = r.get("rojas_clasificadas") or {}
+    if cl.get("resumen"):
+        linea += " · " + cl["resumen"]          # la línea de UNA línea lo dice (F, 10-oct-26)
     if r.get("rojas_casa_base"):
         linea += ("\n🔴 CASA BASE ROJA tras fusionar: %s. En el worktree se saltaban, así que tu "
                   "«en verde» no las cubría. Arréglalo antes de dar nada por hecho."
                   % ", ".join(r["rojas_casa_base"]))
+        if cl:
+            if cl.get("nuevas"):
+                linea += ("\n   ↳ LAS ROMPIÓ ESTA FUSIÓN (estaban en verde antes): %s. Deuda abierta y aviso hecho."
+                          % ", ".join(cl["nuevas"]))
+            if cl.get("previas"):
+                linea += "\n   ↳ ya estaban rojas antes de fusionar (no son de esta rama): %s." % ", ".join(cl["previas"])
+            if cl.get("sin_atribuir"):
+                linea += ("\n   ↳ sin línea base previa, NO se atribuyen a esta rama: %s (deuda abierta igualmente)."
+                          % ", ".join(cl["sin_atribuir"]))
     al_dia, dias, ultima = _continuidad_al_dia()
     if not al_dia:
         cuanto = ("nunca" if dias is None else "hace %.0f día(s), la última es del %s"
