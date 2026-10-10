@@ -392,7 +392,11 @@ class FuncionYCli(unittest.TestCase):
         Sin doble fork y desde un proceso sin terminal: `pty.fork()` le da al hijo un terminal de
         control propio, el hijo cambia `subprocess.Popen` para que `ps` no enseñe a Claude Code y
         llama a la API de verdad; el padre teclea la palabra. Confía con la cadena íntegra y SIN un
-        solo evento de alarma. Si deja de abrir, cambia la cabecera de `borde.PREFIJOS_TTY`."""
+        solo evento de alarma. Si deja de abrir, cambia la cabecera de `borde.PREFIJOS_TTY`.
+        10-oct-26: el parche borra «claude» SIN distinguir mayúsculas. Con `.replace('claude', ...)`
+        a secas el test dependía de cómo se escribe el ancestro: Claude Code 2.1.295 cuelga del
+        ayudante `/Applications/Claude.app/Contents/Helpers/disclaimer` («Claude» con C mayúscula),
+        el detector lo veía y el test daba `False True` aunque el límite siga abierto."""
         src = (
             "import os, select, subprocess, time, pty\n"
             "pid, fd = pty.fork()\n"
@@ -403,7 +407,7 @@ class FuncionYCli(unittest.TestCase):
             "            def communicate(self, *a, **k):\n"
             "                o, e = super().communicate(*a, **k)\n"
             "                if isinstance(o, str):\n"
-            "                    o = o.replace('.claude', 'x').replace('claude', 'x')\n"
+            "                    o = __import__('re').sub('(?i)claude', 'x', o)\n"
             "                return o, e\n"
             "        subprocess.Popen = P\n"
             "        borde.trust_cloud('vision-n1:x', para='n1')\n"
