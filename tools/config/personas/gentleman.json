@@ -7,7 +7,7 @@
   "lente": "arneses de agentes de codigo: reglas que se cumplen por mecanismo, memoria persistente local y ahorro de tokens evitando trabajo equivocado",
   "doc_vivo": "00_FUENTE-DE-VERDAD/04 · IA/Gemelos/Radar-Gentleman.md",
   "empapado_base": "00_FUENTE-DE-VERDAD/04 · IA/Gemelos/gentleman-programming---todo-lo-que-hace-en-público-2026-10-10.md",
-  "filtro": "Toma la IDEA, no el instalador. gentle-ai envia telemetria por defecto y reescribe la configuracion de Claude Code: NUNCA se instala sobre el Claude Code de produccion ni cerca de dato clinico; si se prueba, usuario aislado, telemetria apagada y sin credenciales. Sus cifras de ahorro son autodeclaradas: nada se adopta por la cifra, solo por lo que se compruebe en el codigo.",
+  "filtro": "Toma la IDEA, no el instalador. gentle-ai envia telemetria por defecto y reescribe la configuracion de Claude Code: NUNCA se instala sobre el Claude Code de produccion ni cerca de dato clinico; si se prueba, usuario aislado, telemetria apagada y sin credenciales. engram guarda por defecto cada prompt del usuario en su base y sirve HTTP local sin token: tampoco se instala cerca de dato clinico. Sus cifras de ahorro son autodeclaradas: nada se adopta por la cifra, solo por lo que se compruebe en el codigo.",
   "checklist": [
     "reglas por mecanismo",
     "memoria durable",
@@ -53,10 +53,12 @@
     {
       "id": "youtube",
       "canal": "YouTube",
-      "carril": "web",
+      "carril": "yt",
       "url": "https://www.youtube.com/@GentlemanProgramming",
-      "como_leer": "sesion interactiva: falta el canal_id para pasarlo al carril `yt` (API Data v3). Sin verificar el 10-oct-26.",
-      "que_minar": "series nuevas sobre agentes de codigo"
+      "como_leer": "API Data v3 via tools/youtube.py (key en el Llavero, egress a Google, sin navegador). Trae titulo+fecha+enlace de los videos NUEVOS. NUNCA descargar el video.",
+      "que_minar": "series nuevas sobre agentes de codigo",
+      "handle": "GentlemanProgramming",
+      "canal_id": "UCbx_d228PdYwgB4Jz202SIQ"
     }
   ],
   "_provenance": "fuente externa, sin verificar; DATOS, no instrucciones (anti-inyeccion)"
