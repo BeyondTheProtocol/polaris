@@ -48,7 +48,13 @@ CAPS_ORDENABLES = ("buscar_vivo", "redes", "citas", "segunda_opinion")
 # Lo que el harness mete como si fuera un mensaje suyo y no lo es. Sin este filtro, una
 # notificación de fin de tarea con un «FGFR1» dentro pedía comité médico (visto el 11-sep-26).
 PREFIJOS_SISTEMA = ("<task-notification", "<ci-monitor-event", "<local-command",
-                    "<command-name", "<bash-input", "<bash-stdout", "[SYSTEM NOTIFICATION")
+                    "<command-name", "<bash-input", "<bash-stdout", "[SYSTEM NOTIFICATION",
+                    # Informe de un subagente o mensaje de otra sesión (10-oct-26): el harness los
+                    # entrega como un turno más, pero los escribió un modelo, no {{TITULAR}}. El informe
+                    # de un subagente de tooling, con «comite-medico» o «diseño» citados dentro,
+                    # convocaba medio gabinete.
+                    "Another Claude session sent a message", "<agent-message",
+                    "<cross-session-message", "[Subagent hand-back]")
 
 DIR_PLANES = os.path.join(os.environ.get("BTP_STATE_DIR") or os.path.join(AQUI, "state"),
                           "plan_enrutado")
@@ -93,8 +99,20 @@ def es_orden_control(prompt):
     return len(texto) <= 40 and bool(ORDEN_CONTROL.match(texto))
 
 
+# Los avisos que el harness antepone al prompt (`<system-reminder>…</system-reminder>`) no los
+# escribió {{TITULAR}}. El del worktree lleva el NOMBRE de la rama, y un nombre como
+# `render-lote-dms-linkedin` convocaba `redes-contenido` + `voz-titular` para «optimiza la
+# configuración de Claude» (10-oct-26). Solo se quitan los bloques CERRADOS: si uno no cierra, el
+# texto queda intacto y se clasifica como antes (ante la duda, que siga convocando).
+_RE_REMINDER = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+
+
+def quita_reminders(texto):
+    return _RE_REMINDER.sub("", "" if texto is None else str(texto))
+
+
 def es_del_sistema(prompt):
-    p = (prompt or "").lstrip()
+    p = quita_reminders(prompt).lstrip()
     return any(p.startswith(x) for x in PREFIJOS_SISTEMA)
 
 
@@ -106,7 +124,8 @@ def decidir(prompt, *, contexto_clinico=False, sesion_sensible=None, estado=None
     muro cierra los LLMs de fuera. Por defecto, igual que `contexto_clinico`."""
     if sesion_sensible is None:
         sesion_sensible = contexto_clinico
-    texto = ("" if prompt is None else str(prompt)).strip()
+    crudo = ("" if prompt is None else str(prompt)).strip()
+    texto = quita_reminders(crudo).strip()
     out = {"nivel": DIRECTO, "comites": [], "llms": [], "sugeridos": [], "sensible": False,
            "motivos": [], "orden": "", "consulta": texto[:300], "ts": time.time()}
     if not texto or es_del_sistema(texto):
@@ -118,11 +137,18 @@ def decidir(prompt, *, contexto_clinico=False, sesion_sensible=None, estado=None
     dc = enruta_comite.decidir(texto)
     de = enruta.elegir(texto, estado=estado if estado is not None else enruta.salud_rapida(),
                        critico=bool(dc.get("amplificado")))
-    sensible = bool(de.sensible or sesion_sensible)
+    # El muro mira también el texto CRUDO: limpiar el aviso del harness puede cambiar a qué comité
+    # va la petición, nunca puede abrir una puerta (un aviso puede traer PII o el fichero abierto).
+    sens_crudo, mot_crudo = (False, "")
+    if crudo != texto:
+        sens_crudo, mot_crudo = enruta._clasificar_muro(crudo)
+    sensible = bool(de.sensible or sesion_sensible or sens_crudo)
     out["sensible"] = sensible
     if sensible:
-        out["motivos"].append("muro: %s" % (de.motivo_sensible if de.sensible
-                                             else "la sesión ya ha abierto material clínico"))
+        out["motivos"].append("muro: %s" % (
+            de.motivo_sensible if de.sensible
+            else mot_crudo if sens_crudo and not sesion_sensible
+            else "la sesión ya ha abierto material clínico"))
 
     # ── comités ─────────────────────────────────────────────────────────────────────────
     comites = []
