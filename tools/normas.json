@@ -135,13 +135,14 @@
       "slug": "feedback-dia-de-la-semana-calculado-no-escrito",
       "que": "El día de la semana en un mensaje a {{TITULAR}} (sobre todo citas médicas) se DERIVA de la fecha ISO con weekday(), nunca se escribe de memoria",
       "clase": "salida",
-      "mecanismo": "",
+      "mecanismo": ".claude/hooks/gate_salida.py::dia_semana_mal",
       "fresca": true,
       "heredada": false,
       "aplicable": true,
-      "auditable": false,
+      "auditable": true,
       "repetida": false,
-      "nota": "RE-AÑADIDA el 9-oct-26. El Mejoras-log del 8-oct ya declaraba esta entrada como añadida y verificada (293→294), pero el cambio nunca llegó a commitearse y se perdió: hoy `git log -S` no encuentra ningún commit que haya contenido este slug. Ver la deuda `lo-que-el-lazo-escribe-sin-commitear-se-pierde`. Un día de la semana equivocado en una cita puede costarle la cita, así que es candidata a mecanismo real en gate_salida.py: cazar un nombre de día junto a una fecha ISO y recalcularlo."
+      "nota": "RE-AÑADIDA el 9-oct-26 (el cambio del 8-oct no llegó a commitearse; ver la deuda `lo-que-el-lazo-escribe-sin-commitear-se-pierde`). 10-oct-26: mecanizada en AVISO con `dia_semana_mal` (datetime, sin LLM): el día de la semana pegado a una fecha («jueves 8 de octubre», «2026-10-09, jueves») o a hoy/mañana/pasado mañana se recalcula con weekday(). Test: tests/test_gate_dia_semana.py. Parcial: no comprueba «el jueves» a secas ni «el jueves de la semana que viene». Subir a bloqueo: escalera del gate y OK de {{TITULAR}}.",
+      "modo": "aviso"
     },
     {
       "slug": "feedback-aviso-condicionado-no-parte-de-estado",
@@ -153,7 +154,7 @@
       "aplicable": true,
       "auditable": false,
       "repetida": false,
-      "nota": "Clasificada el 9-oct-26 por auto-mejora. Clase `salida` porque se detecta en el texto antes de entregarlo: un parte cuyo contenido es «X sigue sin pasar» sobre un aviso armado. Hermana de la deuda cerrada `vega-ruido-33-al-dia`: la forma de matar un aviso es repetirlo mientras no hay noticia."
+      "nota": "Clasificada el 9-oct-26 por auto-mejora. Clase `salida` porque se detecta en el texto antes de entregarlo: un parte cuyo contenido es «X sigue sin pasar» sobre un aviso armado. Hermana de la deuda cerrada `vega-ruido-33-al-dia`: la forma de matar un aviso es repetirlo mientras no hay noticia. · 10-oct-26 (S15): no cabe en un check de salida sin falsos positivos. Lo que hay que frenar es un parte «X sigue sin pasar» sobre una vigilancia armada, y eso exige saber que existe esa vigilancia (estado de Vega, no el texto de la respuesta: «todavía no ha respondido» es una contestación legítima si ella pregunta directamente). El caso origen fue una respuesta de Vega (inferencia: por un canal que no pasa por este hook Stop de sesión). Mecanismo real pendiente: el chequeo del emisor, en la deuda `vega-sin-novedad-hook-mecanismo`."
     },
     {
       "slug": "feedback-cola-recover-reencola-todo-lo-fallido",

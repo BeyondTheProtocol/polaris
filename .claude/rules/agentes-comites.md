@@ -38,3 +38,12 @@ Cuando alguien entra como contacto, el agente `investigador` saca **automáticam
 
 ## Al escribir el prompt de un agente
 Si la lección que estás incorporando es una corrección de {{TITULAR}}, va **también** a su memoria `feedback-*` con *Why* + *How to apply*. Un agente afinado y una memoria sin escribir = la lección se pierde en la siguiente sesión.
+
+## Vega, aprobaciones y potencia (salió de CLAUDE.md el 10-oct-26, sin cambiar una palabra)
+
+- La continuidad se escribe sola al cerrar, y cada fusión queda en el registro de aprobaciones de Vega (`cerrar_sesion.py`).
+- Quién aprueba qué lo dice `tools/config/politica_aprobacion.json` (A Vega sola, B pregunta a {{TITULAR}}, C su firma).
+- El `orquestador` es el enrutador que Vega usa para repartir; no es una segunda cabeza.
+- **Máxima potencia (ultracode) = tarea plan-primero o ultra-importante** → todo el músculo para **sacar el PLAN**; la ejecución la lleva el comité responsable (`feedback-ultracode-para-lo-ultraimportante`).
+- Ojo de coach: aviso solo si le ahorra energía, tiempo o un error. Si dice «menos coaching», callo la sesión.
+- Sesiones en paralelo: El paralelo es lo NORMAL: no paro y espero.

@@ -95,6 +95,20 @@ MOVIDAS = [
     ("`ramas.py list`: quién trabaja", "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
     ("`cosecha_checklists.py`: sube al Tablero los checklists que viven dentro de los `.md`",
      "rules/herramientas.md", ".claude/rules/herramientas.md", "CLAUDE.md"),
+    # ── 10-oct-26: mecánica de Vega, aprobaciones y ultracode → agentes-comites.md (CLAUDE.md
+    #    pasaba 633 B del tope). La norma «Vega orquesta todo» y su buzón siguen en CLAUDE.md.
+    ("cada fusión queda en el registro de aprobaciones de Vega (`cerrar_sesion.py`)",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
+    ("`tools/config/politica_aprobacion.json` (A Vega sola, B pregunta a {{TITULAR}}, C su firma)",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
+    ("El `orquestador` es el enrutador que Vega usa para repartir; no es una segunda cabeza",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
+    ("**Máxima potencia (ultracode) = tarea plan-primero o ultra-importante**",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
+    ("Si dice «menos coaching», callo la sesión",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
+    ("El paralelo es lo NORMAL: no paro y espero",
+     "rules/agentes-comites.md", ".claude/rules/agentes-comites.md", "CLAUDE.md"),
     # ── la lista de rutinas → launchd-daemons.md (en CLAUDE.md queda la norma «no las dupliques»)
     ("la lista viva es `python3 tools/launchd/registro.py estado`",
      "rules/launchd-daemons.md", ".claude/rules/launchd-daemons.md", "CLAUDE.md"),
@@ -240,7 +254,8 @@ def test_punteros_vivos():
 
 def test_reglas_nuevas_no_pesan_siempre():
     print("── las reglas que recibieron lo movido llevan paths: (no suman a la carga fija) ──")
-    for nombre in ("herramientas.md", "launchd-daemons.md", "tools-python.md", "hooks-muro.md"):
+    for nombre in ("herramientas.md", "launchd-daemons.md", "tools-python.md", "hooks-muro.md",
+                   "agentes-comites.md"):
         check(salud_memoria._tiene_paths(os.path.join(REGLAS, nombre)),
               "%s lleva paths:" % nombre)
 
