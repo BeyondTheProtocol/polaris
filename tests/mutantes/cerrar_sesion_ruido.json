@@ -74,8 +74,8 @@
     },
     {
       "etiqueta": "no deja línea base para la próxima fusión",
-      "viejo": "            guardar_linea_base(post, rojas_base)",
-      "nuevo": "            pass"
+      "viejo": "        guardar_linea_base(post, rojas)\n",
+      "nuevo": "        pass\n"
     },
     {
       "etiqueta": "el resumen de una línea no lo dice",
@@ -84,18 +84,23 @@
     },
     {
       "etiqueta": "el cierre no llama a hacer_ruido",
-      "viejo": "                clasif = hacer_ruido(rojas_base, head_antes, post, rama)",
-      "nuevo": "                clasif = None"
+      "viejo": "            clasif = hacer_ruido(rojas, pre_sha, post, rama)",
+      "nuevo": "            clasif = None"
     },
     {
       "etiqueta": "compara contra el commit equivocado (el de después de fusionar)",
-      "viejo": "                clasif = hacer_ruido(rojas_base, head_antes, post, rama)",
-      "nuevo": "                clasif = hacer_ruido(rojas_base, post, post, rama)"
+      "viejo": "            clasif = hacer_ruido(rojas, pre_sha, post, rama)",
+      "nuevo": "            clasif = hacer_ruido(rojas, post, post, rama)"
     },
     {
       "etiqueta": "el aviso no dice que estaban en verde antes de fusionar",
       "viejo": "\"Antes de fusionar estaban en verde. \" if c[\"nuevas\"] else",
       "nuevo": "\"\" if c[\"nuevas\"] else"
+    },
+    {
+      "etiqueta": "el cierre no llama a verificar_tras_fusion",
+      "viejo": "        rojas_base, clasif, accs = verificar_tras_fusion(head_antes, rama)\n",
+      "nuevo": "        rojas_base, clasif, accs = [], None, []\n"
     }
   ]
 }

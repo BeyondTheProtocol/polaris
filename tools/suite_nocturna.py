@@ -31,8 +31,9 @@ llegó a {{TITULAR}} y ella confirmó. Sale 0 solo si las tres; no hace falta fi
 Uso:
   python3 tools/suite_nocturna.py                 # la pasada de esta noche (lo que lanza launchd)
   python3 tools/suite_nocturna.py --sembrar       # + un rojo sembrado a propósito (prueba el aviso)
+  python3 tools/suite_nocturna.py --sembrar --solo-aviso   # SOLO el aviso de prueba, sin correr la suite
   python3 tools/suite_nocturna.py condiciones     # ¿se cumplen las tres condiciones? rc 0 = sí
-  python3 tools/suite_nocturna.py confirmar-sembrado "<lo que dijo {{TITULAR}}>"
+  python3 tools/suite_nocturna.py confirmar-sembrado <código>   # el del aviso; exige un prompt HUMANO que lo contenga
 Stdlib pura. Determinista, $0.
 """
 import datetime
@@ -167,6 +168,74 @@ def repetir_sola(bateria):
         return False
 
 
+# ── el rojo sembrado y su confirmación ───────────────────────────────────────────────────
+def _sembrar(hoy):
+    """Manda el aviso de prueba (el camino de «batería del muro en rojo») y apunta el código de confirmación.
+    El código solo viaja en el aviso que recibe {{TITULAR}}: confirmarlo exige que ELLA lo teclee en una sesión."""
+    import secrets
+    nonce = secrets.token_hex(3)
+    a = avisar("[SEMBRADO A PROPÓSITO, NO ES UN FALLO REAL] Prueba de la suite nocturna: así te llegaría el aviso de que una "
+               "batería del muro ha salido roja. Para confirmar que lo has recibido, escribe en la sesión de Claude Code "
+               "este código: %s" % nonce, muro=True, sembrado=True)
+    avisado = bool(a.get("avisado"))
+    try:
+        os.makedirs(DIR, exist_ok=True)
+        with open(SEMBRADO, "w", encoding="utf-8") as f:
+            json.dump({"fecha": hoy.isoformat(), "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                       "avisado": avisado, "nonce": nonce, "confirmado": None}, f, ensure_ascii=False)
+    except Exception:
+        pass
+    return avisado
+
+
+def _prueba_humana(nonce, desde_ts):
+    """(ruta, extracto) del primer prompt TECLEADO POR UNA PERSONA, posterior a `desde_ts`, que contiene `nonce`; o None.
+
+    Es la misma prueba que ya usa el sistema para un OK suyo (`permiso_envio`): los transcripts de Claude Code los
+    escribe el harness, no el agente, y los guards deniegan escribirlos; un mensaje de subagente, de otro agente
+    (origin peer), de una tarea programada o un resultado de herramienta NO es un prompt humano. Un agente puede leer
+    el código en sembrado.json, pero no puede hacer que aparezca en un prompt humano: eso lo teclea ella.
+    LÍMITE (el de permiso_envio): todo corre con el mismo usuario de macOS; no es una garantía criptográfica."""
+    if not nonce or not desde_ts:
+        return None
+    import glob
+    import permiso_envio as PE
+    base = os.environ.get("BTP_TRANSCRIPTS_DIR") or os.path.expanduser("~/.claude/projects")
+    try:
+        desde = datetime.datetime.strptime(desde_ts, "%Y-%m-%dT%H:%M:%SZ")
+    except Exception:
+        return None
+    for ruta in sorted(glob.glob(os.path.join(base, "*", "*.jsonl"))):
+        try:
+            if os.path.getmtime(ruta) < desde.replace(tzinfo=datetime.timezone.utc).timestamp():
+                continue
+            with open(ruta, encoding="utf-8", errors="replace") as f:
+                for linea in f:
+                    if nonce not in linea:
+                        continue
+                    try:
+                        e = json.loads(linea)
+                    except Exception:
+                        continue
+                    if PE._es_humano(e):
+                        texto = PE.texto_prompt(e) or ""
+                    elif PE._es_humano_encolado(e):
+                        texto = PE.solo_suyo(e["attachment"].get("prompt", ""))
+                    else:
+                        continue
+                    ts = str(e.get("timestamp", ""))[:19]
+                    try:
+                        if datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S") < desde:
+                            continue
+                    except Exception:
+                        continue
+                    if nonce in texto:
+                        return os.path.basename(ruta), texto.strip()[:120]
+        except OSError:
+            continue
+    return None
+
+
 # ── la pasada ─────────────────────────────────────────────────────────────────────────────
 def _hoy():
     """BTP_SUITE_NOCTURNA_HOY=AAAA-MM-DD fija «hoy» (los tests); si no, la fecha real."""
@@ -264,7 +333,7 @@ def pasada(hoy=None, sembrar=False):
 
     # domingos: campañas de mutantes lentas de la puerta
     if domingo:
-        for camp in ("test_all_paralelo", "test_all_puerta", "rojos_conocidos_sh", "suite_nocturna", "cerrar_sesion_ruido", "test_all_copia_fija"):
+        for camp in ("test_all_paralelo", "test_all_puerta", "rojos_conocidos_sh", "suite_nocturna", "cerrar_sesion_ruido", "test_all_copia_fija", "git_mutex_ruido"):
             ruta = os.path.join(REPO, "tests", "mutantes", camp + ".json")
             if not os.path.isfile(ruta):
                 continue
@@ -286,16 +355,7 @@ def pasada(hoy=None, sembrar=False):
 
     # el rojo sembrado a propósito: prueba el camino del aviso de punta a punta, sin deuda
     if sembrar:
-        a = avisar("[SEMBRADO A PROPÓSITO, NO ES UN FALLO REAL] Prueba de la suite nocturna: así te llegaría el aviso de "
-                   "que una batería del muro ha salido roja. Confirma a quien te lo haya pedido que lo has recibido.",
-                   muro=True, sembrado=True)
-        entrada["avisado"] = bool(a.get("avisado"))
-        try:
-            os.makedirs(DIR, exist_ok=True)
-            with open(SEMBRADO, "w", encoding="utf-8") as f:
-                json.dump({"fecha": hoy.isoformat(), "avisado": entrada["avisado"], "confirmado": None}, f, ensure_ascii=False)
-        except Exception:
-            pass
+        entrada["avisado"] = _sembrar(hoy)
 
     # aviso a {{TITULAR}} la PRIMERA noche si hay muro en rojo (no espera a que la deuda escale)
     if muro_rojos:
@@ -315,6 +375,14 @@ def pasada(hoy=None, sembrar=False):
 
 
 # ── las tres condiciones para cambiar la norma ───────────────────────────────────────────
+def _muro_en_la_noche(x):
+    """¿Esa noche hubo una batería del NÚCLEO DEL MURO en rojo (nueva, intermitente o conocida)? Una noche así NO cuenta
+    para la racha: el muro en rojo no es una red sana, aunque la pasada «corriera»."""
+    if x.get("estado") == "rojo_muro":
+        return True
+    return any(_es_muro(b) for b in set(x.get("nuevos", [])) | set(x.get("flaky", [])) | set(x.get("conocidos", [])))
+
+
 def condiciones(ahora=None):
     """[(clave, cumplida, detalle)] — A) puerta cerrada en casa base · B) lista de rojos conocidos con vetos ·
     C) tres noches seguidas con latido + rojo sembrado recibido y confirmado."""
@@ -346,8 +414,11 @@ def condiciones(ahora=None):
                     "veta test_fuga* sin OK de {{TITULAR}}: %s · fichero: %s · test enganchado: %s" % (veta, fich, registrado)))
     except Exception as ex:   # noqa: BLE001
         out.append(("B", False, "no pude comprobarlo: %r" % ex))
-    # C1: tres noches seguidas, con pasada de verdad y sin «fallo»
-    h = [x for x in leer_historial() if x.get("corrio") and x.get("estado") != "fallo"]
+    # C1: tres noches seguidas, con pasada de verdad, sin «fallo» y SIN el núcleo del muro en rojo (10-oct-26,
+    # consejero-arquitectura: una racha de tres noches con `test_gate_*` roja no puede dar por buena la red)
+    todas = [x for x in leer_historial() if x.get("corrio") and x.get("estado") != "fallo"]
+    h = [x for x in todas if not _muro_en_la_noche(x)]
+    descartadas = sorted({x["fecha"] for x in todas if x not in h and x.get("fecha")})
     fechas = sorted({x["fecha"] for x in h if x.get("fecha")})
     seguidas = 0
     if fechas:
@@ -366,16 +437,19 @@ def condiciones(ahora=None):
     except Exception:
         edad_h = None
     out.append(("C1", seguidas >= 3 and edad_h is not None and edad_h <= 30,
-                "noches seguidas con pasada y sin «fallo»: %d (hacen falta 3) · último latido hace %s"
-                % (seguidas, ("%.1f h" % edad_h) if edad_h is not None else "—")))
+                "noches seguidas con pasada, sin «fallo» y sin el muro en rojo: %d (hacen falta 3) · último latido hace %s%s"
+                % (seguidas, ("%.1f h" % edad_h) if edad_h is not None else "—",
+                   (" · descartadas por muro en rojo: %s" % ", ".join(descartadas)) if descartadas else "")))
     # C2: el sembrado llegó y ella lo confirmó
     try:
         s = json.load(open(SEMBRADO, encoding="utf-8"))
     except Exception:
         s = None
-    out.append(("C2", bool(s and s.get("avisado") and s.get("confirmado")),
-                "rojo sembrado: %s" % ("sin sembrar (python3 tools/suite_nocturna.py --sembrar)" if not s else
-                                       "aviso enviado=%s, confirmado por {{TITULAR}}=%s" % (bool(s.get("avisado")), bool(s.get("confirmado"))))))
+    prueba = _prueba_humana((s or {}).get("nonce"), (s or {}).get("ts")) if s and s.get("confirmado") else None
+    out.append(("C2", bool(s and s.get("avisado") and s.get("confirmado") and prueba),
+                "rojo sembrado: %s" % ("sin sembrar (python3 tools/suite_nocturna.py --sembrar --solo-aviso)" if not s else
+                                       "aviso enviado=%s, confirmado=%s, prueba de un prompt HUMANO con el código=%s"
+                                       % (bool(s.get("avisado")), bool(s.get("confirmado")), bool(prueba)))))
     return out
 
 
@@ -392,20 +466,31 @@ def main(argv):
                                    if todo else "NO se cumplen todas; la norma NO se cambia todavía"))
         return 0 if todo else 1
     if argv[:1] == ["confirmar-sembrado"]:
-        cita = " ".join(argv[1:]).strip()
-        if len(cita) < 5:
-            print("hace falta lo que dijo {{TITULAR}}, literal")
-            return 2
+        codigo = " ".join(argv[1:]).strip()
         try:
-            s = json.load(open(SEMBRADO, encoding="utf-8"))
+            sem = json.load(open(SEMBRADO, encoding="utf-8"))
         except Exception:
-            print("no hay rojo sembrado: corre antes `--sembrar`")
+            print("no hay rojo sembrado: corre antes `--sembrar --solo-aviso`")
             return 2
-        s["confirmado"] = {"cita": cita, "ts": datetime.datetime.utcnow().isoformat() + "Z"}
+        if not sem.get("nonce") or codigo != sem["nonce"]:
+            print("el código no es el del aviso sembrado: tiene que ser el que recibió {{TITULAR}} en su aviso")
+            return 2
+        prueba = _prueba_humana(sem["nonce"], sem.get("ts"))
+        if not prueba:
+            print("NO hay un prompt HUMANO posterior al aviso que contenga el código. Esto no lo confirma un agente: "
+                  "{{TITULAR}} tiene que escribir el código en una sesión de Claude Code. Pídeselo y repite.")
+            return 2
+        sem["confirmado"] = {"codigo": codigo, "ts": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                             "transcript": prueba[0], "extracto": prueba[1]}
         with open(SEMBRADO, "w", encoding="utf-8") as f:
-            json.dump(s, f, ensure_ascii=False)
-        print("confirmado")
+            json.dump(sem, f, ensure_ascii=False)
+        print("confirmado (prompt humano en %s)" % prueba[0])
         return 0
+    if "--sembrar" in argv and "--solo-aviso" in argv:
+        avisado = _sembrar(_hoy())
+        print(json.dumps({"sembrado": True, "avisado": avisado, "siguiente": "{{TITULAR}} teclea el código en una sesión; "
+                          "luego `confirmar-sembrado <código>`"}, ensure_ascii=False))
+        return 0 if avisado else 1
     rc, entrada = pasada(sembrar="--sembrar" in argv)
     print(json.dumps(entrada, ensure_ascii=False))
     return rc

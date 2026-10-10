@@ -340,6 +340,7 @@ runpy test_cerrar_sesion_conflicto.py
 runpy test_cerrar_sesion_poda_viva.py   # 25-sep · no podar el worktree de una sesión viva (le apagaba el muro)
 runpy test_cerrar_sesion_verifica_base.py   # 26-sep · tras fusionar, corre en casa base lo que el worktree salta
 runpy test_cerrar_sesion_ruido.py   # 10-oct · F: una fusión que deja roja una batería de casa base abre deuda, avisa (urgente si es del muro) y no culpa a la rama de lo que ya estaba (campaña de mutantes: tests/mutantes/cerrar_sesion_ruido.json, domingos de noche)
+runpy test_git_mutex_ruido.py   # 10-oct · I: una fusión DIRECTA con git_mutex.py merge también verifica casa base, abre deuda y avisa (misma función que cerrar_sesion; campaña: tests/mutantes/git_mutex_ruido.json)
 runpy test_run_agent_casa_master.py
 runpy test_ff_al_abrir.py
 runpy test_mini.py

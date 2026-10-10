@@ -56,6 +56,11 @@
       "etiqueta": "el veto usa solo test_fuga (no todos los prefijos del muro)",
       "viejo": "        return tuple(tests_afectados._MURO_PREFIJOS)",
       "nuevo": "        return (\"test_fuga\",)"
+    },
+    {
+      "etiqueta": "I: el OK de {{TITULAR}} sí resta un rojo del muro del código de salida",
+      "viejo": "                if es_muro(nombre):\n",
+      "nuevo": "                if False:\n"
     }
   ]
 }

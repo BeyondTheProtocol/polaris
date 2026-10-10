@@ -1,0 +1,42 @@
+{
+  "_por_que": "Defensas del ruido tras una fusion DIRECTA con git_mutex.py merge (punto I, 10-oct-26): sin ellas, una fusion que deja roja una bateria vuelve a pasar en silencio.",
+  "_nota": "Sin mutacion sobre «solo en casa base» (_es_casa_base): comprobarlo exigiria una segunda repo; queda sin cubrir.",
+  "objetivo": "tools/git_mutex.py",
+  "test": [
+    "python3",
+    "tests/test_git_mutex_ruido.py"
+  ],
+  "env": "BTP_GIT_MUTEX_TOOL",
+  "mutaciones": [
+    {
+      "etiqueta": "git_mutex no verifica tras fusionar",
+      "viejo": "    if rc == 0 and resto and resto[0] == \"merge\" and _es_casa_base(repo):\n        _tras_fusionar(repo, resto)\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "verifica aunque el merge haya fallado (conflicto)",
+      "viejo": "    if rc == 0 and resto and resto[0] == \"merge\" and _es_casa_base(repo):",
+      "nuevo": "    if resto and resto[0] == \"merge\" and _es_casa_base(repo):"
+    },
+    {
+      "etiqueta": "el commit anterior es el de después de fusionar",
+      "viejo": "        pre = sha(\"HEAD^1\") if sha(\"HEAD^2\") else sha(\"ORIG_HEAD\")",
+      "nuevo": "        pre = sha(\"HEAD\")"
+    },
+    {
+      "etiqueta": "en un fast-forward el anterior se toma de HEAD^1",
+      "viejo": "        pre = sha(\"HEAD^1\") if sha(\"HEAD^2\") else sha(\"ORIG_HEAD\")",
+      "nuevo": "        pre = sha(\"HEAD^1\")"
+    },
+    {
+      "etiqueta": "el interruptor BTP_CIERRE_SIN_VERIFICAR no se respeta",
+      "viejo": "    if os.environ.get(\"BTP_CIERRE_SIN_VERIFICAR\") or any(",
+      "nuevo": "    if any("
+    },
+    {
+      "etiqueta": "el nombre de la rama se pierde",
+      "viejo": "ramas[0] if ramas else \"?\"",
+      "nuevo": "\"?\""
+    }
+  ]
+}

@@ -373,19 +373,8 @@ def cerrar(apply=False, scope=None, podar=True):
     rojas_base = None
     clasif = None
     if apply and fusionado and not os.environ.get("BTP_CIERRE_SIN_VERIFICAR"):
-        rojas_base, corridas = _verificar_en_casa_base()
-        acciones.append("casa base: %d batería(s) que en el worktree se saltan, corridas allí → %s"
-                        % (corridas, ("ROJAS: " + ", ".join(rojas_base)) if rojas_base else "en verde"))
-        try:
-            post = _git(["rev-parse", "HEAD"], BASE)[1].strip()
-            if rojas_base:
-                clasif = hacer_ruido(rojas_base, head_antes, post, rama)
-                acciones.append("casa base roja → %s · deuda: %s · aviso: %s" % (
-                    clasif["resumen"], ", ".join(clasif["abiertas"]) or "ninguna nueva",
-                    {True: "enviado", False: "NO se pudo enviar", None: "no hacía falta"}[clasif["avisado"]]))
-            guardar_linea_base(post, rojas_base)
-        except Exception as e:  # noqa: BLE001  registrar y avisar no puede deshacer la fusión ni tumbar el cierre
-            acciones.append("‼️ casa base roja: NO pude abrir la deuda / avisar (%s: %s)" % (type(e).__name__, e))
+        rojas_base, clasif, accs = verificar_tras_fusion(head_antes, rama)
+        acciones.extend(accs)
     if apply and fusionado:
         acciones.append(_registrar_en_vega(rama, base, rojas_base))
 
@@ -755,6 +744,34 @@ def hacer_ruido(rojas, pre_sha, post_sha, rama, linea_base=None, deudas=None, no
         partes.append("%d sin línea base previa, no se atribuyen" % len(c["sin_atribuir"]))
     c["resumen"] = "casa base roja: " + " · ".join(partes) if partes else ""
     return c
+
+
+def verificar_tras_fusion(pre_sha, rama):
+    """(rojas, clasif, acciones): lo que SE HACE tras fusionar en casa base, venga la fusión de donde venga
+    (`cerrar_sesion --apply` o `git_mutex.py merge`, 10-oct-26: cuatro fusiones directas con git_mutex no
+    verificaron nada). Corre las baterías que en un worktree se saltan, las compara con la línea base anterior a
+    la fusión, abre la deuda `casa-base-roja-<bat>`, avisa (urgente si es del muro) y deja la línea base para la
+    siguiente. Una sola implementación para los dos caminos. Nunca lanza: no puede deshacer una fusión."""
+    acciones = []
+    rojas, clasif = [], None
+    try:
+        rojas, corridas = _verificar_en_casa_base()
+        acciones.append("casa base: %d batería(s) que en el worktree se saltan, corridas allí → %s"
+                        % (corridas, ("ROJAS: " + ", ".join(rojas)) if rojas else "en verde"))
+    except Exception as e:  # noqa: BLE001
+        acciones.append("‼️ casa base: NO pude verificar tras fusionar (%s: %s)" % (type(e).__name__, e))
+        return None, None, acciones
+    try:
+        post = _git(["rev-parse", "HEAD"], BASE)[1].strip()
+        if rojas:
+            clasif = hacer_ruido(rojas, pre_sha, post, rama)
+            acciones.append("casa base roja → %s · deuda: %s · aviso: %s" % (
+                clasif["resumen"], ", ".join(clasif["abiertas"]) or "ninguna nueva",
+                {True: "enviado", False: "NO se pudo enviar", None: "no hacía falta"}[clasif["avisado"]]))
+        guardar_linea_base(post, rojas)
+    except Exception as e:  # noqa: BLE001  registrar y avisar no puede deshacer la fusión ni tumbar el cierre
+        acciones.append("‼️ casa base roja: NO pude abrir la deuda / avisar (%s: %s)" % (type(e).__name__, e))
+    return rojas, clasif, acciones
 
 
 def _una_linea(r):

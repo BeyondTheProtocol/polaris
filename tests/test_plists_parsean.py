@@ -9,7 +9,8 @@ respondió «plist ilegible … line 15, column 64» y la rutina no se pudo carg
 Se fija:
   1. los 70+ plists del repo parsean con `plistlib.load` (el parser de activar_daemon), todos, por nombre;
   2. ningún comentario XML contiene un doble guion (la causa concreta, para que el mensaje sea claro);
-  3. `activar_daemon.py com.btp.suite-nocturna --dry` sale con rc 0 contra un HOME de prueba (sin tocar el real).
+  3. `activar_daemon.py com.btp.suite-nocturna --dry` sale con rc 0 contra un HOME de prueba y un `launchctl` falso (sin tocar
+     el real, y sin depender de si la rutina YA está cargada en la máquina: esa dependencia lo puso en rojo en casa base).
 """
 import glob
 import os
@@ -54,7 +55,12 @@ check(not con_guiones, "sin «--» dentro de comentarios (%s)" % con_guiones)
 print("3) activar_daemon --dry de la nocturna")
 home = tempfile.mkdtemp(prefix="plists_home_")
 os.makedirs(os.path.join(home, "Library", "LaunchAgents"))
-env = dict(os.environ, HOME=home)
+# `launchctl` FALSO al principio del PATH: «ya está cargado» (guardián label-unico) depende del launchd REAL de la máquina
+# y este test dejó de pasar el día que se cargó la rutina de verdad (rc=4). Aquí no hay ninguna cargada.
+falso = tempfile.mkdtemp(prefix="plists_launchctl_")
+open(os.path.join(falso, "launchctl"), "w").write("#!/bin/sh\nprintf 'PID\\tStatus\\tLabel\\n'\n")
+os.chmod(os.path.join(falso, "launchctl"), 0o755)
+env = dict(os.environ, HOME=home, PATH=falso + os.pathsep + os.environ.get("PATH", ""))
 for k in ("BTP_REPO", "BTP_STATE_DIR"):
     env.pop(k, None)
 r = subprocess.run([sys.executable, os.path.join(RAIZ, "tools", "activar_daemon.py"), "com.btp.suite-nocturna", "--dry"],

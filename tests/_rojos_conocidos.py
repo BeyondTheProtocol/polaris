@@ -14,7 +14,8 @@ cuenta como conocida si:
   · su `firma` (las líneas de fallo normalizadas) coincide EXACTAMENTE con la del log de hoy: si la
     batería falla por otra cosa, es un rojo NUEVO dentro de una batería conocida;
   · si la batería es del núcleo del muro (`_MURO_PREFIJOS`) lleva además `ok_titular` con fecha y su
-    cita literal. Sin eso, VETADA. Un test fija que el fichero real no la incumple.
+    cita literal. Sin eso, VETADA. Y AUN CON ELLA solo se ETIQUETA: sigue contando como rojo NUEVO (rc≠0) y la
+    nocturna sigue avisando (10-oct-26). Un test fija que el fichero real no la incumple.
 Cualquier cosa rara (fichero ilegible, entrada mal formada) hace que los rojos sigan siendo NUEVOS:
 falla cerrado.
 
@@ -164,7 +165,7 @@ def clasifica(rojo_dir, fichero=FICHERO, hoy=None, deudas=None, baterias=None, c
     for e in entradas:
         if isinstance(e, dict):
             por_bat.setdefault(e.get("bateria"), []).append(e)
-    res = {"conocidos": [], "nuevos": [], "curados": [], "aviso": error}
+    res = {"conocidos": [], "nuevos": [], "curados": [], "muro_con_ok": [], "aviso": error}
     rojos = set()
     logs = sorted(f for f in os.listdir(rojo_dir) if f.startswith("rojo-") and f.endswith(".log")) if os.path.isdir(rojo_dir) else []
     for f in logs:
@@ -189,6 +190,12 @@ def clasifica(rojo_dir, fichero=FICHERO, hoy=None, deudas=None, baterias=None, c
                 motivo = "entrada no válida: " + "; ".join(pr)
                 continue
             if sorted(_norm_linea(x) for x in e["firma"]) == firma:
+                if es_muro(nombre):
+                    # 10-oct-26 (consejero-arquitectura): el OK de {{TITULAR}} ETIQUETA el rojo del muro, pero NO lo resta del
+                    # código de salida ni calla el aviso. Un rojo en el núcleo del muro no se vuelve «normal» por escrito.
+                    res["muro_con_ok"].append(nombre)
+                    motivo = "núcleo del muro con ok_titular (deuda %s): queda etiquetado, pero SIGUE contando como rojo" % e["deuda"]
+                    break
                 res["conocidos"].append((nombre, e["deuda"]))
                 motivo = None
                 break
@@ -227,6 +234,8 @@ def main(argv):
         print("   🟠 CONOCIDO: %s (deuda: %s)" % (n, d))
     for n, m in r["nuevos"]:
         print("   🔴 NUEVO: %s — %s" % (n, m))
+    for n in r["muro_con_ok"]:
+        print("   🏷️  %s lleva el OK de {{TITULAR}} (etiqueta), pero es del muro: NO resta" % n)
     for n in r["curados"]:
         print("   🩹 ¿CURADO?: %s está en la lista y no falló (puede haber saltado): revisa si hay que quitarla" % n)
     print("RESUMEN conocidos=%d nuevos=%d" % (len(r["conocidos"]), len(r["nuevos"])))

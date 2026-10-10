@@ -66,7 +66,33 @@
       "etiqueta": "la puerta rápida pierde el núcleo del muro",
       "viejo": "\"seleccion\": sel | nucleo_muro(disponibles)}",
       "nuevo": "\"seleccion\": sel}"
+    },
+    {
+      "etiqueta": "H: las tools con red ya no exigen la completa",
+      "viejo": "    if f in con_red:\n        return \"tool con acceso a la red (directo o por lo que importa): puede sacar datos\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "H: la red solo cuenta si es directa (sin cierre transitivo)",
+      "viejo": "    cambio = True\n    while cambio:\n        cambio = False\n        for n, r in refs.items():\n            if n not in con_red and r & con_red:",
+      "nuevo": "    cambio = False\n    while cambio:\n        cambio = False\n        for n, r in refs.items():\n            if n not in con_red and r & con_red:"
+    },
+    {
+      "etiqueta": "H: googleapiclient no es red",
+      "viejo": "\"ssl\", \"paramiko\", \"boto3\", \"googleapiclient\", ",
+      "nuevo": "\"ssl\", \"paramiko\", \"boto3\", "
+    },
+    {
+      "etiqueta": "H: imaplib no es red",
+      "viejo": "\"smtplib\", \"imaplib\", ",
+      "nuevo": "\"smtplib\", "
+    },
+    {
+      "etiqueta": "H: los programas de red lanzados con subprocess no cuentan",
+      "viejo": "            if partes and partes[0] in _CLI_RED:\n                return True\n",
+      "nuevo": ""
     }
   ],
-  "_nota": "Se quitó la mutación «sin rev-parse de la base»: es una defensa REDUNDANTE (el diff contra la base ya falla con rc≠0 si no existe, y _git sube ese fallo). Se conserva el rev-parse por el mensaje claro."
+  "_nota": "Se quitó la mutación «sin rev-parse de la base»: es una defensa REDUNDANTE (el diff contra la base ya falla con rc≠0 si no existe, y _git sube ese fallo). Se conserva el rev-parse por el mensaje claro.",
+  "_nota_H": "Sin mutación sobre _PUERTA_TOOLS_POR_ROL: tests_afectados.py está en el cierre del muro y sus cadenas «tools/x.py» arrastran a esas tools al cierre (el escáner de strings es conservador): la lista por rol es redundante con el cierre por construcción. Se conserva por claridad y como respaldo si el escáner cambia."
 }

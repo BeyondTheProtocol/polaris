@@ -152,7 +152,12 @@ muro_e = dict(VALIDA, bateria="test_fuga_toy.py")
 r = juguete([muro_e], bateria="test_fuga_toy.py")
 check(r.returncode == 1 and "VETADA" in r.stdout, "test_fuga* sin el OK de {{TITULAR}} → VETADA, rc 1")
 r = juguete([dict(muro_e, ok_titular={"fecha": iso(HOY), "cita": "vale, entra en la lista ({{TITULAR}})"})], bateria="test_fuga_toy.py")
-check(r.returncode == 0 and "CONOCIDO: test_fuga_toy.py" in r.stdout, "con su OK (fecha y cita) → conocido")
+check(r.returncode != 0 and "CONOCIDO: test_fuga_toy.py" not in r.stdout and "SIN ROJOS NUEVOS" not in r.stdout,
+      "con su OK (fecha y cita) el rojo del muro NO resta: rc≠0 (rc=%d)" % r.returncode)
+check("NUEVO: test_fuga_toy.py" in r.stdout and "SIGUE contando como rojo" in r.stdout and "lleva el OK de {{TITULAR}}" in r.stdout,
+      "queda ETIQUETADO (dice que tiene el OK) pero cuenta como nuevo")
+r = juguete([dict(muro_e, ok_titular={"fecha": iso(HOY), "cita": "vale, entra en la lista ({{TITULAR}})"})], bateria="test_fuga_toy.py", jobs=4)
+check(r.returncode != 0, "lo mismo en paralelo")
 
 print("5) el fichero REAL")
 ent, err = RC.carga_entradas(os.path.join(RAIZ, "tests", "rojos_conocidos.json"))

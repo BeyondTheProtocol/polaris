@@ -75,7 +75,8 @@ def corre(root, *args, hoy="2026-10-12", ahora=None, extra=None, tope=None):
     alerta = os.path.join(root, "alertas.jsonl")
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_JOBS", "BTP_ROJO_DIR", "BTP_REPO", "BTP_STATE_DIR")}
     env.update(BTP_REPO=root, BTP_STATE_DIR=os.path.join(root, "estado"), BTP_SUITE_NOCTURNA_HOY=hoy,
-               BTP_SUITE_NOCTURNA_AVISO_A=alerta, BTP_SUITE_NOCTURNA_PERMITE_WORKTREE="")
+               BTP_SUITE_NOCTURNA_AVISO_A=alerta, BTP_SUITE_NOCTURNA_PERMITE_WORKTREE="",
+               BTP_TRANSCRIPTS_DIR=os.path.join(root, "transcripts"))
     if ahora:
         env["BTP_SUITE_NOCTURNA_AHORA"] = ahora
     if tope:
@@ -160,21 +161,63 @@ r, al = corre(root, tope=2)
 check(r.returncode == 1 and latido(root)["estado"] == "fallo" and len(al) == 1 and "NO pudo completarse" in al[0]["texto"],
       "runner colgado → estado «fallo» y AVISO (una nocturna muda es peor que ninguna)")
 
-print("7) --sembrar")
+print("7) --sembrar, --solo-aviso y la confirmación (solo vale un prompt HUMANO)")
+ahora_utc = datetime.datetime.utcnow()
+iso_ = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def escribe_transcript(root, entradas, nombre="sesion.jsonl"):
+    d = os.path.join(root, "transcripts", "proyecto")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, nombre), "a") as f:
+        for e in entradas:
+            f.write(json.dumps(e) + "\n")
+
+
+def humano(texto, dt, **kw):
+    e = {"type": "user", "origin": {"kind": "human"}, "isSidechain": False, "message": {"content": texto}, "timestamp": iso_(dt)}
+    e.update(kw)
+    return e
+
+
+root = juguete()
+r, al = corre(root, "--sembrar", "--solo-aviso")
+sem_p = os.path.join(root, "estado", "suite_nocturna", "sembrado.json")
+sem = json.load(open(sem_p))
+check(r.returncode == 0 and not os.path.exists(os.path.join(root, "cfg", "corrio.marca")), "--solo-aviso NO corre la suite")
+check(len(al) == 1 and al[0]["sembrado"] and "SEMBRADO A PROPÓSITO" in al[0]["texto"] and sem["nonce"] in al[0]["texto"],
+      "el aviso sembrado sale y lleva el código (%s)" % sem.get("nonce"))
+check(sem["avisado"] is True and sem["confirmado"] is None and not deuda(root) and not hist(root), "queda esperando; ni deuda ni noche en el historial")
+cod = sem["nonce"]
+r1, _ = corre(root, "confirmar-sembrado", "000000")
+check(r1.returncode == 2, "un código que no es el del aviso no vale")
+r2, _ = corre(root, "confirmar-sembrado", cod)
+check(r2.returncode == 2 and "HUMANO" in r2.stdout and json.load(open(sem_p))["confirmado"] is None,
+      "con el código bueno pero SIN prompt humano que lo contenga, un agente NO puede confirmar")
+despues = ahora_utc + datetime.timedelta(minutes=5)
+escribe_transcript(root, [
+    humano("el código es %s" % cod, despues, origin={"kind": "peer"}),                       # otro agente
+    humano("el código es %s" % cod, despues, isSidechain=True),                              # subagente
+    {"type": "assistant", "message": {"content": "el código es %s" % cod}, "timestamp": iso_(despues)},   # el propio modelo
+    {"type": "user", "message": {"content": [{"type": "tool_result", "content": "código %s" % cod}]}, "timestamp": iso_(despues)},
+    humano("antes del aviso: %s" % cod, ahora_utc - datetime.timedelta(hours=3)),            # anterior al sembrado
+])
+r3, _ = corre(root, "confirmar-sembrado", cod)
+check(r3.returncode == 2, "ni un peer, ni un subagente, ni el modelo, ni un tool_result, ni un prompt anterior al aviso lo confirman")
+escribe_transcript(root, [humano("sí, me ha llegado, el código es %s" % cod, despues)])
+r4, _ = corre(root, "confirmar-sembrado", cod)
+conf = json.load(open(sem_p))["confirmado"]
+check(r4.returncode == 0 and conf and conf["transcript"] == "sesion.jsonl", "con un prompt HUMANO posterior que contiene el código, confirma")
+r5, _ = corre(root, "confirmar-sembrado", "")
+check(r5.returncode == 2, "una confirmación vacía no vale")
 root = juguete()
 r, al = corre(root, "--sembrar")
-sem = json.load(open(os.path.join(root, "estado", "suite_nocturna", "sembrado.json")))
-check(len(al) == 1 and al[0]["sembrado"] and "SEMBRADO A PROPÓSITO" in al[0]["texto"], "el aviso sembrado sale")
-check(sem["avisado"] is True and sem["confirmado"] is None and not deuda(root), "queda esperando confirmación, sin deuda")
-r2, _ = corre(root, "confirmar-sembrado", "sí, me llegó el aviso de prueba")
-check(r2.returncode == 0 and json.load(open(os.path.join(root, "estado", "suite_nocturna", "sembrado.json")))["confirmado"], "confirmar-sembrado lo registra")
-r3, _ = corre(root, "confirmar-sembrado", "ok")
-check(r3.returncode == 2, "una confirmación vacía no vale")
+check(os.path.exists(os.path.join(root, "cfg", "corrio.marca")) and len(al) == 1 and al[0]["sembrado"], "--sembrar a secas sí corre la pasada y siembra")
 
 print("8) condiciones")
 
 
-def prepara_condiciones(noches, ultimo_latido_h=2, sembrado=None, puerta=True, lista=True, sin_veto=False):
+def prepara_condiciones(noches, ultimo_latido_h=2, sembrado=None, puerta=True, lista=True, sin_veto=False, humano_ok=True):
     root = juguete()
     if sin_veto:   # una lista de rojos conocidos que NO veta el núcleo del muro
         open(os.path.join(root, 'tests', '_rojos_conocidos.py'), 'w').write(
@@ -189,17 +232,20 @@ def prepara_condiciones(noches, ultimo_latido_h=2, sembrado=None, puerta=True, l
     os.makedirs(os.path.join(est, "heartbeat"), exist_ok=True)
     with open(os.path.join(est, "suite_nocturna", "historial.jsonl"), "w") as f:
         for d in noches:
-            f.write(json.dumps({"fecha": d, "corrio": True, "estado": "ok"}) + "\n")
+            f.write(json.dumps(d if isinstance(d, dict) else {"fecha": d, "corrio": True, "estado": "ok"}) + "\n")
     ahora = datetime.datetime(2026, 10, 14, 12, 0, 0)
     ts = (ahora - datetime.timedelta(hours=ultimo_latido_h)).strftime("%Y-%m-%dT%H:%M:%SZ")
     json.dump({"agente": "suite-nocturna", "ts": ts, "estado": "ok"}, open(os.path.join(est, "heartbeat", "suite-nocturna.json"), "w"))
     if sembrado is not None:
         json.dump(sembrado, open(os.path.join(est, "suite_nocturna", "sembrado.json"), "w"))
+        if humano_ok and sembrado.get("nonce"):
+            escribe_transcript(root, [humano("recibido, el código es %s" % sembrado["nonce"], datetime.datetime.utcnow() - datetime.timedelta(hours=1))])
     return root, ahora.isoformat()
 
 
 BUENAS = ["2026-10-12", "2026-10-13", "2026-10-14"]
-SEMB_OK = {"fecha": "2026-10-12", "avisado": True, "confirmado": {"cita": "me llegó"}}
+SEMB_TS = (datetime.datetime.utcnow() - datetime.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+SEMB_OK = {"fecha": "2026-10-12", "ts": SEMB_TS, "nonce": "abc123", "avisado": True, "confirmado": {"codigo": "abc123"}}
 
 
 def veredicto(root, ahora):
@@ -216,15 +262,31 @@ for desc, kw, esperado in (
         ("las 3 noches son de hace una semana", dict(noches=["2026-10-05", "2026-10-06", "2026-10-07"], sembrado=SEMB_OK), "C1"),
         ("último latido de hace 40 h", dict(noches=BUENAS, ultimo_latido_h=40, sembrado=SEMB_OK), "C1"),
         ("sin rojo sembrado", dict(noches=BUENAS, sembrado=None), "C2"),
-        ("sembrado sin confirmar", dict(noches=BUENAS, sembrado={"fecha": "2026-10-12", "avisado": True, "confirmado": None}), "C2"),
-        ("sembrado que NO se envió", dict(noches=BUENAS, sembrado={"fecha": "2026-10-12", "avisado": False, "confirmado": {"cita": "x"}}), "C2"),
+        ("sembrado sin confirmar", dict(noches=BUENAS, sembrado=dict(SEMB_OK, confirmado=None)), "C2"),
+        ("sembrado que NO se envió", dict(noches=BUENAS, sembrado=dict(SEMB_OK, avisado=False)), "C2"),
+        ("«confirmado» escrito A MANO en sembrado.json, sin prompt humano que lo respalde", dict(noches=BUENAS, sembrado=SEMB_OK, humano_ok=False), "C2"),
         ("sin test de la puerta", dict(noches=BUENAS, sembrado=SEMB_OK, puerta=False), "A"),
         ("sin lista de rojos conocidos", dict(noches=BUENAS, sembrado=SEMB_OK, lista=False), "B"),
-        ("lista de rojos conocidos que NO veta el muro", dict(noches=BUENAS, sembrado=SEMB_OK, sin_veto=True), "B")):
+        ("lista de rojos conocidos que NO veta el muro", dict(noches=BUENAS, sembrado=SEMB_OK, sin_veto=True), "B"),
+        ("una de las 3 noches con un rojo NUEVO del muro (test_gate_*)",
+         dict(noches=[BUENAS[0], {"fecha": BUENAS[1], "corrio": True, "estado": "ok", "nuevos": ["test_gate_toy.py"]}, BUENAS[2]],
+              sembrado=SEMB_OK), "C1"),
+        ("una noche con un rojo INTERMITENTE del muro",
+         dict(noches=[{"fecha": BUENAS[0], "corrio": True, "estado": "ok", "flaky": ["test_fuga.sh"]}, BUENAS[1], BUENAS[2]],
+              sembrado=SEMB_OK), "C1"),
+        ("una noche con un rojo CONOCIDO del muro (permanente, con OK)",
+         dict(noches=[BUENAS[0], BUENAS[1], {"fecha": BUENAS[2], "corrio": True, "estado": "ok", "conocidos": ["test_muro_hook.py"]}],
+              sembrado=SEMB_OK), "C1"),
+        ("una noche en estado rojo_muro (p. ej. una campaña de mutantes de la puerta)",
+         dict(noches=[BUENAS[0], {"fecha": BUENAS[1], "corrio": True, "estado": "rojo_muro", "nuevos": ["mutantes-test_all_puerta"]}, BUENAS[2]],
+              sembrado=SEMB_OK), "C1")):
     root, ahora = prepara_condiciones(**kw)
     rc, out = veredicto(root, ahora)
     linea = [l for l in out.splitlines() if l.startswith("❌")]
     check(rc == 1 and any(l.startswith("❌ " + esperado) for l in linea), "%s → NO se cumple (%s)" % (desc, esperado))
+root, ahora = prepara_condiciones([BUENAS[0], {"fecha": BUENAS[1], "corrio": True, "estado": "rojo_nuevo", "nuevos": ["test_roja.py"]}, BUENAS[2]], sembrado=SEMB_OK)
+rc_nm, out_nm = veredicto(root, ahora)
+check(rc_nm == 0, "un rojo que NO es del muro no descarta la noche (rc=%d)" % rc_nm)
 noches_con_fallo = [{"fecha": d, "corrio": True, "estado": "fallo"} for d in BUENAS]
 root, ahora = prepara_condiciones(BUENAS, sembrado=SEMB_OK)
 with open(os.path.join(root, "estado", "suite_nocturna", "historial.jsonl"), "w") as f:

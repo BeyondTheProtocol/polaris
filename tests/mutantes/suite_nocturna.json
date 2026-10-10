@@ -86,6 +86,51 @@
       "etiqueta": "la condición B no exige el veto",
       "viejo": "veta and registrado and fich",
       "nuevo": "registrado and fich"
+    },
+    {
+      "etiqueta": "G: las noches con el muro en rojo cuentan para la racha",
+      "viejo": "    h = [x for x in todas if not _muro_en_la_noche(x)]",
+      "nuevo": "    h = list(todas)"
+    },
+    {
+      "etiqueta": "G: el estado rojo_muro no descarta la noche",
+      "viejo": "    if x.get(\"estado\") == \"rojo_muro\":\n        return True\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "G: los rojos intermitentes del muro no descartan la noche",
+      "viejo": "set(x.get(\"nuevos\", [])) | set(x.get(\"flaky\", [])) | set(x.get(\"conocidos\", [])))\n\n\n",
+      "nuevo": "set(x.get(\"nuevos\", [])) | set(x.get(\"conocidos\", [])))\n\n\n"
+    },
+    {
+      "etiqueta": "I: un agente puede confirmar sin prompt humano",
+      "viejo": "        if not prueba:\n            print(\"NO hay un prompt HUMANO",
+      "nuevo": "        if False:\n            print(\"NO hay un prompt HUMANO"
+    },
+    {
+      "etiqueta": "I: cualquier mensaje con el código vale como humano",
+      "viejo": "                    if PE._es_humano(e):",
+      "nuevo": "                    if True:"
+    },
+    {
+      "etiqueta": "I: un prompt anterior al aviso vale",
+      "viejo": "                        if datetime.datetime.strptime(ts, \"%Y-%m-%dT%H:%M:%S\") < desde:\n                            continue\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "I: el código no hace falta que coincida",
+      "viejo": "        if not sem.get(\"nonce\") or codigo != sem[\"nonce\"]:",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "I: condiciones no re-verifica la prueba humana (vale lo escrito en el JSON)",
+      "viejo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\") and prueba)",
+      "nuevo": "bool(s and s.get(\"avisado\") and s.get(\"confirmado\"))"
+    },
+    {
+      "etiqueta": "I: --solo-aviso corre la pasada completa",
+      "viejo": "    if \"--sembrar\" in argv and \"--solo-aviso\" in argv:",
+      "nuevo": "    if False:"
     }
   ]
 }

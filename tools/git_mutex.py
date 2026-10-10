@@ -263,6 +263,29 @@ def _a_medias(gd):
     return {cmd for f, cmd in A_MEDIAS if gd and os.path.exists(os.path.join(gd, f))}
 
 
+def _tras_fusionar(repo, resto):
+    """Tras un `git merge` que HA movido casa base: verifica y hace ruido igual que `cerrar_sesion --apply` (10-oct-26).
+    Antes, una fusión directa con git_mutex no corría nada y el aviso de casa base roja nunca saltaba. Misma función
+    (`cerrar_sesion.verificar_tras_fusion`), sin duplicar. Fail-soft: jamás cambia el código de salida del merge.
+    BTP_CIERRE_SIN_VERIFICAR=1 lo salta (mismo interruptor que el cierre)."""
+    if os.environ.get("BTP_CIERRE_SIN_VERIFICAR") or any(
+            a in ("--no-commit", "--squash", "--abort", "--quit", "--continue") for a in resto):
+        return
+    try:
+        def sha(ref):
+            return subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "--quiet", ref], capture_output=True,
+                                  text=True, timeout=10).stdout.strip()
+        # fusión con commit: el padre 1 es casa base de antes; si fue fast-forward, ORIG_HEAD
+        pre = sha("HEAD^1") if sha("HEAD^2") else sha("ORIG_HEAD")
+        ramas = _ramas_del_merge(resto[1:])
+        import cerrar_sesion
+        _rojas, _clasif, acciones = cerrar_sesion.verificar_tras_fusion(pre, ramas[0] if ramas else "?")
+        for ln in acciones:
+            sys.stderr.write("git_mutex: %s\n" % ln)
+    except Exception as e:           # noqa: BLE001
+        sys.stderr.write("git_mutex: no pude verificar casa base tras fusionar (%s: %s)\n" % (type(e).__name__, e))
+
+
 def main(argv):
     if not argv:
         sys.stderr.write("uso: git_mutex.py <args de git...>\n")
@@ -317,6 +340,8 @@ def main(argv):
         sys.stdout.write(out)
     if err:
         sys.stderr.write(err)
+    if rc == 0 and resto and resto[0] == "merge" and _es_casa_base(repo):
+        _tras_fusionar(repo, resto)
     if vigilar and rc != 0:
         for cmd in sorted(_a_medias(gd) - antes):
             try:

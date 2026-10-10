@@ -137,6 +137,8 @@ _PUERTA_TOOLS_POR_ROL = (
     "tools/local.py", "tools/nube_n1.py", "tools/vision_n1.py", "tools/exporta_n1.py",
     "tools/puerta_n1.py", "tools/identidad_paciente.py", "tools/laminillas_jaulas.py",
     "tools/lector_clinico.py",
+    # instalan o regeneran EL MURO (hooks de usuario, el «Muro común» de cada agente): editarlas cambia las defensas
+    "tools/instala_muro_usuario.py", "tools/rebuild_agents.py",
 )
 
 
@@ -169,6 +171,76 @@ def _refs_de_tool(ruta, existentes):
             if re.fullmatch(r"[A-Za-z0-9_]+", nodo.value):   # importlib.import_module("x")
                 nombres.add(nodo.value)
     return nombres & existentes
+
+
+# ── TOOLS CON RED (10-oct-26, consejero-arquitectura) ─────────────────────────────────────────────
+# El cierre del muro mide «lo alcanza un hook», no «puede SACAR DATOS». `subir_historial_drive.py`,
+# `correo_responder.py`, `calendar_write.py` y `adjuntos_clinicos.py` pasaban por la vía rápida y hablan con
+# Drive, SMTP, Google Calendar o IMAP. Regla: una tool que usa la red —directamente o porque importa otra que
+# la usa— exige la suite COMPLETA. Lista (y por qué):
+#   · módulos de red de la stdlib y de terceros: requests/httpx/aiohttp (HTTP), urllib.request y http.client
+#     (HTTP stdlib), http.server/socketserver (escucha), socket y ssl (sockets), smtplib/imaplib/poplib/ftplib/
+#     telnetlib (correo y ficheros), paramiko (ssh), googleapiclient y google.* (Drive, Calendar, OAuth), boto3,
+#     websocket(s), playwright/selenium (navegador), tweepy/slack_sdk (redes), anthropic/openai (modelos);
+#   · programas de red lanzados con subprocess: curl, wget, ssh, scp, sftp, rsync, nc, ncat, xurl, gh.
+# NO cuentan `urllib.parse` (solo texto), `git` ni `ollama` (local). Una cadena «gh» suelta sí cuenta: ante la duda, completa.
+_MODULOS_RED_RAIZ = frozenset({
+    "requests", "httpx", "aiohttp", "smtplib", "imaplib", "poplib", "ftplib", "telnetlib", "socket", "socketserver",
+    "ssl", "paramiko", "boto3", "googleapiclient", "websocket", "websockets", "playwright", "selenium", "tweepy",
+    "slack_sdk", "anthropic", "openai", "google"})
+_MODULOS_RED_EXACTOS = frozenset({"urllib.request", "http.client", "http.server", "xmlrpc.client"})
+_CLI_RED = frozenset({"curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "xurl", "gh"})
+
+
+def _usa_red_directa(ruta):
+    """¿Esta tool habla con la red por sí misma? (imports en cualquier nivel + programas de red en cadenas)."""
+    import ast
+    try:
+        arbol = ast.parse(open(ruta, encoding="utf-8", errors="replace").read())
+    except Exception:  # noqa: BLE001
+        return True                      # no se puede leer/parsear: ante la duda, con red
+    for nodo in ast.walk(arbol):
+        if isinstance(nodo, ast.Import):
+            for a in nodo.names:
+                if a.name in _MODULOS_RED_EXACTOS or a.name.split(".")[0] in _MODULOS_RED_RAIZ:
+                    return True
+        elif isinstance(nodo, ast.ImportFrom) and nodo.module:
+            m = nodo.module
+            if m in _MODULOS_RED_EXACTOS or m.split(".")[0] in _MODULOS_RED_RAIZ:
+                return True
+            if m == "urllib" and any(a.name == "request" for a in nodo.names):
+                return True
+            if m == "http" and any(a.name in ("client", "server") for a in nodo.names):
+                return True
+            if m == "xmlrpc" and any(a.name == "client" for a in nodo.names):
+                return True
+        elif isinstance(nodo, ast.Constant) and isinstance(nodo.value, str):
+            partes = nodo.value.strip().split()
+            if partes and partes[0] in _CLI_RED:
+                return True
+    return False
+
+
+def tools_con_red(raiz=RAIZ):
+    """tools/*.py que usan la red, directamente o porque importan (a cualquier profundidad) otra que la usa."""
+    k = ("red", os.path.realpath(raiz))
+    if k in _CACHE_MURO:
+        return set(_CACHE_MURO[k])
+    carpeta = os.path.join(raiz, "tools")
+    nombres = sorted(f[:-3] for f in os.listdir(carpeta) if f.endswith(".py"))
+    existentes = set(nombres)
+    con_red = {n for n in nombres if _usa_red_directa(os.path.join(carpeta, n + ".py"))}
+    refs = {n: _refs_de_tool(os.path.join(carpeta, n + ".py"), existentes) - {n} for n in nombres}
+    cambio = True
+    while cambio:
+        cambio = False
+        for n, r in refs.items():
+            if n not in con_red and r & con_red:
+                con_red.add(n)
+                cambio = True
+    res = {"tools/%s.py" % n for n in con_red}
+    _CACHE_MURO[k] = frozenset(res)
+    return res
 
 
 _CACHE_MURO = {}
@@ -211,7 +283,7 @@ def _calcula_tools_de_hooks(raiz=RAIZ, transitivo=True):
     return {"tools/%s.py" % n for n in cierre}
 
 
-def motivo_completa(f, muro_tools, rastreados, disponibles, raiz=RAIZ):
+def motivo_completa(f, muro_tools, rastreados, disponibles, raiz=RAIZ, con_red=None):
     """None si `f` es SEGURO; si no, el motivo por el que la puerta exige la suite COMPLETA."""
     base = os.path.basename(f)
     if f.startswith(".claude/"):
@@ -228,6 +300,10 @@ def motivo_completa(f, muro_tools, rastreados, disponibles, raiz=RAIZ):
         return "tool del muro (la usa un hook, directa o transitivamente)"
     if f in _PUERTA_TOOLS_POR_ROL:
         return "tool del muro por rol (egress, N1, jaulas, identidad)"
+    if con_red is None:
+        con_red = tools_con_red(raiz)
+    if f in con_red:
+        return "tool con acceso a la red (directo o por lo que importa): puede sacar datos"
     if not os.path.exists(os.path.join(raiz, f)):
         return "fichero borrado o renombrado"
     if f.endswith(".md"):
@@ -245,7 +321,7 @@ def motivo_completa(f, muro_tools, rastreados, disponibles, raiz=RAIZ):
     return "no clasificado como seguro"
 
 
-def exige_completa(ficheros, muro_tools=None, rastreados=None, disponibles=None, raiz=RAIZ):
+def exige_completa(ficheros, muro_tools=None, rastreados=None, disponibles=None, raiz=RAIZ, con_red=None):
     """[(fichero, motivo)] de los cambios que obligan a la suite COMPLETA antes de fusionar."""
     if muro_tools is None:
         muro_tools = tools_de_hooks(raiz)
@@ -257,7 +333,7 @@ def exige_completa(ficheros, muro_tools=None, rastreados=None, disponibles=None,
         disponibles = baterias()
     out = []
     for f in ficheros:
-        m = motivo_completa(f, muro_tools, rastreados, disponibles, raiz)
+        m = motivo_completa(f, muro_tools, rastreados, disponibles, raiz, con_red)
         if m:
             out.append((f, m))
     return out
@@ -268,9 +344,9 @@ def nucleo_muro(disponibles):
     return {b for b in disponibles if b.startswith(_MURO_PREFIJOS)}
 
 
-def puerta(ficheros, disponibles, grafo=None, muro_tools=None, rastreados=None, raiz=RAIZ):
+def puerta(ficheros, disponibles, grafo=None, muro_tools=None, rastreados=None, raiz=RAIZ, con_red=None):
     """{'veredicto': 'COMPLETA'|'RAPIDA', 'motivos': [...], 'seleccion': set}"""
-    motivos = exige_completa(ficheros, muro_tools, rastreados, disponibles, raiz)
+    motivos = exige_completa(ficheros, muro_tools, rastreados, disponibles, raiz, con_red)
     if motivos:
         return {"veredicto": "COMPLETA", "motivos": motivos, "seleccion": set(disponibles)}
     _todo, sel = afectados(ficheros, disponibles, grafo)
