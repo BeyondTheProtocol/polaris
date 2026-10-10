@@ -1,0 +1,26 @@
+{
+  "_por_que": "Cada entrada es una defensa de `test_all.sh --puerta/--cambiados` contra su propio selector roto (10-oct-26). Si al quitarla test_all_puerta sigue verde, la puerta puede volver a abrirse en silencio cuando el selector falla.",
+  "objetivo": "tests/test_all.sh",
+  "test": ["python3", "tests/test_all_puerta.py"],
+  "env": "BTP_SUITE",
+  "mutaciones": [
+    {"etiqueta": "puerta: no se mira el código de salida del selector",
+     "viejo": "if [ $_rcsel -eq 0 ] && [ \"$_p1\" = \"RAPIDA\" ] && [ \"$_nsel\" -gt 0 ]; then",
+     "nuevo": "if [ \"$_p1\" = \"RAPIDA\" ] && [ \"$_nsel\" -gt 0 ]; then"},
+    {"etiqueta": "puerta: una RAPIDA sin baterías vale",
+     "viejo": "if [ $_rcsel -eq 0 ] && [ \"$_p1\" = \"RAPIDA\" ] && [ \"$_nsel\" -gt 0 ]; then",
+     "nuevo": "if [ $_rcsel -eq 0 ] && [ \"$_p1\" = \"RAPIDA\" ]; then"},
+    {"etiqueta": "puerta: lo no entendido cae en rápida con selección vacía",
+     "viejo": "    echo \"🚪 PUERTA: COMPLETA. Motivo:\"\n    echo \"   el selector no contestó limpio",
+     "nuevo": "    CAMBIADOS=1; PUERTA=1; SELECCION=\" \"\n    echo \"🚪 PUERTA: COMPLETA. Motivo:\"\n    echo \"   el selector no contestó limpio"},
+    {"etiqueta": "puerta: el meta-check de huérfanos no corre en la rápida",
+     "viejo": "if [ -z \"$CAMBIADOS\" ] || [ -n \"$PUERTA\" ]; then",
+     "nuevo": "if [ -z \"$CAMBIADOS\" ]; then"},
+    {"etiqueta": "--cambiados: no se mira el código de salida del selector",
+     "viejo": "elif [ $_rcsel -eq 0 ] && [ -n \"$_p1\" ] && [ \"$_p1\" != \"TODO\" ]; then",
+     "nuevo": "elif [ -n \"$_p1\" ] && [ \"$_p1\" != \"TODO\" ]; then"},
+    {"etiqueta": "--cambiados: una salida vacía vale como «ninguna batería»",
+     "viejo": "if [ $_rcsel -eq 0 ] && [ \"$_p1\" = \"NINGUNA\" ]; then",
+     "nuevo": "if [ -z \"$_p1\" ] || [ \"$_p1\" = \"NINGUNA\" ]; then"}
+  ]
+}

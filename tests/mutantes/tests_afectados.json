@@ -1,0 +1,72 @@
+{
+  "_por_que": "Cada entrada es una defensa de la puerta de fusión que FALLA CERRADA (10-oct-26, revisión de consejero-arquitectura). Si al quitarla test_tests_afectados sigue verde, la puerta puede volver a abrirse en silencio.",
+  "objetivo": "tools/tests_afectados.py",
+  "test": [
+    "python3",
+    "tests/test_tests_afectados.py"
+  ],
+  "env": "BTP_TESTS_AFECTADOS",
+  "mutaciones": [
+    {
+      "etiqueta": "git ignora su código de salida (base inexistente = «sin cambios»)",
+      "viejo": "    if p.returncode != 0:\n        raise RuntimeError(\"git %s falló (rc=%d): %s\" % (\" \".join(args[:2]), p.returncode,\n                                                         (p.stderr or \"\").strip()[:200]))\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "lo no clasificado pasa por rápida (lista negra)",
+      "viejo": "    return \"no clasificado como seguro\"",
+      "nuevo": "    return None"
+    },
+    {
+      "etiqueta": "una tool nueva sin clasificar pasa por rápida",
+      "viejo": "        if f not in rastreados:\n            return \"tool nueva sin clasificar\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "un test sin registrar pasa por rápida",
+      "viejo": "        if base not in disponibles:\n            return \"test sin registrar en test_all.sh (nadie lo corre)\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "editar una batería del muro pasa por rápida",
+      "viejo": "        if base.startswith(_MURO_PREFIJOS):\n            return \"batería del muro editada: debilitarla no se vería\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "un fichero borrado pasa por rápida",
+      "viejo": "    if not os.path.exists(os.path.join(raiz, f)):\n        return \"fichero borrado o renombrado\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "las tools del muro por rol (local.py…) no cuentan",
+      "viejo": "    if f in _PUERTA_TOOLS_POR_ROL:\n        return \"tool del muro por rol (egress, N1, jaulas, identidad)\"\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "el cierre de tools del muro se queda en un nivel",
+      "viejo": "    if transitivo:\n        pendientes = list(cierre)",
+      "nuevo": "    if False:\n        pendientes = list(cierre)"
+    },
+    {
+      "etiqueta": "el cierre ignora los import perezosos (dentro de funciones)",
+      "viejo": "        if isinstance(nodo, ast.Import):",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "los hooks ya no mandan (cualquier .claude/ es seguro)",
+      "viejo": "    if f.startswith(\".claude/\"):\n        if f.startswith(\".claude/hooks/\"):",
+      "nuevo": "    if False:\n        if f.startswith(\".claude/hooks/\"):"
+    },
+    {
+      "etiqueta": "un fallo del selector devuelve rápida/«nada» en vez de completa",
+      "viejo": "        print(\"COMPLETA\" if modo_puerta else \"TODO\")",
+      "nuevo": "        print(\"RAPIDA\" if modo_puerta else \"NINGUNA\")"
+    },
+    {
+      "etiqueta": "la puerta rápida pierde el núcleo del muro",
+      "viejo": "\"seleccion\": sel | nucleo_muro(disponibles)}",
+      "nuevo": "\"seleccion\": sel}"
+    }
+  ],
+  "_nota": "Se quitó la mutación «sin rev-parse de la base»: es una defensa REDUNDANTE (el diff contra la base ya falla con rc≠0 si no existe, y _git sube ese fallo). Se conserva el rev-parse por el mensaje claro."
+}

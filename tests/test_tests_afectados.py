@@ -21,7 +21,16 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-import tests_afectados as T  # noqa: E402
+# BTP_TESTS_AFECTADOS: la campaña de mutantes (tests/mutantes/tests_afectados.json) apunta aquí a una
+# copia MUTADA de tools/tests_afectados.py; sin la variable, la de verdad.
+if os.environ.get("BTP_TESTS_AFECTADOS"):
+    import importlib.util
+    _spec = importlib.util.spec_from_file_location("tests_afectados", os.environ["BTP_TESTS_AFECTADOS"])
+    T = importlib.util.module_from_spec(_spec)
+    sys.modules["tests_afectados"] = T
+    _spec.loader.exec_module(T)
+else:
+    import tests_afectados as T  # noqa: E402
 
 DISPONIBLES = {"test_muro_fase0.py", "test_salida_guard.py", "test_ok_envio_blindado.py",
                "test_fuga.sh", "test_healthcheck_cpu.py", "test_bucles_colgados.py",
@@ -152,6 +161,84 @@ class PuertaDeFusion(unittest.TestCase):
         out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "tests_afectados.py"), "--puerta"],
                              capture_output=True, text=True, timeout=120, stdin=subprocess.DEVNULL).stdout
         self.assertIn(out.splitlines()[0], ("COMPLETA", "RAPIDA"))
+
+
+class PuertaFallaCerrada(unittest.TestCase):
+    """10-oct-26 · revisión de consejero-arquitectura: la puerta es una LISTA BLANCA. Todo lo que no
+    esté explícitamente en seguros exige la completa; un fallo del propio selector también."""
+
+    REALES = T.baterias()
+    SEGUROS_BASE = {"README.md", "tools/viajes_precios.py"}
+
+    def _p(self, ficheros, disponibles=None, **kw):
+        kw.setdefault("rastreados", set(T._git("ls-tree", "-r", "--name-only", "HEAD").splitlines()))
+        return T.puerta(ficheros, disponibles or self.REALES, GrafoFalso({}), **kw)["veredicto"]
+
+    def test_base_inexistente_no_es_nada_que_correr(self):
+        with self.assertRaises(RuntimeError):
+            T.cambiados("rama-que-no-existe-jamas")
+
+    def test_cli_con_base_inexistente_dice_completa(self):
+        import subprocess
+        for flag, esperado in (("--puerta", "COMPLETA"), ("--cambiados", "TODO")):
+            out = subprocess.run([sys.executable, T.__file__, flag,   # el módulo BAJO PRUEBA (el mutado, en la campaña)
+                                  "--base", "rama-que-no-existe-jamas"], capture_output=True, text=True,
+                                 timeout=120, stdin=subprocess.DEVNULL)
+            self.assertEqual(out.returncode, 0)
+            self.assertEqual(out.stdout.splitlines()[0], esperado, flag)
+
+    def test_lo_no_clasificado_exige_la_completa(self):
+        for f in (".mcp.json", "tools/local.py", "tests/test_fuga.sh", "tests/test_muro_hook.py",
+                  "tools/launchd/com.btp.healthcheck.plist", ".github/workflows/contribuciones.yml",
+                  "tools/tool_que_no_existe_todavia.py", "tests/test_nuevo_sin_registrar.py",
+                  "tools/fichas/tests_afectados.py.json", "package.json", "tools/algo.sh"):
+            self.assertEqual(self._p([f]), "COMPLETA", f)
+
+    def test_fichero_borrado_exige_la_completa(self):
+        # aun si git lo diera por rastreado: si no está en disco se borró o renombró
+        self.assertEqual(self._p(["tools/ya_no_existe_jamas.py"], rastreados={"tools/ya_no_existe_jamas.py"},
+                                 muro_tools=set()), "COMPLETA")
+
+    def test_tool_nueva_sin_clasificar_exige_la_completa(self):
+        # existe en disco pero NO estaba en la base: nadie la ha clasificado
+        self.assertEqual(self._p(["tools/viajes_precios.py"], rastreados=set(), muro_tools=set()), "COMPLETA")
+
+    def test_test_sin_registrar_exige_la_completa(self):
+        # existe, no es del muro, pero test_all.sh no lo lista: nadie lo corre
+        sin = set(self.REALES) - {"test_web_lint.py"}
+        self.assertEqual(self._p(["tests/test_web_lint.py"], disponibles=sin, muro_tools=set()), "COMPLETA")
+        self.assertEqual(self._p(["tests/test_web_lint.py"], muro_tools=set()), "RAPIDA")
+
+    def test_tools_por_rol_son_muro_aunque_ningun_hook_las_use(self):
+        for t in ("tools/local.py", "tools/nube_n1.py", "tools/identidad_paciente.py"):
+            self.assertEqual(self._p([t], muro_tools=set()), "COMPLETA", t)
+
+    def test_los_seguros_siguen_siendo_rapidos(self):
+        # el reverso: la lista blanca no puede ser tan estrecha que nada pase
+        self.assertEqual(self._p(["README.md"], muro_tools=set()), "RAPIDA")
+        self.assertEqual(self._p(["tools/viajes_precios.py"], muro_tools=set()), "RAPIDA")
+        self.assertEqual(self._p(["tests/test_web_lint.py"], muro_tools=set()), "RAPIDA")
+
+    def test_una_tool_a_dos_saltos_de_un_hook_es_muro(self):
+        import tempfile
+        raiz = tempfile.mkdtemp(prefix="puerta_saltos_")
+        for d in (".claude/hooks", "tools"):
+            os.makedirs(os.path.join(raiz, d))
+        open(os.path.join(raiz, ".claude/hooks/h.py"), "w").write("import sys\nsys.path.insert(0, 'tools')\nimport uno\n")
+        open(os.path.join(raiz, "tools/uno.py"), "w").write("def f():\n    import dos   # perezoso\n")
+        open(os.path.join(raiz, "tools/dos.py"), "w").write("import tres\n")
+        open(os.path.join(raiz, "tools/tres.py"), "w").write("x = 1\n")
+        open(os.path.join(raiz, "tools/ajena.py"), "w").write("y = 2\n")
+        self.assertEqual(T.tools_de_hooks(raiz, transitivo=False), {"tools/uno.py"})
+        self.assertEqual(T.tools_de_hooks(raiz), {"tools/uno.py", "tools/dos.py", "tools/tres.py"})
+        self.assertNotIn("tools/ajena.py", T.tools_de_hooks(raiz))
+
+    def test_tools_reales_alcanzables_desde_un_hook_exigen_la_completa(self):
+        directas = T.tools_de_hooks(transitivo=False)
+        cierre = T.tools_de_hooks()
+        self.assertTrue(directas < cierre, "el cierre no añade nada: pasaría en vacío")
+        for t in ("tools/identidad_paciente.py", "tools/puerta_n1.py", "tools/laminillas_jaulas.py"):
+            self.assertEqual(self._p([t]), "COMPLETA", t)
 
 
 if __name__ == "__main__":

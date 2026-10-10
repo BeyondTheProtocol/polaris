@@ -155,25 +155,39 @@ while [ $# -gt 0 ]; do
 done
 case "$JOBS" in ''|*[!0-9]*) JOBS=1;; esac
 [ "$JOBS" -ge 1 ] || JOBS=1
+# FALLA CERRADA (10-oct-26, revisión de consejero-arquitectura): el selector tiene que contestar
+# limpio (rc 0 y una primera línea que entendemos). Si revienta, no existe o imprime vacío, NO se
+# concluye «no hay nada que correr»: va la suite completa. Test: test_all_puerta.py.
 if [ -n "$_pide_cambiados" ]; then
-  _sel=$("$PY" "$ROOT/tools/tests_afectados.py")
-  if [ "$(echo "$_sel" | head -1)" != "TODO" ]; then
+  _sel=$("$PY" "$ROOT/tools/tests_afectados.py" 2>/dev/null); _rcsel=$?
+  _p1=$(echo "$_sel" | head -1)
+  if [ $_rcsel -eq 0 ] && [ "$_p1" = "NINGUNA" ]; then
+    CAMBIADOS=1; SELECCION=" "
+    echo "⚡ MODO --cambiados: ninguna batería afectada (solo documentación). Antes de fusionar, la suite completa."
+  elif [ $_rcsel -eq 0 ] && [ -n "$_p1" ] && [ "$_p1" != "TODO" ]; then
     CAMBIADOS=1; SELECCION=" $(echo $_sel) "
     echo "⚡ MODO --cambiados: $(echo "$_sel" | grep -c .) batería(s) afectada(s). Antes de fusionar, la suite completa."
-  else
+  elif [ $_rcsel -eq 0 ] && [ "$_p1" = "TODO" ]; then
     echo "⚡ --cambiados: se tocó test_all.sh, así que va la suite completa."
+  else
+    echo "⚡ --cambiados: el selector no contestó limpio (rc=$_rcsel), así que va la suite completa."
   fi
 fi
 # --puerta (10-oct-26, propuesta): la puerta de fusión por impacto (tools/tests_afectados.py --puerta).
 # COMPLETA (se tocó un hook, el runner o una tool del muro) → corre la suite entera, como siempre.
 # RAPIDA → las afectadas + el núcleo fijo del muro; el resumen NO dice «TODO EN VERDE».
 if [ -n "$_pide_puerta" ]; then
-  _sel=$("$PY" "$ROOT/tools/tests_afectados.py" --puerta)
-  if [ "$(echo "$_sel" | head -1)" = "COMPLETA" ]; then
+  _sel=$("$PY" "$ROOT/tools/tests_afectados.py" --puerta 2>/dev/null); _rcsel=$?
+  _p1=$(echo "$_sel" | head -1)
+  _nsel=$(echo "$_sel" | grep -vcE '^(RAPIDA|COMPLETA|#)')
+  if [ $_rcsel -eq 0 ] && [ "$_p1" = "RAPIDA" ] && [ "$_nsel" -gt 0 ]; then
+    CAMBIADOS=1; PUERTA=1; SELECCION=" $(echo "$_sel" | grep -vE '^(RAPIDA|#)' | tr '\n' ' ') "
+    echo "🚪 PUERTA: RAPIDA · $_nsel batería(s) (afectadas + núcleo del muro)."
+  elif [ $_rcsel -eq 0 ] && [ "$_p1" = "COMPLETA" ]; then
     echo "🚪 PUERTA: COMPLETA. Motivo:"; echo "$_sel" | grep '^#' | sed 's/^# /   /'
   else
-    CAMBIADOS=1; PUERTA=1; SELECCION=" $(echo "$_sel" | grep -v '^RAPIDA$' | tr '\n' ' ') "
-    echo "🚪 PUERTA: RAPIDA · $(echo "$_sel" | grep -vc '^RAPIDA$') batería(s) (afectadas + núcleo del muro)."
+    echo "🚪 PUERTA: COMPLETA. Motivo:"
+    echo "   el selector no contestó limpio (rc=$_rcsel, primera línea «${_p1}», $_nsel baterías): ante la duda, la completa."
   fi
 fi
 _fuera() { [ -n "$CAMBIADOS" ] || return 1; case "$SELECCION" in *" $1 "*) return 1;; esac; fuera=$((fuera+1)); return 0; }
@@ -217,6 +231,7 @@ runpy test_gate_citas.py
 runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU carpeta (deuda test-all-log-rojo-tmp-compartido)
 runpy test_all_stdin_cerrado.py   # 25-sep · la suite cierra stdin: ningún test hereda un pipe que no se cierra
 runpy test_all_paralelo.py   # 10-oct · BTP_JOBS: serie y paralelo dicen lo mismo, fail-closed, SOLO_SERIE, cronómetro (campaña de mutantes: tests/mutantes/test_all_paralelo.json, a mano o de noche: ~8 min)
+runpy test_all_puerta.py   # 10-oct · la puerta FALLA CERRADA: selector roto/vacío/desconocido → suite completa; el meta-check corre también en la rápida
 runpy test_gate_red_caida.py   # 25-sep · punto 07 {{CONTACTO}}+KAI: sin red, la cita sale «sin verificar», nunca verificada
 runpy test_gate_preclinico.py
 runpy test_verifica_citas_estados.py
@@ -498,6 +513,10 @@ echo "── mutantes: tests/mutantes/caso_publico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-caso-publico.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes caso_publico (log: $ROJO_DIR/rojo-mutantes-caso-publico.log)"; }
+echo "── mutantes: tests/mutantes/tests_afectados.json ──"
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/tests_afectados.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-tests-afectados.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes tests_afectados (log: $ROJO_DIR/rojo-mutantes-tests-afectados.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
@@ -656,7 +675,7 @@ runpy test_session_start_lazo.py      # 25-sep · el lazo no lanza el drenaje de
 _vacia_cola   # con BTP_JOBS>1 aquí corre todo lo encolado; en serie no hace nada
 
 # Meta-check: que este runner no se vuelva a quedar atrás solo.
-if [ -z "$CAMBIADOS" ]; then
+if [ -z "$CAMBIADOS" ] || [ -n "$PUERTA" ]; then   # también en la puerta rápida: un test nuevo sin registrar no se cuela
 echo "── meta: tests no invocados ──"
 _huerf=""
 for _f in "$ROOT"/tests/test_*.py "$ROOT"/tests/test_*.sh; do
