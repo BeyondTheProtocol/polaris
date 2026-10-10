@@ -2,6 +2,7 @@
 name: git
 description: Mecanica de git del repo: ramas, commits con scope, historial limpio y fusiones a casa base.
 model: haiku
+effort: low
 tools: Bash, Read, Grep, Glob
 estado: activo
 ritmo: permanente

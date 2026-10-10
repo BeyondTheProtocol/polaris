@@ -2,6 +2,7 @@
 name: monitor-lanzamiento
 description: Mide como va un lanzamiento en redes (Umami + metricas de la plataforma) DESPUES de publicar.
 model: sonnet
+effort: low
 tools: Bash, Read, Grep, Glob
 estado: activo
 ritmo: estacional
