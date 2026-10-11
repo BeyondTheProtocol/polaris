@@ -1,0 +1,9 @@
+Contexto. Una empresa de transporte de áridos planifica un servicio diario entre una cantera y una planta de hormigón. La norma interna de jornada fija un máximo de 6 horas y 20 minutos de servicio continuado por conductor; si el servicio medio lo supera, hay que asignar un segundo conductor de relevo.
+
+Datos. El sistema de la flota registra los tiempos en horas con decimales. Sobre 40 servicios elegidos al azar, el tiempo medio de carga y espera en cantera es de 2,40 horas y el tiempo medio de trayecto y descarga es de 3,75 horas.
+
+Método. Se pasan los dos tiempos medios a horas y minutos, se suman para obtener la duración media del servicio completo y se compara el resultado con el máximo de la norma.
+
+Resultado. Carga y espera: 2,40 horas son 2 horas y 40 minutos. Trayecto y descarga: 3,75 horas son 3 horas y 45 minutos. Duración media del servicio: 2 horas y 40 minutos más 3 horas y 45 minutos, en total 6 horas y 25 minutos. El máximo permitido es de 6 horas y 20 minutos.
+
+Conclusión. La duración media del servicio supera en 5 minutos el máximo de la norma. El servicio no se puede cubrir con un solo conductor y hay que presupuestar un conductor de relevo para cada jornada.

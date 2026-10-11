@@ -341,7 +341,11 @@ FAMILIAS = [
                        "modelo_mlx",    # el otro LLM de casa (MLX, egress 0) con sus frenos de memoria
                        # adaptadores de salida de las laminillas: Gemini sobre N1 y CellViT++ en
                        # GPU de Scaleway, enjaulados y tras trust-cloud (2-oct-26)
-                       "vision_n1", "nube_n1")),
+                       "vision_n1", "nube_n1",
+                       # la boca por la que un texto abstracto entero sale a una IA de otra casa a que
+                       # lo revise (fase 1 de la vía de Grok, 10-oct-26): sin herramientas, sellada,
+                       # solo con la auditoría confirmada por {{TITULAR}}
+                       "otra_casa")),
     ("documentos", ("md_to_pdf", "drive", "_pdf", "pdf_")),
     ("la casa (infra)", ("_lock", "_net", "_xurl", "_casa", "activar_daemon", "backup",
                          "borde", "preview_remoto", "staging", "mcp_server",

@@ -1,0 +1,9 @@
+Contexto. Una línea de envasado llena botellas de agua con un volumen nominal de 500 ml. La norma interna pide dos cosas: que el volumen medio de llenado no sea inferior a 500 ml y que las botellas individuales queden entre 495 y 505 ml.
+
+Datos. Se toman al azar 49 botellas de un turno y se mide su volumen. Media de la muestra: 500,8 ml. Desviación típica entre botellas: 2,0 ml. El histograma es simétrico, compatible con una distribución normal.
+
+Método. Para la media se usa el error estándar y un intervalo de confianza del 95 % con la t de 48 grados de libertad, de valor crítico 2,011. Para las botellas individuales se usa la desviación típica: en una normal, cerca del 95 % de los valores queda a menos de dos desviaciones típicas de la media.
+
+Resultado. Error estándar de la media: 2,0 / 7 = 0,29 ml. Intervalo de confianza del 95 % para la media: 500,8 más o menos 0,57, de 500,2 a 501,4 ml. Intervalo aproximado para el 95 % de las botellas: 500,8 más o menos 2 por 2,0, de 496,8 a 504,8 ml.
+
+Conclusión. El intervalo de la media queda entero por encima de 500 ml: los datos respaldan que el volumen medio cumple el requisito. El intervalo de las botellas individuales queda dentro de los límites, así que la gran mayoría cumple la tolerancia.

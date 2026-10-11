@@ -1,0 +1,11 @@
+Contexto. Una tienda en línea reparte sus pedidos con dos transportistas, que aquí se llaman transportista norte y transportista sur, y quiere quedarse con uno solo. El criterio es la proporción de entregas hechas dentro del plazo prometido. Los pedidos van a zona urbana o a zona rural, y el reparto de zonas entre los dos transportistas vino dado por contratos anteriores.
+
+Datos. Entregas en plazo sobre entregas totales.
+Transportista norte: zona urbana 270 de 300; zona rural 60 de 100.
+Transportista sur: zona urbana 95 de 100; zona rural 210 de 300.
+
+Método. Se calcula la proporción global de entregas en plazo de cada transportista y se contrasta la igualdad de las dos proporciones con una prueba z bilateral, con nivel de significación 0,05.
+
+Resultado. Transportista norte: 330 de 400 entregas en plazo, el 82,5 %. Transportista sur: 305 de 400, el 76,25 %. Diferencia: 6,25 puntos porcentuales. Estadístico z = 2,18, p = 0,029. Intervalo de confianza del 95 % para la diferencia: de 0,7 a 11,8 puntos.
+
+Conclusión. El transportista norte entrega en plazo con más frecuencia que el transportista sur y la diferencia es estadísticamente significativa. Se recomienda asignarle todos los pedidos, urbanos y rurales.

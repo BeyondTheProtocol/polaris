@@ -1,0 +1,9 @@
+Contexto. Una planta de pinturas quiere saber si el turno de trabajo influye en la calidad del producto. De cada lote se registran 20 parámetros de calidad: viscosidad, densidad, brillo, tiempo de secado, tamaño de partícula y otros quince. Se dispone de 30 lotes fabricados en el turno de mañana y 30 en el de tarde, elegidos al azar del registro de producción.
+
+Datos. Para cada uno de los 20 parámetros se tienen la media y la desviación típica de los 30 lotes de cada turno.
+
+Método. Cada parámetro se compara entre los dos turnos con una prueba t para dos muestras independientes, bilateral. Se declara significativa toda comparación con p menor que 0,05.
+
+Resultado. De las 20 comparaciones, 19 dan valores de p entre 0,09 y 0,94. La comparación de la viscosidad da p = 0,031: la media del turno de tarde es un 2,1 % mayor que la del turno de mañana. Es la única por debajo de 0,05.
+
+Conclusión. El turno de trabajo afecta a la viscosidad de la pintura (p = 0,031). Se recomienda revisar el procedimiento de mezcla del turno de tarde y recalibrar sus equipos de dosificación.

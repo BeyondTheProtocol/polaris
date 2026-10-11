@@ -1,0 +1,9 @@
+Contexto. Una nave agrícola recoge el agua de lluvia de su cubierta en un depósito de 4 metros cúbicos. Se quiere saber si el depósito, partiendo de vacío, retiene toda el agua de un episodio de lluvia medio de la zona.
+
+Datos. Superficie de la cubierta en planta: 250 metros cuadrados. Coeficiente de escorrentía de la cubierta: 0,9. En 30 episodios de lluvia independientes registrados en el pluviómetro de la finca, la lluvia media por episodio es de 24,0 mm, con desviación típica 6,0 mm.
+
+Método. Intervalo de confianza del 95 % para la lluvia media por episodio con la t de 29 grados de libertad, de valor crítico 2,045. Para pasar a volumen se usa que 1 mm de lluvia equivale a 1 litro por metro cuadrado y que 1 metro cúbico son 1000 litros.
+
+Resultado. Error estándar: 6,0 / raíz de 30 = 1,10 mm. Intervalo para la lluvia media: 24,0 más o menos 2,24, de 21,8 a 26,2 mm. Un episodio medio deja 24 litros por metro cuadrado por 250 metros cuadrados por 0,9 = 5400 litros = 5,4 metros cúbicos. Con los límites del intervalo, entre 4,9 y 5,9 metros cúbicos.
+
+Conclusión. Un episodio medio aporta 5,4 metros cúbicos, más que los 4 del depósito, y también el límite inferior del intervalo queda por encima. El depósito no retiene toda el agua de un episodio medio: rebosarían unos 1,4 metros cúbicos. Se recomienda ampliar el depósito o prever un rebosadero.

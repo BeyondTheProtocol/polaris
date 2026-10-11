@@ -1,0 +1,18 @@
+Revisa el análisis estadístico que aparece debajo de esta instrucción. Comprueba el planteamiento, el método, los cálculos y la conclusión, y recalcula lo que haga falta. El análisis puede ser correcto o contener un error. Cuenta como error solo lo que se puede demostrar recalculando o por definición, no una cuestión de estilo ni de preferencia. Una interpretación o una conclusión que contradice la definición de lo calculado también cuenta como error. Los valores intermedios se muestran redondeados y los cálculos usan todos los decimales: una discrepancia en la última cifra mostrada no es un error.
+
+Responde SOLO con un objeto JSON, sin texto antes ni después y sin bloque de código, con exactamente estas tres claves:
+- "hay_error": true o false.
+- "clase": uno de los ocho identificadores de la lista de abajo si hay error; null si no lo hay.
+- "explicacion": una frase de 40 palabras como máximo que diga dónde está el error; si no hay error, una cadena vacía.
+
+Clases de error (vocabulario cerrado; usa el identificador tal cual):
+- no-pareado: prueba para muestras independientes aplicada a datos pareados, o prueba pareada aplicada a muestras independientes.
+- multiplicidad: muchas comparaciones sin corrección y se da por bueno el resultado que sale significativo.
+- se-por-sd: error estándar confundido con desviación típica, o al revés, en un cálculo o en una conclusión.
+- tasa-base: falacia de la tasa base; se confunde P(A|B) con P(B|A) y se ignora la frecuencia de partida.
+- simpson: paradoja de Simpson; la conclusión sacada del agregado se invierte al mirar por estratos.
+- grados-libertad: grados de libertad mal contados.
+- ic-probabilidad: intervalo de confianza interpretado como la probabilidad de que el parámetro esté dentro.
+- redondeo-unidades: error de redondeo o de unidades que cambia el resultado.
+
+Análisis que hay que revisar:

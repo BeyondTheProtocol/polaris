@@ -1,0 +1,9 @@
+Contexto. Un vivero compara tres sustratos para el cultivo de tomate en maceta. Se preparan 24 macetas iguales y se asignan por sorteo 8 a cada sustrato. Al final del ciclo se pesa la producción de cada maceta.
+
+Datos. Producción en kilogramos por maceta, media y desviación típica de cada sustrato: primero 5,2 y 0,60; segundo 6,1 y 0,70; tercero 5,5 y 0,65. Media general: 5,6.
+
+Método. Análisis de la varianza de un factor con nivel de significación 0,05. Las desviaciones típicas son parecidas y las macetas son independientes. Grados de libertad: entre sustratos, 3 menos 1 = 2; dentro de los sustratos, 24 menos 3 = 21.
+
+Resultado. Suma de cuadrados entre sustratos: 3,36; cuadrado medio: 1,68. Suma de cuadrados dentro: 8,91; cuadrado medio: 0,424. Estadístico F = 3,96. El valor crítico de F con 2 y 21 grados de libertad es 3,47, y p = 0,035.
+
+Conclusión. Se rechaza que los tres sustratos den la misma producción media: al menos uno difiere de los otros. El análisis no dice todavía cuáles; para eso hacen falta comparaciones entre pares con una corrección por multiplicidad.

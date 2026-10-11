@@ -1,0 +1,9 @@
+Contexto. Un grupo de seguimiento de humedales estudia qué condiciones del agua se relacionan con la abundancia de una libélula. Visita 40 charcas y en cada una cuenta los ejemplares adultos en un recorrido fijo y mide 16 variables del agua y de la orilla: temperatura, profundidad, conductividad, turbidez, cobertura de vegetación y otras once.
+
+Datos. Una fila por charca con el recuento de libélulas y las 16 variables.
+
+Método. Para cada variable se calcula el coeficiente de correlación de rangos con el recuento y se contrasta que la correlación es nula, con una prueba bilateral basada en la t con 38 grados de libertad. Se toma como significativo todo p menor que 0,05.
+
+Resultado. De las 16 correlaciones, 15 quedan entre -0,24 y 0,22, con valores de p superiores a 0,13. La conductividad da un coeficiente de -0,37, que corresponde a t = -2,46 y p = 0,019. Es la única correlación significativa.
+
+Conclusión. La abundancia de la libélula está asociada negativamente con la conductividad del agua (p = 0,019). Es una asociación observada en un único muestreo y no prueba por sí sola que la conductividad sea la causa.

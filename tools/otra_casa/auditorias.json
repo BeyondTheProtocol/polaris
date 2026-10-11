@@ -1,0 +1,210 @@
+{
+ "_nota": "Auditoría propia de otra_casa.py, aparte de panel_vision/auditorias.json. NACE SIN CONFIRMAR: condiciones_cumplidas y cada constancia de {{TITULAR}} en false. Confirmarlo es un acto de {{TITULAR}} y no basta con poner «confirmada» a true: cada constancia lleva la fecha (el día de esta auditoría o después) y lo que vio o decidió, en el vocabulario que dice su condición; si falta algo, la boca no abre. Cambiar cualquier campo de la entrada cambia su huella y vuelve a avisar antes del siguiente primer envío. Sin cifras ni rasgos del caso, y en «que_ve» sin datos personales, sin saldos y sin la clave: este fichero se versiona. Revisada el 10-oct-2026 tras la segunda ronda de revisión (textos de c1 a c4, k1, k3, k4, k5 y u2, y tres datos de xAI más); nada confirmado.",
+ "grok": {
+  "veredicto": "apto con condiciones",
+  "fase": 1,
+  "destino": "razona:grok",
+  "modelo": "grok-4.7",
+  "config": {
+   "endpoint": "https://api.x.ai/v1/responses",
+   "effort": "xhigh",
+   "store": false,
+   "tools": []
+  },
+  "clases_admitidas": [
+   "texto-abstracto"
+  ],
+  "fecha": "2026-10-10",
+  "fuente": "Nota archivada «PLAN · Vía de Grok como revisor de otra casa (10-oct-2026)» (plan-vía-de-grok-como-revisor-de-otra-casa-10-oct-2026, en 04 · IA/Notas) y su anexo con las tres lentes.",
+  "estado_fuente": "BORRADOR",
+  "lentes": [
+   "acceso-herramientas",
+   "legal-burocracia",
+   "verificacion"
+  ],
+  "alcance": "Fase 1: un texto abstracto entero (un problema, un método o un razonamiento contado en abstracto) sin cifras, rasgos ni identificadores del caso. La fase 2 (contexto clínico, razona-n1:grok) NO está auditada ni construida. Límites: las guardas son detectores (regex y diccionarios), no una garantía, y un texto abstracto puede re-identificar por descripción; toda petición va ligada a la cuenta dueña de la clave, que identifica a su titular.",
+  "condiciones": [
+   {
+    "id": "c1",
+    "de": "titular",
+    "texto": "DÓNDE: console.x.ai, con la cuenta dueña de la clave btp-grok-api. QUÉ MIRAR: (1) que esa clave figura en la lista de claves de API de un equipo tuyo (por su nombre o por sus últimos caracteres); (2) que ese equipo PAGA por uso: en «Billing → API spend management» se compran los créditos y se ve que los hay. Tener solo un medio de pago puesto no lo prueba: xAI cobra por créditos prepago por equipo, la facturación mensual viene desactivada y, con los créditos agotados, rechaza las peticiones (su página de facturación). Esa página no define «equipo de pago», así que anota en qué te basas. QUÉ ANOTAR en la constancia c1: «cuando» (AAAA-MM-DD, el día de esta auditoría o después); «que_ve» (una frase: qué equipo es y cómo sabes que paga; SIN datos personales, SIN el saldo y SIN la clave, porque este fichero se versiona); «titular_cuenta» (exactamente «personal» o «asociacion»: de quién es la cuenta, porque es quien responde de lo que se envía); «captura» (dónde guardaste la captura, fuera del repo); «confirmada»: true."
+   },
+   {
+    "id": "c2",
+    "de": "titular",
+    "texto": "DÓNDE: console.x.ai, ajustes del equipo (la lente legal los sitúa en «Team Settings»; sin cotejar: esa consola solo la ves tú). QUÉ MIRAR: (1) cualquier ajuste de compartir datos o de usar tus datos para entrenar o mejorar el producto; (2) que no hay aceptado ningún consentimiento de ese tipo. La FAQ de seguridad nombra uno: al usar Grok Build CLI sale una pantalla «to allow us to retain data to improve the product and model». El programa de compartir datos a cambio de crédito está SIN VERIFICAR: no aparece en las páginas oficiales abiertas, solo en terceros. QUÉ ANOTAR en la constancia c2: «compartir_datos», exactamente «apagado» (ves el ajuste y está apagado) o «no-visible» (no encuentras ningún ajuste; NO se da por apagado); «que_ve» (una frase con lo que ves, sin datos personales ni saldos); «captura»; «cuando» (el día de esta auditoría o después); «confirmada»: true. Si anotas «no-visible», pon además «acepta_si_no_visible»: true solo si aceptas expresamente enviar texto abstracto sin haber podido comprobarlo. CAMBIO RESPECTO AL PLAN: su tabla de fases pide «compartir datos comprobado como apagado»; aquí se admite «no-visible» con tu aceptación expresa. Esa rebaja la decides tú: si no la quieres, no pongas acepta_si_no_visible y la boca no abre."
+   },
+   {
+    "id": "c3",
+    "de": "titular",
+    "texto": "QUÉ ES: según su FAQ de seguridad, xAI guarda peticiones y respuestas cifradas 30 días «for auditing purposes in the event of suspected abuse or misuse» y las borra después. La FAQ NO dice quién puede acceder a lo retenido. La petición lleva store=false, pero eso no sustituye esta decisión. LAS DOS OPCIONES: «acepta-30-dias» (aceptas esa retención para texto abstracto) o «retencion-cero» (la activas tú en el equipo: en la consola, página Team Settings, fila «Zero Data Retention (ZDR)», como administradora; la consola no deja activarla mientras queden ficheros o colecciones guardados en el equipo). ANTES DE ELEGIR RETENCIÓN CERO: es del equipo ENTERO, no de una clave; desactiva la API de respuestas con estado, ficheros, colecciones y lotes; no se sabe si rompe las búsquedas de grok.py, que usa el mismo punto de acceso; la propia FAQ no la recomienda para la mayoría. El plan recomienda, para la fase 1, dejar los 30 días. QUÉ ANOTAR en la constancia c3: «decision», exactamente «acepta-30-dias» o «retencion-cero»; «cuando» (el día de esta auditoría o después); «confirmada»: true. Con «retencion-cero» la boca exige que cada respuesta traiga la cabecera x-zero-data-retention a «true» y, si no, para la tanda (ese primer texto ya habrá salido); reanudar no lo arregla: antes hay que corregir el ajuste o cambiar esta decisión. Según el revisor legal de la tercera ronda (FAQ de seguridad, WebFetch con resumidor; no cotejado por el orquestador), activar la retención cero pide además aceptar unos términos de confirmación en la consola y desactiva el registro de peticiones por clave."
+   },
+   {
+    "id": "c4",
+    "de": "titular",
+    "texto": "ACEPTACIÓN EXPRESA, para texto abstracto, de tres cosas que el sistema no puede cambiar o no ha podido leer. (1) «acepta_punto_global»: el texto sale por api.x.ai, el punto de acceso global; la página de regiones dice que «the processing location is not guaranteed» y no lista ninguno de la UE (hay uno de EE. UU., us.api.x.ai, un 10 % más caro: usarlo exige re-auditar). (2) «acepta_contraparte»: la empresa que figura en la documentación es «SpaceXAI». (3) «acepta_terminos_sin_leer»: nadie del sistema ha podido abrir el contrato de tratamiento de datos ni los términos de empresa (dan 403 a las herramientas), y la FAQ no afirma cumplir el RGPD. Lo razonable es que rijan los términos que aceptaste al abrir la cuenta, pero eso es una INFERENCIA: nadie los ha abierto. El 403 es a las herramientas, no a ti: puedes abrirlos en tu navegador antes de aceptar. QUÉ ANOTAR en la constancia c4: los tres campos a true (cada uno es una aceptación tuya), «cuando» (el día de esta auditoría o después) y «confirmada»: true. SI NO ACEPTAS alguno, no lo pongas a true: la boca no abre y no sale nada. NO ESTABA EN EL PLAN: lo añade la revisión legal de la ronda 1 para que la decisión sea informada; el plan dejaba estos tres puntos para la fase 2. Quitar esta compuerta para atenerse al plan también es decisión tuya: es un cambio de código (la lista de condiciones que la boca exige) y una auditoría nueva."
+   },
+   {
+    "id": "k1",
+    "de": "codigo",
+    "texto": "Solo texto abstracto, un documento UTF-8 por fichero (nunca por argv), leído de fuera de zona clínica (un fichero de ahí es N2 por procedencia), en NFC, de 60.000 caracteres como máximo, sin caracteres de control, de formato, marcas combinantes sueltas ni blancos disfrazados. La entrada exacta pasa la Puerta de identidad, el borde (clasificar, identificador_directo, clasificar_consulta, senas_caso a cero, egress_check limpio y sin alarma), la centralita y un tripwire propio que cierra ante contexto clínico (eso es la fase 2), por clases de vocabulario: enfermedad, tratamiento, marcadores, desenlaces, anatomía y pruebas, y una persona con su edad. Son detectores, no una garantía. Un canario del borde en la entrada no es un texto sucio más: la boca deja que el borde selle su alarma y escale, y cierra."
+   },
+   {
+    "id": "k2",
+    "de": "codigo",
+    "texto": "Sin herramientas (ni web, ni X, ni código), sin instrucciones de sistema, sin estado: una sola llamada. Modelo grok-4.7 y esfuerzo xhigh fijados en el código, store=false, cuerpo por lista blanca (model, input, reasoning, store) comprobado sobre los bytes enviados, sin reintento, sin proxies del entorno ni redirecciones, solo api.x.ai por https."
+   },
+   {
+    "id": "k3",
+    "de": "codigo",
+    "texto": "Respuesta por lista blanca. De la respuesta buena se sellan solo hashes, el uso, el modelo devuelto, el store que declara y la cabecera x-zero-data-retention (nunca el texto ni la clave); de un error del proveedor, su mensaje limpio de la clave y recortado a 160 caracteres. Una negativa, un corte o un error paran la tanda, sin reintento; también la para una respuesta buena que contradice lo auditado (store distinto de false, o retención cero anotada y la cabecera sin «true»), y entonces la boca dice que reanudar no lo arregla. La parada sobrevive entre invocaciones, igual que un envío que se quedó sin desenlace, y reanudar lo teclea {{TITULAR}}. Un texto que recibió una respuesta inaceptable (un HTTP 400, 413 o 422, o un 200 fuera de la lista blanca) no se reenvía (se compara también normalizado). Cualquier otro status (401, 402, 403, 404, 408, 429, un 5xx…) para la tanda sin bloquear el texto: es una decisión de este código, no un dato de xAI."
+   },
+   {
+    "id": "k4",
+    "de": "codigo",
+    "texto": "Destino razona:grok SIN confianza tecleada: si alguien lo confía, la boca cierra y deja una alarma en la cadena. Clave solo del Llavero, sin fichero de respaldo, leída al enviar y no antes. Aviso a {{TITULAR}} ENTREGADO ENTERO antes del primer envío, anclado a la huella de esta auditoría. Sale como urgente: se salta el cupo diario de avisos, una vez por huella. El silencio nocturno no se salta: dentro de esa ventana la boca cierra sin avisar y el primer envío se lanza de día. Solo cuenta como entregado lo que el canal apunta como enviado con el aviso entero; lo retenido, lo aplazado al parte y un recorte del aviso no cuentan. El aviso dice qué hacer si la confirmación no la puso ella. Que el aviso salga urgente es una decisión del código que {{TITULAR}} puede revertir: volver al cupo diario es un cambio de código y una auditoría nueva."
+   },
+   {
+    "id": "k5",
+    "de": "codigo",
+    "texto": "La boca real (transporte real o clave real) solo corre en la casa base de verdad: el directorio personal que dice el sistema más claudecode, su estado y su HALT, y sin BTP_REPO, BTP_HALT_FILES ni BTP_CANARIOS en el entorno; tampoco PYTHONPATH, PYTHONHOME, PYTHONUSERBASE ni PYTHONSTARTUP, ni un sitecustomize o usercustomize cargado de fuera del intérprete; y el código que corre (la boca, la Puerta, el borde) tiene que ser el de tools de esa casa: la copia de un worktree sin fusionar no envía. Si no, cierra antes de sellar, de avisar y de leer la clave."
+   },
+   {
+    "id": "u1",
+    "de": "uso",
+    "texto": "La salida de Grok es una PISTA SIN COTEJAR. Claude revisa primero a ciegas; nada de lo que diga Grok entra en un documento sin cotejarlo, y sus citas se verifican o se descartan. Hasta que el piloto de aceptación dé USAR, esta boca solo se usa para el piloto: el plan pone el piloto (paso 4) antes del primer texto real (paso 5), y con NO USAR o ZONA GRIS no se adopta."
+   },
+   {
+    "id": "u2",
+    "de": "uso",
+    "texto": "Antes de enviar un texto DERIVADO del caso (el primer uso real del plan lo es), una sesión distinta de la que lo redactó lo coteja contra el caso y deja constancia de que no arrastra cifras, fechas, secuencia ni estructura reconocible. DÓNDE Y CON QUÉ: una nota archivada (archivar_nota.py) con el sha256 del texto que se va a enviar (el mismo que queda en el sello otra_casa_envio, para poder casar cada envío con su cotejo), qué sesión lo cotejó, la fecha y contra qué se cotejó. Los problemas sintéticos del piloto están exentos. Las guardas no ven una re-identificación por descripción, y el tripwire de contexto clínico es una lista de vocabulario: esta condición es lo que de verdad separa la fase 1 de la fase 2. Es una regla de uso: la boca no puede comprobar que se cumplió."
+   }
+  ],
+  "condiciones_cumplidas": false,
+  "condiciones_cumplidas_quien": "pasa a true SOLO cuando {{TITULAR}} confirma c1, c2, c3 y c4 (cada una con su constancia completa) y lo pone ella; nunca por inferencia ni por el código. otra_casa.py lo lee de casa base y sin true no envía. Un JSON lo escribe cualquiera que pueda escribir en casa base: la boca comprueba que la constancia esté completa, no quién la tecleó (límite declarado).",
+  "condiciones_constancia": {
+   "c1": {
+    "confirmada": false,
+    "cuando": null,
+    "que_ve": null,
+    "titular_cuenta": null,
+    "captura": null
+   },
+   "c2": {
+    "confirmada": false,
+    "cuando": null,
+    "compartir_datos": null,
+    "que_ve": null,
+    "captura": null,
+    "acepta_si_no_visible": null
+   },
+   "c3": {
+    "confirmada": false,
+    "cuando": null,
+    "decision": null
+   },
+   "c4": {
+    "confirmada": false,
+    "cuando": null,
+    "acepta_punto_global": null,
+    "acepta_contraparte": null,
+    "acepta_terminos_sin_leer": null
+   }
+  },
+  "_sellos": "En datos_de_xai, «el orquestador» y «el orquestador de la construcción» son las fórmulas que dejó quien construyó la boca; quien corrigió la ronda 1 no ha podido saber si nombran a la misma sesión. El orquestador de la revisión declara haber abierto el 10-oct-2026 con WebFetch: modelos, esfuerzo, store, API de respuestas, FAQ de seguridad y regiones. Lo que lleva «abierto por el corrector» lo reabrió el corrector (tecnico) ese mismo día. WebFetch pasa por un resumidor: nada de esto es copia literal. Lo que lleva «ronda 2» lo abrió el corrector de la segunda ronda (tecnico), también el 10-oct-2026 y también con WebFetch.",
+  "datos_de_xai": [
+   {
+    "dato": "grok-4.7 figura tal cual en la página de modelos («the most capable model we've built»), 500k de contexto, 2 y 6 dólares por millón de tokens por debajo de 200k de prompt. La misma página dice que «<modelname> is aliased to the latest stable version»: grok-4.7 puede ser un ALIAS y no lista snapshot fechado; xAI puede moverlo sin aviso (límite declarado: se sella el modelo devuelto y se exige que empiece por grok-4.7).",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/models"
+   },
+   {
+    "dato": "reasoning.effort admite low, medium, high (por defecto) y xhigh; «xhigh» está disponible en grok-4.6 y posteriores; el razonamiento no se puede desactivar; presencePenalty, frequencyPenalty y stop dan error con modelos de razonamiento.",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/model-capabilities/text/reasoning"
+   },
+   {
+    "dato": "Guardar la respuesta está activo por defecto y se puede poner store=false en la petición; las respuestas guardadas se conservan 30 días.",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/model-capabilities/text/generate-text"
+   },
+   {
+    "dato": "API de respuestas: la petición admite model, input, store, max_output_tokens (por defecto 128.000), reasoning.effort, tools, previous_response_id, instructions, include, temperature. La respuesta trae status (completed, in_progress o incomplete), incomplete_details (sin razones enumeradas), error, output (items message con partes output_text, e items reasoning), model y usage. NO documenta ningún campo de negativa ni cómo señala un corte: por eso el adaptador valida la respuesta buena entera (lista blanca) y no busca la mala.",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/rest-api-reference/inference/responses"
+   },
+   {
+    "dato": "Códigos de error documentados: 400, 401, 403, 404, 405, 415, 422 y 429.",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/key-information/debugging"
+   },
+   {
+    "dato": "«SpaceXAI never trains on your API inputs or outputs without your explicit permission»; por defecto guarda peticiones y respuestas cifradas en reposo 30 días «for auditing purposes in the event of suspected abuse or misuse» y las borra después; la página NO dice quién accede a lo retenido. La retención cero la activa un administrador del equipo en la consola, es del equipo entero («There is no ability to enable ZDR for specific API keys») y desactiva la API de respuestas con estado, ficheros, colecciones, lotes y otras; la propia página no la recomienda para la mayoría. Dice «We are SOC 2 Type 2 compliant»; no afirma RGPD ni menciona un contrato de tratamiento de datos. La empresa figura como «SpaceXAI».",
+    "sello": "verificado por el orquestador de la construcción con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/faq/security"
+   },
+   {
+    "dato": "api.x.ai es el punto de acceso global: «SpaceXAI may route requests between regions for capacity or reliability, so the processing location is not guaranteed». Hay uno regional de EE. UU. (us.api.x.ai/v1; solo grok-4.7 y grok-4.6; un 10 % más caro) y ninguno de la UE en la página. «A regional endpoint is not, by itself, a comprehensive data-residency guarantee». Esta boca usa el global.",
+    "sello": "verificado por el orquestador de la construcción con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/regions"
+   },
+   {
+    "dato": "La FAQ de seguridad dice que «every API response includes an x-zero-data-retention header set to \"true\" or \"false\"». El código sella su valor en la respuesta y, si la constancia c3 dice retención cero y la cabecera no dice «true», para la tanda. No se ha visto todavía en una respuesta real.",
+    "sello": "abierto por el corrector (tecnico, ronda 1) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/faq/security"
+   },
+   {
+    "dato": "La referencia de la API de respuestas lista «store» (booleano) entre los campos de la RESPUESTA («Whether to store the input message(s) and model response for later retrieval») y su ejemplo lo enseña a true. El código sella el valor que devuelva y, si no es false, para la tanda.",
+    "sello": "abierto por el corrector (tecnico, ronda 1) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/rest-api-reference/inference/responses"
+   },
+   {
+    "dato": "usage.cost_in_usd_ticks: «there is 10'000'000'000 ticks in one dollar». usage.cost_in_nano_usd: «Cost in nano US dollars for this request», sin conversión en la página (que sean milmillonésimas de dólar es inferencia por el nombre). El gasto que se apunta sale de los ticks.",
+    "sello": "abierto por el corrector (tecnico, ronda 1) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/rest-api-reference/inference/responses"
+   },
+   {
+    "dato": "La FAQ de seguridad nombra otro consentimiento: «On using the Grok Build CLI, you will also see a screen to allow us to retain data to improve the product and model». No describe ningún ajuste de compartir datos del equipo, y no dice quién accede a lo retenido los 30 días.",
+    "sello": "abierto por el corrector (tecnico, ronda 1) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/faq/security"
+   },
+   {
+    "dato": "Facturación: los créditos se compran y se ven en «Billing → API spend management» («Pre-purchase credits for your team»: son por equipo). «Monthly invoiced billing is disabled by default». «Your API requests will be automatically rejected once your prepaid credits are depleted». La página no dice con qué código HTTP se rechazan.",
+    "sello": "abierto por el corrector (tecnico, ronda 2) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/key-information/billing"
+   },
+   {
+    "dato": "Página de errores: 400 («Check your request body or request URL»), 401, 403 («Ask your team admin for permission»), 404, 405, 415, 422 («A field in the POST request body has an invalid format») y 429 (límite de peticiones). No menciona 402, 408, 409 ni 413, ni qué devuelve con el saldo agotado. Que solo 400, 413 y 422 bloqueen el texto es decisión del código.",
+    "sello": "abierto por el corrector (tecnico, ronda 2) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/key-information/debugging"
+   },
+   {
+    "dato": "La retención cero se activa en la consola, página Team Settings, fila «Zero Data Retention (ZDR)», como administrador del equipo; «The Console blocks Enable while stored files or collections remain».",
+    "sello": "abierto por el corrector (tecnico, ronda 2) con WebFetch el 10-oct-2026 (pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/docs/faq/security"
+   },
+   {
+    "dato": "Por encima de 200.000 tokens de prompt el precio de grok-4.7 se dobla (4 y 12 dólares por millón), para todos los tokens de la petición. En esta boca no aplica: la entrada tiene un tope de 60.000 caracteres.",
+    "sello": "verificado por el orquestador con WebFetch el 10-oct-2026 (WebFetch pasa por un resumidor: no es copia literal)",
+    "fuente": "https://docs.x.ai/developers/models"
+   },
+   {
+    "dato": "Activar la retención cero exige aceptar unos términos de confirmación en la consola y desactiva también el registro de peticiones por clave.",
+    "sello": "abierto por el revisor legal de la tercera ronda con WebFetch el 10-oct-2026 (resumidor, no copia literal); NO cotejado por el orquestador",
+    "fuente": "https://docs.x.ai/docs/faq/security"
+   },
+   {
+    "dato": "Programa de compartir datos a cambio de crédito.",
+    "sello": "SIN VERIFICAR: no aparece en las páginas oficiales abiertas, solo en terceros",
+    "fuente": null
+   },
+   {
+    "dato": "Contrato de tratamiento de datos y términos de empresa de xAI.",
+    "sello": "SIN VERIFICAR: las páginas dan 403 a las herramientas, no abiertas",
+    "fuente": null
+   }
+  ],
+  "adaptador": "escrito: tools/otra_casa.py (grok-4.7 fijado, esfuerzo xhigh, store false, sin herramientas; POST https://api.x.ai/v1/responses con cuerpo model, input, reasoning y store; clave btp-grok-api del Llavero solo al enviar; una llamada sin reintento). Otra casa no es «adaptador y auditoría»: es su adaptador, su auditoría y sus pruebas de cuerpo y de respuesta, porque hoy esas funciones nombran a xAI.",
+  "trust_cloud": "no aplica: la fase 1 va SIN confianza tecleada (confiar el destino le levantaría al borde el bloqueo de lo sensible)."
+ }
+}

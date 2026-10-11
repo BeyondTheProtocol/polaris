@@ -1,0 +1,9 @@
+Contexto. Una comarca estudia su recurso eólico. El estudio pasa a la fase de medición detallada solo si la velocidad media de los emplazamientos supera los 5,5 metros por segundo. De una lista de varios miles de emplazamientos posibles se eligen 36 por sorteo y en cada uno se mide la velocidad media del viento a la misma altura durante una campaña completa.
+
+Datos. Emplazamientos medidos: 36. Media de las velocidades medias: 6,4 metros por segundo. Desviación típica entre emplazamientos: 1,5 metros por segundo.
+
+Método. Intervalo de confianza del 95 % para la velocidad media de todos los emplazamientos de la comarca, con la distribución t de 35 grados de libertad, cuyo valor crítico es 2,030.
+
+Resultado. Error estándar de la media: 1,5 / 6 = 0,25. Margen: 2,030 por 0,25 = 0,51. Intervalo: de 5,9 a 6,9 metros por segundo.
+
+Conclusión. La velocidad media de los emplazamientos de la comarca se estima en 6,4 metros por segundo y el intervalo de confianza del 95 % va de 5,9 a 6,9. El intervalo entero queda por encima de los 5,5 metros por segundo fijados como mínimo, así que procede pasar a la fase de medición detallada.

@@ -1,0 +1,11 @@
+Contexto. Una red de academias prepara a estudiantes para un examen oficial de mecanografía con dos métodos, que aquí se llaman método de bloques y método continuo. Cada academia eligió libremente qué método aplicar a cada grupo. Los grupos son de nivel inicial o de nivel avanzado según una prueba de entrada.
+
+Datos. Aprobados sobre presentados.
+Método de bloques: nivel inicial 12 de 40 (30 %); nivel avanzado 144 de 160 (90 %).
+Método continuo: nivel inicial 64 de 160 (40 %); nivel avanzado 38 de 40 (95 %).
+
+Método. Se suman los dos niveles para obtener el total de cada método y se comparan las proporciones de aprobados con una prueba ji-cuadrado de independencia sobre la tabla de dos por dos, con 1 grado de libertad.
+
+Resultado. Método de bloques: 156 aprobados de 200 (78 %). Método continuo: 102 aprobados de 200 (51 %). Estadístico ji-cuadrado = 31,84, p < 0,001.
+
+Conclusión. El método de bloques consigue 27 puntos porcentuales más de aprobados que el método continuo y la diferencia es muy significativa. Se recomienda adoptar el método de bloques en todos los grupos, tanto de nivel inicial como avanzado.

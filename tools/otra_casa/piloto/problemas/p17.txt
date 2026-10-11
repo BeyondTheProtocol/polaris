@@ -1,0 +1,9 @@
+Contexto. Una empresa de semillas certifica un lote de semilla de girasol. La etiqueta comercial solo se puede poner si la tasa de germinación del lote es de al menos el 75 %. El ensayo se hace en cámara, con temperatura y humedad controladas, sobre una muestra del lote.
+
+Datos. Se toman al azar 400 semillas y se ponen a germinar en bandejas. Al cabo del plazo normalizado han germinado 332.
+
+Método. Se estima la tasa de germinación con la proporción de la muestra y se construye un intervalo de confianza del 95 % con la aproximación normal: proporción más o menos 1,96 por el error estándar, que es la raíz de p por (1 menos p) entre n. Con 332 germinadas y 68 sin germinar, la aproximación normal es adecuada.
+
+Resultado. Proporción de la muestra: 332 / 400 = 0,83. Error estándar: raíz de (0,83 por 0,17 / 400) = 0,0188. Margen: 1,96 por 0,0188 = 0,037. Intervalo de confianza del 95 %: de 79,3 % a 86,7 %.
+
+Conclusión. La tasa de germinación real del lote está entre el 79,3 % y el 86,7 % con una probabilidad de 0,95; la probabilidad de que quede fuera de esos dos valores es solo de 0,05. El intervalo entero supera el 75 % exigido para la etiqueta.

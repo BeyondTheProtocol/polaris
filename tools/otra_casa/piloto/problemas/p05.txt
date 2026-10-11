@@ -1,0 +1,11 @@
+Contexto. Un analista de una liga de balonmano quiere medir la ventaja de jugar en casa. Para cada uno de los 10 equipos de la liga calcula los puntos por partido obtenidos en casa y los obtenidos fuera durante la misma temporada. Cada equipo jugó el mismo número de partidos en casa que fuera.
+
+Datos. Puntos por partido, equipo por equipo y en el mismo orden.
+En casa: 1,9; 1,6; 2,2; 1,4; 1,7; 2,0; 1,3; 1,8; 1,5; 2,1.
+Fuera: 1,5; 1,4; 1,9; 1,3; 1,2; 1,8; 1,1; 1,6; 1,4; 1,6.
+
+Método. Cada equipo aporta dos medidas, de modo que los datos son pareados. Se calcula la diferencia casa menos fuera de cada equipo y se aplica una prueba t pareada, bilateral, con nivel de significación 0,05. Las diferencias no muestran valores extremos.
+
+Resultado. Diferencias: 0,4; 0,2; 0,3; 0,1; 0,5; 0,2; 0,2; 0,2; 0,1; 0,5. Media de las diferencias: 0,27 puntos por partido; desviación típica: 0,149; error estándar: 0,149 / raíz de 10 = 0,047. Estadístico, cociente entre la media y su error estándar: t = 5,71 con 9 grados de libertad, p < 0,001. Con el valor crítico 2,262, el intervalo de confianza del 95 % para la diferencia media es [0,16; 0,38].
+
+Conclusión. En esta liga y en esta temporada los equipos obtuvieron de media 0,27 puntos más por partido en casa que fuera (p < 0,001).

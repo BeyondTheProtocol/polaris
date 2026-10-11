@@ -108,7 +108,8 @@ test_cosecha_panel.py test_githooks_base.py test_healthcheck.py test_cascada_cli
 LARGAS="test_laminillas.py test_laminillas_n1.py test_laminillas_piloto_b.py test_anatomia_tecnica.py
 test_anatomia_push.py test_laminillas_piloto_congela.py test_laminillas_f3.py test_visor3d_modelo_port.py
 test_dispatcher.sh test_visor3d_cuelgue.py test_laminillas_capas.py test_laminillas_1bis.py
-test_correos_publicables.py test_deid_eval.py test_laminillas_valis.py test_panel_vision.py"
+test_correos_publicables.py test_deid_eval.py test_laminillas_valis.py test_panel_vision.py
+test_otra_casa_piloto.py"
 _lanza() {   # <run|py> <batería>
   _fuera "$2" && return 0
   if [ "$JOBS" -gt 1 ]; then _COLA+=("$1 $2"); return 0; fi
@@ -291,6 +292,8 @@ runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos
 runpy test_trust_cloud_tty.py     # 1-oct · confiar una nube de píxeles N1 solo tecleando en su terminal
 runpy test_laminillas_n1.py       # 1-oct · Puerta de N1, exporta_n1, vision_n1, nube_n1 (PII sintética)
 runpy test_laminillas_n1_jaula.py # 2-oct · jaula vision.sb de la llamada HTTP de vision_n1/nube_n1 (canarios sintéticos) y config.json sellado
+runpy test_otra_casa.py           # 10-oct · la boca de otra casa (fase 1 de la vía de Grok): guardas, sellos, parada; todo sintético y sin red. Su campaña COMPLETA de mutantes (tests/mutantes/otra_casa_completa.json) no corre aquí: se pasa a mano con `python3 tests/test_otra_casa.py --sellar-completa` y deja un sello; este test se pone rojo si la boca, el test o la campaña cambian sin volver a pasarla
+runpy test_otra_casa_piloto.py    # 10-oct · piloto de aceptación de Grok: corpus, umbral pre-registrado, puntuador y lanzador (no se corre: transporte de mentira)
 runpy test_laminillas_jaulas_secretos.py # 2-oct · ninguna jaula SBPL (×extras reales) abre secretos ni zona clínica: deny de secretos al FINAL, sandbox-exec con señuelos
 runpy test_nivel_salida.py   # 25-sep · P3 F1: nivel de cada salida EN SOMBRA (anota, no manda)
 runpy test_ok_envio_blindado.py
@@ -559,6 +562,12 @@ echo "── mutantes: tests/mutantes/tests_afectados.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/tests_afectados.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-tests-afectados.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes tests_afectados (log: $ROJO_DIR/rojo-mutantes-tests-afectados.log)"; }
+echo "── mutantes: tests/mutantes/otra_casa.json (núcleo) ──"
+# NÚCLEO: lo que depende de código ajeno (borde, Puerta, centralita, zonas clínicas, casa base). La campaña
+# completa tarda varios minutos y va aparte, con sello (ver la línea de test_otra_casa.py, arriba).
+"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/otra_casa.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
+[ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-otra-casa.log" 2>/dev/null;
+                     echo "  🔴 ROJO: campaña de mutantes otra_casa, núcleo (log: $ROJO_DIR/rojo-mutantes-otra-casa.log)"; }
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"

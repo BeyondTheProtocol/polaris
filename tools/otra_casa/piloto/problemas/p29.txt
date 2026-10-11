@@ -1,0 +1,9 @@
+Contexto. El cuerpo técnico de un equipo de fútbol valora la regularidad física de la plantilla con la distancia total recorrida por el equipo en cada partido. Quiere saber cuánto varía esa distancia de un partido a otro y si el último partido, con 104,0 km, fue anómalo.
+
+Datos. El informe de la temporada resume 36 partidos: distancia media por partido 108,4 km, con un error estándar de la media de 1,5 km. El informe no incluye la desviación típica entre partidos.
+
+Método. La desviación típica entre partidos se obtiene a partir del error estándar y del número de partidos. Con esa desviación se calcula el coeficiente de variación y la distancia del último partido a la media, medida en desviaciones típicas.
+
+Resultado. Desviación típica entre partidos: 1,5 / raíz de 36 = 1,5 / 6 = 0,25 km. Coeficiente de variación: 0,25 / 108,4 = 0,23 %. El último partido queda 4,4 km por debajo de la media, es decir, a 17,6 desviaciones típicas.
+
+Conclusión. La distancia recorrida apenas cambia de un partido a otro, con un coeficiente de variación inferior al 1 %. El último partido es una anomalía extrema, a más de 17 desviaciones típicas de la media, y conviene investigar su causa.

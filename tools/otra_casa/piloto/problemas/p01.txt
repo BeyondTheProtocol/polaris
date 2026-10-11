@@ -1,0 +1,9 @@
+Contexto. Un laboratorio de materiales compara la resistencia a compresión de cuatro mezclas de hormigón que difieren en la proporción de árido reciclado. De cada mezcla se fabrican 6 probetas, 24 en total, que se curan en las mismas condiciones y se ensayan en orden aleatorio.
+
+Datos. Resistencia en megapascales, media y desviación típica de las 6 probetas de cada mezcla: primera 31,0 y 2,10; segunda 33,5 y 2,40; tercera 34,6 y 2,30; cuarta 32,1 y 2,35. Media general: 32,8.
+
+Método. Análisis de la varianza de un factor con nivel de significación 0,05. La suma de cuadrados entre mezclas es 6 por la suma de los cuadrados de las desviaciones de cada media respecto a la media general; la suma de cuadrados dentro de las mezclas es 5 por la suma de las cuatro varianzas. Grados de libertad: entre mezclas, 4 menos 1 = 3; dentro de las mezclas, 24 menos 1 = 23.
+
+Resultado. Suma de cuadrados entre mezclas: 44,76; cuadrado medio: 44,76 / 3 = 14,92. Suma de cuadrados dentro: 104,91; cuadrado medio: 104,91 / 23 = 4,56. Estadístico F = 14,92 / 4,56 = 3,27. El valor crítico de F con 3 y 23 grados de libertad es 3,03, y p = 0,039.
+
+Conclusión. El estadístico supera el valor crítico: se rechaza la igualdad de las cuatro medias. Al menos una mezcla difiere de las otras en resistencia media. El análisis no dice todavía cuáles; para eso hacen falta comparaciones entre pares con una corrección por multiplicidad.

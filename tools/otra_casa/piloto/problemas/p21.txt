@@ -1,0 +1,9 @@
+Contexto. Una escuela de idiomas compara cuatro horarios de clase: mañana, mediodía, tarde y noche. En cada horario hay un grupo de 25 estudiantes asignados por sorteo, y todos hacen la misma prueba final de comprensión, puntuada sobre 100.
+
+Datos. Media y desviación típica de la prueba en cada grupo: mañana 74,0 y 10,0; mediodía 65,0 y 9,6; tarde 68,9 y 10,4; noche 68,0 y 9,9.
+
+Método. Con cuatro grupos hay 4 por 3 entre 2 = 6 pares de horarios. Cada par se compara con una prueba t para dos muestras independientes con varianza común, bilateral, con 48 grados de libertad. Se corrige por el número de comparaciones: una comparación es significativa solo si su p es menor que 0,05 / 6 = 0,0083.
+
+Resultado. Comparaciones ordenadas por su valor de p: mañana frente a mediodía, t = 3,25, p = 0,002; mañana frente a noche, t = 2,13, p = 0,038; mañana frente a tarde, t = 1,77, p = 0,084; mediodía frente a tarde, t = 1,38, p = 0,175; mediodía frente a noche, t = 1,09, p = 0,282; tarde frente a noche, t = 0,31, p = 0,755. Solo la primera queda por debajo de 0,0083.
+
+Conclusión. Después de corregir por las 6 comparaciones, la única diferencia estadísticamente significativa es la de mañana frente a mediodía, de 9,0 puntos. La de mañana frente a noche, con p = 0,038, no supera el umbral corregido.

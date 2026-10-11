@@ -1,0 +1,252 @@
+{
+ "_por_que": "10-oct-26, tras las rondas 1 y 2 de revisión. NÚCLEO de la campaña de tools/otra_casa.py: los mutantes cuya supervivencia sería una fuga o un envío sin guarda Y cuya caza depende de código ajeno (borde, puerta_n1, enruta, zonas_clinicas, _casa). Es lo que el sello de la campaña completa NO ve: si otra rama cambia el borde y una guarda de la boca se queda hueca, esto se pone rojo en la suite. Cada mutación de aquí está, idéntica, en tests/mutantes/otra_casa_completa.json (lo afirma el test). La orden es `--nucleo`: solo las clases en proceso (sin hijos del CLI), para que quepa en la suite.",
+ "objetivo": "tools/otra_casa.py",
+ "test": [
+  "python3",
+  "tests/test_otra_casa.py",
+  "--nucleo"
+ ],
+ "env": "BTP_OTRA_CASA",
+ "mutaciones": [
+  {
+   "etiqueta": "0 casa: la boca real no comprueba la casa",
+   "viejo": "    if transporte is None or _leer_llavero is _LLAVERO_REAL:            # guarda 0: la boca REAL\n        _exigir_casa_de_verdad()\n",
+   "nuevo": "    if transporte is None or _leer_llavero is _LLAVERO_REAL:            # guarda 0: la boca REAL\n        pass\n"
+  },
+  {
+   "etiqueta": "0 casa: el directorio personal sale de HOME y no del sistema",
+   "viejo": "    return os.path.realpath(pwd.getpwuid(os.getuid()).pw_dir)",
+   "nuevo": "    return os.path.realpath(os.path.expanduser(\"~\"))"
+  },
+  {
+   "etiqueta": "0 casa: con fallos no cierra",
+   "viejo": "    if fallos:\n        raise PuertaCerrada(\"la boca real solo corre",
+   "nuevo": "    if False:\n        raise PuertaCerrada(\"la boca real solo corre"
+  },
+  {
+   "etiqueta": "0 canario: enviar no mira el canario (solo lo para la Puerta, sin alarma)",
+   "viejo": "    _exigir_sin_canario(destino, instruccion, texto, alarmar=True)      # guarda 0: el canario, antes que nada\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "0 canario: el borde no escala",
+   "viejo": "        puerta.borde.egress_check(literal, destino=dest, intencion=\"otra_casa:revisar\", escalar=True)",
+   "nuevo": "        puerta.borde.egress_check(literal, destino=dest, intencion=\"otra_casa:revisar\", escalar=False)"
+  },
+  {
+   "etiqueta": "0 canario: va después de las guardas de destino",
+   "viejo": "    _exigir_sin_canario(destino, instruccion, texto, alarmar=True)      # guarda 0: el canario, antes que nada\n    d = listo(destino, modelo, clase, alarmar=True)                     # guardas 1 y 2\n",
+   "nuevo": "    d = listo(destino, modelo, clase, alarmar=True)                     # guardas 1 y 2\n    _exigir_sin_canario(destino, instruccion, texto, alarmar=True)      # guarda 0: el canario, antes que nada\n"
+  },
+  {
+   "etiqueta": "0 canario: preparar también sella y escala (comprobar dejaría alarma)",
+   "viejo": "    _exigir_sin_canario(None, instruccion, texto)\n",
+   "nuevo": "    _exigir_sin_canario(None, instruccion, texto, alarmar=True)\n"
+  },
+  {
+   "etiqueta": "1 destino: cualquier destino vale",
+   "viejo": "    if destino != DESTINO:\n",
+   "nuevo": "    if False:\n"
+  },
+  {
+   "etiqueta": "2 auditoría: se lee del árbol del fichero y no de casa base",
+   "viejo": "    return os.path.join(_casa.casa_base(), *AUDITORIAS_REL)",
+   "nuevo": "    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *AUDITORIAS_REL)"
+  },
+  {
+   "etiqueta": "2 auditoría: sin condiciones_cumplidas",
+   "viejo": "    if ent.get(\"condiciones_cumplidas\") is not True:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "2 condiciones: ninguna constancia se exige",
+   "viejo": "    for ident in de_titular:\n        falta = falta_en_constancia(",
+   "nuevo": "    for ident in []:\n        falta = falta_en_constancia("
+  },
+  {
+   "etiqueta": "2 HALT: listo no lo mira",
+   "viejo": "    _sin_halt(\"al empezar\")\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "2 confianza: un destino confiado a mano no cierra",
+   "viejo": "    if puerta.borde.es_trusted(destino):\n        if alarmar:",
+   "nuevo": "    if False:\n        if alarmar:"
+  },
+  {
+   "etiqueta": "2 cadena: no se verifica la cadena entera",
+   "viejo": "        ok, det = puerta.borde.verificar_cadena()\n        if not ok:",
+   "nuevo": "        ok, det = True, \"\"\n        if not ok:"
+  },
+  {
+   "etiqueta": "2 cadena: no se mira la cola contra head.txt",
+   "viejo": "        ok, det = puerta.cola_coincide_con_head()\n        if not ok:",
+   "nuevo": "        ok, det = True, \"\"\n        if not ok:"
+  },
+  {
+   "etiqueta": "2 parada: listo no mira la parada",
+   "viejo": "    _cadena_integra()\n    _exigir_sin_parada(destino)\n    return {",
+   "nuevo": "    _cadena_integra()\n    return {"
+  },
+  {
+   "etiqueta": "3 procedencia: no se mira la zona clínica",
+   "viejo": "    _exigir_fuera_de_zona_clinica(ruta)\n    real = os.path.realpath(ruta)",
+   "nuevo": "    real = os.path.realpath(ruta)"
+  },
+  {
+   "etiqueta": "3 procedencia: la política sale del árbol del módulo y no de casa base",
+   "viejo": "os.path.join(_casa.casa_base(), *ZONAS_REL))",
+   "nuevo": "os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *ZONAS_REL))"
+  },
+  {
+   "etiqueta": "3 procedencia: si no se puede juzgar, se lee",
+   "viejo": "        raise PuertaCerrada(\"no pude juzgar si el fichero está en zona clínica (%s): no se lee\" % type(e).__name__)",
+   "nuevo": "        clinica = False"
+  },
+  {
+   "etiqueta": "4 Puerta: sin exigir el diccionario",
+   "viejo": "    _juzga(\"la Puerta\", puerta.exigir_diccionario)\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "4 Puerta: no se revisa el texto",
+   "viejo": "    _juzga(\"la Puerta\", lambda: puerta.revisar_texto(cadena, \"texto\"))\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "4 preparar: no se llama a las guardas de contenido",
+   "viejo": "        exigir_contenido_limpio(cadena)\n    except PuertaCerrada as e:",
+   "nuevo": "        pass\n    except PuertaCerrada as e:"
+  },
+  {
+   "etiqueta": "5 borde: el HALT del contenido no cierra",
+   "viejo": "    if _juzga(\"el borde (HALT)\", borde.halted) is not False:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 borde: clasificar no cierra",
+   "viejo": "    if _juzga(\"borde.clasificar\", lambda: borde.clasificar(cadena)[0]) is not False:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 borde: identificador_directo no cierra",
+   "viejo": "    if _juzga(\"borde.identificador_directo\", lambda: borde.identificador_directo(cadena)[0]) is not False:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 borde: clasificar_consulta no cierra",
+   "viejo": "    if _juzga(\"borde.clasificar_consulta\", lambda: borde.clasificar_consulta(cadena)[0]) is not False:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 borde: las señas de caso no cierran",
+   "viejo": "    if _juzga(\"borde.senas_caso\", lambda: borde.senas_caso(cadena)[0]) != 0:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 centralita: nada cierra",
+   "viejo": "    if sensible is not False or crudo is not False:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "5 centralita: estado sin dict (lanza sondas de fondo)",
+   "viejo": "    d = enruta.elegir(TAREA_CENTRALITA, contenido=cadena, estado={})",
+   "nuevo": "    d = enruta.elegir(TAREA_CENTRALITA, contenido=cadena, estado=None)"
+  },
+  {
+   "etiqueta": "5 juez: una capa que revienta no cierra",
+   "viejo": "    except Exception as e:                                  # noqa: BLE001 — fail-closed\n        raise PuertaCerrada(\"%s no pudo juzgar",
+   "nuevo": "    except ZeroDivisionError as e:\n        raise PuertaCerrada(\"%s no pudo juzgar"
+  },
+  {
+   "etiqueta": "5 egress: sin llamar a egress_check",
+   "viejo": "    v = puerta.borde.egress_check(plan[\"cadena\"], destino=destino, intencion=\"otra_casa:revisar\")",
+   "nuevo": "    v = type(\"V\", (), {\"permitido\": True, \"sensibilidad\": \"limpio\", \"alarma\": False})()"
+  },
+  {
+   "etiqueta": "5 egress: solo mira .permitido",
+   "viejo": "    if v.permitido is not True or v.sensibilidad != \"limpio\" or v.alarma:",
+   "nuevo": "    if not v.permitido:"
+  },
+  {
+   "etiqueta": "5 egress: sin comprobar que sea limpio",
+   "viejo": "    if v.permitido is not True or v.sensibilidad != \"limpio\" or v.alarma:",
+   "nuevo": "    if v.permitido is not True or v.alarma:"
+  },
+  {
+   "etiqueta": "5 fase: sin el tripwire de contexto clínico",
+   "viejo": "        raise PuertaCerrada(\"la centralita (enruta.elegir) da la entrada por sensible o cruda\")\n    _exigir_sin_contexto_clinico(cadena)\n",
+   "nuevo": "        raise PuertaCerrada(\"la centralita (enruta.elegir) da la entrada por sensible o cruda\")\n"
+  },
+  {
+   "etiqueta": "6 cuerpo: no se vuelve a comprobar lo serializado",
+   "viejo": "    verificar_peticion(cuerpo, d[\"modelo\"], plan[\"cadena\"])\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "7 clave: la batería no niega la clave real",
+   "viejo": "    if os.environ.get(\"BTP_TEST_BATTERY\") == \"1\" and _leer_llavero is _LLAVERO_REAL:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "7 clave: con fichero de respaldo",
+   "viejo": "    return _secrets.get(servicio)",
+   "nuevo": "    return _secrets.get(servicio, os.path.join(os.path.dirname(os.path.abspath(__file__)), \".grok_secrets.json\"), \"api_key\")"
+  },
+  {
+   "etiqueta": "8 aviso: callado",
+   "viejo": "    aviso, sin_registro = estado_aviso(destino, d[\"huella\"])            # guarda 8",
+   "nuevo": "    aviso, sin_registro = AVISO_ENTREGADO, []            # guarda 8"
+  },
+  {
+   "etiqueta": "9 sello: si no se puede sellar, se envía",
+   "viejo": "    _sella_o_cierra({\"evento\": EV_ENVIO,",
+   "nuevo": "    _sella({\"evento\": EV_ENVIO,"
+  },
+  {
+   "etiqueta": "12 parada: una parada vigente no cierra",
+   "viejo": "    p = parada_vigente(destino)\n    if p is None:\n        return\n    if p.get(\"evento\") == EV_ENVIO:",
+   "nuevo": "    p = None\n    if p is None:\n        return\n    if p.get(\"evento\") == EV_ENVIO:"
+  },
+  {
+   "etiqueta": "12 huérfano: un envío sin desenlace no cierra",
+   "viejo": "    for rec in abiertos.values():\n        return rec\n    return None",
+   "nuevo": "    return None"
+  },
+  {
+   "etiqueta": "12 reanudar: sin comprobar quién lo lanza",
+   "viejo": "        puerta.borde._comprobar_lanzador(destino, rechazo=rechazo, que=que, etiqueta=\"reanudar BLOQUEADO\")",
+   "nuevo": "        pass"
+  },
+  {
+   "etiqueta": "0 casa: PYTHONPATH en el entorno no cierra",
+   "viejo": "VARIABLES_DEL_INTERPRETE = (\"PYTHONPATH\", \"PYTHONHOME\", \"PYTHONUSERBASE\", \"PYTHONSTARTUP\")",
+   "nuevo": "VARIABLES_DEL_INTERPRETE = (\"PYTHONHOME\", \"PYTHONUSERBASE\", \"PYTHONSTARTUP\")"
+  },
+  {
+   "etiqueta": "0 casa: un sitecustomize o usercustomize ajeno no cierra",
+   "viejo": "    fallos += _arranque_ajeno()\n",
+   "nuevo": ""
+  },
+  {
+   "etiqueta": "0 casa: no se mira de qué árbol es el código",
+   "viejo": "    if _arboles_del_codigo() != [os.path.realpath(os.path.join(casa, \"tools\"))]:",
+   "nuevo": "    if False:"
+  },
+  {
+   "etiqueta": "8 aviso: una salida que no entrega no cierra",
+   "viejo": "    if not (isinstance(r, dict) and r.get(\"delivered\") is True):\n        raise PuertaCerrada(\"no pude avisar",
+   "nuevo": "    if False:\n        raise PuertaCerrada(\"no pude avisar"
+  },
+  {
+   "etiqueta": "8 aviso: el silencio nocturno no cierra",
+   "viejo": "        if salida._en_silencio() is not False:\n            raise PuertaCerrada(MSG_SILENCIO % destino)",
+   "nuevo": "        if False:\n            raise PuertaCerrada(MSG_SILENCIO % destino)"
+  },
+  {
+   "etiqueta": "8 aviso: lo retenido, lo aplazado y lo archivado del parte cuentan como entregado",
+   "viejo": "        if not _es_registro_de_entrega(ruta):\n            continue\n",
+   "nuevo": ""
+  }
+ ]
+}

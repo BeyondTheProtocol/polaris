@@ -1,0 +1,12 @@
+Contexto. Una explotación de manzanos quiere saber si el sistema de riego está relacionado con el calibre de la fruta. De la cosecha de los árboles regados por goteo se toma una muestra aleatoria de 160 manzanas, y de la de los regados por aspersión, otra de 150. Cada manzana se clasifica en calibre pequeño, mediano o grande.
+
+Datos. Manzanas de calibre pequeño, mediano y grande, en ese orden.
+Goteo: 40; 70; 50.
+Aspersión: 60; 60; 30.
+Totales por calibre: 100; 130; 80. Total general: 310.
+
+Método. Prueba ji-cuadrado sobre la tabla de 2 filas y 3 columnas, con nivel de significación 0,05. Grados de libertad: (2 menos 1) por (3 menos 1) = 2. La menor frecuencia esperada es 38,7, suficiente para la aproximación.
+
+Resultado. Estadístico ji-cuadrado = 9,46. El valor crítico con 2 grados de libertad es 5,99 y p = 0,009.
+
+Conclusión. Se rechaza que el reparto de calibres sea el mismo con los dos riegos: con goteo hay más proporción de fruta grande (31 % frente a 20 %) y menos de pequeña. Se recomienda tener en cuenta el sistema de riego al prever el reparto de calibres de la próxima cosecha.

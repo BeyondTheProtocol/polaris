@@ -1,0 +1,9 @@
+Contexto. Un servicio de aguas quiere saber si la lluvia media por episodio de tormenta en su cuenca difiere del valor de diseño de la red de drenaje, que es 38,0 mm. Para ello reúne los registros de 100 episodios de tormenta independientes medidos en el pluviómetro principal. Si la media real fuera distinta del valor de diseño, habría que revisar el dimensionado de los colectores.
+
+Datos. Se registran 100 episodios. La lluvia media por episodio es de 42,0 mm, con una desviación típica entre episodios de 12,0 mm.
+
+Método. Se construye el intervalo de confianza del 95 % para la lluvia media por episodio con la distribución t con 99 grados de libertad, cuyo valor crítico es 1,984. Si el valor de diseño queda dentro del intervalo, no se rechaza que la media coincida con él.
+
+Resultado. Intervalo de confianza del 95 % para la media: 42,0 más o menos 1,984 por 12,0, es decir, 42,0 más o menos 23,8. El intervalo va de 18,2 a 65,8 mm. El valor de diseño, 38,0 mm, está dentro.
+
+Conclusión. Con 100 episodios no hay evidencia de que la lluvia media por episodio difiera del valor de diseño: la media observada, 42,0 mm, es algo mayor, pero el intervalo es amplio y contiene de sobra los 38,0 mm. No hace falta revisar el dimensionado de la red.

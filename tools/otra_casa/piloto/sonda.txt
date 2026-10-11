@@ -1,0 +1,9 @@
+Contexto. Una panadería quiere saber cuánto pesan de media sus barras. Un operario pesa 5 barras tomadas al azar de la misma hornada.
+
+Datos. Pesos en gramos: 248, 252, 250, 249 y 251.
+
+Método. Media aritmética de los cinco pesos y desviación típica muestral, con divisor 5 menos 1 = 4.
+
+Resultado. Suma de los pesos: 1250. Media: 1250 / 5 = 250 gramos. Desviaciones respecto a la media: -2, 2, 0, -1 y 1; suma de sus cuadrados: 10. Varianza muestral: 10 / 4 = 2,5. Desviación típica: raíz de 2,5 = 1,58 gramos.
+
+Conclusión. El peso medio de las cinco barras es 250 gramos, con una desviación típica de 1,58 gramos. Con cinco barras de una sola hornada esto describe la muestra y no permite afirmar nada sobre otras hornadas.

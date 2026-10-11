@@ -1,0 +1,9 @@
+Contexto. Un almacén automático usa un lector que marca los bultos cuya etiqueta parece no coincidir con el contenido declarado. Cada bulto marcado se aparta para abrirlo y comprobarlo a mano. El jefe de operaciones quiere saber qué parte de los bultos marcados tiene de verdad un error de etiquetado.
+
+Datos. Según las auditorías, el 2 % de los bultos tiene un error de etiquetado. En las pruebas, el lector marcó el 90 % de los bultos con error y dejó sin marcar el 97 % de los bultos correctos, de modo que marca por equivocación el 3 % de los correctos.
+
+Método. Se busca la probabilidad de error de etiquetado dado que el lector ha marcado el bulto. Se aplica la regla de la probabilidad condicionada con la frecuencia de errores en el almacén como probabilidad de partida.
+
+Resultado. Proporción de bultos con error y marcados: 0,02 por 0,90 = 0,0180. Proporción de bultos correctos y marcados: 0,98 por 0,03 = 0,0294. Proporción total de bultos marcados: 0,0474. Probabilidad de error dado que el bulto está marcado: 0,0180 / 0,0474 = 0,380.
+
+Conclusión. Cerca del 38 % de los bultos marcados tiene realmente un error de etiquetado; los demás, unos 6 de cada 10, son avisos sobre bultos correctos. Se recomienda mantener la comprobación manual de todos los bultos marcados antes de devolver ninguno al remitente.

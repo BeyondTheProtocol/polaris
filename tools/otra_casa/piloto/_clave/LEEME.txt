@@ -1,0 +1,2 @@
+Este directorio guarda la clave del piloto: no se abre, no se lee y no se envía durante la evaluación a ciegas.
+Solo lo usa la corrección, después de recogidas todas las respuestas; quien evalúa no lo ve nunca.

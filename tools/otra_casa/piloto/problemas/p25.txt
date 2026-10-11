@@ -1,0 +1,9 @@
+Contexto. Una fábrica de rodamientos instala un detector óptico al final de la cadena para señalar las piezas con grietas en la superficie. La dirección quiere decidir qué hacer con una pieza señalada: desecharla directamente o enviarla a una segunda inspección manual, que es lenta pero no se equivoca. La decisión depende de cuántas piezas señaladas son de verdad defectuosas.
+
+Datos. Según el registro de calidad, el 1 % de las piezas que llegan al detector tiene grietas. En las pruebas de validación el detector señaló el 95 % de las piezas con grietas y dejó pasar sin señalar el 95 % de las piezas sanas.
+
+Método. Se quiere la probabilidad de que una pieza señalada por el detector tenga realmente grietas, y se toma de los datos de validación.
+
+Resultado. El detector señala el 95 % de las piezas agrietadas y solo se equivoca con el 5 % de las sanas. Por tanto, cuando el detector señala una pieza, la probabilidad de que tenga grietas es del 95 %.
+
+Conclusión. Con una fiabilidad del 95 %, una pieza señalada es casi con seguridad defectuosa. Las piezas señaladas se pueden desechar directamente: la segunda inspección manual solo recuperaría 1 de cada 20 y no compensa su coste.

@@ -1,0 +1,13 @@
+Contexto. Un equipo de campo estudia si cuatro especies de mariposa se reparten por igual entre tres tipos de hábitat de una misma sierra: bosque, pradera y ribera. En cada hábitat se recorren transectos del mismo esfuerzo y se anota la especie de cada ejemplar observado.
+
+Datos. Ejemplares observados de las especies primera, segunda, tercera y cuarta, en ese orden.
+Bosque: 30; 22; 18; 30 (total 100).
+Pradera: 22; 30; 26; 22 (total 100).
+Ribera: 18; 28; 36; 18 (total 100).
+Totales por especie: 70; 80; 80; 70. Total general: 300.
+
+Método. Se aplica la prueba ji-cuadrado de independencia entre hábitat y especie, con nivel de significación 0,05. Las frecuencias esperadas se obtienen multiplicando el total de la fila por el total de la columna y dividiendo entre el total general; la menor es 23,3, de modo que la aproximación es válida. La tabla tiene 3 por 4 = 12 casillas, así que los grados de libertad son 12 menos 1 = 11.
+
+Resultado. Estadístico ji-cuadrado = 13,80. Con 11 grados de libertad el valor crítico al 0,05 es 19,68 y el valor de p es 0,244. El estadístico no supera el valor crítico.
+
+Conclusión. No se rechaza la independencia entre hábitat y especie. Con estos recuentos no hay evidencia de que las cuatro especies se repartan de manera distinta entre el bosque, la pradera y la ribera, y las diferencias observadas en la tabla son compatibles con el azar del muestreo.

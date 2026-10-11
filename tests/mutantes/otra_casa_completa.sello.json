@@ -1,0 +1,12 @@
+{
+ "_que_es": "La campaña completa de mutantes de tools/otra_casa.py pasó ENTERA sobre estos ficheros. Lo escribe solo `python3 tests/test_otra_casa.py --sellar-completa`; tests/test_otra_casa.py (Sello) se pone rojo si los hashes ya no coinciden. Obstáculo y rastro.",
+ "campana": "tests/mutantes/otra_casa_completa.json",
+ "cazados": 458,
+ "cuando": "2026-10-10T17:28:38Z",
+ "mutantes": 458,
+ "sha256": {
+  "tests/mutantes/otra_casa_completa.json": "d3371eda12207fa7a5633eb52432d0104dd36fa345643b86897a43ee45baa919",
+  "tests/test_otra_casa.py": "9886decaf36a86da02eb2e9650476b3b5209caf1abf65c1c9fffe14c444ff21e",
+  "tools/otra_casa.py": "732026fc6354f849f5207a06470511de61ee0ea9344fce4b53ad0b1a36c52f0b"
+ }
+}

@@ -1,0 +1,9 @@
+Contexto. Un centro de clasificación de paquetería tiene dos cintas transportadoras, una antigua y una nueva instalada hace poco. El responsable de calidad sospecha que la cinta nueva estropea la mercancía y revisa los partes de daños.
+
+Datos. En el periodo revisado pasaron por el centro 5000 paquetes: 4500 por la cinta nueva y 500 por la antigua. Se registraron 100 paquetes dañados. De esos 100, 80 habían pasado por la cinta nueva y 20 por la antigua.
+
+Método. Se calcula qué parte de los paquetes dañados corresponde a cada cinta y se usa esa proporción para valorar el riesgo de cada una.
+
+Resultado. De los paquetes dañados, el 80 % pasó por la cinta nueva y el 20 % por la antigua. Un paquete dañado tiene, por tanto, cuatro veces más probabilidad de proceder de la cinta nueva. De aquí se deduce que el riesgo de daño de un paquete es cuatro veces mayor en la cinta nueva que en la antigua.
+
+Conclusión. La cinta nueva es la principal causa de daños y multiplica por cuatro el riesgo de cada paquete. Se recomienda desviar el tráfico a la cinta antigua hasta que se revise la nueva.

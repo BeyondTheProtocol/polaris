@@ -1,0 +1,11 @@
+{
+ "pieza": "otra_casa/piloto/corre_piloto.py",
+ "estado_ficha": "completa",
+ "para": "Lanzador «a un clic» del piloto de aceptación de Grok como revisor de otra casa. `previa` comprueba sin red, sin clave y sin sellar el destino, la sonda y los 30 problemas, e imprime la cota de coste. `entrada` imprime la entrada exacta de un problema. `apunta-claude` guarda la respuesta de Claude a un problema (el pase a ciegas va después de la sonda y antes que los 30 de Grok). `grok --solo-sonda` envía la sonda desechable; `grok` envía después los 30 problemas uno a uno con la misma tanda por tools/otra_casa.py (avisar=True), y se niega sin la sonda guardada o sin las 30 respuestas de Claude, que tienen que ser de un solo modelo; para en la primera excepción, no reanuda ni reintenta y no reenvía lo que ya tiene respuesta guardada en esa corrida. Guarda cada respuesta en el estado de casa base (otra_casa/piloto/<corrida>/). Nunca lee _clave/ ni interpreta lo que devuelve Grok.",
+ "cuando_si": "El día del piloto, siguiendo PROTOCOLO.md: previa en cualquier momento; grok solo con la auditoría confirmada por {{TITULAR}} (c1 a c4) y su OK, desde casa base, de día y en segundo plano o en su terminal; los 30, con la sonda guardada y las 30 respuestas de Claude ya apuntadas.",
+ "cuando_no": "No para revisar un texto real (eso es tools/otra_casa.py revisar). No para nada del caso. No reanuda una tanda parada: reanudar lo teclea {{TITULAR}}. No puntúa (eso es puntua.py).",
+ "reemplaza": "Nada: pieza nueva.",
+ "test": "tests/test_otra_casa_piloto.py",
+ "alta": "2026-10-10",
+ "origen": "Plan «Vía de Grok como revisor de otra casa» (10-oct-26), fase 1: piloto de aceptación pre-registrado en tools/otra_casa/piloto/PROTOCOLO.md."
+}

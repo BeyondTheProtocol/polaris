@@ -1,0 +1,9 @@
+Contexto. Una plataforma logística tiene cinco muelles de descarga equivalentes. El sistema de asignación debería repartir los camiones por igual entre los cinco, pero los operarios sospechan que carga más unos muelles que otros. Se revisa el registro de una muestra aleatoria de 200 camiones.
+
+Datos. Camiones asignados a los muelles primero a quinto: 54; 46; 38; 34; 28. Total: 200.
+
+Método. Prueba ji-cuadrado de bondad de ajuste a un reparto uniforme, con nivel de significación 0,05. Si el reparto fuera uniforme, a cada muelle le corresponderían 200 / 5 = 40 camiones. El estadístico suma, para cada muelle, el cuadrado de la diferencia entre lo observado y lo esperado dividido entre lo esperado. Al haber cinco categorías, se toman 5 grados de libertad.
+
+Resultado. Diferencias entre observado y esperado: 14; 6; -2; -6; -12. Sus cuadrados: 196; 36; 4; 36; 144, que suman 416. Estadístico ji-cuadrado = 416 / 40 = 10,40. Con 5 grados de libertad el valor crítico al 0,05 es 11,07 y p = 0,065. El estadístico queda por debajo del valor crítico.
+
+Conclusión. No se rechaza el reparto uniforme. Las diferencias entre muelles, que van de 28 a 54 camiones, son compatibles con el azar, y no hay motivo para revisar el sistema de asignación.

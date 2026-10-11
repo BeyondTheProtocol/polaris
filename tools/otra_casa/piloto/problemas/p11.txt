@@ -1,0 +1,9 @@
+Contexto. Un grupo de agricultores ensaya una variedad nueva de garbanzo y quiere comparar su rendimiento con el de referencia de la comarca, que es de 3,1 toneladas por hectárea. El ensayo se hace en parcelas pequeñas, todas del mismo tamaño, repartidas al azar por una finca.
+
+Datos. Se cosechan 16 parcelas de 25 metros cuadrados cada una. Peso medio de grano por parcela: 4,2 kg. Desviación típica entre parcelas: 0,6 kg.
+
+Método. Se calcula el intervalo de confianza del 95 % para el peso medio por parcela con la distribución t de 15 grados de libertad, cuyo valor crítico es 2,131. Después se pasa a rendimiento por hectárea: una hectárea son 10 000 metros cuadrados, es decir, 400 parcelas de 25 metros cuadrados, y una tonelada son 1000 kg.
+
+Resultado. Error estándar: 0,6 / 4 = 0,15 kg. Intervalo para la media por parcela: 4,2 más o menos 0,32, de 3,88 a 4,52 kg. Rendimiento medio por hectárea: 4,2 por 400 = 1680 kg por hectárea, que equivalen a 16,8 toneladas por hectárea. Con la misma conversión, los límites del intervalo son 15,5 y 18,1 toneladas por hectárea.
+
+Conclusión. La variedad nueva rinde 16,8 toneladas por hectárea, más de cinco veces el rendimiento de referencia de 3,1, y todo el intervalo de confianza queda muy por encima de ese valor. Se recomienda sustituir la variedad habitual por la nueva.

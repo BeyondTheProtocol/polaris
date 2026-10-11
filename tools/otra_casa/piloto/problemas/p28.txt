@@ -1,0 +1,11 @@
+Contexto. Una fábrica de herramientas recibe varillas de acero de dos proveedores y quiere saber si la dureza media difiere, porque para su uso interesa la varilla más dura. Toma al azar 12 varillas de un envío del primer proveedor y 15 varillas de un envío del segundo. Son piezas distintas, sin ninguna relación entre las de un proveedor y las del otro.
+
+Datos. Dureza en la escala habitual del taller.
+Primer proveedor: 12 varillas, media 61,8, desviación típica 2,4.
+Segundo proveedor: 15 varillas, media 59,1, desviación típica 3,1.
+
+Método. Las muestras son independientes y las desviaciones típicas no coinciden, así que se usa la prueba t para varianzas desiguales, bilateral, con nivel de significación 0,05. Los grados de libertad se obtienen con la aproximación habitual para varianzas desiguales.
+
+Resultado. Error estándar de la diferencia: raíz de (5,76 / 12 más 9,61 / 15) = 1,059. Estadístico t = (61,8 menos 59,1) / 1,059 = 2,55. Grados de libertad aproximados: 25,0. Resultado: p = 0,017. Con el valor crítico 2,060, el intervalo de confianza del 95 % para la diferencia de medias es [0,52; 4,88].
+
+Conclusión. La dureza media de las varillas del primer proveedor supera a la del segundo en 2,7 unidades y la diferencia es estadísticamente significativa al nivel 0,05. Se recomienda dar preferencia al primer proveedor en el próximo pedido de varillas.

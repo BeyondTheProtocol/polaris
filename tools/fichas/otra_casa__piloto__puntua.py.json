@@ -1,0 +1,11 @@
+{
+ "pieza": "otra_casa/piloto/puntua.py",
+ "estado_ficha": "completa",
+ "para": "Puntuación de UNA pasada, determinista y sin red, del piloto de aceptación de Grok: lee _clave/clave.json y las respuestas de Claude y de Grok de una corrida, aplica las definiciones y el umbral pre-registrados en PROTOCOLO.md, imprime la tabla por problema y por clase, los incrementales en los dos sentidos y el veredicto (USAR, NO USAR, ZONA GRIS o INVÁLIDO) y escribe puntuacion.json en la corrida. Se niega si falta algún problema, si el pase de Claude mezcla modelos, si el corpus o el protocolo cambiaron desde que se abrió la corrida o si la corrida ya está puntuada.",
+ "cuando_si": "Una vez, cuando la corrida tiene las 30 respuestas de Claude y el pase de Grok completo (o cortado por una parada que bloquea el texto).",
+ "cuando_no": "No antes de recoger todas las respuestas (lee la clave). No dos veces sobre la misma corrida. No para decidir qué modelo razona mejor en general.",
+ "reemplaza": "Nada: pieza nueva.",
+ "test": "tests/test_otra_casa_piloto.py",
+ "alta": "2026-10-10",
+ "origen": "Plan «Vía de Grok como revisor de otra casa» (10-oct-26), fase 1: piloto de aceptación pre-registrado en tools/otra_casa/piloto/PROTOCOLO.md."
+}

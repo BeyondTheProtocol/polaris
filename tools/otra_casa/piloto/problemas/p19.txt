@@ -1,0 +1,11 @@
+Contexto. Una estación agraria compara dos variedades de girasol, que aquí se llaman variedad temprana y variedad tardía. El criterio es la proporción de parcelas que alcanzan el rendimiento objetivo. Las parcelas son de regadío o de secano, y cada agricultor eligió la variedad.
+
+Datos. Parcelas que alcanzan el objetivo sobre parcelas sembradas.
+Variedad temprana: regadío 57 de 60 (95 %); secano 84 de 140 (60 %).
+Variedad tardía: regadío 126 de 140 (90 %); secano 30 de 60 (50 %).
+
+Método. El tipo de riego influye en el rendimiento y está repartido de forma desigual entre las variedades, así que la comparación se hace dentro de cada tipo de riego y se resume con una prueba de ji cuadrado estratificada, que combina los dos estratos, con 1 grado de libertad y sin corrección de continuidad.
+
+Resultado. En regadío la temprana supera a la tardía por 5 puntos porcentuales y en secano por 10 puntos. Estadístico de la prueba estratificada = 2,91, p = 0,088. En el total sin estratificar el orden aparente es el contrario: temprana 141 de 200 (70,5 %) y tardía 156 de 200 (78,0 %).
+
+Conclusión. A igual tipo de riego, la variedad temprana alcanza el objetivo con más frecuencia que la tardía, pero la diferencia combinada no es estadísticamente significativa al nivel 0,05.

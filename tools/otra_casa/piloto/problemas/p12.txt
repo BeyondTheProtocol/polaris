@@ -1,0 +1,9 @@
+Contexto. Una finca de frutales usa una alarma automática que avisa al anochecer si prevé helada durante la noche. Cada aviso obliga a encender los sistemas de protección, que tienen un coste alto. La finca quiere saber cuánto puede fiarse de un aviso, es decir, qué probabilidad hay de que hiele en una noche en la que la alarma ha sonado, para decidir si compensa encender la protección siempre.
+
+Datos. Se revisan 500 noches de varias campañas. Heló en 20 de ellas. La alarma sonó en 18 de las 20 noches con helada y en 48 de las 480 noches sin helada.
+
+Método. Se calcula con qué frecuencia acierta la alarma y se usa ese valor como probabilidad de helada en una noche con aviso.
+
+Resultado. La alarma detectó 18 de las 20 heladas, es decir, el 90 %. En las noches sin helada sonó sin motivo en 48 de 480, el 10 %. La alarma acierta, por tanto, el 90 % de las veces: cuando suena, la probabilidad de que hiele esa noche es del 90 %.
+
+Conclusión. Un aviso de la alarma implica helada con una probabilidad del 90 %. Está justificado encender la protección cada vez que suena, porque solo 1 de cada 10 avisos resultará innecesario.

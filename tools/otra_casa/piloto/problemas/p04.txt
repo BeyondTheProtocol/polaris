@@ -1,0 +1,11 @@
+Contexto. Un centro de formación quiere saber si un material de estudio nuevo mejora la nota de una prueba de cálculo. De una promoción se sortean 20 estudiantes: 10 van a un aula que trabaja con el material habitual y otros 10, distintos, a otra aula que trabaja con el material nuevo. Al final todos hacen la misma prueba, puntuada sobre 100.
+
+Datos. Notas de cada aula, listadas de menor a mayor.
+Material habitual: 48; 52; 55; 59; 61; 64; 68; 71; 75; 80.
+Material nuevo: 51; 54; 59; 62; 65; 67; 70; 75; 78; 84.
+
+Método. Se empareja la primera nota de una lista con la primera de la otra, la segunda con la segunda y así hasta la última, y se calcula la diferencia de cada pareja. Sobre esas 10 diferencias se aplica una prueba t pareada, bilateral, con nivel de significación 0,05.
+
+Resultado. Medias: 63,3 con el material habitual y 66,5 con el nuevo. Las diferencias tienen media 3,2 puntos y desviación típica 0,79; su error estándar es 0,25. El estadístico, cociente entre la media de las diferencias y su error estándar, es t = 12,83 con 9 grados de libertad, p < 0,001.
+
+Conclusión. El material nuevo mejora la nota en 3,2 puntos de media y la mejora es altamente significativa. Se recomienda extenderlo a toda la promoción.

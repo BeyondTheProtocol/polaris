@@ -1,0 +1,11 @@
+Contexto. Una empresa de reparto prueba un programa nuevo de planificación de rutas. Elige 8 rutas fijas de su red, de longitudes muy diferentes, y mide el tiempo medio de reparto de cada una durante un periodo con el programa antiguo y, a continuación, durante un periodo igual con el programa nuevo. Las rutas, los vehículos y la carga son los mismos en los dos periodos.
+
+Datos. Tiempo medio de reparto en minutos, ruta por ruta y en el mismo orden.
+Programa antiguo: 52; 75; 38; 91; 64; 47; 83; 58.
+Programa nuevo: 49; 71; 37; 86; 61; 45; 78; 55.
+
+Método. Como las varianzas podrían no ser iguales, se aplica la prueba t para dos muestras independientes con varianzas desiguales, bilateral, con nivel de significación 0,05.
+
+Resultado. Media con el programa antiguo 63,50 min (desviación típica 18,34); media con el programa nuevo 60,25 min (desviación típica 16,99). Error estándar de la diferencia: 8,84 min. Estadístico t = 3,25 / 8,84 = 0,37, con 13,9 grados de libertad según la aproximación para varianzas desiguales, p = 0,719.
+
+Conclusión. La reducción media de 3,25 minutos no alcanza la significación estadística. No se puede afirmar que el programa nuevo acorte los tiempos de reparto, y la mejora observada es compatible con el azar.

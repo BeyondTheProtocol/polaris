@@ -1,0 +1,9 @@
+Contexto. Un taller mecaniza pasadores de acero cuya longitud nominal es 50,00 mm, con una tolerancia de más o menos 0,15 mm: un pasador es válido si mide entre 49,85 y 50,15 mm. Antes de enviar un lote grande al cliente, que monta los pasadores sin revisarlos, se quiere estimar qué parte de las piezas cumple la tolerancia y decidir si hace falta medir todas.
+
+Datos. Se miden 64 pasadores tomados al azar del lote. El informe de metrología da la media de la muestra, 50,02 mm, y el error estándar de esa media, 0,05 mm. Las longitudes siguen una distribución aproximadamente normal.
+
+Método. En una distribución normal, cerca del 95 % de los valores individuales queda a menos de dos desviaciones típicas de la media. Se calcula ese intervalo para las piezas y se compara con los límites de tolerancia.
+
+Resultado. Intervalo que contiene aproximadamente el 95 % de los pasadores: 50,02 más o menos 2 por 0,05, es decir, de 49,92 a 50,12 mm. Ese intervalo queda entero dentro de los límites 49,85 y 50,15 mm.
+
+Conclusión. Prácticamente todos los pasadores del lote cumplen la tolerancia: el intervalo del 95 % de las piezas deja un margen de 0,03 mm respecto al límite superior y de 0,07 mm respecto al inferior. El lote se puede enviar sin inspección unitaria.

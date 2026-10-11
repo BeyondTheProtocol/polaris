@@ -1,0 +1,9 @@
+Contexto. Un fabricante de cable de acero debe documentar la carga media de rotura de un lote antes de entregarlo. El contrato exige que la carga media de rotura del lote no sea inferior a 82,0 kilonewtons. El ensayo es destructivo, de modo que solo se puede romper una muestra.
+
+Datos. Se cortan al azar 25 tramos del lote y se ensayan a tracción hasta la rotura. Carga media de rotura de la muestra: 84,6 kN. Desviación típica: 3,5 kN. Los valores no muestran asimetría ni datos extremos.
+
+Método. Se calcula el intervalo de confianza del 95 % para la carga media de rotura del lote con la distribución t. El error estándar de la media es la desviación típica dividida entre la raíz del tamaño de la muestra, y el valor crítico de la t con 24 grados de libertad es 2,064.
+
+Resultado. Error estándar: 3,5 / 5 = 0,70 kN. Margen: 2,064 por 0,70 = 1,44 kN. Intervalo de confianza del 95 %: de 83,2 a 86,0 kN. El límite inferior queda por encima de los 82,0 kN del contrato.
+
+Conclusión. Hay una probabilidad del 95 % de que la carga media de rotura verdadera del lote esté entre 83,2 y 86,0 kN. Como todo el intervalo supera el mínimo del contrato, el lote se puede entregar con la documentación de este ensayo.

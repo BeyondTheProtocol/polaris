@@ -1,0 +1,11 @@
+Contexto. Una cooperativa compara dos abonos, el habitual y uno nuevo, en un cultivo de cereal. Para ello usa 10 parcelas de suelos muy distintos entre sí. Cada parcela se divide en dos mitades iguales: una mitad recibe el abono habitual y la otra el nuevo, con la mitad asignada por sorteo.
+
+Datos. Cosecha en kilogramos por mitad de parcela, en el mismo orden de parcelas.
+Abono habitual: 41,2; 35,8; 47,5; 30,1; 44,0; 38,6; 50,3; 33,4; 42,7; 36,9.
+Abono nuevo: 42,9; 37,1; 48,4; 32,0; 45,8; 39,5; 52,6; 34,3; 44,9; 38,2.
+
+Método. Se comparan las medias de los dos abonos con una prueba t para dos muestras independientes con varianza común, bilateral, con nivel de significación 0,05.
+
+Resultado. Media con el abono habitual 40,05 kg (desviación típica 6,31); media con el abono nuevo 41,57 kg (desviación típica 6,49). La desviación típica combinada es 6,40 y el error estándar de la diferencia, 2,86. El estadístico es t = 1,52 / 2,86 = 0,53 con 18 grados de libertad, p = 0,602. El valor crítico es 2,101.
+
+Conclusión. La diferencia de 1,52 kg a favor del abono nuevo no es estadísticamente significativa. Con estos datos no hay evidencia de que el abono nuevo aumente la cosecha. Para detectar una diferencia de ese tamaño harían falta más parcelas.
