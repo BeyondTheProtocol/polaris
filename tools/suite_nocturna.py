@@ -23,6 +23,14 @@ QUÉ HACE, en orden:
      `suite_nocturna/<fecha>/` con el log y los rojos. Si el propio runner se cuelga o revienta,
      estado «fallo» y aviso: una nocturna muda es peor que ninguna.
 
+REGLAS QUE SALEN DEL 11-OCT-26 (cada una con su test y su mutante):
+  · Una sola pasada a la vez (cerrojo `suite_nocturna/pasada.lock`); cada entrada del historial lleva inicio, fin y pid.
+  · Un HALT que aparece con la pasada en marcha (se mira cada 5 s, y al acabar) la PARA: la entrada queda
+    `interrumpida_por_halt`, sin clasificar rojos, sin deuda, sin aviso, y NO cuenta en C1 ni como roja ni como buena.
+  · `test_deuda_escalada.py` con solo su semáforo en rojo es un INDICADOR (`indicadores` en la entrada), no un rojo; en
+    cambio una deuda escalada marcada del muro (`deuda_muro_escalada`) sí saca a la noche de la racha C1.
+  · C1 mira UNA entrada por día: la última concluyente (ni «fallo» ni interrumpida por HALT).
+
 `condiciones` dice si se cumplen las TRES condiciones para cambiar la norma «suite completa antes
 de fusionar» (decisión 10-oct-26): A) la puerta falla cerrada en casa base, B) existe la lista de
 rojos conocidos con sus vetos, C) tres noches seguidas con latido y un rojo sembrado a propósito que
@@ -50,6 +58,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -66,6 +75,7 @@ HISTORIAL = os.path.join(DIR, "historial.jsonl")
 SEMBRADO = os.path.join(DIR, "sembrado.json")
 TOPE_S = int(os.environ.get("BTP_SUITE_NOCTURNA_TOPE_S", "10800"))      # 3 h
 TOPE_REPETIR_S = int(os.environ.get("BTP_SUITE_NOCTURNA_TOPE_REPETIR_S", "600"))
+SONDEO_S = float(os.environ.get("BTP_SUITE_NOCTURNA_SONDEO_S", "5"))      # cada cuánto mira si ha aparecido un HALT
 DOMINGO = 6
 
 
@@ -84,7 +94,15 @@ def _heartbeat(estado, **extra):
         pass
 
 
+def _reloj():
+    """Hora local con zona, para el historial: hasta el 11-oct las entradas no llevaban hora y no se podía saber cuándo
+    corrió cada pasada ni si una pisó a otra."""
+    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+
+
 def _historial(entrada):
+    if "inicio" in entrada:
+        entrada["fin"] = _reloj()
     try:
         os.makedirs(DIR, exist_ok=True)
         with open(HISTORIAL, "a", encoding="utf-8") as f:
@@ -171,6 +189,37 @@ def _es_muro(bateria):
         return str(bateria).startswith(_MURO_RESPALDO)     # sin el módulo: nunca MENOS vetos
 
 
+# Baterías que son un SEMÁFORO de estado, no una defensa (11-oct-26). `test_deuda_escalada.py` se pone roja A PROPÓSITO
+# mientras haya deuda escalada sin cerrar («no digas todo en verde»): no mide si el código está roto. Se le trata como
+# indicador SOLO si lo único que falla es esa comprobación; si falla otra del fichero (las reglas de cierre de la deuda),
+# es un rojo normal. Batería -> las únicas comprobaciones cuyo fallo es el semáforo.
+_INDICADORES = {"test_deuda_escalada.py": {"test_no_hay_deuda_escalada_sin_cerrar"}}
+
+
+def _fallos_de(log_texto):
+    """Nombres de las comprobaciones unittest que fallaron en un log; vacío si no se reconoce ninguna."""
+    return set(re.findall(r"^(?:FAIL|ERROR): (\w+) \(", log_texto, re.M))
+
+
+def es_indicador(bateria, log_texto):
+    """True si el rojo de `bateria` es solo su semáforo de estado (y no una rotura de la propia batería)."""
+    semaforo = _INDICADORES.get(bateria)
+    fallos = _fallos_de(log_texto)
+    return bool(semaforo and fallos and fallos <= semaforo)
+
+
+def deuda_muro_escalada():
+    """Claves de deuda ESCALADA y marcada del muro, salvo las que la propia nocturna abre (`suite-nocturna-…`: son el
+    espejo de un rojo de ESA noche, que ya cuenta por sí mismo; contarlas de nuevo ataría la racha a una deuda vieja
+    aunque la batería ya estuviera verde). Esto es lo que mantiene a una noche fuera de la racha C1 por una deuda del
+    muro sin cerrar. Si el libro no se puede leer, sale un marcador: nunca MENOS vetos."""
+    try:
+        import deuda
+        return sorted(k for k, v in deuda.escaladas().items() if v.get("muro") and not k.startswith("suite-nocturna-"))
+    except Exception as e:   # noqa: BLE001
+        return ["libro-de-deuda-ilegible: %r" % e]
+
+
 def _env_limpio(extra=None):
     env = {k: v for k, v in os.environ.items()
            if k not in ("CI", "BTP_JOBS", "BTP_ROJO_DIR", "BTP_PORTABLE", "CLAUDE_PROJECT_DIR")
@@ -179,8 +228,18 @@ def _env_limpio(extra=None):
     return env
 
 
+def _ficheros_halt():
+    """Los HALT que cuentan. BTP_HALT_FILES (":" entre rutas) los aísla, como en borde/cost_guard/mcp_server: sin eso el
+    test de esta herramienta leía el ~/.btp.HALT REAL y salía rojo (y su campaña de mutantes con él, «el test ya está
+    ROJO sin mutar») mientras había un código rojo puesto (11-oct-26, 06:01-09:55)."""
+    fijados = os.environ.get("BTP_HALT_FILES")
+    if fijados:
+        return tuple(p for p in fijados.split(":") if p)
+    return (os.path.expanduser("~/.btp.HALT"), os.path.join(REPO, ".HALT"))
+
+
 def halt_activo():
-    return any(os.path.exists(p) for p in (os.path.expanduser("~/.btp.HALT"), os.path.join(REPO, ".HALT")))
+    return any(os.path.exists(p) for p in _ficheros_halt())
 
 
 def repetir_sola(bateria):
@@ -195,6 +254,99 @@ def repetir_sola(bateria):
         return p.returncode in (0, 77)
     except Exception:
         return False
+
+
+def _parar(proc):
+    """Termina el grupo de procesos entero (la suite lanza xargs, bash y python hijos), no solo al hijo directo: con
+    `subprocess.run(timeout=…)` los nietos seguían vivos tras el «fallo» por tiempo y pisaban la pasada siguiente."""
+    for sig, espera in ((signal.SIGTERM, 15), (signal.SIGKILL, 5)):
+        try:
+            os.killpg(proc.pid, sig)
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
+        try:
+            proc.wait(timeout=espera)
+            return
+        except subprocess.TimeoutExpired:
+            continue
+
+
+def _corre_vigilando(cmd, env, tope_s, stdout=None):
+    """Corre `cmd` en su propio grupo y lo vigila: si aparece un HALT lo para (el HALT es pausa total) y si pasa de `tope_s`
+    también. Devuelve (rc, salida_capturada, motivo) con motivo None | 'halt' | 'tope'. `stdout=<fichero>` lo vuelca allí
+    (salida_capturada ''); sin él la captura. Mira el HALT antes de lanzar y cada SONDEO_S segundos."""
+    ya = halt_activo()
+    if ya:
+        return None, "", "halt"
+    proc = subprocess.Popen(cmd, cwd=REPO, env=env, stdin=subprocess.DEVNULL, stdout=stdout if stdout is not None else subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, start_new_session=True)
+    t0 = time.time()
+    while True:
+        try:
+            out, _ = proc.communicate(timeout=SONDEO_S)
+            return proc.returncode, out or "", None
+        except subprocess.TimeoutExpired:
+            motivo = "halt" if halt_activo() else ("tope" if time.time() - t0 > tope_s else None)
+            if motivo:
+                _parar(proc)
+                try:
+                    out = proc.communicate(timeout=5)[0]
+                except Exception:   # noqa: BLE001
+                    out = ""
+                return proc.returncode, out or "", motivo
+
+
+# ── una sola pasada a la vez ──────────────────────────────────────────────────────────────
+LOCK = os.path.join(DIR, "pasada.lock")
+LOCK_VIEJO_S = 12 * 3600        # un cerrojo más viejo que esto es de una pasada muerta aunque el pid se haya reutilizado
+
+
+def _vivo(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except (PermissionError, ValueError, TypeError, OverflowError):
+        return True       # existe pero no es nuestro / dato raro: ante la duda, vivo
+
+
+def _tomar_lock():
+    """None si la tomamos; si no, una descripción de quién la tiene. Cerrojo de fichero (O_EXCL): hasta el 11-oct nada
+    impedía que un kick de launchd o una pasada a mano corrieran a la vez sobre la misma carpeta del día, el mismo
+    tests/test_all.sh (que las campañas de mutantes mutan EN SITIO) y el mismo historial."""
+    os.makedirs(DIR, exist_ok=True)
+    for _ in range(3):
+        try:
+            fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            try:
+                d = json.load(open(LOCK, encoding="utf-8"))
+            except Exception:   # noqa: BLE001
+                d = {}
+            try:
+                edad = time.time() - os.path.getmtime(LOCK)
+            except OSError:
+                continue
+            if d.get("pid") and _vivo(d["pid"]) and edad < LOCK_VIEJO_S:
+                return "pid %s, desde %s" % (d.get("pid"), d.get("inicio", "?"))
+            try:
+                os.remove(LOCK)          # de una pasada muerta: se toma
+            except OSError:
+                pass
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"pid": os.getpid(), "inicio": _reloj()}, f)
+        return None
+    return "no pude tomar el cerrojo %s" % LOCK
+
+
+def _soltar_lock():
+    try:
+        if json.load(open(LOCK, encoding="utf-8")).get("pid") == os.getpid():
+            os.remove(LOCK)
+    except Exception:   # noqa: BLE001
+        pass
 
 
 # ── el rojo sembrado y su confirmación ───────────────────────────────────────────────────
@@ -294,7 +446,8 @@ def pasada(hoy=None, sembrar=False):
     domingo = hoy.weekday() == DOMINGO
     entrada = {"fecha": hoy.isoformat(), "corrio": False, "dia": "domingo (serie)" if domingo else "paralelo",
                "jobs": 1 if domingo else int(os.environ.get("BTP_SUITE_NOCTURNA_JOBS", "6")),
-               "nuevos": [], "conocidos": [], "flaky": [], "sin_log": 0, "sembrado": bool(sembrar), "avisado": None}
+               "nuevos": [], "conocidos": [], "flaky": [], "sin_log": 0, "sembrado": bool(sembrar), "avisado": None,
+               "inicio": _reloj(), "pid": os.getpid()}
 
     real = os.path.realpath(REPO)
     if "/.claude/worktrees/" in real and not os.environ.get("BTP_SUITE_NOCTURNA_PERMITE_WORKTREE"):
@@ -306,27 +459,76 @@ def pasada(hoy=None, sembrar=False):
         _historial(entrada)
         return 0, entrada
 
+    otra = _tomar_lock()
+    if otra:      # otra pasada VIVA (un kick, una a mano): dos a la vez se pisaban rojos, log y campañas de mutantes
+        entrada["nota"] = "otra pasada en curso (%s): no corrí" % otra
+        sys.stderr.write("suite_nocturna: %s\n" % entrada["nota"])
+        _historial(entrada)
+        return 0, entrada
+    try:
+        return _correr(hoy, domingo, entrada, sembrar)
+    finally:
+        _soltar_lock()
+
+
+def _que_campana(salida):
+    """Qué mutante sobrevive (o que el test ya estaba rojo), no la última línea de `mutantes.py`: esa es siempre el mismo
+    «Esa defensa no está cubierta…» y el 11-oct la deuda no decía CUÁL (hubo que reproducirlo a mano)."""
+    lineas = [l.strip() for l in (salida or "").splitlines() if l.strip()]
+    clave = [l for l in lineas if "SOBREVIVE" in l or "ROJO" in l]
+    return " | ".join(clave)[:400] if clave else (lineas[-1][:200] if lineas else "(sin salida)")
+
+
+def _interrumpida(entrada, donde):
+    """Una pasada cortada por un HALT no vale ni como rojo ni como noche buena: sin deuda, sin aviso, sin contar en C1."""
+    entrada["interrumpida_por_halt"] = True
+    entrada["estado"] = "interrumpida_halt"
+    entrada["nota"] = ("HALT activo %s: la pasada no es concluyente (ni rojo ni noche buena). Lo hallado antes del HALT, si "
+                       "algo, queda en la deuda; los logs, en la carpeta de la noche." % donde)
+    _heartbeat("ok_sin_novedad", corrio=False, nota=entrada["nota"], interrumpida=True)
+    _historial(entrada)
+    return 0, entrada
+
+
+def _correr(hoy, domingo, entrada, sembrar):
     carpeta = os.path.join(DIR, hoy.isoformat())
     rojos = os.path.join(carpeta, "rojos")
     os.makedirs(rojos, exist_ok=True)
     log = os.path.join(carpeta, "salida.log")
+    # una pasada anterior del mismo día no puede dejar rojos viejos en la carpeta (se clasificarían como de esta noche) ni
+    # perder su log: el log se aparta, los rojos se limpian
+    for viejo in os.listdir(rojos):
+        if viejo.startswith("rojo-"):
+            try:
+                os.remove(os.path.join(rojos, viejo))
+            except OSError:
+                pass
+    if os.path.exists(log):
+        try:
+            os.replace(log, os.path.join(carpeta, "salida-%d.log" % os.path.getmtime(log)))
+        except OSError:
+            pass
     t0 = time.time()
-    runner_ok, rc_suite = True, None
+    runner_ok, rc_suite, motivo = True, None, None
     try:
         with open(log, "w", encoding="utf-8") as f:
-            p = subprocess.run(["bash", os.path.join(REPO, "tests", "test_all.sh")], cwd=REPO, stdout=f,
-                               stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, timeout=TOPE_S,
-                               env=_env_limpio({"BTP_JOBS": str(entrada["jobs"]), "BTP_ROJO_DIR": rojos}))
-        rc_suite = p.returncode
-    except subprocess.TimeoutExpired:
-        runner_ok = False
-        entrada["error"] = "la suite no acabó en %d s (colgada o la máquina va muy justa)" % TOPE_S
+            rc_suite, _o, motivo = _corre_vigilando(["bash", os.path.join(REPO, "tests", "test_all.sh")],
+                                                    _env_limpio({"BTP_JOBS": str(entrada["jobs"]), "BTP_ROJO_DIR": rojos}),
+                                                    TOPE_S, stdout=f)
     except Exception as e:   # noqa: BLE001
         runner_ok = False
         entrada["error"] = "no pude lanzar la suite: %r" % e
+    else:
+        if motivo == "tope":
+            runner_ok = False
+            entrada["error"] = "la suite no acabó en %d s (colgada o la máquina va muy justa)" % TOPE_S
     entrada["segundos"] = int(time.time() - t0)
     entrada["corrio"] = True
     entrada["rc"] = rc_suite
+    # HALT durante la pasada (o a caballo de ella: puesto justo al acabar): los rojos de esa pasada no son de fiar. El
+    # 11-oct la pasada de las 05:48 vio el HALT de las 06:01 y siete baterías salieron rojas por él, no por el código.
+    if motivo == "halt" or halt_activo():
+        return _interrumpida(entrada, "durante la suite")
 
     if not runner_ok:
         a = avisar("La suite nocturna NO pudo completarse: %s. Sin pasada de verdad no hay red de seguridad esta noche."
@@ -350,6 +552,19 @@ def pasada(hoy=None, sembrar=False):
         nuevos = sorted(f[5:-4] for f in os.listdir(rojos) if f.startswith("rojo-") and f.endswith(".log"))
     entrada["conocidos"] = conocidos
     entrada["sin_log"] = max(0, (rc_suite or 0) - len(nuevos)) if (rc_suite or 0) > 0 else 0
+    # los semáforos de estado (test_deuda_escalada con solo su comprobación roja) se apuntan aparte: ni deuda propia (se
+    # escalaría a sí mismo), ni repetición, ni estado rojo. Siguen contando en `rc` (por eso arriba, antes de apartarlos).
+    entrada["indicadores"] = []
+    for b in list(nuevos):
+        try:
+            texto = open(os.path.join(rojos, "rojo-%s.log" % b), encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        if es_indicador(b, texto):
+            nuevos.remove(b)
+            entrada["indicadores"].append(b)
+    # una deuda ESCALADA marcada del muro sigue pesando en la noche aunque ninguna batería esté roja
+    entrada["deuda_muro_escalada"] = deuda_muro_escalada()
 
     # repetir cada nuevo SOLO; deuda; ¿muro?
     muro_rojos = []
@@ -377,16 +592,19 @@ def pasada(hoy=None, sembrar=False):
             if not os.path.isfile(ruta):
                 continue
             try:
-                q = subprocess.run([sys.executable, os.path.join(REPO, "tools", "mutantes.py"), ruta], cwd=REPO,
-                                   env=_env_limpio(), capture_output=True, text=True, timeout=TOPE_S,
-                                   stdin=subprocess.DEVNULL)
-                if q.returncode != 0:
+                rc_c, out_c, motivo_c = _corre_vigilando([sys.executable, os.path.join(REPO, "tools", "mutantes.py"), ruta],
+                                                         _env_limpio(), TOPE_S)
+                if motivo_c == "halt":      # una campaña cortada por un HALT no dice nada de la defensa
+                    return _interrumpida(entrada, "durante la campaña de mutantes %s" % camp)
+                if motivo_c == "tope":
+                    raise RuntimeError("la campaña no acabó en %d s" % TOPE_S)
+                if rc_c != 0:
                     nombre = "mutantes-" + camp
                     entrada["nuevos"].append(nombre)
                     _deuda("suite-nocturna-%s" % nombre,
                            "La campaña de mutantes %s tiene mutantes que SOBREVIVEN (o su test está rojo): "
                            "una defensa de la puerta de fusión ya no está cubierta. Última línea: %s"
-                           % (camp, (q.stdout.strip().splitlines() or [""])[-1][:200]), True)
+                           % (camp, _que_campana(out_c)), True)
                     muro_rojos.append(nombre)
             except Exception as e:   # noqa: BLE001
                 entrada["nuevos"].append("mutantes-" + camp)
@@ -419,6 +637,8 @@ def _muro_en_la_noche(x):
     """¿Esa noche hubo una batería del NÚCLEO DEL MURO en rojo (nueva, intermitente o conocida)? Una noche así NO cuenta
     para la racha: el muro en rojo no es una red sana, aunque la pasada «corriera»."""
     if x.get("estado") == "rojo_muro":
+        return True
+    if x.get("deuda_muro_escalada"):      # 11-oct-26: una deuda escalada del muro sin cerrar no es una red sana
         return True
     return any(_es_muro(b) for b in set(x.get("nuevos", [])) | set(x.get("flaky", [])) | set(x.get("conocidos", [])))
 
@@ -457,8 +677,17 @@ def condiciones(ahora=None):
     # C1: tres noches seguidas, con pasada de verdad, sin «fallo» y SIN el núcleo del muro en rojo (10-oct-26,
     # consejero-arquitectura: una racha de tres noches con `test_gate_*` roja no puede dar por buena la red)
     todas = [x for x in leer_historial() if x.get("corrio") and x.get("estado") != "fallo"]
-    h = [x for x in todas if not _muro_en_la_noche(x)]
-    descartadas = sorted({x["fecha"] for x in todas if x not in h and x.get("fecha")})
+    interrumpidas = sorted({x["fecha"] for x in todas if x.get("interrumpida_por_halt") and x.get("fecha")})
+    todas = [x for x in todas if not x.get("interrumpida_por_halt")]     # cortada por un HALT: ni noche buena ni roja
+    # UNA entrada por día: un día puede tener varias pasadas (kicks, pasadas a mano, reintentos; el 11-oct hubo cuatro) y
+    # decide la ÚLTIMA concluyente, que es el estado en que quedó casa base. Antes cada entrada se miraba suelta y un
+    # día con una pasada buena y otra con el muro en rojo contaba como noche buena Y como descartada a la vez.
+    por_fecha = {}
+    for x in todas:
+        if x.get("fecha"):
+            por_fecha[x["fecha"]] = x
+    h = [x for x in por_fecha.values() if not _muro_en_la_noche(x)]
+    descartadas = sorted(f for f, x in por_fecha.items() if x not in h)
     fechas = sorted({x["fecha"] for x in h if x.get("fecha")})
     seguidas = 0
     if fechas:
@@ -479,7 +708,8 @@ def condiciones(ahora=None):
     out.append(("C1", seguidas >= 3 and edad_h is not None and edad_h <= 30,
                 "noches seguidas con pasada, sin «fallo» y sin el muro en rojo: %d (hacen falta 3) · último latido hace %s%s"
                 % (seguidas, ("%.1f h" % edad_h) if edad_h is not None else "—",
-                   (" · descartadas por muro en rojo: %s" % ", ".join(descartadas)) if descartadas else "")))
+                   ((" · descartadas por muro en rojo o deuda del muro: %s" % ", ".join(descartadas)) if descartadas else "")
+                   + ((" · con pasada cortada por un HALT (no cuenta): %s" % ", ".join(interrumpidas)) if interrumpidas else ""))))
     # C2: el sembrado llegó y ella lo confirmó
     try:
         s = json.load(open(SEMBRADO, encoding="utf-8"))

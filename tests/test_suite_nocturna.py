@@ -48,8 +48,11 @@ ROJOS="${BTP_ROJO_DIR:?}"; mkdir -p "$ROJOS"
 echo corrio > "$(dirname "$0")/../cfg/corrio.marca"
 [ -f "$(dirname "$0")/../cfg/dormir" ] && sleep "$(cat "$(dirname "$0")/../cfg/dormir")"
 if [ -f "$(dirname "$0")/../cfg/rojos.txt" ]; then
-  while IFS='|' read -r n l; do [ -n "$n" ] && printf '%s\n' "$l" > "$ROJOS/rojo-$n.log"; done < "$(dirname "$0")/../cfg/rojos.txt"
+  while IFS='|' read -r n l; do [ -n "$n" ] && printf '%b\n' "$l" > "$ROJOS/rojo-$n.log"; done < "$(dirname "$0")/../cfg/rojos.txt"
 fi
+C="$(dirname "$0")/../cfg"
+[ -f "$C/halt_al_final" ] && { touch "$C/../.HALT"; sleep 30; }     # un HALT que aparece con la suite en marcha
+[ -f "$C/halt_y_sale" ] && touch "$C/../.HALT"                      # un HALT puesto justo al acabar
 exit "$(cat "$(dirname "$0")/../cfg/rc" 2>/dev/null || echo 0)"
 '''
 
@@ -82,7 +85,9 @@ def corre(root, *args, hoy="2026-10-12", ahora=None, extra=None, tope=None):
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_JOBS", "BTP_ROJO_DIR", "BTP_REPO", "BTP_STATE_DIR")}
     env.update(BTP_REPO=root, BTP_STATE_DIR=os.path.join(root, "estado"), BTP_SUITE_NOCTURNA_HOY=hoy,
                BTP_SUITE_NOCTURNA_AVISO_A=alerta, BTP_SUITE_NOCTURNA_PERMITE_WORKTREE="",
-               BTP_TRANSCRIPTS_DIR=os.path.join(root, "transcripts"))
+               BTP_TRANSCRIPTS_DIR=os.path.join(root, "transcripts"),
+               # el HALT del juguete, no el ~/.btp.HALT real: con un código rojo puesto este test salía rojo
+               BTP_HALT_FILES=os.path.join(root, ".HALT") + ":" + os.path.join(root, "ext.HALT"))
     if ahora:
         env["BTP_SUITE_NOCTURNA_AHORA"] = ahora
     if tope:
@@ -163,6 +168,12 @@ print("6) HALT, worktree y runner colgado")
 root = juguete(halt=True)
 r, al = corre(root)
 check(r.returncode == 0 and not os.path.exists(os.path.join(root, "cfg", "corrio.marca")) and not hist(root)[0]["corrio"], "con HALT no corre y lo apunta")
+root = juguete()
+home_halt = tempfile.mkdtemp(prefix="homehalt_")
+open(os.path.join(home_halt, ".btp.HALT"), "w").write("x")
+r, al = corre(root, extra={"HOME": home_halt})
+check(r.returncode == 0 and os.path.exists(os.path.join(root, "cfg", "corrio.marca")) and hist(root)[0]["corrio"],
+      "BTP_HALT_FILES aísla: un ~/.btp.HALT real (aquí, en un HOME falso) no para la pasada del juguete (11-oct: el test salía rojo con el código rojo puesto)")
 root = juguete(en_worktree=True)
 r, al = corre(root)
 check(r.returncode == 2 and not os.path.exists(os.path.join(root, "cfg", "corrio.marca")), "desde un worktree se niega (rc 2) y no corre nada")
@@ -406,6 +417,141 @@ finally:
             os.environ.pop(_k, None)
         else:
             os.environ[_k] = _v
+
+print("10) el semáforo de la deuda escalada es un indicador; la deuda escalada del muro sigue contando")
+SEMAFORO = "FAIL: test_no_hay_deuda_escalada_sin_cerrar (__main__.DeudaReal)"
+root = juguete(rojos=[("test_deuda_escalada.py", SEMAFORO)], rc=1)
+r, al = corre(root)
+h = hist(root)[0]
+check(h["indicadores"] == ["test_deuda_escalada.py"] and h["nuevos"] == [] and h["estado"] == "ok" and r.returncode == 0,
+      "solo el semáforo en rojo → indicador, estado «ok», no cuenta como rojo (estado=%s, nuevos=%s)" % (h["estado"], h["nuevos"]))
+check("suite-nocturna-test_deuda_escalada.py" not in deuda(root) and not al, "…y no abre deuda propia (se escalaría a sí mismo) ni avisa")
+check(h["sin_log"] == 0, "…y no lo cuenta como «rojo sin log» (sin_log=%s)" % h["sin_log"])
+root = juguete(rojos=[("test_deuda_escalada.py", "FAIL: test_cerrar_exige_un_test (__main__.Reglas)")], rc=1)
+r, al = corre(root)
+h = hist(root)[0]
+check(h["nuevos"] == ["test_deuda_escalada.py"] and h["indicadores"] == [] and h["estado"] == "rojo_nuevo",
+      "si falla OTRA comprobación del fichero (las reglas de cierre) es un rojo normal")
+root = juguete(rojos=[("test_deuda_escalada.py", SEMAFORO + "\\nFAIL: test_cerrar_exige_un_test (__main__.Reglas)")], rc=1)
+r, al = corre(root)
+check(hist(root)[0]["nuevos"] == ["test_deuda_escalada.py"], "semáforo + otra comprobación rota → rojo normal (no se esconde la rotura tras el semáforo)")
+root = juguete(rojos=[("test_otra_cosa.py", SEMAFORO)], rc=1)
+r, al = corre(root)
+check(hist(root)[0]["nuevos"] == ["test_otra_cosa.py"], "el nombre del semáforo en OTRA batería no la exime")
+root = juguete(rojos=[("test_deuda_escalada.py", "Traceback (most recent call last):\\nboom")], rc=1)
+r, al = corre(root)
+check(hist(root)[0]["nuevos"] == ["test_deuda_escalada.py"], "un log que no se reconoce (se rompió, no es el semáforo) es un rojo normal")
+
+root = juguete()
+json.dump({"deuda-del-muro": {"estado": "escalado", "muro": True, "veces": 2},
+           "deuda-normal": {"estado": "escalado", "muro": False, "veces": 5},
+           "muro-sin-escalar": {"estado": "abierto", "muro": True},
+           "suite-nocturna-test_x.py": {"estado": "escalado", "muro": True}},
+          open(os.path.join(root, "estado", "deuda.json"), "w"))
+r, al = corre(root)
+check(hist(root)[0]["deuda_muro_escalada"] == ["deuda-del-muro"],
+      "se apunta SOLO la deuda escalada y del muro (no la normal, no la abierta, no el espejo suite-nocturna-*): %s" % hist(root)[0]["deuda_muro_escalada"])
+root = juguete()
+r, al = corre(root)
+check(hist(root)[0]["deuda_muro_escalada"] == [], "sin deuda del muro, lista vacía")
+
+DEBUG = {"fecha": BUENAS[1], "corrio": True, "estado": "ok"}
+root, ahora = prepara_condiciones([BUENAS[0], dict(DEBUG, deuda_muro_escalada=["subagente-ejecuta-lo-que-el-muro-me-deniega"]), BUENAS[2]], sembrado=SEMB_OK)
+rc_dm, out_dm = veredicto(root, ahora)
+check(rc_dm == 1 and "❌ C1" in out_dm, "una noche con deuda escalada del MURO sin cerrar no entra en la racha")
+root, ahora = prepara_condiciones([BUENAS[0], dict(DEBUG, indicadores=["test_deuda_escalada.py"], deuda_muro_escalada=[]), BUENAS[2]], sembrado=SEMB_OK)
+rc_in, out_in = veredicto(root, ahora)
+check(rc_in == 0, "una noche con solo el semáforo en rojo SÍ entra en la racha (rc=%d)" % rc_in)
+
+print("11) HALT a mitad de la pasada, una sola pasada a la vez, y un día con varias entradas")
+import time as _time
+
+RAPIDO = {"BTP_SUITE_NOCTURNA_SONDEO_S": "0.3"}
+# a) el HALT aparece con la suite en marcha (y ya había escrito rojos): se para, no cuenta ni como rojo ni como noche buena
+root = juguete(rojos=[("test_roja.py", "❌ falla"), ("test_fuga_toy.py", "❌ el muro")], rc=1)
+open(os.path.join(root, "cfg", "halt_al_final"), "w").write("x")
+t0_ = _time.time()
+r, al = corre(root, extra=RAPIDO)
+seg_ = _time.time() - t0_
+h = hist(root)[0]
+check(r.returncode == 0 and h.get("interrumpida_por_halt") is True and h["estado"] == "interrumpida_halt",
+      "HALT con la suite en marcha → pasada «interrumpida_halt», rc 0 (rc=%d, estado=%s)" % (r.returncode, h.get("estado")))
+check(seg_ < 25 and h["nuevos"] == [] and h["flaky"] == [], "…se PARA la suite (no espera a los 30 s del juguete: %.1f s) y no clasifica sus rojos" % seg_)
+check(not deuda(root) and not al, "…sin deuda ni aviso (los rojos de una pasada con HALT no son del código)")
+check(latido(root)["estado"] == "ok_sin_novedad" and latido(root).get("interrumpida") is True, "…y el latido lo dice")
+check(not os.path.exists(os.path.join(root, "estado", "suite_nocturna", "pasada.lock")), "…y suelta el cerrojo")
+# b) el HALT se pone justo al acabar: tampoco es de fiar
+root = juguete(rojos=[("test_roja.py", "❌ falla")], rc=1)
+open(os.path.join(root, "cfg", "halt_y_sale"), "w").write("x")
+r, al = corre(root, extra=RAPIDO)
+h = hist(root)[0]
+check(h.get("interrumpida_por_halt") is True and h["nuevos"] == [] and not deuda(root),
+      "HALT puesto justo al acabar → también interrumpida, sin rojos ni deuda")
+# c) HALT en una campaña de mutantes del domingo (11-oct-26 es domingo): la campaña cortada no dice nada de la defensa
+root = juguete()
+os.makedirs(os.path.join(root, "tests", "mutantes"))
+open(os.path.join(root, "tests", "mutantes", "test_all_paralelo.json"), "w").write("{}")
+open(os.path.join(root, "tools", "mutantes.py"), "w").write(
+    "import os, time\nopen(os.path.join(%r, '.HALT'), 'w').write('x')\ntime.sleep(30)\n" % root)
+t0_ = _time.time()
+r, al = corre(root, hoy="2026-10-11", extra=RAPIDO)
+h = hist(root)[0]
+check(h.get("interrumpida_por_halt") is True and h["nuevos"] == [] and not deuda(root) and (_time.time() - t0_) < 25,
+      "HALT durante una campaña de mutantes → interrumpida, la campaña se corta y no abre deuda")
+# d) una campaña que sobrevive dice CUÁL (la última línea de mutantes.py es siempre la misma frase genérica)
+root = juguete()
+os.makedirs(os.path.join(root, "tests", "mutantes"))
+open(os.path.join(root, "tests", "mutantes", "test_all_paralelo.json"), "w").write("{}")
+open(os.path.join(root, "tools", "mutantes.py"), "w").write(
+    "print('  🔴 SOBREVIVE el mutante X OK')\nprint('❌ 1 mutante(s) SOBREVIVEN: el mutante X')\nprint('   Esa defensa no está cubierta')\nraise SystemExit(1)\n")
+r, al = corre(root, hoy="2026-10-11")
+q_ = deuda(root).get("suite-nocturna-mutantes-test_all_paralelo", {}).get("que", "")
+check("el mutante X" in q_ and "Esa defensa no está cubierta" not in q_, "la deuda de una campaña roja nombra el mutante que sobrevive (%s)" % q_[-90:])
+
+# e) una sola pasada a la vez
+root = juguete()
+lock_ = os.path.join(root, "estado", "suite_nocturna", "pasada.lock")
+os.makedirs(os.path.dirname(lock_))
+json.dump({"pid": os.getpid(), "inicio": "2026-10-12T03:00:00+02:00"}, open(lock_, "w"))
+r, al = corre(root)
+h = hist(root)[0]
+check(r.returncode == 0 and not os.path.exists(os.path.join(root, "cfg", "corrio.marca")) and not h["corrio"] and "otra pasada en curso" in h["nota"],
+      "con el cerrojo de una pasada VIVA no corre y lo apunta (%s)" % h.get("nota"))
+check(os.path.exists(lock_), "…y no le quita el cerrojo a la que corre")
+root = juguete()
+lock_ = os.path.join(root, "estado", "suite_nocturna", "pasada.lock")
+os.makedirs(os.path.dirname(lock_))
+json.dump({"pid": 999999, "inicio": "2026-10-11T03:00:00+02:00"}, open(lock_, "w"))
+r, al = corre(root)
+check(r.returncode == 0 and os.path.exists(os.path.join(root, "cfg", "corrio.marca")) and hist(root)[0]["corrio"] and not os.path.exists(lock_),
+      "con el cerrojo de una pasada MUERTA corre y lo suelta al acabar")
+h = hist(root)[0]
+check(h.get("inicio") and h.get("fin") and h.get("pid"), "cada entrada lleva inicio, fin y pid (antes no llevaban hora)")
+
+# f) lo que dejó una pasada anterior del mismo día no se cuela en esta
+root = juguete()
+vieja_ = os.path.join(root, "estado", "suite_nocturna", "2026-10-12")
+os.makedirs(os.path.join(vieja_, "rojos"))
+open(os.path.join(vieja_, "rojos", "rojo-test_vieja.py.log"), "w").write("❌ de una pasada anterior\n")
+open(os.path.join(vieja_, "salida.log"), "w").write("log de la pasada anterior\n")
+r, al = corre(root)
+h = hist(root)[0]
+check(h["nuevos"] == [] and h["estado"] == "ok", "un rojo viejo de otra pasada del mismo día no se clasifica como de esta (nuevos=%s)" % h["nuevos"])
+check(any(n.startswith("salida-") for n in os.listdir(vieja_)), "…y el log anterior se aparta, no se pierde")
+
+# g) varias entradas el mismo día: decide la ÚLTIMA concluyente; las interrumpidas por HALT ni suman ni restan
+OK_ = lambda d, **k: dict({"fecha": d, "corrio": True, "estado": "ok"}, **k)
+MURO_ = lambda d: {"fecha": d, "corrio": True, "estado": "rojo_muro", "nuevos": ["mutantes-x"]}
+HALT_ = lambda d: {"fecha": d, "corrio": True, "estado": "interrumpida_halt", "interrumpida_por_halt": True}
+for desc, noches, cumple in (
+        ("día con pasada en muro rojo Y una posterior verde → cuenta (decide la última)", [OK_(BUENAS[0]), MURO_(BUENAS[1]), OK_(BUENAS[1]), OK_(BUENAS[2])], True),
+        ("día con pasada verde Y una posterior en muro rojo → NO cuenta (decide la última)", [OK_(BUENAS[0]), OK_(BUENAS[1]), MURO_(BUENAS[1]), OK_(BUENAS[2])], False),
+        ("una pasada interrumpida por HALT tras la verde del día no la deshace", [OK_(BUENAS[0]), OK_(BUENAS[1]), HALT_(BUENAS[1]), OK_(BUENAS[2])], True),
+        ("un día con SOLO una pasada interrumpida por HALT no cuenta (rompe la racha)", [OK_(BUENAS[0]), HALT_(BUENAS[1]), OK_(BUENAS[2])], False),
+        ("una pasada interrumpida con estado de rojo no descarta un día bueno", [OK_(BUENAS[0]), OK_(BUENAS[1]), dict(MURO_(BUENAS[1]), interrumpida_por_halt=True), OK_(BUENAS[2])], True)):
+    root, ahora = prepara_condiciones(noches, sembrado=SEMB_OK)
+    rc_, out_ = veredicto(root, ahora)
+    check((rc_ == 0) == cumple, "%s (rc=%d)" % (desc, rc_))
 
 if fallos:
     print("\n❌ %d fallo(s)" % len(fallos))

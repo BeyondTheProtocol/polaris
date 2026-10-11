@@ -41,16 +41,23 @@ CAB = re.sub(r'LARGAS="[^"]*"', 'LARGAS=""', "\n".join(lineas[:ini]), count=1)
 FIN = "\n".join(lineas[fin:])
 
 
-def monta(tmpdir):
+def monta(tmpdir, paralelo=False):
     root = tempfile.mkdtemp(prefix="copia_fija_", dir=tmpdir)
     os.makedirs(os.path.join(root, "tests"))
     marca = os.path.join(root, "marcas")
     os.makedirs(marca)
+    espera = "import os, time\nfor _ in range(300):\n    if os.path.exists(%r): break\n    time.sleep(0.1)\n" % (marca + "/script_reescrito")
+    # 11-oct-26 (carrera): con 3 trabajos, A y C acaban al instante y el trabajador de D arrancaba ANTES de la reescritura
+    # (la reescritura espera al sondeo de 0,1 s): un trabajador que leyera el fichero VIVO ya habría leído el original y
+    # el mutante «los trabajadores leen el fichero vivo» sobrevivía según la velocidad de la máquina (verde con el
+    # entorno de una sesión, rojo con el de launchd). En paralelo A y C esperan a la reescritura: ocupan los 3 puestos y
+    # el trabajador de D solo puede arrancar DESPUÉS, o sea leyendo el fichero reescrito si no usa la copia.
+    # En serie no se espera (A bloquearía a B, que es quien dispara la reescritura).
     cuerpos = {
-        "test_a.py": "print('ok a')\n",
+        "test_a.py": (espera if paralelo else "") + "print('ok a')\n",
         # la batería B es la que da tiempo a reescribir el script: avisa de que ha empezado y espera
-        "test_b.py": "import os, time\nopen(%r, 'w').write('b-en-marcha')\nfor _ in range(100):\n    if os.path.exists(%r): break\n    time.sleep(0.1)\nprint('ok b')\n" % (marca + "/b_empezo", marca + "/script_reescrito"),
-        "test_c.py": "print('ok c')\n",
+        "test_b.py": "import os, time\nopen(%r, 'w').write('b-en-marcha')\nfor _ in range(300):\n    if os.path.exists(%r): break\n    time.sleep(0.1)\nprint('ok b')\n" % (marca + "/b_empezo", marca + "/script_reescrito"),
+        "test_c.py": (espera if paralelo else "") + "print('ok c')\n",
         "test_d.py": "print('ok d')\n",
     }
     for n, c in cuerpos.items():
@@ -63,7 +70,7 @@ def monta(tmpdir):
 
 def pasada(jobs):
     tmpdir = tempfile.mkdtemp(prefix="copia_fija_tmp_")
-    root, ruta, marca = monta(tmpdir)
+    root, ruta, marca = monta(tmpdir, paralelo=bool(jobs))
     original = open(ruta).read()
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE",
                                                             "BTP_TEST_ALL_ROOT", "BTP_TEST_ALL_COPIA", "BTP_TEST_ALL_DUENA")}

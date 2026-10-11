@@ -33,6 +33,121 @@
       "nuevo": "    if False:"
     },
     {
+      "etiqueta": "H: el HALT no se puede aislar con BTP_HALT_FILES (el test lee el ~/.btp.HALT real)",
+      "viejo": "    fijados = os.environ.get(\"BTP_HALT_FILES\")\n    if fijados:",
+      "nuevo": "    fijados = None\n    if fijados:"
+    },
+    {
+      "etiqueta": "K: el semáforo de la deuda escalada cuenta como un rojo más",
+      "viejo": "        if es_indicador(b, texto):",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "K: cualquier fallo de test_deuda_escalada se toma por el semáforo",
+      "viejo": "    return bool(semaforo and fallos and fallos <= semaforo)",
+      "nuevo": "    return bool(semaforo)"
+    },
+    {
+      "etiqueta": "K: un log que no se reconoce vale como semáforo",
+      "viejo": "    return bool(semaforo and fallos and fallos <= semaforo)",
+      "nuevo": "    return bool(semaforo and fallos <= semaforo)"
+    },
+    {
+      "etiqueta": "K: el semáforo exime a cualquier batería",
+      "viejo": "    semaforo = _INDICADORES.get(bateria)",
+      "nuevo": "    semaforo = next(iter(_INDICADORES.values()))"
+    },
+    {
+      "etiqueta": "K: la deuda escalada del muro no se apunta en la noche",
+      "viejo": "    entrada[\"deuda_muro_escalada\"] = deuda_muro_escalada()",
+      "nuevo": "    entrada[\"deuda_muro_escalada\"] = []"
+    },
+    {
+      "etiqueta": "K: la racha no mira la deuda escalada del muro",
+      "viejo": "    if x.get(\"deuda_muro_escalada\"):",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "K: toda deuda escalada cuenta como del muro",
+      "viejo": "if v.get(\"muro\") and not k.startswith(\"suite-nocturna-\")",
+      "nuevo": "if not k.startswith(\"suite-nocturna-\")"
+    },
+    {
+      "etiqueta": "K: el espejo suite-nocturna-* de la propia nocturna ata la racha",
+      "viejo": "if v.get(\"muro\") and not k.startswith(\"suite-nocturna-\")",
+      "nuevo": "if v.get(\"muro\")"
+    },
+    {
+      "etiqueta": "L: el HALT no se vigila mientras la suite corre",
+      "viejo": "            motivo = \"halt\" if halt_activo() else (\"tope\" if time.time() - t0 > tope_s else None)",
+      "nuevo": "            motivo = \"tope\" if time.time() - t0 > tope_s else None"
+    },
+    {
+      "etiqueta": "L: un HALT puesto justo al acabar la suite no se mira",
+      "viejo": "    if motivo == \"halt\" or halt_activo():",
+      "nuevo": "    if motivo == \"halt\":"
+    },
+    {
+      "etiqueta": "L: una pasada con HALT se clasifica como cualquier otra",
+      "viejo": "    if motivo == \"halt\" or halt_activo():",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "L: una campaña de mutantes cortada por un HALT abre deuda",
+      "viejo": "                if motivo_c == \"halt\":",
+      "nuevo": "                if False:"
+    },
+    {
+      "etiqueta": "L: dos pasadas pueden correr a la vez",
+      "viejo": "    otra = _tomar_lock()\n    if otra:",
+      "nuevo": "    otra = None\n    if otra:"
+    },
+    {
+      "etiqueta": "L: el cerrojo de una pasada muerta bloquea para siempre",
+      "viejo": "            if d.get(\"pid\") and _vivo(d[\"pid\"]) and edad < LOCK_VIEJO_S:",
+      "nuevo": "            if True:"
+    },
+    {
+      "etiqueta": "L: el cerrojo no se suelta al acabar",
+      "viejo": "    finally:\n        _soltar_lock()",
+      "nuevo": "    finally:\n        pass"
+    },
+    {
+      "etiqueta": "L: los rojos de una pasada anterior del día se cuelan en la siguiente",
+      "viejo": "        if viejo.startswith(\"rojo-\"):",
+      "nuevo": "        if False:"
+    },
+    {
+      "etiqueta": "L: el log de la pasada anterior se pierde",
+      "viejo": "            os.replace(log, os.path.join(carpeta, \"salida-%d.log\" % os.path.getmtime(log)))",
+      "nuevo": "            pass"
+    },
+    {
+      "etiqueta": "L: las entradas no llevan hora de inicio",
+      "viejo": "               \"inicio\": _reloj(), \"pid\": os.getpid()}",
+      "nuevo": "               \"pid\": os.getpid()}"
+    },
+    {
+      "etiqueta": "L: en un día con varias pasadas decide la primera",
+      "viejo": "            por_fecha[x[\"fecha\"]] = x",
+      "nuevo": "            por_fecha.setdefault(x[\"fecha\"], x)"
+    },
+    {
+      "etiqueta": "L: una pasada cortada por un HALT cuenta como noche",
+      "viejo": "    todas = [x for x in todas if not x.get(\"interrumpida_por_halt\")]",
+      "nuevo": "    pass"
+    },
+    {
+      "etiqueta": "L: la deuda de una campaña roja no dice qué mutante sobrevive",
+      "viejo": "% (camp, _que_campana(out_c)), True)",
+      "nuevo": "% (camp, (out_c.strip().splitlines() or [\"\"])[-1][:200]), True)"
+    },
+    {
+      "etiqueta": "L: la racha no distingue un día suelto de dos pasadas (todas las entradas cuentan)",
+      "viejo": "    h = [x for x in por_fecha.values() if not _muro_en_la_noche(x)]",
+      "nuevo": "    h = [x for x in todas if not _muro_en_la_noche(x)]"
+    },
+    {
       "etiqueta": "un runner colgado/roto no avisa ni marca «fallo»",
       "viejo": "    if not runner_ok:",
       "nuevo": "    if False:"
@@ -84,8 +199,8 @@
     },
     {
       "etiqueta": "G: las noches con el muro en rojo cuentan para la racha",
-      "viejo": "    h = [x for x in todas if not _muro_en_la_noche(x)]",
-      "nuevo": "    h = list(todas)"
+      "viejo": "    h = [x for x in por_fecha.values() if not _muro_en_la_noche(x)]",
+      "nuevo": "    h = list(por_fecha.values())"
     },
     {
       "etiqueta": "G: el estado rojo_muro no descarta la noche",
