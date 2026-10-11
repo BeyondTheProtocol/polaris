@@ -1,5 +1,5 @@
 {
- "_nota": "Auditoría propia de otra_casa.py, aparte de panel_vision/auditorias.json. NACE SIN CONFIRMAR: condiciones_cumplidas y cada constancia de {{TITULAR}} en false. Confirmarlo es un acto de {{TITULAR}} y no basta con poner «confirmada» a true: cada constancia lleva la fecha (el día de esta auditoría o después) y lo que vio o decidió, en el vocabulario que dice su condición; si falta algo, la boca no abre. Cambiar cualquier campo de la entrada cambia su huella y vuelve a avisar antes del siguiente primer envío. Sin cifras ni rasgos del caso, y en «que_ve» sin datos personales, sin saldos y sin la clave: este fichero se versiona. Revisada el 10-oct-2026 tras la segunda ronda de revisión (textos de c1 a c4, k1, k3, k4, k5 y u2, y tres datos de xAI más); nada confirmado.",
+ "_nota": "Auditoría propia de otra_casa.py, aparte de panel_vision/auditorias.json. Nació sin confirmar (condiciones_cumplidas y cada constancia de {{TITULAR}} en false). Confirmarlo es un acto de {{TITULAR}} y no basta con poner «confirmada» a true: cada constancia lleva la fecha (el día de esta auditoría o después) y lo que vio o decidió, en el vocabulario que dice su condición; si falta algo, la boca no abre. Cambiar cualquier campo de la entrada cambia su huella y vuelve a avisar antes del siguiente primer envío. Sin cifras ni rasgos del caso, y en «que_ve» sin datos personales, sin saldos y sin la clave: este fichero se versiona. Revisada el 10-oct-2026 tras la segunda ronda de revisión (textos de c1 a c4, k1, k3, k4, k5 y u2, y tres datos de xAI más); entonces, nada confirmado. CONFIRMADA el 11-oct-2026: {{TITULAR}} confirmó c1 a c4 en el chat y la sesión de Claude de la vía de Grok lo transcribió por orden suya (ver condiciones_cumplidas_como); la consola de xAI la leyó esa sesión con el navegador de {{TITULAR}}, en solo lectura.",
  "grok": {
   "veredicto": "apto con condiciones",
   "fase": 1,
@@ -80,35 +80,36 @@
     "texto": "Antes de enviar un texto DERIVADO del caso (el primer uso real del plan lo es), una sesión distinta de la que lo redactó lo coteja contra el caso y deja constancia de que no arrastra cifras, fechas, secuencia ni estructura reconocible. DÓNDE Y CON QUÉ: una nota archivada (archivar_nota.py) con el sha256 del texto que se va a enviar (el mismo que queda en el sello otra_casa_envio, para poder casar cada envío con su cotejo), qué sesión lo cotejó, la fecha y contra qué se cotejó. Los problemas sintéticos del piloto están exentos. Las guardas no ven una re-identificación por descripción, y el tripwire de contexto clínico es una lista de vocabulario: esta condición es lo que de verdad separa la fase 1 de la fase 2. Es una regla de uso: la boca no puede comprobar que se cumplió."
    }
   ],
-  "condiciones_cumplidas": false,
+  "condiciones_cumplidas": true,
   "condiciones_cumplidas_quien": "pasa a true SOLO cuando {{TITULAR}} confirma c1, c2, c3 y c4 (cada una con su constancia completa) y lo pone ella; nunca por inferencia ni por el código. otra_casa.py lo lee de casa base y sin true no envía. Un JSON lo escribe cualquiera que pueda escribir en casa base: la boca comprueba que la constancia esté completa, no quién la tecleó (límite declarado).",
+  "condiciones_cumplidas_como": "11-oct-2026: {{TITULAR}} confirmó c1, c2, c3 y c4 en el chat de la sesión de la vía de Grok, sobre la propuesta de valores que se le presentó (titular personal, compartir datos «no-visible» con su aceptación, 30 días de retención y las tres aceptaciones de c4). NO lo tecleó ella: lo transcribió esa sesión de Claude por orden suya. No es un OK al piloto ni a ningún envío.",
   "condiciones_constancia": {
    "c1": {
-    "confirmada": false,
-    "cuando": null,
-    "que_ve": null,
-    "titular_cuenta": null,
-    "captura": null
+    "confirmada": true,
+    "cuando": "2026-10-11",
+    "que_ve": "Un equipo de la consola con un solo miembro, que es su creadora, y una sola clave de API. En Billing constan medio de pago, facturas y créditos prepago con saldo, con recarga automática activada: en eso se basa que paga por uso. Que esa clave sea la del Llavero es INFERENCIA: es la única del equipo, pero el sistema no lee el Llavero y nadie cotejó sus últimos caracteres; {{TITULAR}} dice en el chat que la clave es suya. Leído el 11-oct-2026 por la sesión de Claude con el navegador de {{TITULAR}}, en solo lectura.",
+    "titular_cuenta": "personal",
+    "captura": "~/.btp/otra_casa/capturas/2026-10-11-billing.jpg (fuera del repo; página Billing; la hizo la sesión de Claude)"
    },
    "c2": {
-    "confirmada": false,
-    "cuando": null,
-    "compartir_datos": null,
-    "que_ve": null,
-    "captura": null,
-    "acepta_si_no_visible": null
+    "confirmada": true,
+    "cuando": "2026-10-11",
+    "compartir_datos": "no-visible",
+    "que_ve": "Barrido de todo el menú del equipo (General, Billing, Observability, Team members, Security, Domains, Audit Log, Management Keys) y de la página personal Account: en ninguna aparece un ajuste de compartir datos ni de usar los datos para entrenar o mejorar el producto. NO se da por apagado. Lo que la consola no enseña: si alguna vez se aceptó la pantalla de consentimiento del CLI de Grok Build (en esta máquina no está instalado). No se abrieron los diálogos «Edit team» ni «Manage», ni los términos. La retención cero (ZDR) figura sin activar. Leído el 11-oct-2026 por la sesión de Claude con el navegador de {{TITULAR}}, en solo lectura.",
+    "captura": "~/.btp/otra_casa/capturas/2026-10-11-equipo.jpg (fuera del repo; página General del equipo; del resto de páginas hay lectura del texto, sin imagen; la hizo la sesión de Claude)",
+    "acepta_si_no_visible": true
    },
    "c3": {
-    "confirmada": false,
-    "cuando": null,
-    "decision": null
+    "confirmada": true,
+    "cuando": "2026-10-11",
+    "decision": "acepta-30-dias"
    },
    "c4": {
-    "confirmada": false,
-    "cuando": null,
-    "acepta_punto_global": null,
-    "acepta_contraparte": null,
-    "acepta_terminos_sin_leer": null
+    "confirmada": true,
+    "cuando": "2026-10-11",
+    "acepta_punto_global": true,
+    "acepta_contraparte": true,
+    "acepta_terminos_sin_leer": true
    }
   },
   "_sellos": "En datos_de_xai, «el orquestador» y «el orquestador de la construcción» son las fórmulas que dejó quien construyó la boca; quien corrigió la ronda 1 no ha podido saber si nombran a la misma sesión. El orquestador de la revisión declara haber abierto el 10-oct-2026 con WebFetch: modelos, esfuerzo, store, API de respuestas, FAQ de seguridad y regiones. Lo que lleva «abierto por el corrector» lo reabrió el corrector (tecnico) ese mismo día. WebFetch pasa por un resumidor: nada de esto es copia literal. Lo que lleva «ronda 2» lo abrió el corrector de la segunda ronda (tecnico), también el 10-oct-2026 y también con WebFetch.",
