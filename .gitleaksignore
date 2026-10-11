@@ -5,3 +5,7 @@ G0DM0D3/API.md:curl-auth-header:133
 G0DM0D3/API.md:curl-auth-header:146
 # Easter egg del frontend (string de juego, no secreto).
 G0DM0D3/src/hooks/useEasterEggs.ts:generic-api-key:27
+# tests/test_otra_casa_piloto.py (rama de la vía de Grok, commit 6c91f84f): clave DE MENTIRA de un test
+# («xai-clave-falsa-…»), no una clave real. Disparó el código rojo del 11-oct-26. La constante ya no
+# se llama como una clave de API; esta línea tapa el commit viejo, que sigue en el historial.
+6c91f84fedc4af120c0d6e4eb6b3e391be7f7f34:tests/test_otra_casa_piloto.py:generic-api-key:39

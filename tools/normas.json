@@ -3684,6 +3684,30 @@
       "auditable": false,
       "repetida": false,
       "nota": "Clasificada el 10-oct-26 tras valorar una regla de salida sobre la frase «no consta si se valoró». No cabe por forma: lo que hace falta saber es quién pidió la prueba y si después hubo dosis, inclusión o alta, y eso no está en la respuesta. La misma frase es correcta para pruebas de terceros (otro centro, un paciente de un paper) y para «no tenemos el documento». En un replay de 30 días (4.264 turnos) la frase literal no aparece ni una vez (0 aciertos reales que medir) y «consta … no he visto que se hiciera» sí aparece, en un uso legítimo. Con 0 positivos medibles y falsos positivos previsibles, el check sería ruido o falso verde. Sin garantía, y se dice así; el recordatorio queda en la memoria y en el recall."
+    },
+    {
+      "slug": "feedback-buenas-noticias-con-alegria-y-gracias",
+      "que": "Un anuncio público de buena noticia lleva la alegría en la primera línea, un gracias explícito y 4-6 emojis de celebración de su inventario; texto corto, sin tope de «0-1 emoji»",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 11-oct-26. Contexto: es criterio de tono para un tipo de pieza (anuncio de buena noticia) que redactan `voz-titular` y `redes-contenido`; un check de salida tendría que adivinar qué es «buena noticia» y contar emojis, con falsos positivos seguros. Vive en el pase de voz."
+    },
+    {
+      "slug": "feedback-explicativos-en-general-no-tu-adc",
+      "que": "Los vídeos y piezas que explican un tratamiento van en general («cómo funciona un ADC»), no personalizados con «tu/mi ADC»",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 11-oct-26. Contexto: es criterio editorial de las piezas explicativas; «tu/mi» + nombre de fármaco es legítimo en casi cualquier otra respuesta, así que un patrón de salida dispararía en falso. Vive en quien redacta el guion."
     }
   ]
 }
