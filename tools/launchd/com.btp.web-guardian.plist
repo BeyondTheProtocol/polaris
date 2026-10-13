@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- El guardián de la web (13-oct-2026): detector diario, determinista, sin IA y fuera de la cola.
+     07:35, antes del parte de las 08:12, para que su línea (si la hay) entre en él. Arranca en
+     modo SOMBRA: apunta y no propone ni avisa. PREPARADA SIN ACTIVAR: encenderla es gate de
+     {{TITULAR}}, desde casa base y con `python3 tools/activar_daemon.py com.btp.web-guardian`. Al
+     encenderla, quítala de `_PARKED_HC` en tools/healthcheck.py para que se vigile. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.web-guardian</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/web_guardian.py</string>
+  </array>
+  <key>StartCalendarInterval</key><dict>
+    <key>Hour</key><integer>7</integer>
+    <key>Minute</key><integer>35</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/web-guardian.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/web-guardian.err</string>
+</dict></plist>

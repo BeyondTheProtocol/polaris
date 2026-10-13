@@ -613,6 +613,9 @@ class WebNovedadNoSeRompe(_Base):
         aceptara `BTP_OK_ENVIO_CLAVE` bastaría con ponerla para firmar lo que quisiera."""
         sys.path.insert(0, os.path.join(ROOT, "tools"))
         os.environ["BTP_STATE_DIR"] = self.tmp
+        # 13-oct-26: web_novedad mira el permiso de SU sesión, así que se le dice cuál es.
+        self._sesion_real = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        os.environ["CLAUDE_CODE_SESSION_ID"] = self.sesion
         import importlib
         import permiso_envio
         import web_novedad
@@ -621,6 +624,10 @@ class WebNovedadNoSeRompe(_Base):
 
     def tearDown(self):
         os.environ.pop("BTP_STATE_DIR", None)
+        if getattr(self, "_sesion_real", None) is None:
+            os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+        else:
+            os.environ["CLAUDE_CODE_SESSION_ID"] = self._sesion_real
         import permiso_envio
         permiso_envio.CLAVE_TEST = None
 

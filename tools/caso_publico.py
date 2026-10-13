@@ -34,6 +34,7 @@ lo clínico se permite SOLO dentro de esta estructura con sello; la prosa suelta
 Uso:
   python3 tools/caso_publico.py build --web <repo web>   # escribe privado + público
   python3 tools/caso_publico.py check --web <repo web>   # valida sin escribir
+  python3 tools/caso_publico.py eventos --web <repo web> # SOLO la cronología del panel
   python3 tools/caso_publico.py fechas "ene–feb 2024"    # prueba el lector de fechas
   python3 tools/caso_publico.py --selftest
 """
@@ -699,6 +700,47 @@ def cmd_build(web, escribir=True):
     return publico
 
 
+TIPOS_AVISO_CRONOLOGIA = ("cronologia_en", "etiqueta_desconocida", "fecha_no_interpretable")
+
+
+def sincroniza_eventos(web, escribir=True):
+    """Pone al día SOLO `eventos` del panel público con la cronología de `web`. Devuelve el público.
+
+    POR QUÉ NO BASTA `build` (13-oct-2026). El panel lleva una copia de la cronología. Si
+    `web_novedad` añade una entrada al YAML y no toca el panel, los dos divergen; y si para
+    arreglarlo se regenera el panel ENTERO, con la novedad se publican de rebote las analíticas
+    que hubiera pendientes, que nadie pidió publicar. Aquí cambia `eventos` y los avisos que
+    hablan de la cronología. `generado`, las analíticas y el perfil se quedan como estaban.
+
+    Una entrada nueva nace solo en español (su inglés se escribe, no se traduce, y llega en otro
+    PR), y con eso `eventos_web` descarta TODOS los títulos en inglés por no poder emparejarlos.
+    Para no despublicar 31 títulos por añadir una entrada, se conservan los que ya estaban,
+    emparejados por fecha y título en español.
+
+    Mismo freno que `build`: lint del panel y citas futuras. Si algo falla, no se escribe nada."""
+    ruta = os.path.join(web, SALIDA_WEB)
+    publico = _cargar(ruta, "el panel público ya publicado")
+    eventos, avisos = eventos_web(web)
+    previos = {(e.get("fecha_texto"), (e.get("titulo") or {}).get("es")): (e.get("titulo") or {}).get("en")
+               for e in publico.get("eventos") or []}
+    for e in eventos:
+        en = previos.get((e["fecha_texto"], e["titulo"].get("es")))
+        if en and "en" not in e["titulo"]:
+            e["titulo"]["en"] = en
+    publico["eventos"] = eventos
+    publico["avisos"] = [a for a in publico.get("avisos") or []
+                         if a.get("tipo") not in TIPOS_AVISO_CRONOLOGIA] + avisos
+    import web_lint
+    fallos = ["[%s] %s" % (c, m) for c, m in web_lint.revisar_caso(publico)]
+    fallos += citas_futuras(publico, date.today())
+    if fallos:
+        raise ErrorCaso(fallos)
+    if escribir:
+        _escribir(ruta, publico)
+        _escribir(os.path.join(web, DESCARGA_WEB), publico)
+    return publico
+
+
 def _selftest():
     casos = {
         "2021": ("2021-01-01", "2021-12-31", "anio"),
@@ -736,6 +778,16 @@ def main(argv):
     web = WEB
     if "--web" in argv:
         web = argv[argv.index("--web") + 1]
+    if argv[0] == "eventos":
+        try:
+            pub = sincroniza_eventos(web)
+        except ErrorCaso as e:
+            print("⛔ los eventos NO se sincronizan (%d fallo(s)):" % len(e.fallos))
+            for x in e.fallos:
+                print("  · %s" % x)
+            return 1
+        print("✅ eventos del panel al día con la cronología: %d" % len(pub["eventos"]))
+        return 0
     if argv[0] not in ("build", "check"):
         print(__doc__)
         return 2

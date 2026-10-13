@@ -139,6 +139,9 @@ class QuienLoPide(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="quien-")
         os.environ["BTP_STATE_DIR"] = self.tmp
+        # Desde el 13-oct-26 el permiso es el de ESTA sesión; el de prueba se emite como «s1».
+        self._sesion_real = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "s1"
         import importlib
         import permiso_envio
         permiso_envio.CLAVE_TEST = self.CLAVE
@@ -147,10 +150,36 @@ class QuienLoPide(unittest.TestCase):
 
     def tearDown(self):
         os.environ.pop("BTP_STATE_DIR", None)
+        if self._sesion_real is None:
+            os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+        else:
+            os.environ["CLAUDE_CODE_SESSION_ID"] = self._sesion_real
         import importlib
         import permiso_envio
         permiso_envio.CLAVE_TEST = None
         importlib.reload(WN)
+
+    def test_la_orden_de_otra_sesion_no_vale_aqui(self):
+        """Deuda `web_novedad_permiso_sin_sesion`: antes valía el permiso más reciente de
+        cualquier sesión, así que esta podía publicar con la orden que ella dio en otra."""
+        self._pide()                                   # ella lo pidió en la sesión «s1»
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "otra-sesion"
+        self.assertFalse(WN.lo_pide_titular()[0])
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "s1"
+        self.assertTrue(WN.lo_pide_titular()[0], "y la suya sigue intacta")
+
+    def test_sin_saber_la_sesion_no_se_publica(self):
+        self._pide()
+        os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
+        ok, motivo = WN.lo_pide_titular()
+        self.assertFalse(ok)
+        self.assertIn("sesión", motivo)
+
+    def test_preguntar_no_gasta(self):
+        """Al publicar, el uso se gasta al fusionar: una novedad que el CI tumba no cuesta uno."""
+        self._pide()
+        for _ in range(5):
+            self.assertTrue(WN.lo_pide_titular(gastar=False)[0])
 
     def _pide(self, texto="añádelo a la cronología: hoy abrimos novedades", ts=None):
         import datetime as dt
@@ -229,6 +258,25 @@ class Deshacer(unittest.TestCase):
         self.assertIn('"[auto] cronolog', fuente)
         rev = open(os.path.join(ROOT, "tools", "web_revertir.py"), encoding="utf-8").read()
         self.assertIn(r"^\[auto\]", rev, "revertir busca por ese mismo marcador")
+
+    def test_ultimo_no_elige_una_reversion_ni_algo_ya_revertido(self):
+        """Antes `--ultimo` cogía el `[auto]` más reciente sin mirar qué era: podía «deshacer el
+        deshacer», o volver a revertir algo que ya no estaba publicado."""
+        import web_revertir as WR
+        a, b, c = "a" * 40, "b" * 40, "c" * 40
+        filas = [(c, "ccccccc", "2026-09-21", "[auto] revertir bbbbbbbb"),
+                 (b, "bbbbbbb", "2026-09-20", "[auto] cronología: entrada que se quitó"),
+                 (a, "aaaaaaa", "2026-09-20", "[auto] cronología: entrada que sigue")]
+        vivas = WR.filtra(filas, "Pedido con web_revertir.\n\nThis reverts commit %s.\n" % b)
+        self.assertEqual([("aaaaaaa", "2026-09-20", "[auto] cronología: entrada que sigue")], vivas)
+
+    def test_revertir_prepara_y_no_fusiona(self):
+        """Hasta el 13-oct-26 fusionaba la reversión sin comprobar ningún permiso. Ahora deja el
+        PR listo y la fusión va por el «fusiona» de {{TITULAR}}, que ya vigila el muro."""
+        with open(os.path.join(ROOT, "tools", "web_revertir.py"), encoding="utf-8") as f:
+            rev = f.read()
+        self.assertNotIn('"merge"', rev)
+        self.assertNotIn("fusionar(", rev)
 
 
 if __name__ == "__main__":

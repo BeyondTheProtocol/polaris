@@ -279,6 +279,66 @@ class Construye(unittest.TestCase):
         self.assertNotIn("24B-1043", json.dumps(self.pub, ensure_ascii=False))
 
 
+class SoloLaCronologia(unittest.TestCase):
+    """`sincroniza_eventos` (13-oct-2026): al publicar una novedad, el panel se pone al día en su
+    cronología y en NADA más. Regenerarlo entero publicaría de rebote las analíticas pendientes."""
+
+    NUEVA = ("\n  - date: '30 sep 2026'\n    tag: Divulgación\n    title: Una novedad de prueba\n"
+             "    description: >\n      Texto cualquiera de la novedad.\n    highlight: false\n")
+
+    def setUp(self):
+        _preparar()
+        self.antes = cp.cmd_build(WEB)
+        with open(os.path.join(WEB, "content", "es", "timeline.yml"), "a", encoding="utf-8") as f:
+            f.write(self.NUEVA)                      # solo en español, como hace web_novedad
+
+    def test_entra_la_entrada_nueva(self):
+        pub = cp.sincroniza_eventos(WEB)
+        titulos = [e["titulo"]["es"] for e in pub["eventos"]]
+        self.assertIn("Una novedad de prueba", titulos)
+        self.assertEqual(len(self.antes["eventos"]) + 1, len(pub["eventos"]))
+
+    def test_no_despublica_los_titulos_en_ingles_que_ya_estaban(self):
+        """Con una entrada más en ES que en EN, `eventos_web` no puede emparejar y los suelta
+        todos. Los que ya estaban publicados se conservan."""
+        pub = cp.sincroniza_eventos(WEB)
+        ev = {e["titulo"]["es"]: e for e in pub["eventos"]}
+        self.assertEqual("The trial ends", ev["Se acaba el ensayo"]["titulo"].get("en"))
+        self.assertNotIn("en", ev["Una novedad de prueba"]["titulo"])
+        self.assertTrue(any(a["tipo"] == "cronologia_en" for a in pub["avisos"]),
+                        "y el descuadre ES/EN queda dicho, no escondido")
+
+    def test_lo_demas_no_se_mueve(self):
+        with open(cp.BIOMARCADORES, encoding="utf-8") as f:
+            bio = json.load(f)
+        bio["grupos"]["hematologia"]["analitos"][0]["puntos"].append(
+            {"fecha": "2026-10-01", "valor": 9.9, "fuera": True, "confianza": "alta", "fuente": "z.md"})
+        with open(cp.BIOMARCADORES, "w", encoding="utf-8") as f:
+            json.dump(bio, f)                         # una analítica nueva, pendiente de publicar
+        pub = cp.sincroniza_eventos(WEB)
+        for clave in pub:
+            if clave not in ("eventos", "avisos"):
+                self.assertEqual(self.antes[clave], pub[clave], clave)
+
+    def test_escribe_las_dos_copias_iguales(self):
+        cp.sincroniza_eventos(WEB)
+        with open(_publico(), encoding="utf-8") as a, \
+                open(os.path.join(WEB, cp.DESCARGA_WEB), encoding="utf-8") as b:
+            self.assertEqual(a.read(), b.read())
+
+    def test_una_cita_futura_con_dia_no_entra_por_esta_puerta(self):
+        with open(os.path.join(WEB, "content", "es", "timeline.yml"), "a", encoding="utf-8") as f:
+            f.write("\n  - date: '1 ene 2026'\n    tag: Divulgación\n"
+                    "    title: Cita el 14 de diciembre de 2031\n    description: >\n      x\n"
+                    "    highlight: false\n")
+        with open(_publico(), encoding="utf-8") as f:
+            antes = f.read()
+        with self.assertRaises(cp.ErrorCaso):
+            cp.sincroniza_eventos(WEB)
+        with open(_publico(), encoding="utf-8") as f:
+            self.assertEqual(antes, f.read(), "si falla, no escribe nada")
+
+
 class FallaCerrado(unittest.TestCase):
 
     def _falla(self, fuente, trozo):

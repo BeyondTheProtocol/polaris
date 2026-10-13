@@ -1,0 +1,11 @@
+{
+ "pieza": "web_guardian.py",
+ "estado_ficha": "completa",
+ "para": "Detector diario, sin IA, de que helptitular.com se ha quedado atrás o tiene algo roto: cronología parada, informes sin reflejar, /datos más viejo que sus fuentes, ES y EN descuadrados, ancla y sitemap en vivo, deudas de contenido abiertas.",
+ "cuando_si": "Para saber qué tiene la web pendiente antes de preparar el lote semanal, o para mirar su salud en vivo. Lo corre la rutina com.btp.web-guardian y lo lee la sesión semanal del guardián.",
+ "cuando_no": "Para publicar, redactar o abrir PRs: solo detecta y apunta. Tampoco lee redes, correo ni DMs (texto no confiable); ni la crónica interna, que no registra hitos del caso.",
+ "reemplaza": "Las deudas web-* que se abrían a mano cuando alguien notaba que la web iba atrasada.",
+ "test": "tests/test_web_guardian.py",
+ "alta": "2026-10-13",
+ "origen": "Plan «guardián de la web» v2, aprobado por {{TITULAR}} el 13-oct-2026 (fase 4). Arranca en modo sombra, como tools/acciones_datadas.py."
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "web_publicar.py",
+ "estado_ficha": "completa",
+ "para": "El único punto por el que algo se fusiona a helptitular.com: exige permiso firmado de la sesión, mira el copy publicado, espera al CI, fusiona atado a la cabeza y comprueba el despliegue.",
+ "cuando_si": "Cualquier herramienta que vaya a fusionar un PR de la web (novedad, revertir, lote semanal). Se importa y se llama a fusionar(); no se ejecuta gh pr merge por libre desde Python.",
+ "cuando_no": "Para abrir PRs, redactar o decidir qué se publica: eso es de quien llama. Tampoco para el repo de Polaris (casa base se fusiona con cerrar_sesion.py).",
+ "reemplaza": "Los gh pr merge sueltos que llevaban dentro web_novedad.py y web_revertir.py, que fusionaban sin esperar al CI y, en el segundo, sin permiso.",
+ "test": "tests/test_web_publicar.py",
+ "alta": "2026-10-13",
+ "origen": "Plan «guardián de la web» v2, aprobado por {{TITULAR}} el 13-oct-2026 (fase 1). Hallazgo de la exploración: PR #199 fusionado 3 s después de crearse, antes de que acabara su CI."
+}

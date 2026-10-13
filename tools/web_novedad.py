@@ -31,6 +31,18 @@ EL FRENO (dos, y hacen falta los dos)
 
   El fallo por defecto es **PR**, no «publicado». Esa es la propiedad que hace seguro lo demás.
 
+CÓMO SE FUSIONA (13-oct-2026)
+  Ya no aquí. La fusión la hace `tools/web_publicar.py`, el único punto de paso: permiso de ESTA
+  sesión, copy publicado, CI en verde, cabeza atada y despliegue comprobado. Antes este fichero
+  fusionaba tres segundos después de crear el PR, sin dejar opinar al CI ni a la preview.
+
+LO QUE ESCRIBE ADEMÁS DEL YAML
+  · la porción `eventos` del panel `/datos` (`caso_publico.sincroniza_eventos`), para que la
+    cronología de la web y la del panel no diverjan. Solo esa porción: regenerar el panel entero
+    publicaría de rebote las analíticas pendientes.
+  · el inglés NO. La versión en otro idioma se escribe, no se traduce
+    (`feedback-version-idioma-adaptar-no-traducir`): la redacta `voz-titular` y va en otro PR.
+
 DÓNDE TRABAJA
   En un worktree propio desde `origin/main`, nunca en el árbol de {{TITULAR}} — que ahora mismo está
   sucio, en una rama de hackathon y 52 commits por delante. Mismo patrón que `tools/staging.py`.
@@ -58,6 +70,7 @@ import _casa  # noqa: E402
 import web_lint  # noqa: E402
 
 import permiso_envio as P  # noqa: E402
+import web_publicar as WP  # noqa: E402
 
 # Su petición puede traer 2-3 entradas («el ensayo fallido Y que entro en X»); más ya no es una
 # petición. (El origen «telegram» que se aceptaba aquí no lo emitía nadie: se quita, 22-sep-26.)
@@ -66,7 +79,9 @@ USOS_MAX = 3
 WEB = os.environ.get("BTP_WEB_REPO", "/Users/polaris/projects/titular-{{APELLIDO}}-case")
 BASE = "main"
 REL_ES = os.path.join("content", "es", "timeline.yml")
-REL_EN = os.path.join("content", "en", "timeline.yml")
+DATOS = (os.path.join("app", "data", "caso.json"), os.path.join("public", "datos", "caso.json"))
+URL_CRONOLOGIA = "https://helptitular.com/timeline"
+TOPE_DESPLIEGUE_S = int(os.environ.get("BTP_WEB_TOPE_DESPLIEGUE", "150"))
 CLAVE = "entries:"
 # Las fechas del timeline son humanas y en español ('31 oct 2023'), no ISO. Si el carril
 # automático metiera '2026-09-20' rompería la voz del fichero en la primera entrada.
@@ -82,8 +97,8 @@ def _git(*args, cwd=None, check=True):
     return (r.stdout or "").strip()
 
 
-def lo_pide_titular():
-    """(bool, origen|motivo). Consume el permiso que abre su mensaje — el mismo de `ok_envio`.
+def lo_pide_titular(gastar=True):
+    """(bool, origen|motivo). Mira el permiso que abre su mensaje — el mismo de `ok_envio`.
 
     No es burocracia: sin esto, cualquier agente (o cualquier texto externo que uno se trague)
     podría publicar en una web pública con su nombre, porque la herramienta está permitida.
@@ -92,22 +107,25 @@ def lo_pide_titular():
     comprueba `permiso_envio.validar` —firma del Llavero, su prompt en el transcript como mensaje
     humano, el último suyo y con la orden— y el contador de usos va firmado, así que no se puede
     rebobinar a mano. La clave NUNCA sale del entorno: esta tool la lanza el agente, y con
-    `BTP_OK_ENVIO_CLAVE=x` firmaría lo que quisiera."""
-    if not P.hay_alguno():   # lo normal: nadie ha pedido nada (y sin tocar el Llavero)
-        return False, "nadie lo ha pedido en un mensaje"
-    k = P.clave(permitir_env=False)
-    if not k:
-        return False, "sin clave de firma en el Llavero: el permiso no se puede comprobar"
-    d, motivo, ctx = P.validar(k)
+    `BTP_OK_ENVIO_CLAVE=x` firmaría lo que quisiera.
+
+    Desde el 13-oct-26 el permiso tiene que ser el de ESTA sesión (`web_publicar.permiso`). Antes
+    valía el más reciente de cualquiera: una sesión podía publicar con la orden que ella dio en
+    otra (deuda `web_novedad_permiso_sin_sesion`).
+
+    `gastar=False` solo pregunta. Al publicar, el uso lo gasta `web_publicar.fusionar` en el
+    momento de fusionar y no antes: una novedad que el CI tumba no le cuesta un uso."""
+    d, motivo, ctx, k = WP.permiso("envio")
     if not d:
+        # Publicar en la web es enviar. Un permiso abierto con «prográmalo» no lo cubre (24-sep-26).
+        if ctx and not P.permite(ctx, "envio"):
+            return False, "ella pidió programar una tarea, no publicar en la web"
         return False, motivo
-    # Publicar en la web es enviar. Un permiso abierto con «prográmalo» no lo cubre (24-sep-26).
-    if not P.permite(ctx, "envio"):
-        return False, "ella pidió programar una tarea, no publicar en la web"
-    try:
-        P.gastar_uno(d, k, USOS_MAX)
-    except Exception:
-        return False, "no se pudo apuntar el uso del permiso"
+    if gastar:
+        try:
+            P.gastar_uno(d, k, USOS_MAX)
+        except Exception:
+            return False, "no se pudo apuntar el uso del permiso"
     return True, d.get("origen")
 
 
@@ -278,6 +296,21 @@ def _escribir(worktree, texto, fecha, tag="Divulgación", link=None):
     return ruta, False
 
 
+def _sincroniza_panel(worktree):
+    """Pone al día la cronología del panel `/datos` en el mismo commit. "" si fue bien; si no, el
+    motivo (y entonces la novedad se queda en PR: publicarla dejaría dos cronologías distintas)."""
+    if not os.path.exists(os.path.join(worktree, DATOS[0])):
+        return ""                      # una web sin panel: no hay nada que sincronizar
+    try:
+        import caso_publico
+        caso_publico.sincroniza_eventos(worktree)
+        for rel in DATOS:
+            _git("add", rel, cwd=worktree)
+        return ""
+    except Exception as e:
+        return str(e)[:300]
+
+
 RE_FECHA = re.compile(r"@(\d{1,2}\s+(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)"
                       r"(?:\s+\d{4})?)\s*", re.I)
 
@@ -328,7 +361,8 @@ def publicar(texto, *, dry=False, tag=None, fecha=None):
         _git("worktree", "add", "-b", rama, wt, "origin/" + BASE)
         ruta, era_nuevo = _escribir(wt, texto, fecha, tag, link)
         _git("add", os.path.relpath(ruta, wt), cwd=wt)
-        asunto = "[auto] cronología: %s" % titulo[:60]
+        res["eventos_error"] = _sincroniza_panel(wt)
+        asunto ="[auto] cronología: %s" % titulo[:60]
         cuerpo = ("Publicado por tools/web_novedad.py tras pasar tools/web_lint.py.\n"
                   "Deshacer: python3 tools/web_revertir.py --ultimo\n")
         _git("commit", "-q", "-m", asunto, "-m", cuerpo, cwd=wt)
@@ -343,16 +377,20 @@ def publicar(texto, *, dry=False, tag=None, fecha=None):
             cwd=wt, capture_output=True, text=True, timeout=180)
         res["pr"] = (pr.stdout or pr.stderr).strip().splitlines()[-1] if pr.stdout or pr.stderr else ""
 
-        suyo, origen = lo_pide_titular()
+        suyo, origen = lo_pide_titular(gastar=False)
         res["pedido_por_titular"] = suyo
         if not suyo:
             res["motivo_no_merge"] = origen
-        if not fallos and suyo:
-            m = subprocess.run(["gh", "pr", "merge", "--squash", "--delete-branch", rama],
-                               cwd=wt, capture_output=True, text=True, timeout=180)
-            res["merged"] = m.returncode == 0
-            if m.returncode != 0:
-                res["merge_error"] = (m.stderr or m.stdout).strip()[:300]
+        elif res["eventos_error"]:
+            res["motivo_no_merge"] = "el panel /datos no se pudo poner al día: " + res["eventos_error"]
+        if not fallos and suyo and not res["eventos_error"]:
+            r = WP.fusionar(rama, por="web_novedad", que="envio", cwd=wt, usos_max=USOS_MAX,
+                            verifica=(URL_CRONOLOGIA, titulo), tope_despliegue_s=TOPE_DESPLIEGUE_S)
+            res["merged"] = r["merged"]
+            for clave in ("ci", "motivo_no_merge", "merge_error", "desplegado", "verifica",
+                          "copy_avisa"):
+                if clave in r:
+                    res[clave] = r[clave]
         else:
             res["merged"] = False
     except Exception as e:
@@ -408,7 +446,9 @@ def main():
     if dry:
         return 0
     if res.get("merged"):
-        print("✅ publicado en la cronología. Deshacer: python3 tools/web_revertir.py --ultimo")
+        print("✅ cronología: %s" % WP.explica_despliegue(res))
+        print("   Falta su versión en inglés: se escribe aparte, no se traduce.")
+        print("   Deshacer: python3 tools/web_revertir.py --ultimo prepara el PR; sale con su «fusiona».")
         return 0
     if not res.get("pedido_por_titular"):
         print("🟡 El lint dio verde, pero esto no lo ha pedido {{TITULAR}} en un mensaje (%s)."
@@ -416,8 +456,8 @@ def main():
         print("   Queda en PR, sin publicar: %s" % res.get("pr", "?"))
         print("   Es el freno de quién, no el de qué. Si lo pide ella, sale solo.")
         return 1
-    print("🟡 lint limpio y pedido por ella, pero el merge no salió (%s). PR: %s"
-          % (res.get("merge_error", "?"), res.get("pr", "?")))
+    print("🟡 lint limpio y pedido por ella, pero no se ha fusionado: %s. PR: %s"
+          % (res.get("motivo_no_merge") or res.get("merge_error") or "?", res.get("pr", "?")))
     return 1
 
 

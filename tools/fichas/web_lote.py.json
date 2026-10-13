@@ -1,0 +1,11 @@
+{
+ "pieza": "web_lote.py",
+ "estado_ficha": "completa",
+ "para": "El lote semanal de la web: valida N PRs ya preparados, escribe el manifiesto que {{TITULAR}} lee y, con UNA orden suya, fusiona exactamente esos, atados al commit que vio.",
+ "cuando_si": "Cuando hay varios PRs de la web listos (CI en verde, preview mirada) y se le van a presentar juntos. Primero `render` para el manifiesto del mensaje; tras su «fusiona», `fusionar`.",
+ "cuando_no": "Para un solo PR (basta su «fusiona» y gh pr merge con el SHA), para preparar los PRs o para el repo de Polaris. Tampoco para saltarse el peldaño 3: esos solo salen si ella nombra su número.",
+ "reemplaza": "Las N órdenes «fusiona» seguidas, una por PR, que la convertían en el cuello de botella de la web.",
+ "test": "tests/test_web_lote.py",
+ "alta": "2026-10-13",
+ "origen": "Plan «guardián de la web» v2, aprobado por {{TITULAR}} el 13-oct-2026 (fase 2). Mismo principio que tools/lote_envio.py: una orden para N cosas que tuvo delante."
+}

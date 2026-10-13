@@ -1124,6 +1124,14 @@ def construir_hoy(franja="mediodía", canal="telegram"):
         pend_lineas = _pend.resumen_hoy()
     except Exception:
         pend_lineas = []
+    # 🌐 WEB (13-oct-2026, plan «guardián de la web»): mismo patrón perezoso y tolerante a fallos.
+    # Casi siempre viene vacío: en sombra, o si no hay nada que ella tenga que mirar, o si ya se
+    # le dijo y no ha cambiado. Va dentro del parte para no gastar uno de los 3 avisos del día.
+    try:
+        import web_guardian as _web
+        web_lineas = _web.resumen_hoy()
+    except Exception:
+        web_lineas = []
 
     tu, yo, clic, luego = [], [], [], []
     for h in pend:
@@ -1201,7 +1209,11 @@ def construir_hoy(franja="mediodía", canal="telegram"):
         L.append("✉️ ESPERAN TU RESPUESTA")
         L.extend(pend_lineas)
 
-    if not (tu or yo or clic or hechos_hoy or pend_lineas):
+    if web_lineas:
+        L.append("")
+        L.extend(web_lineas)
+
+    if not (tu or yo or clic or hechos_hoy or pend_lineas or web_lineas):
         L.append("✅ Todo al día, nada urgente.")
 
     if franja == "noche":
