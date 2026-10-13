@@ -1,0 +1,71 @@
+{
+  "_por_que": "Cada entrada es una defensa del paralelo por defecto y del cupo de máquina de test_all.sh (13-oct-26). Si al quitarla test_all_cupo sigue verde, dos sesiones pueden volver a pisarse, una suite anidada puede colgarse esperando una ficha que tiene su madre, o un cupo roto puede dejar baterías sin correr. No va enganchada en test_all.sh (unos 5 min): a mano o en la nocturna del domingo.",
+  "objetivo": "tests/test_all.sh",
+  "test": [
+    "python3",
+    "tests/test_all_cupo.py"
+  ],
+  "env": "BTP_SUITE",
+  "mutaciones": [
+    {
+      "etiqueta": "una suite ANIDADA se pone en paralelo sola",
+      "viejo": "[ -n \"$_JOBS_AUTO\" ] && [ -z \"$_ANIDADA\" ] && [ -z \"$CI\" ]",
+      "nuevo": "[ -n \"$_JOBS_AUTO\" ] && [ -z \"$CI\" ]"
+    },
+    {
+      "etiqueta": "el CI se pone en paralelo solo",
+      "viejo": "[ -z \"$_ANIDADA\" ] && [ -z \"$CI\" ] && [ -z \"$BTP_PORTABLE\" ]",
+      "nuevo": "[ -z \"$_ANIDADA\" ] && [ -z \"$BTP_PORTABLE\" ]"
+    },
+    {
+      "etiqueta": "un --jobs explícito no manda sobre el valor por defecto",
+      "viejo": "case \" $* \" in *\" --jobs\"*|*\" -j \"*) _JOBS_AUTO=\"\";; esac\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "el cupo no se activa nunca (los trabajadores no reciben las fichas)",
+      "viejo": "[ -n \"$_fichas\" ] && export BTP_CUPO_FICHAS=\"$_fichas\"",
+      "nuevo": "false && export BTP_CUPO_FICHAS=\"$_fichas\""
+    },
+    {
+      "etiqueta": "con lockf roto la batería NO corre",
+      "viejo": "[ \"$_rl\" -eq 75 ] || break 2 ",
+      "nuevo": "[ \"$_rl\" -eq 75 ] || exit 0 "
+    },
+    {
+      "etiqueta": "la espera por una ficha no tiene tope",
+      "viejo": "      [ \"$SECONDS\" -lt \"$_tope\" ] || break\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "tras correr con ficha la batería vuelve a correr",
+      "viejo": "        [ -f \"$2/$3.ini\" ] && exit 0 ",
+      "nuevo": "        : "
+    },
+    {
+      "etiqueta": "las variables del cupo bajan a las baterías (trabajador)",
+      "viejo": "  unset BTP_CUPO_FICHAS BTP_CUPO_NFICHAS BTP_CUPO_TENGO BTP_CUPO_ESPERA_S\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "las variables del cupo bajan a las baterías (cabecera)",
+      "viejo": "_CUPO_N=\"$BTP_CUPO_N\"; unset BTP_CUPO_DIR BTP_CUPO_N",
+      "nuevo": "_CUPO_N=\"$BTP_CUPO_N\""
+    },
+    {
+      "etiqueta": "las baterías no se ven anidadas",
+      "viejo": "_ANIDADA=\"$BTP_DENTRO_DE_SUITE\"; export BTP_DENTRO_DE_SUITE=1",
+      "nuevo": "_ANIDADA=\"$BTP_DENTRO_DE_SUITE\""
+    },
+    {
+      "etiqueta": "una suite anidada coge fichas del cupo de la máquina",
+      "viejo": "  if { [ -z \"$_ANIDADA\" ] || [ -n \"$_CUPO_DIR\" ]; } && command -v lockf",
+      "nuevo": "  if command -v lockf"
+    },
+    {
+      "etiqueta": "el nº de trabajos por defecto no es el del cupo",
+      "viejo": "then JOBS=$_CUPO_N; fi",
+      "nuevo": "then JOBS=6; fi"
+    }
+  ]
+}

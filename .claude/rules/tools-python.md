@@ -15,6 +15,7 @@ paths:
 
 ## Al terminar
 - **Mientras iteras, corre tu test** (`python3 tests/test_X.py`) o `bash tests/test_all.sh --cambiados` (solo las baterías que tocan tus ficheros); **`bash tests/test_all.sh` una vez al final**, antes de «hecho» o de pasar a `git`, no solo tu test ([[feedback-correr-test-all-no-solo-py]]).
+- **La completa tarda ~20 min y va sola en paralelo** (cupo de CPU compartido entre sesiones): lánzala **en segundo plano con log** (`bash tests/test_all.sh > <scratchpad>/test_all.log 2>&1`, `run_in_background`), **nunca con `| tail`** ni en primer plano (el Bash corta a los 10 min). El progreso sale por stderr; `BTP_JOBS=1` la fuerza en serie.
 - **Verifica el EFECTO, no que el script corrió sin error** ([[feedback-verificar-efecto-no-que-corrio]]).
 - Si la tool avisa a {{TITULAR}}, el aviso sale por **`salida.py`** (respeta HALT y anti-spam). Todo aviso necesita anti-spam ([[feedback-todo-aviso-a-titular-necesita-anti-spam]]).
 - **Envío opt-in en tests:** ningún test manda mensajes de verdad a {{TITULAR}} ([[feedback-envio-opt-in-para-no-spamear-en-tests]]).

@@ -47,6 +47,7 @@ def corre(marca, env_extra):
         f.write("import sys\nprint(%r)\nsys.exit(1)\n" % marca)
     script = cabecera() + '\nROOT=%s\nrunpy falla.py\necho "DIR=$ROJO_DIR"\n' % root
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR")}
+    env["BTP_DENTRO_DE_SUITE"] = "1"      # suite de juguete = anidada: sin BTP_JOBS va en serie (13-oct-26)
     env.update(env_extra)
     r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env, timeout=60)
     m = re.search(r"log: (\S+)\)", r.stdout)

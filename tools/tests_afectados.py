@@ -16,7 +16,14 @@ Qué entra (unión):
   · los tests que NOMBRAN el fichero cambiado (lo que el grafo no ve: `.mjs`, rutas a trozos);
   · si se tocó un hook (`.claude/hooks/`) o `settings*.json`, todas las baterías del muro:
     ahí un fallo no se ve en el grafo y es justo lo que no se puede romper;
-  · si se tocó `tests/test_all.sh`, todo (no hay forma honesta de acotarlo).
+  · si se tocó `tests/test_all.sh`, todo... SALVO que el diff solo dé de alta baterías (13-oct-26):
+    líneas `run`/`runpy` a nivel raíz y comentarios. Entonces entran las recién registradas más la
+    selección normal. Cualquier otra cosa en ese diff (una función, una lista, una baja) sigue
+    siendo todo: FALLA CERRADA. El 41 % de las ramas tocaba el runner solo para registrar su test
+    y `--cambiados` les corría la suite entera en serie;
+  · las campañas de mutantes (`mutantes:<campaña>.json`) cuyo json, objetivo o test tocó la rama.
+    En `--cambiados` las demás no corren (eran 285 s fijos aunque solo cambiara un README); en la
+    suite completa y en la puerta corren TODAS, siempre.
 Cambios solo en `.md`, memorias o docs: ninguna batería.
 
 Uso: python3 tools/tests_afectados.py [--base master]   → nombres de batería, uno por línea
@@ -72,11 +79,106 @@ def baterias():
             if f.startswith("test_") and f.endswith((".py", ".sh")) and f in texto}
 
 
-def afectados(ficheros, disponibles, grafo=None):
-    """(todo, set de baterías)."""
-    if any(f == "tests/test_all.sh" for f in ficheros):
-        return True, set(disponibles)
+_RE_ALTA = None
+
+
+def altas_del_runner(diff):
+    """Baterías que el diff de `tests/test_all.sh` da de ALTA, o None si el diff hace cualquier otra cosa.
+
+    Solo se entiende esto: líneas en blanco, comentarios enteros (`# …`) y `run|runpy test_x.py|sh`
+    SIN sangría (a nivel raíz: una línea sangrada puede estar dentro de un `if` o de una lista).
+    Quitar una línea `run` solo vale si la misma batería vuelve a entrar en el mismo diff (se le
+    cambió el comentario o se movió); una BAJA de verdad no se acota. Lo que no se reconoce → None,
+    y quien llama corre todo. Un diff vacío o sin hunks también es None: no se concluye «nada»."""
+    global _RE_ALTA
+    import re
+    if _RE_ALTA is None:
+        _RE_ALTA = re.compile(r"(?:run|runpy)[ \t]+(test_[A-Za-z0-9_]+\.(?:py|sh))[ \t]*(?:#.*)?$")
+    if not diff or "\n@@" not in "\n" + diff:
+        return None
+    altas, bajas, en_hunk = set(), set(), False
+    for linea in diff.splitlines():
+        if linea.startswith("@@"):
+            en_hunk = True
+            continue
+        if not en_hunk or not linea or linea[0] not in "+-":
+            if en_hunk and linea and linea[0] not in " \\":
+                return None                      # algo que no es contexto ni «\ No newline…»
+            continue
+        signo, cuerpo = linea[0], linea[1:]
+        if not cuerpo.strip() or cuerpo.lstrip().startswith("#"):
+            continue
+        m = _RE_ALTA.match(cuerpo)
+        if not m:
+            return None
+        (altas if signo == "+" else bajas).add(m.group(1))
+    if bajas - altas:
+        return None
+    return altas
+
+
+def diff_del_runner(base="master"):
+    """Diff de `tests/test_all.sh` desde el punto de bifurcación hasta el ÁRBOL DE TRABAJO (lo
+    commiteado y lo que aún no). Un fallo de git sube, como en `cambiados`."""
+    mb = _git("merge-base", base, "HEAD").strip()
+    return _git("diff", "-U0", mb, "--", "tests/test_all.sh")
+
+
+def campanas_afectadas(ficheros, raiz=RAIZ):
+    """{'mutantes:<campaña>.json'} de las campañas que `test_all.sh` corre y cuyo json, objetivo o
+    test cambió la rama (o `tools/mutantes.py`, que las corre a todas). Una campaña que no se
+    puede leer entra: ante la duda, se corre."""
+    import json
+    import re
+    try:
+        runner = open(os.path.join(raiz, "tests", "test_all.sh"), encoding="utf-8").read()
+    except Exception:
+        return set()
+    tocados = set(ficheros)
     sel = set()
+    for rel in sorted(set(re.findall(r"tools/mutantes\.py\" (tests/mutantes/[A-Za-z0-9_.-]+\.json)", runner))):
+        nombre = "mutantes:" + os.path.basename(rel)
+        if rel in tocados or "tools/mutantes.py" in tocados:
+            sel.add(nombre)
+            continue
+        try:
+            c = json.load(open(os.path.join(raiz, rel), encoding="utf-8"))
+            rutas = {c["objetivo"]} | set(re.findall(r"(?:tests|tools|evals|\.claude)/[A-Za-z0-9_./-]+",
+                                                      " ".join(c["test"])))
+        except Exception:
+            sel.add(nombre)
+            continue
+        if rutas & tocados:
+            sel.add(nombre)
+    return sel
+
+
+def trozos(raiz=RAIZ):
+    """{original: [trozos]} de `tests/_trozos.py` (vacío si no existe). Si existe y no carga, SUBE:
+    quien llama no puede concluir «sin trozos» de una tabla que no se pudo leer."""
+    ruta = os.path.join(raiz, "tests", "_trozos.py")
+    if not os.path.isfile(ruta):
+        return {}
+    k = ("trozos", os.path.realpath(ruta))
+    if k not in _CACHE_MURO:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_trozos_tabla", ruta)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _CACHE_MURO[k] = {o: [t for t, _s in partes] for o, partes in mod.TROZOS.items()}
+    return dict(_CACHE_MURO[k])
+
+
+def afectados(ficheros, disponibles, grafo=None, diff_runner=None):
+    """(todo, set de baterías). `diff_runner`: el diff de `tests/test_all.sh` si la rama lo tocó;
+    sin él (o si no es solo altas de baterías), tocar el runner sigue siendo TODO."""
+    sel = set()
+    if any(f == "tests/test_all.sh" for f in ficheros):
+        altas = altas_del_runner(diff_runner)
+        if altas is None or not altas <= set(disponibles):
+            return True, set(disponibles)
+        sel |= altas
+        ficheros = [f for f in ficheros if f != "tests/test_all.sh"]
     toca_muro = any(f.startswith(".claude/hooks/")
                     or (f.startswith(".claude/") and os.path.basename(f).startswith("settings"))
                     for f in ficheros)
@@ -101,14 +203,25 @@ def afectados(ficheros, disponibles, grafo=None):
             sel |= {os.path.basename(d) for d in deps if d.startswith("tests/")} & disponibles
         # Lo que el grafo no ve (un .mjs, una ruta armada a trozos): los tests que NOMBRAN el
         # fichero cambiado. Sin esto, tocar captura_visor.mjs o _chrome_headless.mjs no corría nada.
-        nombres = {os.path.basename(f) for f in codigo}
+        # El nombre ENTERO, no una subcadena (13-oct-26): `ia.py` casaba con «anatomia.py» y
+        # `local.py` con cualquier «…_local.py», 240 baterías de más repartidas en 157 tools.
+        import re
+        nombres = re.compile(r"(?<![A-Za-z0-9_])(?:%s)" % "|".join(
+            sorted(re.escape(os.path.basename(f)) for f in codigo)))
         for b in disponibles:
             try:
                 texto = open(os.path.join(RAIZ, "tests", b), encoding="utf-8", errors="replace").read()
             except Exception:
                 continue
-            if any(n in texto for n in nombres):
+            if nombres.search(texto):
                 sel.add(b)
+    sel.discard("test_all.sh")       # el runner se nombra a sí mismo y está en tests/, pero no es una batería
+    # Una batería repartida en TROZOS (tests/_trozos.py) ya no tiene línea propia en el runner: lo que
+    # corre son sus trozos. Sin este cambio, seleccionarla sería no correr nada y decir «verde».
+    for original, partes in trozos().items():
+        if original in sel and set(partes) <= set(disponibles):
+            sel.discard(original)
+            sel |= set(partes)
     return False, sel
 
 
@@ -368,7 +481,10 @@ def main(argv):
         if modo_puerta:
             r = puerta(ficheros, disponibles, rastreados=_rastreados_en(base))
         else:
-            todo, sel = afectados(ficheros, disponibles)
+            diff = diff_del_runner(base) if "tests/test_all.sh" in ficheros else None
+            todo, sel = afectados(ficheros, disponibles, diff_runner=diff)
+            if not todo:
+                sel |= campanas_afectadas(ficheros)
     except (Exception, SystemExit) as e:        # FALLA CERRADA: lo que no se pudo decidir va completo
         print("COMPLETA" if modo_puerta else "TODO")
         if modo_puerta:

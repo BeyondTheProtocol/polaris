@@ -1,0 +1,46 @@
+{
+  "_por_que": "Cada entrada es una defensa del reparto de las baterías gordas en trozos (13-oct-26). Si al quitarla test_trozos sigue verde, un test del muro de laminillas (puerta de N1, jaulas) puede dejar de correr o correr dos veces sin que nadie lo vea. No va enganchada en test_all.sh: a mano o en la nocturna del domingo.",
+  "objetivo": "tests/_trozos.py",
+  "test": [
+    "python3",
+    "tests/test_trozos.py"
+  ],
+  "env": "BTP_TROZOS",
+  "mutaciones": [
+    {
+      "etiqueta": "el RESTO repite las clases que otro trozo ya nombra",
+      "viejo": "            out += [c for c in clases if c not in nombradas]",
+      "nuevo": "            out += list(clases)"
+    },
+    {
+      "etiqueta": "la parte i de n se salta el primer test (se pierde uno)",
+      "viejo": "        mios = clases[clase][i - 1::n]",
+      "nuevo": "        mios = clases[clase][i::n]"
+    },
+    {
+      "etiqueta": "la parte i de n coge todos los tests (se repiten)",
+      "viejo": "        mios = clases[clase][i - 1::n]",
+      "nuevo": "        mios = clases[clase][:]"
+    },
+    {
+      "etiqueta": "un original sin RESTO no revienta (las clases sin nombrar no corren)",
+      "viejo": "    if sum(sel.count(RESTO) for sel in partes.values()) != 1:",
+      "nuevo": "    if False:"
+    },
+    {
+      "etiqueta": "una clase que no existe se ignora en vez de reventar",
+      "viejo": "            raise SystemExit(\"_trozos: la clase %s no existe en %s\" % (clase, orig))",
+      "nuevo": "            continue"
+    },
+    {
+      "etiqueta": "los tests heredados no cuentan al partir una clase",
+      "viejo": "            if p in defs and p not in visto:\n                propios |= tests(p, visto + (c,))",
+      "nuevo": "            if False:\n                pass"
+    },
+    {
+      "etiqueta": "un trozo sin nada que correr acaba sin reventar",
+      "viejo": "    if not out:\n        raise SystemExit(\"_trozos: %s no tiene nada que correr\" % trozo)\n",
+      "nuevo": ""
+    }
+  ]
+}

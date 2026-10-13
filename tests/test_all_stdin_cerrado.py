@@ -35,7 +35,7 @@ os.makedirs(os.path.join(root, "tests"))
 with open(os.path.join(root, "tests", "lee_stdin.py"), "w") as f:
     f.write("import sys\nsys.stdin.read()\nprint('leyó hasta EOF')\n")
 script = "\n".join(lineas[:fin]) + '\nROOT=%s\nrunpy lee_stdin.py\necho "FAIL=$fail"\n' % root
-env = dict(os.environ, BTP_ROJO_DIR=os.path.join(root, "rojos"))
+env = dict(os.environ, BTP_ROJO_DIR=os.path.join(root, "rojos"), BTP_DENTRO_DE_SUITE="1")
 env.pop("CI", None)
 
 print("una batería que lee stdin, con la suite recibiendo un pipe que no se cierra")

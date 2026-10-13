@@ -18,6 +18,9 @@ Se fija:
   7. el meta-check de tests huérfanos corre TAMBIÉN en la rápida (un test nuevo sin registrar no
      puede colarse por la puerta).
   8. `--cambiados` tiene la misma salvaguarda (salida vacía o rc≠0 → suite completa).
+  9. (13-oct-26) las campañas de mutantes: en la suite completa y en la puerta rápida corren TODAS;
+     en `--cambiados` solo las que el selector nombra («mutantes:<campaña>.json»). Y ninguna campaña
+     del runner real queda fuera del filtro `_mut_va` ni se repite.
 """
 import os
 import re
@@ -44,8 +47,16 @@ FINAL = "\n".join(lineas[fin:])
 TOYS = {"test_a.py": "print('ok a')\n", "test_b.py": "print('ok b')\n", "test_c.py": "print('ok c')\n"}
 
 
-def monta(selector, huerfano=False):
-    """Raíz de juguete. `selector`: cuerpo del tools/tests_afectados.py falso (None = no existe)."""
+_m_ini = next(i for i, l in enumerate(lineas) if l.startswith("if _mut_va "))
+_m_fin = max(i for i, l in enumerate(lineas) if l.startswith("if _mut_va "))
+_m_fin = next(i for i in range(_m_fin, len(lineas)) if lineas[i] == "fi")
+MUTANTES = "\n".join(lineas[_m_ini:_m_fin + 1])          # el bloque REAL de campañas del runner
+CAMPANAS = re.findall(r"^if _mut_va (\S+\.json); then$", MUTANTES, re.M)
+
+
+def monta(selector, huerfano=False, mutantes=False):
+    """Raíz de juguete. `selector`: cuerpo del tools/tests_afectados.py falso (None = no existe).
+    `mutantes`: mete el bloque real de campañas, con un tools/mutantes.py falso que solo dice cuál corrió."""
     root = tempfile.mkdtemp(prefix="all_puerta_")
     os.makedirs(os.path.join(root, "tests"))
     os.makedirs(os.path.join(root, "tools"))
@@ -57,6 +68,10 @@ def monta(selector, huerfano=False):
         open(os.path.join(root, "tools", "tests_afectados.py"), "w").write(selector)
     cab = re.sub(r'LARGAS="[^"]*"', 'LARGAS=""', CABECERA, count=1)
     toy = "\n".join("runpy " + n for n in sorted(TOYS))
+    if mutantes:
+        open(os.path.join(root, "tools", "mutantes.py"), "w").write(
+            "import os, sys\nprint('CAMPAÑA ' + os.path.basename(sys.argv[1]))\n")
+        toy += "\n" + MUTANTES
     open(os.path.join(root, "tests", "test_all.sh"), "w").write(cab + "\n" + toy + "\n" + FINAL + "\n")
     return root
 
@@ -64,6 +79,7 @@ def monta(selector, huerfano=False):
 def corre(root, *args):
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE")}
     env["BTP_ROJO_DIR"] = os.path.join(root, "rojos")
+    env["BTP_DENTRO_DE_SUITE"] = "1"      # suite de juguete = anidada: sin BTP_JOBS va en serie (13-oct-26)
     r = subprocess.run(["bash", os.path.join(root, "tests", "test_all.sh")] + list(args),
                        capture_output=True, text=True, env=env, timeout=120, stdin=subprocess.DEVNULL)
     corridas = re.findall(r"^── (test_\S+) ──", r.stdout, re.M)
@@ -105,6 +121,37 @@ for desc, sel in (("vacía", "pass\n"), ("rc≠0", "import sys\nprint('test_a.py
     r, corridas = corre(root, "--cambiados")
     check(sorted(corridas) == sorted(TOYS), "--cambiados con selector %s → corre las 3 (corrió %s)" % (desc, corridas))
     check("va la suite completa" in r.stdout, "--cambiados con selector %s → lo dice" % desc)
+
+print("9) campañas de mutantes: todas en la completa y en la puerta; en --cambiados, solo las nombradas")
+check(len(CAMPANAS) >= 10 and len(set(CAMPANAS)) == len(CAMPANAS), "el runner real tiene %d campañas, sin repetir" % len(CAMPANAS))
+_todo = "\n".join(lineas)
+_invocadas = re.findall(r'tools/mutantes\.py" tests/mutantes/(\S+\.json)', _todo)
+check(sorted(_invocadas) == sorted(CAMPANAS) and sorted(re.findall(r'tools/mutantes\.py" tests/mutantes/(\S+\.json)', MUTANTES)) == sorted(CAMPANAS),
+      "cada campaña que el runner invoca va dentro de su `if _mut_va <la misma>`")
+for _bloque in re.findall(r"^if _mut_va (\S+\.json); then\n(.*?)^fi$", MUTANTES, re.M | re.S):
+    if _bloque[1].count("tools/mutantes.py") != 1 or ("tests/mutantes/%s " % _bloque[0]) not in _bloque[1]:
+        check(False, "el bloque de %s corre exactamente su campaña" % _bloque[0])
+corrio = lambda r: re.findall(r"^CAMPAÑA (\S+)$", r.stdout, re.M)
+root = monta("print('TODO')\n", mutantes=True)
+r, _ = corre(root)
+check(sorted(corrio(r)) == sorted(CAMPANAS), "suite completa → corren las %d (corrieron %d)" % (len(CAMPANAS), len(corrio(r))))
+r, _ = corre(root, "--cambiados")
+check(sorted(corrio(r)) == sorted(CAMPANAS), "--cambiados que cae a TODO → corren todas (corrieron %d)" % len(corrio(r)))
+root = monta("print('RAPIDA')\nprint('test_a.py')\n", mutantes=True)
+r, _ = corre(root, "--puerta")
+check(sorted(corrio(r)) == sorted(CAMPANAS), "puerta RAPIDA → corren todas (corrieron %d)" % len(corrio(r)))
+root = monta("print('mutantes:%s')\nprint('test_a.py')\n" % CAMPANAS[1], mutantes=True)
+r, corridas = corre(root, "--cambiados")
+check(corrio(r) == [CAMPANAS[1]] and corridas == ["test_a.py"],
+      "--cambiados con una campaña nombrada → corre solo esa y su batería (campañas %s, baterías %s)" % (corrio(r), corridas))
+check("1 batería(s) afectada(s) y 1 campaña(s) de mutantes" in r.stdout, "y dice cuántas de cada")
+check("PARCIAL en verde" in r.stdout and "TODO EN VERDE" not in r.stdout, "el resumen sigue siendo PARCIAL, nunca «TODO EN VERDE»")
+root = monta("print('test_a.py')\n", mutantes=True)
+r, _ = corre(root, "--cambiados")
+check(corrio(r) == [], "--cambiados sin campañas nombradas → no corre ninguna (corrieron %s)" % corrio(r))
+root = monta("print('NINGUNA')\n", mutantes=True)
+r, corridas = corre(root, "--cambiados")
+check(corrio(r) == [] and corridas == [], "--cambiados «NINGUNA» → ni baterías ni campañas")
 
 if fallos:
     print("\n❌ %d fallo(s)" % len(fallos))

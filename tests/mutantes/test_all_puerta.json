@@ -21,6 +21,15 @@
      "nuevo": "elif [ -n \"$_p1\" ] && [ \"$_p1\" != \"TODO\" ]; then"},
     {"etiqueta": "--cambiados: una salida vacía vale como «ninguna batería»",
      "viejo": "if [ $_rcsel -eq 0 ] && [ \"$_p1\" = \"NINGUNA\" ]; then",
-     "nuevo": "if [ -z \"$_p1\" ] || [ \"$_p1\" = \"NINGUNA\" ]; then"}
+     "nuevo": "if [ -z \"$_p1\" ] || [ \"$_p1\" = \"NINGUNA\" ]; then"},
+    {"etiqueta": "13-oct: la suite COMPLETA también filtra las campañas de mutantes",
+     "viejo": "_mut_va() { { [ -z \"$CAMBIADOS\" ] || [ -n \"$PUERTA\" ]; } && return 0",
+     "nuevo": "_mut_va() { { [ -z \"$CAMBIADOS\" ] && [ -n \"$PUERTA\" ]; } && return 0"},
+    {"etiqueta": "13-oct: la puerta RAPIDA deja fuera las campañas de mutantes",
+     "viejo": "_mut_va() { { [ -z \"$CAMBIADOS\" ] || [ -n \"$PUERTA\" ]; } && return 0",
+     "nuevo": "_mut_va() { [ -z \"$CAMBIADOS\" ] && return 0"},
+    {"etiqueta": "13-oct: --cambiados corre todas las campañas aunque el selector no las nombre",
+     "viejo": "            case \"$SELECCION\" in *\" mutantes:$1 \"*) return 0;; esac; fuera=$((fuera+1)); return 1; }",
+     "nuevo": "            return 0; }"}
   ]
 }

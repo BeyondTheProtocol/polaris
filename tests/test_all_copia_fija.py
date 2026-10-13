@@ -74,7 +74,7 @@ def pasada(jobs):
     original = open(ruta).read()
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE",
                                                             "BTP_TEST_ALL_ROOT", "BTP_TEST_ALL_COPIA", "BTP_TEST_ALL_DUENA")}
-    env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), TMPDIR=tmpdir)
+    env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), TMPDIR=tmpdir, BTP_DENTRO_DE_SUITE="1")
     if jobs:
         env["BTP_JOBS"] = str(jobs)
     p = subprocess.Popen(["bash", ruta], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env,
@@ -121,7 +121,7 @@ open(os.path.join(root, "tests", "test_a.py"), "w").write(
     "print('FUGA' if vars_ else 'limpio')\nsys.exit(1 if vars_ else 0)\n")
 open(os.path.join(marca, "script_reescrito"), "w").write("x")          # B no espera
 env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE")}
-env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), TMPDIR=tmpdir)
+env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), TMPDIR=tmpdir, BTP_DENTRO_DE_SUITE="1")
 for jobs in (None, "3"):
     e = dict(env)
     if jobs:

@@ -15,6 +15,12 @@ if [ -z "$_COPIA" ] && [ -f "$0" ]; then
   [ -n "$_c" ] && rm -f "$_c"
 fi
 [ -n "$_DUENA" ] && trap 'rm -f "$_COPIA"' EXIT
+# ANIDADA (13-oct-26): una batería que lanza otra suite (las de juguete de test_all_*.py) la ve marcada.
+# Una suite anidada NO se pone en paralelo sola ni coge fichas del cupo: su madre ya tiene una, y si las
+# hijas esperasen otra con todas ocupadas, la pasada se quedaría colgada consigo misma.
+_ANIDADA="$BTP_DENTRO_DE_SUITE"; export BTP_DENTRO_DE_SUITE=1
+# El cupo se lee aquí y NO baja a las baterías (igual que las variables de la copia).
+_CUPO_DIR="$BTP_CUPO_DIR"; _CUPO_N="$BTP_CUPO_N"; unset BTP_CUPO_DIR BTP_CUPO_N
 PY=/usr/bin/python3; [ -x "$PY" ] || PY=python3
 fail=0
 skip=0
@@ -84,10 +90,39 @@ if [ "$1" = "--worker" ]; then
   # BTP_JOBS NO baja a las baterías: test_all_rojo_dir.py y test_all_stdin_cerrado.py ejecutan la
   # cabecera de este script y, heredándolo, ENCOLABAN en vez de correr (2 falsos rojos en la 1ª pasada).
   unset BTP_JOBS
+  # CUPO DE MÁQUINA (13-oct-26): antes de correr, el trabajador coge una de las N fichas que comparten
+  # TODAS las pasadas de la máquina (cerrojos `lockf`: si el proceso muere, la ficha se suelta sola).
+  # Con todas ocupadas espera; así dos sesiones se reparten los núcleos en vez de pisarse (el 13-oct la
+  # misma batería tardó 429 s una noche y 2160 s otra). FALLA A FAVOR DE CORRER: si `lockf` se rompe o la
+  # espera pasa del tope, la batería corre sin ficha; un cupo roto no puede dejar la suite sin correr.
+  if [ -n "$BTP_CUPO_FICHAS" ] && [ -z "$BTP_CUPO_TENGO" ]; then
+    _nf="${BTP_CUPO_NFICHAS:-6}"; _tope=$(( SECONDS + ${BTP_CUPO_ESPERA_S:-1800} ))
+    while [ ! -f "$2/$3.ini" ]; do
+      _kf=0
+      while [ "$_kf" -lt "$_nf" ]; do
+        _f=$(( ($3 + _kf) % _nf + 1 )); _kf=$((_kf+1))
+        BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_COPIA" BTP_CUPO_TENGO=1 \
+          lockf -k -s -t 0 "$BTP_CUPO_FICHAS/ficha.$_f" "${BASH:-bash}" "$0" "$@"; _rl=$?
+        [ -f "$2/$3.ini" ] && exit 0          # corrió (o murió corriendo: el padre lo cuenta ROJO)
+        [ "$_rl" -eq 75 ] || break 2          # 75 = ficha ocupada; otra cosa = lockf roto → sin ficha
+      done
+      [ "$SECONDS" -lt "$_tope" ] || break
+      sleep 1
+    done
+    echo "⚠️  cupo: $5 corre SIN ficha (lockf rc=$_rl o espera agotada)" >&2
+  fi
+  unset BTP_CUPO_FICHAS BTP_CUPO_NFICHAS BTP_CUPO_TENGO BTP_CUPO_ESPERA_S
+  : > "$2/$3.ini"
   _w="$2"; _i="$3"; _t0=$SECONDS
   _corre "$4" "$5" > "$_w/$_i.out" 2>&1; _r=$?
   echo "$((SECONDS-_t0))" > "$_w/$_i.t"; echo "$_r" > "$_w/$_i.rc"
   [ "$_r" -eq 1 ] && echo "🔴 (en vivo) $5" >&2
+  # Progreso (solo la suite de verdad, que deja `total`): las lentas y una de cada 25, para que una
+  # pasada de 20 min no parezca colgada. Va por stderr; el bloque ordenado sigue saliendo al final.
+  if [ -f "$_w/total" ]; then
+    _h=$(ls "$_w" | grep -c '\.rc$'); _t=$((SECONDS-_t0))
+    { [ "$_t" -ge 10 ] || [ $((_h % 25)) -eq 0 ]; } && echo "   · [$_h/$(cat "$_w/total")] $5 (${_t}s)" >&2
+  fi
   exit 0
 fi
 
@@ -95,6 +130,12 @@ fi
 # siempre. Con N>1 las baterías se ENCOLAN y se corren N a la vez, salvo las de SOLO_SERIE, que van
 # después una a una con la máquina libre. La salida sale en el MISMO orden de siempre, al final.
 JOBS="${BTP_JOBS:-1}"; _COLA=()
+# 13-oct-26: SIN `BTP_JOBS` ni `--jobs`, la suite de verdad ya NO va en serie: va con tantos trabajos
+# como fichas tiene el cupo de máquina (6). Medido: 47-76 min en serie frente a 19-23 en paralelo, y solo
+# 5 de 54 lanzamientos en 7 días pedían el paralelo a mano. `BTP_JOBS=1` sigue siendo la serie de
+# siempre. No cambia: una suite anidada, el CI (`CI`, `BTP_PORTABLE`) ni un valor basura (serie).
+_JOBS_AUTO=""; [ -z "$BTP_JOBS" ] && _JOBS_AUTO=1
+case " $* " in *" --jobs"*|*" -j "*) _JOBS_AUTO="";; esac
 # Comparten estado real (git del repo, Llavero, procesos del sistema, relojes, ficheros fijos) o miden
 # tiempos/carga: en paralelo darían rojos intermitentes. Lista medida, no supuesta (ver la nota del plan).
 SOLO_SERIE="test_fuga.sh test_halt.sh test_anatomia.py test_anatomia_al_dia.py test_contrato_asiento.py
@@ -104,12 +145,14 @@ test_cosecha_panel.py test_githooks_base.py test_healthcheck.py test_cascada_cli
 #   base; en un worktree saltan (rc 77), así que NINGUNA pasada de prueba las vio en paralelo. Sin
 #   evidencia, serie. Si la rutina nocturna las pasa 10 noches en paralelo sin rojo, se sacan de aquí.
 # · cascada_clinica: crea 00_FUENTE-DE-VERDAD/ en la raíz y eso decide si saltan otras (acopla el orden).
-# Las más lentas medidas el 10-oct-26 (≥ 40 s, ~1 núcleo cada una): arrancan primero en el pool.
-LARGAS="test_laminillas.py test_laminillas_n1.py test_laminillas_piloto_b.py test_anatomia_tecnica.py
+# Las más lentas (≥ 20 s de CPU, medidas el 10 y el 13-oct-26): arrancan primero en el pool.
+LARGAS="test_laminillas_piloto_b_t1.py test_laminillas_n1_t1.py test_laminillas_n1_t4.py test_laminillas_n1_t5.py
+test_laminillas_t2.py test_laminillas_t1.py test_laminillas_n1_t3.py test_laminillas_piloto_b_t2.py
+test_laminillas_n1_t2.py test_anatomia_tecnica.py
 test_anatomia_push.py test_laminillas_piloto_congela.py test_laminillas_f3.py test_visor3d_modelo_port.py
-test_dispatcher.sh test_visor3d_cuelgue.py test_laminillas_capas.py test_laminillas_1bis.py
+test_dispatcher.sh test_laminillas_capas.py test_laminillas_1bis.py
 test_correos_publicables.py test_deid_eval.py test_laminillas_valis.py test_panel_vision.py
-test_otra_casa_piloto.py"
+test_otra_casa_piloto.py test_trust_cloud_tty.py test_laminillas_he.py test_salida_guard.py"
 _lanza() {   # <run|py> <batería>
   _fuera "$2" && return 0
   if [ "$JOBS" -gt 1 ]; then _COLA+=("$1 $2"); return 0; fi
@@ -137,8 +180,20 @@ _vacia_cola() {
   done
   if [ -s "$_w/gordas" ]; then cat "$_w/gordas" "$_w/pool" > "$_w/pool2"; mv "$_w/pool2" "$_w/pool"; fi
   local _yo="${_COPIA:-$ROOT/tests/test_all.sh}"      # los trabajadores corren la MISMA copia fija, no el fichero vivo
+  # Cupo de máquina: la suite de verdad siempre; una anidada solo si se le da un cupo propio (los tests).
+  local _fichas=""
+  if { [ -z "$_ANIDADA" ] || [ -n "$_CUPO_DIR" ]; } && command -v lockf >/dev/null 2>&1; then
+    _fichas="${_CUPO_DIR:-/tmp/btp-cupo-tests-$(id -u)}"
+    { mkdir -p "$_fichas" 2>/dev/null && [ -w "$_fichas" ]; } || _fichas=""
+  fi
+  if [ -z "$_ANIDADA" ]; then
+    echo "${#_COLA[@]}" > "$_w/total"
+    echo "⚙️  en paralelo: $JOBS trabajos · ${#_COLA[@]} baterías · cupo de máquina: ${_fichas:+$_CUPO_N fichas en }${_fichas:-NO (sin lockf o sin carpeta)} · el bloque ordenado sale al final" >&2
+  fi
+  [ -n "$_fichas" ] && export BTP_CUPO_FICHAS="$_fichas" BTP_CUPO_NFICHAS="$_CUPO_N"
   BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_yo" BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P "$JOBS" bash "$_yo" --worker "$_w" < "$_w/pool"
   BTP_TEST_ALL_ROOT="$ROOT" BTP_TEST_ALL_COPIA="$_yo" BTP_ROJO_DIR="$ROJO_DIR" xargs -L1 -P 1 bash "$_yo" --worker "$_w" < "$_w/serie"
+  unset BTP_CUPO_FICHAS BTP_CUPO_NFICHAS
   _i=0
   for _l in "${_COLA[@]}"; do
     _i=$((_i+1)); _n="${_l#* }"
@@ -171,6 +226,10 @@ while [ $# -gt 0 ]; do
 done
 case "$JOBS" in ''|*[!0-9]*) JOBS=1;; esac
 [ "$JOBS" -ge 1 ] || JOBS=1
+case "$_CUPO_N" in ''|*[!0-9]*|0) _CUPO_N=6;; esac
+_nc=$(getconf _NPROCESSORS_ONLN 2>/dev/null); case "$_nc" in ''|*[!0-9]*|0) _nc=$_CUPO_N;; esac
+[ "$_CUPO_N" -le "$_nc" ] || _CUPO_N=$_nc
+if [ -n "$_JOBS_AUTO" ] && [ -z "$_ANIDADA" ] && [ -z "$CI" ] && [ -z "$BTP_PORTABLE" ]; then JOBS=$_CUPO_N; fi
 # FALLA CERRADA (10-oct-26, revisión de consejero-arquitectura): el selector tiene que contestar
 # limpio (rc 0 y una primera línea que entendemos). Si revienta, no existe o imprime vacío, NO se
 # concluye «no hay nada que correr»: va la suite completa. Test: test_all_puerta.py.
@@ -182,9 +241,9 @@ if [ -n "$_pide_cambiados" ]; then
     echo "⚡ MODO --cambiados: ninguna batería afectada (solo documentación). Antes de fusionar, la suite completa."
   elif [ $_rcsel -eq 0 ] && [ -n "$_p1" ] && [ "$_p1" != "TODO" ]; then
     CAMBIADOS=1; SELECCION=" $(echo $_sel) "
-    echo "⚡ MODO --cambiados: $(echo "$_sel" | grep -c .) batería(s) afectada(s). Antes de fusionar, la suite completa."
+    echo "⚡ MODO --cambiados: $(echo "$_sel" | grep -c '^test_') batería(s) afectada(s) y $(echo "$_sel" | grep -c '^mutantes:') campaña(s) de mutantes. Antes de fusionar, la suite completa."
   elif [ $_rcsel -eq 0 ] && [ "$_p1" = "TODO" ]; then
-    echo "⚡ --cambiados: se tocó test_all.sh, así que va la suite completa."
+    echo "⚡ --cambiados: se tocó test_all.sh en algo más que dar de alta baterías, así que va la suite completa."
   else
     echo "⚡ --cambiados: el selector no contestó limpio (rc=$_rcsel), así que va la suite completa."
   fi
@@ -207,6 +266,11 @@ if [ -n "$_pide_puerta" ]; then
   fi
 fi
 _fuera() { [ -n "$CAMBIADOS" ] || return 1; case "$SELECCION" in *" $1 "*) return 1;; esac; fuera=$((fuera+1)); return 0; }
+# Campañas de mutantes (13-oct-26): en la suite completa y en la puerta corren TODAS, siempre. Solo en
+# --cambiados se quedan las que el selector nombra («mutantes:<campaña>.json»: la rama tocó su json, su
+# objetivo o su test). Antes corrían las 10 aunque solo cambiara un README: 285 s fijos en cada pasada.
+_mut_va() { { [ -z "$CAMBIADOS" ] || [ -n "$PUERTA" ]; } && return 0
+            case "$SELECCION" in *" mutantes:$1 "*) return 0;; esac; fuera=$((fuera+1)); return 1; }
 
 run   test_fuga.sh
 run   test_halt.sh
@@ -256,6 +320,8 @@ runpy test_all_rojo_dir.py   # 25-sep · cada ejecución guarda sus rojos en SU 
 runpy test_all_stdin_cerrado.py   # 25-sep · la suite cierra stdin: ningún test hereda un pipe que no se cierra
 runpy test_all_copia_fija.py   # 10-oct · reescribir test_all.sh EN SITIO a mitad de una pasada no la corrompe (se ejecuta desde una copia fija)
 runpy test_all_paralelo.py   # 10-oct · BTP_JOBS: serie y paralelo dicen lo mismo, fail-closed, SOLO_SERIE, cronómetro (campaña de mutantes: tests/mutantes/test_all_paralelo.json, a mano o de noche: ~8 min)
+runpy test_all_cupo.py   # 13-oct · paralelo por defecto + cupo de máquina (fichas lockf): dos pasadas se reparten, ficha de un muerto se suelta, lockf roto no deja sin correr (mutantes: tests/mutantes/test_all_cupo.json, a mano o de noche)
+runpy test_trozos.py   # 13-oct · las baterías gordas repartidas en trozos: entre todos corren cada test UNA vez, ni uno menos ni uno repetido
 runpy test_suite_nocturna.py   # 10-oct · la suite de noche sobre casa base: avisa el muro la 1ª noche, deuda, flaky, latido y las 3 condiciones para cambiar la norma (campaña de mutantes: tests/mutantes/suite_nocturna.json, domingos de noche)
 runpy test_rojos_conocidos.py   # 10-oct · «sin rojos NUEVOS»: deuda, dueño, caducidad ≤ 14 d, firma exacta y núcleo del muro VETADO sin el OK de {{TITULAR}}
 runpy test_all_puerta.py   # 10-oct · la puerta FALLA CERRADA: selector roto/vacío/desconocido → suite completa; el meta-check corre también en la rápida
@@ -290,7 +356,12 @@ runpy test_radar_personas.py
 runpy test_salida_guard.py
 runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos a la red se juzga por el DESTINO
 runpy test_trust_cloud_tty.py     # 1-oct · confiar una nube de píxeles N1 solo tecleando en su terminal
-runpy test_laminillas_n1.py       # 1-oct · Puerta de N1, exporta_n1, vision_n1, nube_n1 (PII sintética)
+# test_laminillas_n1.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · Puerta de N1, exporta_n1, vision_n1, nube_n1 (PII sintética)
+runpy test_laminillas_n1_t1.py
+runpy test_laminillas_n1_t2.py
+runpy test_laminillas_n1_t3.py
+runpy test_laminillas_n1_t4.py
+runpy test_laminillas_n1_t5.py
 runpy test_laminillas_n1_jaula.py # 2-oct · jaula vision.sb de la llamada HTTP de vision_n1/nube_n1 (canarios sintéticos) y config.json sellado
 runpy test_otra_casa.py           # 10-oct · la boca de otra casa (fase 1 de la vía de Grok): guardas, sellos, parada; todo sintético y sin red. Su campaña COMPLETA de mutantes (tests/mutantes/otra_casa_completa.json) no corre aquí: se pasa a mano con `python3 tests/test_otra_casa.py --sellar-completa` y deja un sello; este test se pone rojo si la boca, el test o la campaña cambian sin volver a pasarla
 runpy test_otra_casa_piloto.py    # 10-oct · piloto de aceptación de Grok: corpus, umbral pre-registrado, puntuador y lanzador (no se corre: transporte de mentira)
@@ -531,48 +602,68 @@ run   test_credito_agotado.sh
 # Mutantes sobre los frenos del MURO: una defensa sin mutante que la mate no está cubierta.
 # ~20 s. Nació de dos checks que pasaban EN VACÍO el 20-sep-26 y que solo aparecieron al
 # romper a propósito lo que decían proteger.
+if _mut_va lector_clinico.json; then
 echo "── mutantes: tests/mutantes/lector_clinico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/lector_clinico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes (log: $ROJO_DIR/rojo-mutantes.log)"; }
+fi
+if _mut_va soporte_cita.json; then
 echo "── mutantes: tests/mutantes/soporte_cita.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/soporte_cita.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-soporte.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes soporte_cita (log: $ROJO_DIR/rojo-mutantes-soporte.log)"; }
+fi
+if _mut_va biomarcadores.json; then
 echo "── mutantes: tests/mutantes/biomarcadores.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-biomarcadores.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes biomarcadores (log: $ROJO_DIR/rojo-mutantes-biomarcadores.log)"; }
+fi
+if _mut_va biomarcadores_fecha.json; then
 echo "── mutantes: tests/mutantes/biomarcadores_fecha.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/biomarcadores_fecha.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-biomarcadores-fecha.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes biomarcadores_fecha (log: $ROJO_DIR/rojo-mutantes-biomarcadores-fecha.log)"; }
+fi
+if _mut_va caso_publico.json; then
 echo "── mutantes: tests/mutantes/caso_publico.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/caso_publico.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-caso-publico.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes caso_publico (log: $ROJO_DIR/rojo-mutantes-caso-publico.log)"; }
+fi
+if _mut_va errores_entrega.json; then
 echo "── mutantes: tests/mutantes/errores_entrega.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/errores_entrega.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-errores-entrega.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes errores_entrega (log: $ROJO_DIR/rojo-mutantes-errores-entrega.log)"; }
+fi
+if _mut_va aviso_en_camino.json; then
 echo "── mutantes: tests/mutantes/aviso_en_camino.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/aviso_en_camino.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-aviso-en-camino.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes aviso_en_camino (log: $ROJO_DIR/rojo-mutantes-aviso-en-camino.log)"; }
+fi
+if _mut_va rojos_conocidos.json; then
 echo "── mutantes: tests/mutantes/rojos_conocidos.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/rojos_conocidos.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-rojos-conocidos.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes rojos_conocidos (log: $ROJO_DIR/rojo-mutantes-rojos-conocidos.log)"; }
+fi
+if _mut_va tests_afectados.json; then
 echo "── mutantes: tests/mutantes/tests_afectados.json ──"
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/tests_afectados.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-tests-afectados.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes tests_afectados (log: $ROJO_DIR/rojo-mutantes-tests-afectados.log)"; }
+fi
+if _mut_va otra_casa.json; then
 echo "── mutantes: tests/mutantes/otra_casa.json (núcleo) ──"
 # NÚCLEO: lo que depende de código ajeno (borde, Puerta, centralita, zonas clínicas, casa base). La campaña
 # completa tarda varios minutos y va aparte, con sello (ver la línea de test_otra_casa.py, arriba).
 "$PY" "$ROOT/tools/mutantes.py" tests/mutantes/otra_casa.json >/tmp/t.$$ 2>&1; _rcm=$?; tail -1 /tmp/t.$$
 [ $_rcm -ne 0 ] && { fail=$((fail+1)); cp /tmp/t.$$ "$ROJO_DIR/rojo-mutantes-otra-casa.log" 2>/dev/null;
                      echo "  🔴 ROJO: campaña de mutantes otra_casa, núcleo (log: $ROJO_DIR/rojo-mutantes-otra-casa.log)"; }
+fi
 
 # Pieza 10 del arnés agéntico: drift de agentes críticos (determinista, sin LLM)
 echo "── evals/test_drift_agentes.py ──"
@@ -597,9 +688,14 @@ runpy test_muro_secreto_stdout.py
 runpy test_clinico_guard.py
 runpy test_log_auditoria_casa_base.py
 runpy test_lector_clinico_binario.py
-runpy test_laminillas.py   # 1-oct · laminillas DFCI F1-infra: ventanilla enjaulada (sandbox-exec), puertas y jaulas con canarios sintéticos
+# test_laminillas.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · laminillas DFCI F1-infra: ventanilla enjaulada (sandbox-exec), puertas y jaulas con canarios sintéticos
+runpy test_laminillas_t1.py
+runpy test_laminillas_t2.py
+runpy test_laminillas_t3.py
 runpy test_laminillas_piloto_color.py; runpy test_laminillas_piloto_segmenta.py; runpy test_laminillas_piloto_congela.py   # 1-oct · piloto módulo A (venv patologia; sin él, SKIP 77)
-runpy test_laminillas_piloto_b.py   # 1-oct · piloto módulo B: registro, métricas y GeoJSON sobre cortes sintéticos (venv patologia; sin él, SKIP 77)
+# test_laminillas_piloto_b.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · piloto módulo B: registro, métricas y GeoJSON sobre cortes sintéticos (venv patologia; sin él, SKIP 77)
+runpy test_laminillas_piloto_b_t1.py
+runpy test_laminillas_piloto_b_t2.py
 runpy test_laminillas_valis.py   # 2-oct · respaldo VALIS del registro con VALIS REAL: corre (también dentro de analisis) y Slide.M recupera una transformada conocida <1 px, directo y espejo (~40 s; sin venvs, SKIP 77)
 runpy test_laminillas_f3.py   # 2-oct · F3 parte A: FC de consenso, puerta de p63, (a-bis) y gemela NE, (b) y ROI de Carlos, sintéticos (venv patologia; sin él, SKIP 77)
 runpy test_laminillas_he.py   # 2-oct · F3 parte B: H&E del primario (mini-puerta HistoPLUS/NuLite, regiones, infiltrado), hueso sin células y exploratorio, sintéticos (venv patologia; sin él, SKIP 77)

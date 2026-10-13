@@ -91,6 +91,41 @@
       "etiqueta": "H: los programas de red lanzados con subprocess no cuentan",
       "viejo": "            if partes and partes[0] in _CLI_RED:\n                return True\n",
       "nuevo": ""
+    },
+    {
+      "etiqueta": "13-oct: una BAJA de batería en test_all.sh pasa por «solo altas»",
+      "viejo": "    if bajas - altas:\n        return None\n",
+      "nuevo": ""
+    },
+    {
+      "etiqueta": "13-oct: lo que no se reconoce en el diff del runner se ignora en vez de ser TODO",
+      "viejo": "        if not m:\n            return None\n",
+      "nuevo": "        if not m:\n            continue\n"
+    },
+    {
+      "etiqueta": "13-oct: un diff del runner vacío o sin hunks cuenta como «sin cambios»",
+      "viejo": "    if not diff or \"\\n@@\" not in \"\\n\" + diff:\n        return None\n",
+      "nuevo": "    if not diff:\n        return set()\n"
+    },
+    {
+      "etiqueta": "13-oct: dar de alta una batería que el runner no conoce no es TODO",
+      "viejo": "        if altas is None or not altas <= set(disponibles):",
+      "nuevo": "        if altas is None:"
+    },
+    {
+      "etiqueta": "13-oct: una línea run SANGRADA (dentro de un if) cuenta como alta",
+      "viejo": "        m = _RE_ALTA.match(cuerpo)",
+      "nuevo": "        m = _RE_ALTA.match(cuerpo.strip())"
+    },
+    {
+      "etiqueta": "13-oct: una campaña de mutantes ilegible se queda fuera en vez de correr",
+      "viejo": "        except Exception:\n            sel.add(nombre)\n            continue\n",
+      "nuevo": "        except Exception:\n            continue\n"
+    },
+    {
+      "etiqueta": "13-oct: una batería repartida en trozos se selecciona por su nombre original (que el runner ya no lanza)",
+      "viejo": "        if original in sel and set(partes) <= set(disponibles):\n            sel.discard(original)\n            sel |= set(partes)\n",
+      "nuevo": "        if False:\n            pass\n"
     }
   ],
   "_nota": "Se quitó la mutación «sin rev-parse de la base»: es una defensa REDUNDANTE (el diff contra la base ya falla con rc≠0 si no existe, y _git sube ese fallo). Se conserva el rev-parse por el mensaje claro.",

@@ -587,7 +587,8 @@ def _correr(hoy, domingo, entrada, sembrar):
 
     # domingos: campañas de mutantes lentas de la puerta
     if domingo:
-        for camp in ("test_all_paralelo", "test_all_puerta", "rojos_conocidos_sh", "suite_nocturna", "cerrar_sesion_ruido", "test_all_copia_fija", "git_mutex_ruido"):
+        for camp in ("test_all_paralelo", "test_all_puerta", "rojos_conocidos_sh", "suite_nocturna", "cerrar_sesion_ruido", "test_all_copia_fija", "git_mutex_ruido",
+                     "test_all_cupo", "trozos"):
             ruta = os.path.join(REPO, "tests", "mutantes", camp + ".json")
             if not os.path.isfile(ruta):
                 continue

@@ -120,7 +120,8 @@ def juguete(entradas, bateria="test_rojo_conocido.py", mensaje="CONOCIDO", deuda
     toy = "runpy %s\nrunpy test_verde.py" % bateria
     open(os.path.join(root, "tests", "test_all.sh"), "w").write(cab + "\n" + toy + "\n" + FIN + "\n")
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE")}
-    env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), BTP_STATE_DIR=estado, BTP_ROJOS_CONOCIDOS=fich)
+    env.update(BTP_ROJO_DIR=os.path.join(root, "rojos"), BTP_STATE_DIR=estado, BTP_ROJOS_CONOCIDOS=fich,
+               BTP_DENTRO_DE_SUITE="1")
     if jobs:
         env["BTP_JOBS"] = str(jobs)
     r = subprocess.run(["bash", os.path.join(root, "tests", "test_all.sh")], capture_output=True, text=True,

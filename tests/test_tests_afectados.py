@@ -99,6 +99,155 @@ class Seleccion(unittest.TestCase):
         T.cambiados()
 
 
+_CAB = ("diff --git a/tests/test_all.sh b/tests/test_all.sh\nindex 1..2 100755\n"
+        "--- a/tests/test_all.sh\n+++ b/tests/test_all.sh\n@@ -10,0 +11,2 @@ algo\n")
+
+
+class AltasDelRunner(unittest.TestCase):
+    """13-oct-26. Registrar un test en test_all.sh ya no convierte `--cambiados` en la suite entera
+    (le pasaba al 41 % de las ramas). Todo lo demás en ese diff sigue siendo TODO: falla cerrada."""
+
+    def test_solo_altas_y_comentarios_da_las_altas(self):
+        d = _CAB + "+runpy test_web_lint.py   # 13-oct · lo que fija\n+# un comentario\n+\n+run   test_fuga.sh\n"
+        self.assertEqual(T.altas_del_runner(d), {"test_web_lint.py", "test_fuga.sh"})
+
+    def test_lo_que_no_se_entiende_es_todo(self):
+        for mala in ('+SOLO_SERIE="test_fuga.sh"', "+  runpy test_web_lint.py", "+runpy test_web_lint.py; rm -rf x",
+                     "+runpy test_web_lint.py && true", "+_fuera() { return 0; }", "+exit 0", "+runpy ../x/test_a.py",
+                     "+runpy test_web_lint.py extra", "-_vacia_cola", "+run test_a.txt", "+runpyx test_web_lint.py"):
+            self.assertIsNone(T.altas_del_runner(_CAB + mala + "\n"), mala)
+
+    def test_una_baja_es_todo_pero_cambiar_su_comentario_no(self):
+        self.assertIsNone(T.altas_del_runner(_CAB + "-runpy test_web_lint.py\n"))
+        self.assertIsNone(T.altas_del_runner(_CAB + "-runpy test_web_lint.py\n+runpy test_fuga.sh\n"))
+        self.assertEqual(T.altas_del_runner(_CAB + "-runpy test_web_lint.py\n+runpy test_web_lint.py   # nota nueva\n"),
+                         {"test_web_lint.py"})
+
+    def test_diff_vacio_o_sin_hunks_no_concluye_nada(self):
+        for d in ("", None, "diff --git a/tests/test_all.sh b/tests/test_all.sh\n", "Binary files differ\n"):
+            self.assertIsNone(T.altas_del_runner(d), repr(d))
+
+    def test_las_cabeceras_del_diff_no_cuentan_como_cambios(self):
+        self.assertEqual(T.altas_del_runner(_CAB + "+runpy test_web_lint.py\n"), {"test_web_lint.py"})
+
+    def test_afectados_con_solo_altas_suma_y_no_es_todo(self):
+        g = GrafoFalso({"tools/bucles_colgados.py": ["tests/test_bucles_colgados.py"]})
+        todo, sel = T.afectados(["tests/test_all.sh", "tools/bucles_colgados.py"], DISPONIBLES, g,
+                                diff_runner=_CAB + "+runpy test_web_lint.py\n")
+        self.assertFalse(todo)
+        self.assertEqual(sel, {"test_web_lint.py", "test_bucles_colgados.py"})
+
+    def test_afectados_sin_diff_o_con_diff_raro_sigue_siendo_todo(self):
+        for d in (None, "", _CAB + "+LARGAS=\"\"\n"):
+            todo, sel = T.afectados(["tests/test_all.sh"], DISPONIBLES, GrafoFalso({}), diff_runner=d)
+            self.assertTrue(todo, repr(d))
+            self.assertEqual(sel, DISPONIBLES)
+
+    def test_un_alta_de_algo_que_el_runner_no_conoce_es_todo(self):
+        todo, _sel = T.afectados(["tests/test_all.sh"], DISPONIBLES, GrafoFalso({}),
+                                 diff_runner=_CAB + "+runpy test_que_no_existe.py\n")
+        self.assertTrue(todo)
+
+    def test_el_hook_del_muro_sigue_arrastrando_el_muro_con_un_alta(self):
+        _todo, sel = T.afectados(["tests/test_all.sh", ".claude/hooks/salida_guard.py"], DISPONIBLES,
+                                 GrafoFalso({}), diff_runner=_CAB + "+runpy test_web_lint.py\n")
+        self.assertTrue({"test_muro_fase0.py", "test_fuga.sh", "test_web_lint.py"} <= sel)
+
+    def test_la_puerta_no_cambia_tocar_el_runner_exige_la_completa(self):
+        r = T.puerta(["tests/test_all.sh"], DISPONIBLES, GrafoFalso({}), muro_tools=set(),
+                     rastreados={"tests/test_all.sh"}, con_red=set())
+        self.assertEqual(r["veredicto"], "COMPLETA")
+
+    def test_diff_del_runner_real_no_revienta(self):
+        self.assertIsInstance(T.diff_del_runner(), str)
+
+
+class NombreEntero(unittest.TestCase):
+    """El fichero cambiado se busca por su nombre ENTERO: `ia.py` no casa con «anatomia.py»."""
+
+    def test_una_subcadena_no_arrastra(self):
+        reales = T.baterias()
+        _todo, sel = T.afectados(["tools/ia.py"], reales, GrafoFalso({}))
+        self.assertNotIn("test_all.sh", sel)
+        de_trozo = {tr: orig for orig, partes in T.trozos().items() for tr in partes}
+        for b in sel:
+            texto = open(os.path.join(ROOT, "tests", de_trozo.get(b, b)), encoding="utf-8", errors="replace").read()
+            self.assertTrue(re.search(r"(?<![A-Za-z0-9_])ia\.py", texto), b)
+
+    def test_el_nombre_entero_sigue_entrando(self):
+        _todo, sel = T.afectados(["tools/_chrome_headless.mjs"], T.baterias(), GrafoFalso({}))
+        self.assertIn("test_chrome_headless_cierra.py", sel)
+
+    def test_el_runner_no_es_una_bateria(self):
+        _todo, sel = T.afectados(["tools/tests_afectados.py"], T.baterias(), GrafoFalso({}))
+        self.assertNotIn("test_all.sh", sel)
+        self.assertIn("test_tests_afectados.py", sel)
+
+
+class Trozos(unittest.TestCase):
+    """Una batería repartida en trozos (tests/_trozos.py) no tiene línea propia en el runner: seleccionarla
+    tal cual sería no correr nada y decir «verde»."""
+
+    def test_el_original_se_cambia_por_sus_trozos(self):
+        tabla = T.trozos()
+        self.assertIn("test_laminillas.py", tabla)
+        partes = set(tabla["test_laminillas.py"])
+        g = GrafoFalso({"tools/zz_solo_del_test_qq.py": ["tests/test_laminillas.py"]})
+        _todo, sel = T.afectados(["tools/zz_solo_del_test_qq.py"], DISPONIBLES | partes | {"test_laminillas.py"}, g)
+        self.assertEqual(sel, partes)
+
+    def test_si_faltan_trozos_en_el_runner_se_queda_el_original(self):
+        g = GrafoFalso({"tools/zz_solo_del_test_qq.py": ["tests/test_laminillas.py"]})
+        _todo, sel = T.afectados(["tools/zz_solo_del_test_qq.py"], DISPONIBLES | {"test_laminillas.py"}, g)
+        self.assertEqual(sel, {"test_laminillas.py"})
+
+    def test_una_tabla_que_no_carga_sube(self):
+        import tempfile
+        raiz = tempfile.mkdtemp(prefix="trozos_rota_")
+        os.makedirs(os.path.join(raiz, "tests"))
+        self.assertEqual(T.trozos(raiz), {})
+        open(os.path.join(raiz, "tests", "_trozos.py"), "w").write("TROZOS = {esto no es python\n")
+        with self.assertRaises(SyntaxError):
+            T.trozos(raiz)
+
+
+class Campanas(unittest.TestCase):
+    """Las campañas de mutantes que `--cambiados` corre: las que la rama tocó, y solo esas."""
+
+    def test_tocar_el_objetivo_el_test_o_el_json_la_mete(self):
+        for f in ("tools/caso_publico.py", "tests/test_caso_publico.py", "tests/mutantes/caso_publico.json"):
+            self.assertEqual(T.campanas_afectadas([f]), {"mutantes:caso_publico.json"}, f)
+
+    def test_un_objetivo_con_dos_campanas_mete_las_dos(self):
+        self.assertEqual(T.campanas_afectadas(["tools/biomarcadores.py"]),
+                         {"mutantes:biomarcadores.json", "mutantes:biomarcadores_fecha.json"})
+
+    def test_un_test_dentro_de_un_sh_c_tambien_cuenta(self):
+        self.assertIn("mutantes:soporte_cita.json", T.campanas_afectadas(["tests/test_soporte_cita_juez.py"]))
+
+    def test_lo_ajeno_no_mete_ninguna(self):
+        self.assertEqual(T.campanas_afectadas(["README.md", "tools/viajes_precios.py"]), set())
+
+    def test_tocar_la_herramienta_de_mutantes_las_mete_todas(self):
+        todas = T.campanas_afectadas(["tools/mutantes.py"])
+        self.assertGreaterEqual(len(todas), 10)
+        runner = open(os.path.join(ROOT, "tests", "test_all.sh"), encoding="utf-8").read()
+        self.assertEqual(todas, {"mutantes:" + c for c in re.findall(r'tools/mutantes\.py" tests/mutantes/(\S+\.json)', runner)})
+
+    def test_una_campana_ilegible_entra(self):
+        import tempfile
+        raiz = tempfile.mkdtemp(prefix="campanas_")
+        os.makedirs(os.path.join(raiz, "tests", "mutantes"))
+        open(os.path.join(raiz, "tests", "test_all.sh"), "w").write(
+            '"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/rota.json >/tmp/x\n'
+            '"$PY" "$ROOT/tools/mutantes.py" tests/mutantes/sana.json >/tmp/x\n')
+        open(os.path.join(raiz, "tests", "mutantes", "rota.json"), "w").write("{esto no es json")
+        open(os.path.join(raiz, "tests", "mutantes", "sana.json"), "w").write(
+            '{"objetivo": "tools/x.py", "test": ["python3", "tests/test_x.py"], "mutaciones": []}')
+        self.assertEqual(T.campanas_afectadas(["tools/otra.py"], raiz=raiz), {"mutantes:rota.json"})
+        self.assertEqual(T.campanas_afectadas(["tools/x.py"], raiz=raiz), {"mutantes:rota.json", "mutantes:sana.json"})
+
+
 class PuertaDeFusion(unittest.TestCase):
     """10-oct-26 · la puerta por impacto: lo que puede romper el muro SIN que un grafo lo vea exige
     la suite COMPLETA; el resto, afectadas + núcleo fijo. Aquí se fija que tocar el muro sigue

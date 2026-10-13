@@ -85,6 +85,7 @@ def monta(extra=None, solo_serie="", orden=None):
 def corre(root, args=(), env_extra=None):
     env = {k: v for k, v in os.environ.items() if k not in ("CI", "BTP_ROJO_DIR", "BTP_JOBS", "BTP_PORTABLE")}
     env["BTP_ROJO_DIR"] = os.path.join(root, "rojos_%d" % time.time_ns())
+    env["BTP_DENTRO_DE_SUITE"] = "1"      # suite de juguete = anidada: sin BTP_JOBS va en serie (13-oct-26)
     env.update(env_extra or {})
     t0 = time.monotonic()
     r = subprocess.run(["bash", os.path.join(root, "tests", "test_all.sh")] + list(args),
