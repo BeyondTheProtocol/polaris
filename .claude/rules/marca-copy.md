@@ -11,10 +11,19 @@ idea → **Producto** → **Diseño** (con todo el design system) + Producto →
 
 **4 lentes siempre:** accesibilidad, marketing, psicología, neurodivergencia.
 
-Flujo técnico: rama → PR → preview Netlify → **merge lo hace {{TITULAR}}**. No inventar patrones: se reusa el design system. Detalle: `00_FUENTE-DE-VERDAD/07 · Marca/Proceso-Comite-Web.md`.
+Flujo técnico: rama → PR → preview Netlify → fusión. No inventar patrones: se reusa el design system. Detalle: `00_FUENTE-DE-VERDAD/07 · Marca/Proceso-Comite-Web.md`.
+
+**Quién fusiona (frase única, 13-oct-26, OK de {{TITULAR}}):** *fusiona Polaris con el permiso firmado de {{TITULAR}}, atado al commit que vio.* Su «fusiona» es la firma; la mecánica es mía. Vale para un PR suelto (`gh pr merge <N> --match-head-commit <SHA>`) y para el lote semanal (`tools/web_lote.py`). Lo único que fusiona desde Python es `tools/web_publicar.py`.
 
 ## 🛑 Copy ya publicado
-Editar copy **ya publicado** (sobre todo hero/H1, taglines y claims) es **gate de salida**: un «dale» rápido NO basta. {{TITULAR}} tiene que entenderlo bien y **mergear ella**. No mergeo yo. Detalle: [[feedback-no-tocar-copy-web-sin-ok]].
+Editar copy **ya publicado** (sobre todo hero/H1, taglines y claims) es **gate de salida**: un «dale» rápido NO basta. {{TITULAR}} tiene que entenderlo bien, y ese PR solo sale si **lo nombra por su número** en su mensaje: un «fusiona» genérico no lo arrastra. Detalle: [[feedback-no-tocar-copy-web-sin-ok]].
+
+## 🪜 La escalera del guardián de la web (13-oct-26)
+- **Peldaño 1, mecánico** (código sin texto visible, enlaces rotos, sitemap, accesibilidad, eventos, regenerar /datos ya sellado): entra en el lote y sale con su «fusiona».
+- **Peldaño 2, míralo** (texto visible que cambia sin cambiar de voz, erratas, secciones nuevas, inglés, prensa literal, y **todo lo que nazca de una fuente externa**): va con diff y preview.
+- **Peldaño 3, lo entiende y firma** (hero, claims, navegación principal, dato clínico nuevo, tercero nombrado, borrar copy): solo si nombra el PR.
+
+Plan y motivos: `00_FUENTE-DE-VERDAD/04 · IA/Notas/plan-guardián-de-la-web-v2-aprobado-13-oct-2026-2026-10-13.md`.
 
 Mergeado ≠ desplegado: comprobar el deploy de Netlify ([[feedback-deploy-netlify-creditos]]) y **pasar siempre la preview** ([[feedback-siempre-pasar-preview]]).
 
