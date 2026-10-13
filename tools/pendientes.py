@@ -57,7 +57,7 @@ import fcntl
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -130,9 +130,20 @@ def prioridad_de(sender="", subject=""):
 
 
 def _thread_id(sender_email, subject):
-    """MISMO hash que correo._aviso_key: el ledger de avisos y el de pendientes describen
-    el mismo hilo con el mismo id (facilita cruzar los dos ficheros si hace falta)."""
-    return correo._aviso_key(sender_email, subject)  # noqa: SLF001 (mismo módulo hermano)
+    """Id del hilo: MISMO hash que correo._aviso_key, sobre el asunto SIN «Re:»/«Fwd:»
+    (13-oct-26): «X» y «Re: X» son un solo pendiente, no dos."""
+    return correo._aviso_key(sender_email, correo.asunto_base(subject))  # noqa: SLF001
+
+
+def _tid_en(ledger, sender_email, subject):
+    """Clave de ESTE hilo dentro del ledger. Las entradas anteriores al 13-oct se guardaron
+    con el hash del asunto tal cual (con su «Re:»): si existe esa y no la nueva, se sigue
+    usando la vieja — así «ok <id>» por Telegram no se rompe y no nace un duplicado."""
+    nuevo = _thread_id(sender_email, subject)
+    if nuevo in ledger:
+        return nuevo
+    viejo = correo._aviso_key(sender_email, subject)  # noqa: SLF001
+    return viejo if viejo in ledger else nuevo
 
 
 def _parse_fecha_utc(s):
@@ -210,6 +221,40 @@ def cargar():
     return _cargar_raw()
 
 
+# ── El origen del mensaje y la reapertura (13-oct-26) ─────────────────────────────
+def _anota_origen(entry, m, sender, fecha):
+    """Guarda en la entrada el mensaje ENTRANTE más reciente del hilo (Message-ID, cuenta,
+    dirección, fecha): es lo que necesita `revisar_hilos` para preguntarle a Gmail de quién
+    es el último mensaje. Solo cabeceras; nunca cuerpo."""
+    f_iso = _iso(fecha) if fecha else None
+    if f_iso and (entry.get("ultimo_entrante_ts") or "") > f_iso:
+        return
+    entry["remitente_email"] = sender
+    if m.get("message_id"):
+        entry["message_id"] = m["message_id"]
+    if m.get("cuenta"):
+        entry["cuenta"] = m["cuenta"]
+    if f_iso:
+        entry["ultimo_entrante_ts"] = f_iso
+        entry["fecha_rfc"] = m.get("fecha", "")
+
+
+def _es_posterior(entry, fecha):
+    """¿El hilo tiene ya un entrante MÁS NUEVO que este mensaje? (un «Re:» antiguo marcado
+    \\Answered no puede cerrar un hilo donde luego llegó otra cosa)."""
+    return bool(fecha and (entry.get("ultimo_entrante_ts") or "") > _iso(fecha))
+
+
+def _reabre(entry, fecha):
+    """Un hilo `cerrado` o `esperando` se reabre SOLO con un mensaje posterior al cierre (o
+    al último mensaje de ella): el mismo correo viejo que sigue en la ventana no reabre nada."""
+    if entry.get("estado") not in ("cerrado", "esperando") or fecha is None:
+        return False
+    corte = entry.get("cerrado_ts") if entry.get("estado") == "cerrado" else entry.get("esperando_desde")
+    corte = _parse_iso(corte)
+    return corte is not None and fecha > corte
+
+
 # ── Núcleo determinista: ¿qué sigue pendiente, qué se acaba de cerrar? ──────────
 def sincronizar(mensajes, *, ahora=None, dry=False):
     """Actualiza el ledger a partir del buzón fresco (la lista `mensajes` de buzon.json).
@@ -218,7 +263,7 @@ def sincronizar(mensajes, *, ahora=None, dry=False):
     ahora = ahora or _ahora_utc()
 
     def _mutar(ledger):
-        nuevos, cerrados_ahora = [], []
+        nuevos, cerrados_ahora, reabiertos = [], [], []
         for m in mensajes or []:
             sender = (m.get("remitente_email") or "").strip()
             subject = (m.get("asunto") or "").strip()
@@ -226,24 +271,27 @@ def sincronizar(mensajes, *, ahora=None, dry=False):
                 continue
             if m.get("inyeccion"):
                 continue   # cuarentena la trata correo.py; este ledger no persigue eso
-            tid = _thread_id(sender, subject)
+            tid = _tid_en(ledger, sender, subject)
             answered = "\\Answered" in (m.get("flags") or "")
             entry = ledger.get(tid)
+            if entry and entry.get("estado") == "fusionado" and entry.get("fusionado_en") in ledger:
+                tid = entry["fusionado_en"]   # dos claves, un hilo: manda la entrada dueña
+                entry = ledger[tid]
+            fecha = _parse_fecha_utc(m.get("fecha", ""))
             if answered:
-                if entry and entry.get("estado") == "abierto":
+                if entry and entry.get("estado") == "abierto" and not _es_posterior(entry, fecha):
                     entry["estado"] = "cerrado"
                     entry["motivo_cierre"] = "respondida"
                     entry["cerrado_ts"] = _iso(ahora)
                     cerrados_ahora.append(tid)
                 continue
-            fecha = _parse_fecha_utc(m.get("fecha", ""))
             if fecha is None:
                 continue   # fail-safe: sin fecha fiable, no perseguimos (evita falsos positivos)
             antiguedad_h = (ahora - fecha).total_seconds() / 3600.0
             if antiguedad_h < ANTIGUEDAD_MIN_H:
                 continue
             if entry is None:
-                ledger[tid] = {
+                entry = ledger[tid] = {
                     "primer_visto": _iso(ahora), "ultimo_nudge_ts": None, "n_nudges": 0,
                     "estado": "abierto", "prioridad": prioridad_de(sender, subject),
                     "remitente": m.get("remitente") or sender, "asunto": subject,
@@ -252,7 +300,17 @@ def sincronizar(mensajes, *, ahora=None, dry=False):
             elif entry.get("estado") == "abierto":
                 # refresca prioridad (la config de NED_CRITICOS/es_urgente puede haber cambiado)
                 entry["prioridad"] = prioridad_de(sender, subject)
-        return {"nuevos": nuevos, "cerrados_ahora": cerrados_ahora}
+            elif _reabre(entry, fecha):
+                # Un mensaje NUEVO en un hilo cerrado o en espera lo devuelve a «te toca»: la
+                # segunda respuesta de un médico no puede quedarse muda (13-oct-26).
+                entry.update(estado="abierto", reabierto_ts=_iso(ahora), n_nudges=0,
+                             ultimo_nudge_ts=None, hilo_visto_ts=None, turno="titular",
+                             prioridad=prioridad_de(sender, subject))
+                for k in ("motivo_cierre", "cerrado_ts", "silenciado", "pospuesto_hasta"):
+                    entry.pop(k, None)
+                reabiertos.append(tid)
+            _anota_origen(entry, m, sender, fecha)
+        return {"nuevos": nuevos, "cerrados_ahora": cerrados_ahora, "reabiertos": reabiertos}
 
     if dry:
         ledger = _cargar_raw()
@@ -263,7 +321,8 @@ def sincronizar(mensajes, *, ahora=None, dry=False):
 
     abiertos = [dict(id=tid, **e) for tid, e in ledger.items() if e.get("estado") == "abierto"]
     abiertos.sort(key=lambda e: (e["prioridad"] != "ned", e["prioridad"] != "media", e["primer_visto"]))
-    return {"abiertos": abiertos, "nuevos": res["nuevos"], "cerrados_ahora": res["cerrados_ahora"]}
+    return {"abiertos": abiertos, "nuevos": res["nuevos"], "cerrados_ahora": res["cerrados_ahora"],
+            "reabiertos": res["reabiertos"]}
 
 
 def baseline(mensajes, *, ahora=None, dry=False):
@@ -318,6 +377,301 @@ def reabrir_baseline():
     return _con_lock(_mutar)
 
 
+# ── La verdad del hilo: ¿a quién le toca? (13-oct-26) ─────────────────────────────
+# `sincronizar` solo ve la flag \\Answered de un mensaje que siga en la ventana del buzón. Aquí
+# se le pregunta a Gmail, hilo a hilo y SOLO para NED/media, de quién es el último mensaje:
+#   · último de un tercero → sigue `abierto` (te toca).
+#   · último de {{TITULAR}}     → `esperando` (le toca al otro). No avisa; si pasan
+#                            REPINCHAR_DIAS_HABILES sin respuesta, sale UNA vez como «re-pínchale».
+#   · pide una ACCIÓN (descargar, firmar) → sigue abierto aunque ella haya contestado: eso
+#                            solo lo cierra ella (lección VH-Arxiu, 31-jul).
+#   · no se localiza        → no se toca nada. Nunca se da por contestado lo que no se ha visto.
+REVISAR_CADA_H = 6.0            # no volver a preguntar por el mismo hilo antes de esto
+REVISAR_MAX = 40                # hilos por pasada (cada uno son 2-3 búsquedas IMAP por cuenta)
+REPINCHAR_DIAS_HABILES = 5
+DESILENCIAR_DIAS = 30           # un NED silenciado del arranque vuelve a avisar solo si el
+                                # hilo se movió en este plazo; más viejo, se queda en la lista
+
+
+def _consulta_real(buzones):
+    import correo_imap
+
+    def _c(e):
+        return correo_imap.estado_hilo(
+            e.get("message_id", ""), remitente_email=e.get("remitente_email") or e.get("remitente", ""),
+            asunto=e.get("asunto", ""), fecha=e.get("fecha_rfc", ""), buzones=buzones)
+    return _c
+
+
+def dias_habiles(desde, hasta):
+    """Días laborables (lun-vie) enteros entre dos fechas. Un fin de semana no cuenta como
+    «llevas dos días sin contestar»."""
+    if desde is None or hasta is None or hasta <= desde:
+        return 0
+    n, d = 0, desde
+    while (hasta - d).total_seconds() >= 86400:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            n += 1
+    return n
+
+
+def revisar_hilos(*, ahora=None, consulta=None, max_n=REVISAR_MAX, forzar=False, dry=False):
+    """Pregunta por el estado real de los hilos NED/media abiertos y lo aplica al ledger.
+    La red va FUERA del candado (si no, «ok <id>» por Telegram se quedaría esperando); el
+    resultado se aplica después, bajo candado, y solo a entradas que sigan abiertas.
+    `consulta(entry) -> dict de correo_imap.estado_hilo` se inyecta en tests."""
+    ahora = ahora or _ahora_utc()
+    ledger = cargar()
+    cand = []
+    for tid, e in ledger.items():
+        if e.get("estado") != "abierto" or e.get("prioridad") not in ("ned", "media"):
+            continue
+        visto = _parse_iso(e.get("hilo_visto_ts"))
+        if not forzar and visto is not None and (ahora - visto).total_seconds() < REVISAR_CADA_H * 3600:
+            continue
+        cand.append((tid, e))
+    cand.sort(key=lambda t: (t[1].get("hilo_visto_ts") or "", t[1].get("prioridad") != "ned",
+                             t[1].get("primer_visto", "")))
+    cand = cand[:max_n]
+    res = {"revisados": 0, "te_toca": [], "esperando": [], "no_encontrados": [], "fusionados": [],
+           "errores": [], "pendientes_de_revisar": 0}
+    if not cand:
+        return res
+    buzones = None
+    if consulta is None:
+        import correo_imap
+        buzones, errs = correo_imap.abrir_cuentas()
+        res["errores"].extend(errs)
+        consulta = _consulta_real(buzones)
+    hallazgos = {}
+    try:
+        for tid, e in cand:
+            try:
+                hallazgos[tid] = consulta(e)
+            except Exception as ex:   # un hilo que falla no tumba la pasada ni cambia nada
+                res["errores"].append("%s: %s" % (tid[:_ID_LEN], type(ex).__name__))
+    finally:
+        if buzones is not None:
+            import correo_imap
+            correo_imap.cerrar_cuentas(buzones)
+
+    def _mutar(led):
+        por_hilo = {}
+        for k, x in led.items():
+            if x.get("thrid") and x.get("estado") in ("abierto", "esperando"):
+                por_hilo.setdefault((x.get("cuenta_hilo"), x["thrid"]), k)
+        for tid, h in hallazgos.items():
+            e = led.get(tid)
+            if not e or e.get("estado") != "abierto":
+                continue   # ella lo cerró mientras preguntábamos: manda lo suyo
+            e["hilo_visto_ts"] = _iso(ahora)
+            res["revisados"] += 1
+            res["errores"].extend(h.get("errores") or [])
+            if not h.get("encontrado"):
+                e["hilo_no_encontrado"] = e.get("hilo_no_encontrado", 0) + 1
+                res["no_encontrados"].append(tid)
+                continue
+            e.pop("hilo_no_encontrado", None)
+            ult = datetime.utcfromtimestamp(h["ultimo_ts"]) if h.get("ultimo_ts") else None
+            e.update(thrid=h.get("thrid", ""), cuenta_hilo=h.get("cuenta", ""),
+                     turno=h.get("turno"), via=h.get("via", "hilo"),
+                     ultimo_ts_hilo=_iso(ult) if ult else None)
+            clave = (e["cuenta_hilo"], e["thrid"])
+            dueno = por_hilo.setdefault(clave, tid) if e["thrid"] else tid
+            if dueno != tid:
+                # dos entradas (la de «X» y la vieja de «Re: X») para un mismo hilo de Gmail
+                e.update(estado="fusionado", fusionado_en=dueno, fusionado_ts=_iso(ahora))
+                res["fusionados"].append(tid)
+                continue
+            accion = es_accion_requerida(e.get("remitente_email") or e.get("remitente", ""),
+                                         e.get("asunto", ""))
+            if h.get("turno") == "otro" and not accion:
+                e.update(estado="esperando", esperando_desde=_iso(ult or ahora))
+                e.pop("silenciado", None)
+                res["esperando"].append(tid)
+                continue
+            if e.get("silenciado") and ult and (ahora - ult).days <= DESILENCIAR_DIAS:
+                e.pop("silenciado", None)   # regla de salida del backlog de arranque
+            res["te_toca"].append(tid)
+        return None
+
+    if dry:
+        _mutar(ledger)
+    else:
+        _con_lock(_mutar)
+        ledger = cargar()
+    res["pendientes_de_revisar"] = sum(
+        1 for e in ledger.values()
+        if e.get("estado") == "abierto" and e.get("prioridad") in ("ned", "media")
+        and not e.get("hilo_visto_ts"))
+    res["errores"] = sorted(set(res["errores"]))
+    return res
+
+
+def esperando_vencidos(*, ahora=None):
+    """Hilos donde lo último lo escribió ELLA y el otro lleva REPINCHAR_DIAS_HABILES sin
+    contestar. Cada hilo sale UNA vez por mensaje suyo (`repinchado_de`): si ella vuelve a
+    escribir y vuelven a callar, saldrá otra vez; si no, no se repite."""
+    ahora = ahora or _ahora_utc()
+    out = []
+    for tid, e in cargar().items():
+        if e.get("estado") != "esperando" or e.get("prioridad") not in ("ned", "media"):
+            continue
+        desde = _parse_iso(e.get("esperando_desde"))
+        if desde is None or e.get("repinchado_de") == e.get("esperando_desde"):
+            continue
+        if dias_habiles(desde, ahora) >= REPINCHAR_DIAS_HABILES:
+            out.append((tid, e))
+    out.sort(key=lambda t: (t[1].get("prioridad") != "ned", t[1].get("esperando_desde", "")))
+    return out
+
+
+def posponer(identificador, *, modo="manana", ahora=None):
+    """«mañana <id>»: ese hilo no vuelve a salir hasta mañana a las 8 (UTC+2 aprox: 06:00 UTC).
+    «espero <id>»: ella dice que la pelota está en el otro tejado → `esperando` desde ahora.
+    Mismo criterio fail-closed que `cerrar`: id ambiguo o inexistente no toca nada."""
+    ahora = ahora or _ahora_utc()
+    ident = (identificador or "").strip()
+    if modo not in ("manana", "espero") or not ident:
+        return False, "uso: mañana <id> | espero <id>"
+    out = {}
+
+    def _mutar(led):
+        c = [k for k in led if k == ident] or [k for k in led if k.startswith(ident)]
+        c = [k for k in c if led[k].get("estado") == "abierto"]
+        if len(c) != 1:
+            out["err"] = "ese id es ambiguo; dame más caracteres" if len(c) > 1 else \
+                "no encuentro ese pendiente abierto (%s)" % ident
+            return
+        e = led[c[0]]
+        if modo == "manana":
+            e["pospuesto_hasta"] = _iso((ahora + timedelta(days=1)).replace(hour=6, minute=0, second=0))
+        else:
+            e.update(estado="esperando", esperando_desde=_iso(ahora), turno="otro", via="dicho")
+        out["e"] = e
+
+    _con_lock(_mutar)
+    if out.get("err"):
+        return False, out["err"]
+    e = out["e"]
+    return True, ("pospuesto hasta mañana: %s" if modo == "manana" else "esperando a %s") % e.get("remitente", ident)
+
+
+# ── El mensaje diario: UNO por día hábil, agrupado (13-oct-26) ────────────────────
+# Sustituye a la insistencia hilo a hilo. Repite cada día lo que sigue sin contestar, con los
+# días hábiles que lleva; lo NED que pasa de CRITICO_DIAS_HABILES sube arriba, dicho sin
+# rodeos. Solo entran hilos donde Gmail ha confirmado que el último mensaje NO es suyo (o que
+# piden una acción): lo que no se ha podido comprobar no se le echa en cara.
+CRITICO_DIAS_HABILES = 3
+DIARIO_HORA_LOCAL = 9            # no antes de esta hora (local)
+DIARIO_MAX_LINEAS = 8
+DIARIO_ESTADO = os.path.join(CORREO_DIR, "pendientes_diario.json")
+DIARIO_EN_SECO = os.path.join(CORREO_DIR, "diario_en_seco.txt")
+
+
+def te_toca(*, ahora=None):
+    """Hilos NED/media confirmados como «te toca», sin los pospuestos ni los silenciados.
+    Devuelve [(tid, entry, dias_habiles)] — NED primero, y dentro, el que más lleva."""
+    ahora = ahora or _ahora_utc()
+    out = []
+    for tid, e in cargar().items():
+        if e.get("estado") != "abierto" or e.get("prioridad") not in ("ned", "media"):
+            continue
+        if e.get("silenciado") or not e.get("turno"):
+            continue
+        accion = es_accion_requerida(e.get("remitente_email") or e.get("remitente", ""), e.get("asunto", ""))
+        if e.get("turno") != "titular" and not accion:
+            continue
+        hasta = _parse_iso(e.get("pospuesto_hasta"))
+        if hasta is not None and ahora < hasta:
+            continue
+        desde = _parse_iso(e.get("ultimo_ts_hilo")) or _parse_iso(e.get("ultimo_entrante_ts")) \
+            or _parse_iso(e.get("primer_visto"))
+        out.append((tid, e, dias_habiles(desde, ahora)))
+    out.sort(key=lambda t: (t[1].get("prioridad") != "ned", -t[2]))
+    return out
+
+
+def texto_diario(*, ahora=None):
+    """El texto del mensaje del día, o "" si no hay nada que decir (entonces no se manda)."""
+    ahora = ahora or _ahora_utc()
+    toca, espera = te_toca(ahora=ahora), esperando_vencidos(ahora=ahora)
+    if not toca and not espera:
+        return ""
+    lineas = []
+    if toca:
+        lineas.append("✉️ Te toca contestar (%d):" % len(toca))
+        for tid, e, d in toca[:DIARIO_MAX_LINEAS]:
+            critico = e.get("prioridad") == "ned" and d >= CRITICO_DIAS_HABILES
+            hecho = correo.borrador_ya_generado(e.get("remitente_email", ""), e.get("asunto", ""))
+            lineas.append("%s %s: «%s». %s%s (id %s)" % (
+                "🔴" if critico else "·", e.get("remitente", tid), e.get("asunto", ""),
+                ("Llevas %d días hábiles sin contestar" % d) if critico else
+                ("%d día%s" % (d, "" if d == 1 else "s") if d else "de hoy"),
+                ", y el borrador está hecho en Gmail" if hecho else "", tid[:_ID_LEN]))
+        if len(toca) > DIARIO_MAX_LINEAS:
+            lineas.append("· … y %d más (`pendientes.py lista`)" % (len(toca) - DIARIO_MAX_LINEAS))
+    if espera:
+        lineas.append("⏳ No te han contestado (%d):" % len(espera))
+        for tid, e in espera[:DIARIO_MAX_LINEAS]:
+            d = dias_habiles(_parse_iso(e.get("esperando_desde")), ahora)
+            lineas.append("· %s: «%s». %d días hábiles desde tu último mensaje (id %s)" % (
+                e.get("remitente", tid), e.get("asunto", ""), d, tid[:_ID_LEN]))
+    lineas.append('"ok <id>" hecho · "mañana <id>" lo dejo para mañana · "espero <id>" le toca al otro')
+    return "\n".join(lineas)
+
+
+def diario(*, ahora=None, ahora_local=None, dry=False, avisar=None):
+    """Manda el mensaje del día UNA vez por día hábil. Con BTP_PENDIENTES_SOLO_PARTE=1 no
+    manda nada: lo deja en `diario_en_seco.txt` para poder leer qué habría dicho (así se
+    prueba unos días antes de encenderlo). Solo se sella «enviado hoy» si de verdad llegó."""
+    ahora = ahora or _ahora_utc()
+    local = ahora_local or datetime.now()
+    hoy = local.strftime("%Y-%m-%d")
+    if local.weekday() >= 5 or local.hour < DIARIO_HORA_LOCAL:
+        return {"enviado": False, "motivo": "fuera de horario (día hábil, desde las %dh)" % DIARIO_HORA_LOCAL}
+    try:
+        with open(DIARIO_ESTADO, encoding="utf-8") as f:
+            estado = json.load(f)
+    except Exception:
+        estado = {}
+    seco = _solo_parte()
+    if estado.get("seco" if seco else "enviado") == hoy:
+        return {"enviado": False, "motivo": "ya salió hoy"}
+    texto = texto_diario(ahora=ahora)
+    if not texto:
+        return {"enviado": False, "motivo": "nada que decir"}
+    if dry:
+        return {"enviado": False, "dry": True, "texto": texto}
+    _ensure()
+    if seco:
+        with open(DIARIO_EN_SECO, "a", encoding="utf-8") as f:
+            f.write("── %s (en seco: NO enviado) ──\n%s\n\n" % (local.strftime("%Y-%m-%d %H:%M"), texto))
+        ok = False
+    else:
+        if avisar is None:
+            import salida  # única boca al exterior (Telegram); respeta HALT/silencio/cupo
+            avisar = lambda t: salida.report_to_titular(t, urgente=False, voz="calida", fuente="pendientes-diario")
+        res = avisar(texto)
+        ok = isinstance(res, dict) and bool(res.get("delivered"))
+        if not ok:
+            return {"enviado": False, "motivo": "no entregado; se reintenta en la próxima pasada"}
+        marcados = {tid for tid, _e in esperando_vencidos(ahora=ahora)}
+
+        def _mutar(led):
+            for tid in marcados:   # cada «no te han contestado» sale una vez por mensaje suyo
+                if tid in led:
+                    led[tid]["repinchado_de"] = led[tid].get("esperando_desde")
+        _con_lock(_mutar)
+    estado["seco" if seco else "enviado"] = hoy
+    tmp = DIARIO_ESTADO + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(estado, f)
+    os.replace(tmp, DIARIO_ESTADO)
+    return {"enviado": ok, "en_seco": seco, "lineas": texto.count("\n") + 1}
+
+
 def a_avisar(*, ahora=None):
     """¿Qué pendientes tocan nudge AHORA, respetando la cadencia por prioridad? Devuelve
     (ned, media) — listas de (thread_id, entry). 'baja' nunca aparece aquí (a propósito)."""
@@ -329,6 +683,9 @@ def a_avisar(*, ahora=None):
             continue
         if e.get("silenciado"):
             continue   # backlog de arranque: no avisa, pero SIGUE en la lista del parte
+        hasta = _parse_iso(e.get("pospuesto_hasta"))
+        if hasta is not None and ahora < hasta:
+            continue   # «mañana <id>»: ella lo pospuso, este hilo calla hasta entonces
         prio = e.get("prioridad", "baja")
         if prio == "baja":
             continue
@@ -486,6 +843,19 @@ def _buzon_mensajes():
     return correo_imap.cargar_buzon().get("mensajes", [])
 
 
+def _revisar_hilos_cli(*, dry=False, forzar=False):
+    """La pasada de hilos, fail-soft: si no hay clave o Gmail no responde se DICE en la
+    salida, pero la sincronización por cabeceras sigue valiendo."""
+    try:
+        r = revisar_hilos(dry=dry, forzar=forzar)
+    except Exception as e:
+        return {"ok": False, "motivo": "%s: %s" % (type(e).__name__, e)}
+    return {"ok": True, "revisados": r["revisados"], "te_toca": len(r["te_toca"]),
+            "esperando": len(r["esperando"]), "fusionados": len(r["fusionados"]),
+            "no_encontrados": len(r["no_encontrados"]),
+            "pendientes_de_revisar": r["pendientes_de_revisar"], "errores": r["errores"]}
+
+
 def main(argv):
     cmd = argv[0] if argv else "estado"
     dry = "--dry" in argv[1:]
@@ -494,9 +864,30 @@ def main(argv):
         return 0
     if cmd == "sincroniza":
         r = sincronizar(_buzon_mensajes(), dry=dry)
-        print(json.dumps({"nuevos": r["nuevos"], "cerrados_ahora": r["cerrados_ahora"],
-                          "abiertos": len(r["abiertos"])}, ensure_ascii=False, indent=2))
+        out = {"nuevos": r["nuevos"], "cerrados_ahora": r["cerrados_ahora"],
+               "reabiertos": r["reabiertos"], "abiertos": len(r["abiertos"])}
+        if "--sin-red" not in argv[1:]:
+            out["hilos"] = _revisar_hilos_cli(dry=dry)
+        d = diario(dry=dry)
+        d.pop("texto", None)   # el texto lleva nombres: no al log del daemon
+        out["diario"] = d
+        print(json.dumps(out, ensure_ascii=False, indent=2))
         return 0
+    if cmd == "diario":
+        r = diario(dry=True, ahora_local=datetime.now().replace(hour=12)) if dry else diario()
+        print(r.get("texto") or json.dumps(r, ensure_ascii=False))
+        return 0
+    if cmd == "hilos":
+        print(json.dumps(_revisar_hilos_cli(dry=dry, forzar="--forzar" in argv[1:]),
+                         ensure_ascii=False, indent=2))
+        return 0
+    if cmd in ("manana", "mañana", "espero"):
+        if len(argv) < 2:
+            print("uso: pendientes.py mañana <id> | espero <id>", file=sys.stderr)
+            return 2
+        ok, texto = posponer(argv[1], modo="espero" if cmd == "espero" else "manana")
+        print(("✅ " if ok else "⚠️  ") + texto)
+        return 0 if ok else 1
     if cmd == "baseline":
         r = baseline(_buzon_mensajes(), dry=dry)
         print(json.dumps(r, ensure_ascii=False, indent=2))

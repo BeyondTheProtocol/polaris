@@ -325,6 +325,151 @@ def buscar(query, *, limit=20, cuenta="ambas"):
     return out[:limit]
 
 
+# ── Estado del HILO: ¿de quién es el último mensaje? (13-oct-2026) ───────────────
+# Por qué existe: `pendientes.py` decidía «¿contestó {{TITULAR}}?» solo con la flag \Answered del
+# mensaje, y solo mientras ese mensaje siguiera en la ventana de buzon.json. Resultado medido
+# el 13-oct: 1557 pendientes abiertos y 38 cerrados, con el aviso amordazado porque insistir
+# sobre eso era spam. La verdad está en el hilo: si el último mensaje es suyo, la pelota está
+# en el tejado del otro. Esto lo mira en Todo el correo (recibidos y enviados juntos), en
+# TODAS sus cuentas, SOLO LECTURA y sin leer cuerpos.
+MIS_DIRECCIONES = frozenset(u.lower() for u, _ in CUENTAS)
+HILO_MAX = 25   # mensajes de un hilo que se miran como mucho (los más recientes)
+
+asunto_base = correo.asunto_base   # «X» y «Re: X» son el mismo hilo
+
+
+def es_mia(direccion):
+    """¿Esta dirección es una de las cuentas de {{TITULAR}}? (quién escribió el último mensaje)."""
+    return (email.utils.parseaddr(direccion or "")[1] or "").lower() in MIS_DIRECCIONES
+
+
+class TodoElCorreo(ImapMailbox):
+    """Una cuenta abierta en «Todo el correo» (readonly): búsquedas por hilo de Gmail."""
+
+    def __init__(self, M, cuenta):
+        _select_todo_el_correo(M)
+        super().__init__(M)
+        self.cuenta = cuenta
+
+    def buscar_raw(self, query):
+        q = _solo_ascii(str(query)).replace('"', " ").replace("\\", " ").strip()
+        typ, data = self._M.uid("search", "X-GM-RAW", '"%s"' % q)
+        return sorted(int(x) for x in data[0].split()) if (typ == "OK" and data and data[0]) else []
+
+    def thrid(self, uid):
+        typ, data = self._M.uid("fetch", str(uid), "(X-GM-THRID)")
+        for part in data or []:
+            raw = part[0] if isinstance(part, tuple) else part
+            m = re.search(rb"X-GM-THRID (\d+)", raw or b"")
+            if m:
+                return m.group(1).decode("ascii")
+        return ""
+
+    def uids_de_hilo(self, thrid):
+        if not str(thrid).isdigit():
+            return []
+        typ, data = self._M.uid("search", "X-GM-THRID", str(thrid))
+        return sorted(int(x) for x in data[0].split()) if (typ == "OK" and data and data[0]) else []
+
+
+def _abrir_todo(user, secret):
+    return TodoElCorreo(_login(user, secret), user)
+
+
+def _fecha_gmail(ts):
+    """Fecha para `after:` de Gmail (día anterior, para no perder nada por la zona horaria)."""
+    return datetime.utcfromtimestamp(max(0.0, ts - 86400)).strftime("%Y/%m/%d")
+
+
+def abrir_cuentas(*, abrir=None, cuentas=None):
+    """Abre «Todo el correo» de cada cuenta UNA vez (para revisar muchos hilos en una pasada
+    sin un login por hilo: Gmail corta con 421 si se abusa). Devuelve (buzones, errores).
+    FaltaClave si ninguna cuenta tiene clave. Quien llama cierra con cerrar_cuentas()."""
+    abrir = abrir or _abrir_todo
+    buzones, errores, sin_clave = [], [], 0
+    cuentas = cuentas or CUENTAS
+    for user, secret in cuentas:
+        try:
+            buzones.append(abrir(user, secret))
+        except FaltaClave:
+            sin_clave += 1
+        except Exception as e:
+            errores.append("%s: %s" % (user, type(e).__name__))
+    if not buzones and sin_clave == len(cuentas):
+        raise FaltaClave("ninguna cuenta tiene App Password en el Llavero")
+    return buzones, errores
+
+
+def cerrar_cuentas(buzones):
+    for mb in buzones or []:
+        mb.close()
+
+
+def estado_hilo(message_id="", *, remitente_email="", asunto="", fecha="", abrir=None,
+                cuentas=None, buzones=None):
+    """¿De quién es el ÚLTIMO mensaje del hilo? Devuelve
+        {encontrado, turno: "titular"|"otro", thrid, cuenta, n, ultimo_fecha, ultimo_ts,
+         ultimo_remitente, via: "hilo"|"enviado-aparte", errores}
+    `turno` dice a quién le toca: "titular" si lo último es de un tercero, "otro" si lo último
+    lo escribió ella. `encontrado=False` = no se pudo localizar (fail-safe: quien llama NO
+    cambia nada; nunca se da por contestado lo que no se ha visto).
+
+    Se localiza por Message-ID (rfc822msgid:) y, si falta, por remitente + asunto. Además se
+    busca en cada cuenta un correo SUYO a ese remitente posterior al último de él: cubre el
+    caso de contestar desde la otra cuenta o en un hilo nuevo (`via="enviado-aparte"`).
+    `abrir(user, secret)` se inyecta en tests; por defecto abre IMAP real, readonly."""
+    mid = (message_id or "").strip().strip("<>")
+    rem = (remitente_email or "").strip().lower()
+    base = asunto_base(asunto)
+    propios = buzones is None
+    errores = []
+    if propios:
+        buzones, errores = abrir_cuentas(abrir=abrir, cuentas=cuentas)
+    mejor, aparte = None, None
+    try:
+        for mb in buzones:
+            user = getattr(mb, "cuenta", "")
+            try:
+                uids = mb.buscar_raw("rfc822msgid:%s" % mid) if mid else []
+                if not uids and rem and base:
+                    uids = mb.buscar_raw("from:%s subject:(%s)" % (rem, base))
+                if uids:
+                    thrid = mb.thrid(uids[-1])
+                    hilo = (mb.uids_de_hilo(thrid) or uids)[-HILO_MAX:]
+                    ents = [_entry(u, mb.fetch_header(u), cuenta=user) for u in hilo]
+                    ents = [e for e in ents if _ts(e) > 0] or ents
+                    ult = max(ents, key=_ts)
+                    cand = {"encontrado": True, "thrid": thrid, "cuenta": user, "n": len(ents),
+                            "ultimo_ts": _ts(ult), "ultimo_fecha": ult.get("fecha", ""),
+                            "ultimo_remitente": ult.get("remitente_email", ""),
+                            "turno": "otro" if es_mia(ult.get("remitente_email")) else "titular",
+                            "via": "hilo"}
+                    if mejor is None or cand["ultimo_ts"] > mejor["ultimo_ts"]:
+                        mejor = cand
+                if rem and "@" in rem:
+                    ref = _ts({"fecha": fecha}) or 0.0
+                    env = mb.buscar_raw("in:sent to:%s%s" % (
+                        rem, (" after:%s" % _fecha_gmail(ref)) if ref else ""))
+                    if env:
+                        e = _entry(env[-1], mb.fetch_header(env[-1]), cuenta=user)
+                        if aparte is None or _ts(e) > _ts(aparte):
+                            aparte = e
+            except Exception as e:
+                errores.append("%s: %s" % (user, type(e).__name__))
+    finally:
+        if propios:
+            cerrar_cuentas(buzones)
+    if mejor is None:
+        return {"encontrado": False, "errores": errores}
+    if (mejor["turno"] == "titular" and aparte is not None
+            and _ts(aparte) > mejor["ultimo_ts"]):
+        mejor.update(turno="otro", via="enviado-aparte", ultimo_ts=_ts(aparte),
+                     ultimo_fecha=aparte.get("fecha", ""),
+                     ultimo_remitente=aparte.get("remitente_email", ""))
+    mejor["errores"] = errores
+    return mejor
+
+
 # ── Estado propio (no toca procesados.json del triaje del agente) ────────────────
 def _load_seen(path=None):
     try:

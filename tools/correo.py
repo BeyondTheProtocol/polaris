@@ -451,6 +451,17 @@ def marcar_procesado(thread_ids):
 _AVISO_TTL_H = 72   # purga entradas más viejas que esto (mantiene el fichero pequeño)
 
 
+# «X» y «Re: X» son el MISMO hilo (13-oct-2026). El ledger de pendientes los contaba como dos
+# porque _norm solo pasa a minúsculas: una respuesta abría un pendiente nuevo y el viejo se
+# quedaba abierto para siempre.
+_RE_PREFIJO_RE = re.compile(r"^\s*((re|rv|fw|fwd|tr|aw|wg)\s*(\[\d+\])?\s*:\s*)+", re.I)
+
+
+def asunto_base(asunto):
+    """El asunto sin «Re:» / «RV:» / «Fwd:» delante."""
+    return _RE_PREFIJO_RE.sub("", asunto or "").strip()
+
+
 def _aviso_key(remitente_email, asunto):
     return hashlib.sha256(_norm(remitente_email, asunto).encode("utf-8")).hexdigest()[:16]
 

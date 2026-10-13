@@ -44,6 +44,7 @@ import buzon_ideas             # captura DETERMINISTA y offline de los enlaces a
 import pendientes              # cierre DETERMINISTA de "espera tu respuesta" («ok <id>»/«ignora <id>»)
 
 _OK_IGNORA_RE = re.compile(r"^(ok|ignora)\s+([a-f0-9]{3,16})$", re.I)
+_POSPONER_RE = re.compile(r"^(mañana|manana|espero)\s+([a-f0-9]{3,16})$", re.I)
 
 IDLE = int(os.environ.get("BTP_BOT_IDLE", "3"))
 
@@ -333,6 +334,15 @@ def handle_message(msg):
         ok_p, texto_p = pendientes.cerrar(m_pend.group(2), motivo=motivo)
         responder(("✅ " if ok_p else "⚠️  ") + texto_p)
         return "pendiente-cierre:%s" % ("ok" if ok_p else "no")
+
+    # Posponer UN hilo del mensaje diario («mañana <id>» / «espero <id>», 13-oct-26). Mismo
+    # criterio: determinista, sin LLM. El id es hexadecimal, así que «mañana voy al médico» no casa.
+    m_posp = _POSPONER_RE.match(text.strip())
+    if m_posp:
+        modo = "espero" if m_posp.group(1).lower() == "espero" else "manana"
+        ok_p, texto_p = pendientes.posponer(m_posp.group(2), modo=modo)
+        responder(("✅ " if ok_p else "⚠️  ") + texto_p)
+        return "pendiente-posponer:%s" % ("ok" if ok_p else "no")
 
     # Aprobación del TOPE de gasto del día («sube»): DETERMINISTA, sin agente ni Claude (evita el
     # deadlock de necesitar gasto para aprobar gasto). Solo actúa si hay un aviso de tope pendiente;
