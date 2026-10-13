@@ -220,6 +220,16 @@ def _candidatos(registro, sensible, prefer=None, solo_gratis=False, por_capacida
     return cand
 
 
+def _detalle_error(out):
+    """Lo justo de la salida de `claude -p` para saber POR QUÉ falló: el código de error de
+    la API y el mensaje, recortado a 200 caracteres. La salida de un fallo no lleva el prompt."""
+    try:
+        d = json.loads(out)
+        return ("%s %s" % (d.get("api_error_status") or "", str(d.get("result") or "")))[:200].strip()
+    except Exception:
+        return " ".join((out or "").split())[:200]
+
+
 def _log(rec):
     try:
         os.makedirs(IA_DIR, exist_ok=True)
@@ -377,7 +387,11 @@ def _call_claude(prompt, system, models, interactivo=False, critico=False):
             fallo = "credito"; break
         if ('"api_error_status": 429' in out or '"api_error_status": 529' in out
                 or "overloaded" in low or "rate limit" in low or "usage limit" in low):
-            _log({"evento": "claude", "modelo": m, "fallo": "limite"})
+            # El motivo literal (13-oct-26): «limite» a secas no distingue 429 de la API, tope de
+            # uso del plan o sobrecarga, y sin eso no se sabe qué desbloquea. Solo el mensaje
+            # de error del CLI, recortado; nunca el prompt.
+            _log({"evento": "claude", "modelo": m, "fallo": "limite",
+                  "detalle": _detalle_error(out), "con_clave_api": bool(key)})
             fallo = "limite"; continue          # degrada al siguiente modelo de la cadena
         try:
             d = json.loads(out)
