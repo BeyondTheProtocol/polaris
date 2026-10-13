@@ -99,6 +99,17 @@ class ElManifiesto(unittest.TestCase):
         self.assertIn("#3", texto.split("solo si lo nombras")[1] if "solo si lo nombras" in texto else "")
 
 
+class LaPreview(unittest.TestCase):
+
+    def test_sale_limpia_del_comentario_de_netlify(self):
+        """El comentario real del PR #268: la URL va dentro de un enlace markdown."""
+        cuerpo = ("### ✅ Deploy Preview for *helptitular-web* ready!\n| Name | Link |\n"
+                  "|😎 Deploy Preview | [Preview](https://deploy-preview-268--helptitular-web.netlify.app) |")
+        self.assertEqual("https://deploy-preview-268--helptitular-web.netlify.app", L.preview_en(cuerpo))
+        self.assertEqual("", L.preview_en("sin enlace"))
+        self.assertEqual("", L.preview_en(None))
+
+
 class LaOrden(unittest.TestCase):
 
     def _corre(self, resultado=None):

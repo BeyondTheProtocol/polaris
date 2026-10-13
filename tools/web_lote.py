@@ -34,6 +34,7 @@ Uso:
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -44,6 +45,19 @@ import web_publicar as WP  # noqa: E402
 TOPE_ATENCION = 3      # peldaños 2 y 3: lo que le pide leer (el tope que puso Vega)
 TOPE_MECANICOS = 5     # peldaño 1
 NOMBRES = {1: "mecánico", 2: "míralo", 3: "solo si lo nombras"}
+
+
+RE_PREVIEW = re.compile(r"https://deploy-preview-\d+--[\w-]+\.netlify\.app")
+
+
+def preview_en(texto):
+    """La URL de la preview de Netlify dentro de un comentario del PR, limpia, o "".
+
+    Netlify la escribe como enlace markdown (`[Preview](https://deploy-preview-268--…)`). Partir
+    el comentario por espacios dejaba «Preview](https://…» en el manifiesto: se vio el 14-oct-26
+    al probarlo contra el primer PR real (#268)."""
+    m = RE_PREVIEW.search(texto or "")
+    return m.group(0) if m else ""
 
 
 def leer_pr(numero):
@@ -62,9 +76,7 @@ def leer_pr(numero):
     frena, avisa = WP.revisa_copy(WP.WEB, "origin/" + WP.BASE, cabeza)
     preview = ""
     for c in d.get("comments") or []:
-        for palabra in (c.get("body") or "").split():
-            if "deploy-preview-" in palabra and "netlify.app" in palabra:
-                preview = palabra.strip("()[]<>|*`,")
+        preview = preview_en(c.get("body")) or preview
     return {"number": d.get("number"), "state": d.get("state"), "headRefOid": cabeza,
             "url": d.get("url"), "title": d.get("title"),
             "ci": WP.ci_estado(d.get("statusCheckRollup")),
