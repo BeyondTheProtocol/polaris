@@ -292,25 +292,42 @@ def resumen_hoy(hoy=None):
         with open(os.path.join(DIR, "hallazgos.json"), encoding="utf-8") as f:
             hall = json.load(f).get("hallazgos") or []
         suyos = sorted(h["clave"] for h in hall if h.get("peldano", 1) >= 2)
-        if not suyos:
-            return []
-        ruta = os.path.join(DIR, "parte_visto.json")
-        try:
-            with open(ruta, encoding="utf-8") as f:
-                visto = json.load(f)
-        except (OSError, ValueError):
-            visto = {}
-        misma = visto.get("claves") == suyos
-        if misma and visto.get("fecha") != hoy.isoformat():
-            if (hoy - datetime.date.fromisoformat(visto["fecha"])).days < 7:
-                return []
-        if not misma or visto.get("fecha") != hoy.isoformat():
-            _escribe(ruta, {"claves": suyos, "fecha": hoy.isoformat()})
-        return ["· 🌐 Web: %d cosa%s que mirar (%s). Detalle: `python3 tools/web_guardian.py estado`"
-                % (len(suyos), "" if len(suyos) == 1 else "s",
-                   "; ".join(h["titulo"] for h in hall if h.get("peldano", 1) >= 2)[:220])]
+        return _linea_de_cambios(hall, suyos, hoy) + _linea_del_lunes(hall, hoy)
     except Exception:
         return []
+
+
+def _linea_del_lunes(hall, hoy):
+    """Los lunes, si hay algo detectado, el parte le da la frase que arranca la pasada semanal.
+
+    Sustituye a una rutina programada en la app (14-oct-26): esas viven en su ordenador, una
+    sesión que corre en Polaris no puede crearlas, y el plan no debe depender de que ella monte
+    nada. Con esto le basta abrir una sesión y pegar la frase."""
+    if hoy.weekday() != 0 or not hall:
+        return []
+    return ["· 🌐 Lunes de web: %d hallazgo%s para el lote. Abre una sesión y di «haz la pasada "
+            "semanal del guardián de la web»." % (len(hall), "" if len(hall) == 1 else "s")]
+
+
+def _linea_de_cambios(hall, suyos, hoy):
+    """Lo que ella tiene que mirar, solo cuando cambia o ha pasado una semana desde que se lo dije."""
+    if not suyos:
+        return []
+    ruta = os.path.join(DIR, "parte_visto.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            visto = json.load(f)
+    except (OSError, ValueError):
+        visto = {}
+    misma = visto.get("claves") == suyos
+    if misma and visto.get("fecha") != hoy.isoformat():
+        if (hoy - datetime.date.fromisoformat(visto["fecha"])).days < 7:
+            return []
+    if not misma or visto.get("fecha") != hoy.isoformat():
+        _escribe(ruta, {"claves": suyos, "fecha": hoy.isoformat()})
+    return ["· 🌐 Web: %d cosa%s que mirar (%s). Detalle: `python3 tools/web_guardian.py estado`"
+            % (len(suyos), "" if len(suyos) == 1 else "s",
+               "; ".join(h["titulo"] for h in hall if h.get("peldano", 1) >= 2)[:220])]
 
 
 # ── la pasada real: aquí, y solo aquí, se lee de fuera ───────────────────────────────────────

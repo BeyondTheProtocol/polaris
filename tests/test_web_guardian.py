@@ -233,6 +233,24 @@ class SombraYActivo(unittest.TestCase):
         G.guardar([self.HALL[0]], HOY)
         self.assertEqual([], G.resumen_hoy(hoy=HOY), "solo peldaño 1: nada que leer, nada en el parte")
 
+    def test_los_lunes_el_parte_da_la_frase_de_la_pasada_semanal(self):
+        """Sustituye a la rutina de la app, que una sesión en Polaris no puede crear."""
+        os.makedirs(G.DIR, exist_ok=True)
+        with open(os.path.join(G.DIR, "modo.json"), "w") as f:
+            json.dump({"modo": "activo"}, f)
+        lunes = datetime.date(2026, 10, 19)
+        G.guardar([self.HALL[0]], lunes)                 # solo peldaño 1: nada que leer
+        lineas = G.resumen_hoy(hoy=lunes)
+        self.assertEqual(1, len(lineas))
+        self.assertIn("haz la pasada semanal del guardián de la web", lineas[0])
+        self.assertEqual([], G.resumen_hoy(hoy=datetime.date(2026, 10, 20)), "el martes ya no")
+        G.guardar([], lunes)
+        self.assertEqual([], G.resumen_hoy(hoy=lunes), "sin hallazgos no hay pasada que hacer")
+
+    def test_en_sombra_tampoco_los_lunes(self):
+        G.guardar(self.HALL, datetime.date(2026, 10, 19))
+        self.assertEqual([], G.resumen_hoy(hoy=datetime.date(2026, 10, 19)))
+
     def test_un_estado_roto_no_tumba_el_parte(self):
         os.makedirs(G.DIR, exist_ok=True)
         with open(os.path.join(G.DIR, "hallazgos.json"), "w") as f:
