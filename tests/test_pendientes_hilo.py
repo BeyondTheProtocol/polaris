@@ -225,8 +225,8 @@ def t_revisar_hilos():
     p.sincronizar([entrante("Cita biopsia", mid="h1"),
                    entrante("Resultados analítica", mid="h2", email="lab@{{CENTRO}}.net", nombre="Lab"),
                    entrante("Documentacion: caduca el viernes", mid="h3",
-                            email="arxiu@vhebron.net", nombre="Arxiu"),
-                   entrante("Oferta 2x1", mid="h4", email="promo@tienda.com", nombre="Tienda")],
+                            email="arxiu@hospital.example", nombre="Arxiu"),
+                   entrante("Oferta 2x1", mid="h4", email="promo@tienda.example", nombre="Tienda")],
                   ahora=AHORA)
     led = p.cargar()
     por_mid = {e["message_id"]: k for k, e in led.items()}
@@ -376,7 +376,59 @@ def t_diario():
           len(enviados) == 2 and "Elegibilidad" in enviados[1] and "Ping" not in enviados[1])
 
 
+def t_prueba_real_13oct():
+    """Lo que destapó la primera pasada contra Gmail real (13-oct, 19:13): una respuesta
+    automática y un boletín de hospital salían como «te toca», y hilos de hace meses salían
+    con «llevas 50 días hábiles sin contestar»."""
+    from email.message import EmailMessage
+    def cab(**k):
+        x = EmailMessage()
+        for a, b in k.items():
+            x[a.replace("_", "-")] = b
+        return x
+    check("boletín (List-Unsubscribe) es de máquina", ci.cabeceras_de_maquina(cab(List_Unsubscribe="<mailto:x@y>")))
+    check("respuesta automática (Auto-Submitted) es de máquina", ci.cabeceras_de_maquina(cab(Auto_Submitted="auto-replied")))
+    check("un correo normal no lo es", not ci.cabeceras_de_maquina(cab(Auto_Submitted="no", Subject="Cita")))
+
+    t0 = AHORA - timedelta(hours=48)
+    a = Falso(YO, [m(1, DOC, "Automatische Antwort: [Extern] Informe", t0, mid="au")])
+    r = ci.estado_hilo("<au>", remitente_email=DOC, asunto="Informe", abrir=mundo(a), cuentas=DOS)
+    check("«Automatische Antwort» se marca automático por el asunto", r.get("automatico") is True)
+    a = Falso(YO, [m(1, DOC, "Vacunas disponibles", t0, mid="bo")])
+    a.es_automatico = lambda uid: True
+    r = ci.estado_hilo("<bo>", remitente_email=DOC, asunto="Vacunas disponibles", abrir=mundo(a), cuentas=DOS)
+    check("y por las cabeceras del último mensaje", r.get("automatico") is True)
+
+    limpia()
+    hace = lambda d: p._iso(AHORA - timedelta(days=d))
+    p._guardar_raw({
+        "r1": dict(BASE, primer_visto=hace(3), asunto="Reciente", turno="titular", ultimo_ts_hilo=hace(2)),
+        "a1": dict(BASE, primer_visto=hace(3), asunto="Boletín", turno="titular", ultimo_ts_hilo=hace(2), auto=True),
+        "v1": dict(BASE, primer_visto=hace(80), asunto="De agosto", turno="titular", ultimo_ts_hilo=hace(70)),
+        "w1": dict(BASE, primer_visto=hace(90), asunto="Ping viejo", estado="esperando", esperando_desde=hace(80)),
+        "n1": dict(BASE, primer_visto=hace(3), asunto="Perdido", hilo_no_encontrado=3,
+                   hilo_visto_ts=hace(2))})
+    txt = p.texto_diario(ahora=AHORA)
+    check("lo de máquina no sale como «te toca»", "Boletín" not in txt)
+    check("lo de hace meses no se echa en cara, se cuenta en una línea",
+          "De agosto" not in txt and "1 hilo de hace más de un mes" in txt)
+    check("ni se re-pincha lo que lleva más de un mes callado", "Ping viejo" not in txt)
+    check("…pero sigue abierto y se puede listar",
+          [t for t, _e, _d in p.te_toca(ahora=AHORA, antiguos=True)] == ["v1"])
+    check("lo de máquina tampoco entra en el aviso viejo",
+          "a1" not in [t for t, _ in sum(p.a_avisar(ahora=AHORA), [])])
+    vistos = []
+    p.revisar_hilos(ahora=AHORA, consulta=lambda e: vistos.append(e["asunto"]) or {"encontrado": False})
+    check("tras 3 intentos sin localizarlo deja de preguntar por ese hilo", "Perdido" not in vistos)
+    p.revisar_hilos(ahora=AHORA, consulta=lambda e: {
+        "encontrado": True, "turno": "titular", "thrid": e["asunto"], "cuenta": YO,
+        "ultimo_ts": ts(AHORA - timedelta(days=1)), "via": "hilo", "automatico": e["asunto"] == "Reciente"},
+        forzar=True)
+    check("revisar_hilos guarda la marca de automático", p.cargar()["r1"].get("auto") is True)
+
+
 def main():
+    t_prueba_real_13oct()
     t_diario()
     t_estado_hilo()
     t_un_hilo_una_entrada()

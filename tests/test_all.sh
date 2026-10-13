@@ -416,6 +416,7 @@ runpy test_healthcheck_ci_publico.py
 runpy test_subir_historial_drive.py
 runpy test_subir_historial_ocr_sidecar.py  # el verificador de identidad LEE el OCR (X.pdf.ocr.txt)
 runpy test_pendientes.py
+runpy test_correo_borradores.py # 13-oct · el borrador se prepara solo, sin agente con herramientas (había 4 en meses)
 runpy test_pendientes_hilo.py   # 13-oct · «¿a quién le toca?» por el HILO, no por \Answered (1557 abiertos / 38 cerrados)
 runpy test_correo_smtp.py
 runpy test_correo_triage.py

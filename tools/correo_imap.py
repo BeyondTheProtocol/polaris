@@ -372,6 +372,86 @@ class TodoElCorreo(ImapMailbox):
         return sorted(int(x) for x in data[0].split()) if (typ == "OK" and data and data[0]) else []
 
 
+    def es_automatico(self, uid):
+        """¿Este mensaje lo mandó una máquina? (respuesta automática, boletín, lista). Por las
+        cabeceras que pone quien envía en masa, no por el texto. Un «fuera de la oficina» o
+        un boletín de un hospital NO es algo que {{TITULAR}} tenga que contestar."""
+        typ, data = self._M.uid(
+            "fetch", str(uid),
+            "(BODY.PEEK[HEADER.FIELDS (AUTO-SUBMITTED PRECEDENCE LIST-UNSUBSCRIBE LIST-ID X-AUTOREPLY)])")
+        raw = b""
+        for part in data or []:
+            if isinstance(part, tuple) and len(part) == 2:
+                raw = part[1] or b""
+        return cabeceras_de_maquina(email.message_from_bytes(raw))
+
+    def fetch_cuerpo(self, uid, max_bytes=None):
+        """Bytes crudos del mensaje, con PEEK (no lo marca como leído) y con tope."""
+        typ, data = self._M.uid("fetch", str(uid),
+                                "(BODY.PEEK[]<0.%d>)" % int(max_bytes or CUERPO_MAX_BYTES))
+        for part in data or []:
+            if isinstance(part, tuple) and len(part) == 2:
+                return part[1] or b""
+        return b""
+
+
+_RE_ASUNTO_AUTO = re.compile(
+    r"^\s*(automatische antwort|respuesta autom[aá]tica|resposta autom[aà]tica|out of (the )?office|"
+    r"auto[- ]?reply|automatic reply|fuera de (la )?oficina|abwesenheit)", re.I)
+
+
+def cabeceras_de_maquina(msg):
+    """True si las cabeceras dicen que es correo automático o en masa."""
+    auto = (msg.get("Auto-Submitted") or "").strip().lower()
+    if auto and auto != "no":
+        return True
+    if (msg.get("Precedence") or "").strip().lower() in ("bulk", "list", "junk", "auto_reply"):
+        return True
+    return bool(msg.get("List-Unsubscribe") or msg.get("List-Id") or msg.get("X-Autoreply"))
+
+
+CUERPO_MAX_BYTES = 300000   # lo que se baja de un mensaje como mucho (adjuntos fuera)
+CUERPO_MAX_CHARS = 6000     # lo que se entrega como texto (mismo tope que usa el redactor)
+_RE_TAG = re.compile(r"(?is)<(script|style)\b.*?</\1>|<[^>]+>")
+
+
+def _texto_de(raw):
+    """Texto legible de un mensaje crudo: la parte text/plain; si no hay, el HTML sin etiquetas.
+    Nunca adjuntos. Limpio de controles y unicode oculto (mismo criterio que las cabeceras)."""
+    msg = email.message_from_bytes(raw or b"")
+    plano, html = "", ""
+    for part in (msg.walk() if msg.is_multipart() else [msg]):
+        if part.get_content_maintype() != "text" or part.get_filename():
+            continue
+        try:
+            t = (part.get_payload(decode=True) or b"").decode(part.get_content_charset() or "utf-8", "replace")
+        except Exception:
+            continue
+        if part.get_content_subtype() == "plain" and not plano:
+            plano = t
+        elif part.get_content_subtype() == "html" and not html:
+            html = t
+    texto = plano or _RE_TAG.sub(" ", html)
+    lineas = [_RE_CTRL.sub("", ln).rstrip() for ln in texto.replace("\r", "").split("\n")]
+    return "\n".join(lineas).strip()[:CUERPO_MAX_CHARS]
+
+
+def leer_cuerpo(message_id, cuenta, *, abrir=None):
+    """El texto de UN mensaje (por Message-ID, en su cuenta). SOLO LECTURA, sin marcarlo como
+    leído. Devuelve "" si no se localiza. El texto es DATO NO CONFIABLE: quien lo use lo pasa
+    por correo.detecta_inyeccion y solo lo entrega al carril de confianza, nunca a un agente
+    con herramientas (13-oct-26, Fase 2 del plan de correo)."""
+    mid = (message_id or "").strip().strip("<>")
+    if not mid or not cuenta:
+        return ""
+    mb = (abrir or _abrir_todo)(cuenta, _secret_for(cuenta))
+    try:
+        uids = mb.buscar_raw("rfc822msgid:%s" % mid)
+        return _texto_de(mb.fetch_cuerpo(uids[-1])) if uids else ""
+    finally:
+        mb.close()
+
+
 def _abrir_todo(user, secret):
     return TodoElCorreo(_login(user, secret), user)
 
@@ -444,6 +524,11 @@ def estado_hilo(message_id="", *, remitente_email="", asunto="", fecha="", abrir
                             "ultimo_remitente": ult.get("remitente_email", ""),
                             "turno": "otro" if es_mia(ult.get("remitente_email")) else "titular",
                             "via": "hilo"}
+                    if cand["turno"] == "titular":
+                        auto = bool(_RE_ASUNTO_AUTO.match(ult.get("asunto", "")))
+                        if not auto and hasattr(mb, "es_automatico"):
+                            auto = bool(mb.es_automatico(ult["uid"]))
+                        cand["automatico"] = auto
                     if mejor is None or cand["ultimo_ts"] > mejor["ultimo_ts"]:
                         mejor = cand
                 if rem and "@" in rem:

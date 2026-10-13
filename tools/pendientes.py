@@ -387,6 +387,10 @@ def reabrir_baseline():
 #                            solo lo cierra ella (lección VH-Arxiu, 31-jul).
 #   · no se localiza        → no se toca nada. Nunca se da por contestado lo que no se ha visto.
 REVISAR_CADA_H = 6.0            # no volver a preguntar por el mismo hilo antes de esto
+NO_ENCONTRADO_MAX = 3           # intentos de localizar un hilo antes de dejarlo estar
+ANTIGUO_DIAS = 30               # un hilo parado desde hace más no se le echa en cara cada día:
+                                # sale contado en una línea (prueba real del 13-oct: «llevas 50
+                                # días hábiles sin contestar» sobre cosas resueltas por teléfono)
 REVISAR_MAX = 40                # hilos por pasada (cada uno son 2-3 búsquedas IMAP por cuenta)
 REPINCHAR_DIAS_HABILES = 5
 DESILENCIAR_DIAS = 30           # un NED silenciado del arranque vuelve a avisar solo si el
@@ -430,6 +434,8 @@ def revisar_hilos(*, ahora=None, consulta=None, max_n=REVISAR_MAX, forzar=False,
         visto = _parse_iso(e.get("hilo_visto_ts"))
         if not forzar and visto is not None and (ahora - visto).total_seconds() < REVISAR_CADA_H * 3600:
             continue
+        if not forzar and e.get("hilo_no_encontrado", 0) >= NO_ENCONTRADO_MAX:
+            continue   # entradas viejas sin Message-ID: tres intentos y se deja de gastar IMAP
         cand.append((tid, e))
     cand.sort(key=lambda t: (t[1].get("hilo_visto_ts") or "", t[1].get("prioridad") != "ned",
                              t[1].get("primer_visto", "")))
@@ -476,6 +482,7 @@ def revisar_hilos(*, ahora=None, consulta=None, max_n=REVISAR_MAX, forzar=False,
             ult = datetime.utcfromtimestamp(h["ultimo_ts"]) if h.get("ultimo_ts") else None
             e.update(thrid=h.get("thrid", ""), cuenta_hilo=h.get("cuenta", ""),
                      turno=h.get("turno"), via=h.get("via", "hilo"),
+                     auto=bool(h.get("automatico")),
                      ultimo_ts_hilo=_iso(ult) if ult else None)
             clave = (e["cuenta_hilo"], e["thrid"])
             dueno = por_hilo.setdefault(clave, tid) if e["thrid"] else tid
@@ -521,6 +528,8 @@ def esperando_vencidos(*, ahora=None):
         desde = _parse_iso(e.get("esperando_desde"))
         if desde is None or e.get("repinchado_de") == e.get("esperando_desde"):
             continue
+        if (ahora - desde).days > ANTIGUO_DIAS:
+            continue   # lo que lleva más de un mes callado ya no es un «re-pínchale» del día
         if dias_habiles(desde, ahora) >= REPINCHAR_DIAS_HABILES:
             out.append((tid, e))
     out.sort(key=lambda t: (t[1].get("prioridad") != "ned", t[1].get("esperando_desde", "")))
@@ -570,15 +579,17 @@ DIARIO_ESTADO = os.path.join(CORREO_DIR, "pendientes_diario.json")
 DIARIO_EN_SECO = os.path.join(CORREO_DIR, "diario_en_seco.txt")
 
 
-def te_toca(*, ahora=None):
-    """Hilos NED/media confirmados como «te toca», sin los pospuestos ni los silenciados.
+def te_toca(*, ahora=None, antiguos=False):
+    """Hilos NED/media confirmados como «te toca», sin los pospuestos, los silenciados ni lo
+    que mandó una máquina (respuesta automática, boletín). Por defecto solo los movidos en
+    los últimos ANTIGUO_DIAS; con `antiguos=True`, solo los más viejos.
     Devuelve [(tid, entry, dias_habiles)] — NED primero, y dentro, el que más lleva."""
     ahora = ahora or _ahora_utc()
     out = []
     for tid, e in cargar().items():
         if e.get("estado") != "abierto" or e.get("prioridad") not in ("ned", "media"):
             continue
-        if e.get("silenciado") or not e.get("turno"):
+        if e.get("silenciado") or not e.get("turno") or e.get("auto"):
             continue
         accion = es_accion_requerida(e.get("remitente_email") or e.get("remitente", ""), e.get("asunto", ""))
         if e.get("turno") != "titular" and not accion:
@@ -588,6 +599,9 @@ def te_toca(*, ahora=None):
             continue
         desde = _parse_iso(e.get("ultimo_ts_hilo")) or _parse_iso(e.get("ultimo_entrante_ts")) \
             or _parse_iso(e.get("primer_visto"))
+        viejo = desde is not None and (ahora - desde).days > ANTIGUO_DIAS
+        if viejo != bool(antiguos):
+            continue
         out.append((tid, e, dias_habiles(desde, ahora)))
     out.sort(key=lambda t: (t[1].get("prioridad") != "ned", -t[2]))
     return out
@@ -604,12 +618,19 @@ def texto_diario(*, ahora=None):
         lineas.append("✉️ Te toca contestar (%d):" % len(toca))
         for tid, e, d in toca[:DIARIO_MAX_LINEAS]:
             critico = e.get("prioridad") == "ned" and d >= CRITICO_DIAS_HABILES
-            hecho = correo.borrador_ya_generado(e.get("remitente_email", ""), e.get("asunto", ""))
+            hecho = bool(e.get("borrador_ts")) or correo.borrador_ya_generado(
+                e.get("remitente_email", ""), e.get("asunto", ""))
             lineas.append("%s %s: «%s». %s%s (id %s)" % (
                 "🔴" if critico else "·", e.get("remitente", tid), e.get("asunto", ""),
                 ("Llevas %d días hábiles sin contestar" % d) if critico else
                 ("%d día%s" % (d, "" if d == 1 else "s") if d else "de hoy"),
                 ", y el borrador está hecho en Gmail" if hecho else "", tid[:_ID_LEN]))
+            if e.get("borrador_extracto"):
+                lineas.append("    📝 %s«%s»" % (
+                    "(ojo, el correo traía algo raro) " if e.get("borrador_sospechoso") else "",
+                    e["borrador_extracto"]))
+            elif e.get("borrador_pendiente") and not hecho:
+                lineas.append("    sin borrador todavía: %s" % e["borrador_pendiente"])
         if len(toca) > DIARIO_MAX_LINEAS:
             lineas.append("· … y %d más (`pendientes.py lista`)" % (len(toca) - DIARIO_MAX_LINEAS))
     if espera:
@@ -618,6 +639,10 @@ def texto_diario(*, ahora=None):
             d = dias_habiles(_parse_iso(e.get("esperando_desde")), ahora)
             lineas.append("· %s: «%s». %d días hábiles desde tu último mensaje (id %s)" % (
                 e.get("remitente", tid), e.get("asunto", ""), d, tid[:_ID_LEN]))
+    viejos = len(te_toca(ahora=ahora, antiguos=True))
+    if viejos:
+        lineas.append("· Aparte, %d hilo%s de hace más de un mes sin cerrar (`pendientes.py antiguos`)"
+                      % (viejos, "" if viejos == 1 else "s"))
     lineas.append('"ok <id>" hecho · "mañana <id>" lo dejo para mañana · "espero <id>" le toca al otro')
     return "\n".join(lineas)
 
@@ -681,8 +706,8 @@ def a_avisar(*, ahora=None):
     for tid, e in ledger.items():
         if e.get("estado") != "abierto":
             continue
-        if e.get("silenciado"):
-            continue   # backlog de arranque: no avisa, pero SIGUE en la lista del parte
+        if e.get("silenciado") or e.get("auto"):
+            continue   # backlog de arranque / correo de máquina: no avisa, SIGUE en la lista
         hasta = _parse_iso(e.get("pospuesto_hasta"))
         if hasta is not None and ahora < hasta:
             continue   # «mañana <id>»: ella lo pospuso, este hilo calla hasta entonces
@@ -868,6 +893,11 @@ def main(argv):
                "reabiertos": r["reabiertos"], "abiertos": len(r["abiertos"])}
         if "--sin-red" not in argv[1:]:
             out["hilos"] = _revisar_hilos_cli(dry=dry)
+            try:   # el borrador se prepara ANTES del mensaje del día, para que vaya dentro
+                import correo_responder
+                out["borradores"] = correo_responder.pasada(dry=dry)
+            except Exception as e:
+                out["borradores"] = {"ok": False, "motivo": "%s: %s" % (type(e).__name__, e)}
         d = diario(dry=dry)
         d.pop("texto", None)   # el texto lleva nombres: no al log del daemon
         out["diario"] = d
@@ -876,6 +906,10 @@ def main(argv):
     if cmd == "diario":
         r = diario(dry=True, ahora_local=datetime.now().replace(hour=12)) if dry else diario()
         print(r.get("texto") or json.dumps(r, ensure_ascii=False))
+        return 0
+    if cmd == "antiguos":
+        for tid, e, d in te_toca(antiguos=True):
+            print("· %s: «%s» (%d días hábiles, id %s)" % (e.get("remitente", ""), e.get("asunto", ""), d, tid[:_ID_LEN]))
         return 0
     if cmd == "hilos":
         print(json.dumps(_revisar_hilos_cli(dry=dry, forzar="--forzar" in argv[1:]),

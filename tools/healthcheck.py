@@ -118,10 +118,9 @@ KEEPALIVE_DAEMONS = {
 # RESPUESTA dedicado (3b/3c) — mejor que "¿está cargado?", verifica que de verdad funcionen.
 _ROSTER_SKIP = {"com.btp.observatorio", "com.btp.borde-gateway"}
 # Rutinas aparcadas a propósito: si faltan del roster, NO es un fallo (no alertar).
-_PARKED_HC = {"com.btp.instagram", "com.btp.preview-web", "com.btp.observatorio-remoto",
-              # 13-oct-26: el guardián de la web está construido y SIN encender (encenderlo es
-              # gate de {{TITULAR}}). Al activarlo, quítalo de aquí para que se vigile como el resto.
-              "com.btp.web-guardian"}
+_PARKED_HC = {"com.btp.instagram", "com.btp.preview-web", "com.btp.observatorio-remoto"}
+# (13-oct-26: web-guardian estuvo aquí unas horas, construido y sin encender. {{TITULAR}} lo encendió
+#  ese mismo día → se vigila como el resto.)
 # (23/7: wa-tareas estuvo aquí mientras su gate de cosecha de WhatsApp estaba cerrado. {{TITULAR}} lo
 #  encendió (.wa_cosecha_on) → ya hace trabajo real a diario → vuelve a monitorizarse como el resto.)
 
