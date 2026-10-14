@@ -361,6 +361,11 @@
    "concern": "suite-nocturna",
    "nota": "Suite COMPLETA de noche (03:00) sobre casa base, en paralelo (domingo en serie + mutantes de la puerta). Rojo nuevo -> deuda; rojo del muro -> aviso a {{TITULAR}} esa noche. Latido heartbeat/suite-nocturna.json. No duplica evals (arnes de agentes), seguridad-sweep ni el CI publico (subconjunto portable en Linux). Propuesta 10-oct-26; se enciende solo desde casa base con activar_daemon.py."
   },
+  "com.btp.borradores-higiene": {
+   "script": "borradores_higiene.py",
+   "concern": "borradores-higiene",
+   "nota": "Higiene diaria de Borradores de Gmail (plan aprobado por {{TITULAR}} el 14-oct-26). 07:40, determinista, sin LLM. Duplicados, ya contestados, basura y caducados no protegidos a la Papelera (COPY + UID EXPUNGE de lo copiado); lo clinico/NED antiguo y los borradores que proponen llamadas van a Vega como propuesta. NO cargado: encenderlo es gate de {{TITULAR}} (activar_daemon.py desde casa base)."
+  },
   "com.btp.web-guardian": {
    "script": "web_guardian.py",
    "concern": "web-guardian",

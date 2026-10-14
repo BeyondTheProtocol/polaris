@@ -155,18 +155,60 @@ class ImapMailbox:
     def fetch_header(self, uid):
         typ, data = self._M.uid(
             "fetch", str(uid),
-            "(FLAGS BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
-        flags, raw = "", b""
+            "(FLAGS X-GM-THRID BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID "
+            "AUTO-SUBMITTED PRECEDENCE LIST-UNSUBSCRIBE LIST-ID X-AUTOREPLY)])")
+        flags, raw, thrid = "", b"", ""
         for part in data or []:
+            meta = part[0] if isinstance(part, tuple) else part
             if isinstance(part, tuple) and len(part) == 2:
                 raw = part[1] or b""
-                m = re.search(rb"FLAGS \(([^)]*)\)", part[0] or b"")
+            if isinstance(meta, bytes):
+                m = re.search(rb"FLAGS \(([^)]*)\)", meta)
                 if m:
                     flags = m.group(1).decode("ascii", "replace")
+                m = re.search(rb"X-GM-THRID (\d+)", meta)
+                if m:
+                    thrid = m.group(1).decode("ascii")
         msg = email.message_from_bytes(raw)
         return {"from": msg.get("From", ""), "subject": msg.get("Subject", ""),
                 "date": msg.get("Date", ""), "message_id": msg.get("Message-ID", ""),
-                "flags": flags}
+                "flags": flags, "thrid": thrid, "to": msg.get("To", ""), "cc": msg.get("Cc", ""),
+                "auto": cabeceras_de_maquina(msg)}
+
+    def contexto_vivo(self, dias=None):
+        """Lo ENVIADO por la cuenta en los últimos `dias` días: {"hilos", "destinos", "mias"}.
+        Mira «Todo el correo» (SOLO LECTURA) y devuelve la conexión a INBOX. Para la señal de
+        «conversación viva» (correo.senal_viva): sin cuerpos, solo THRID y destinatarios."""
+        dias = dias or correo.VIVO_DIAS
+        try:
+            _select_todo_el_correo(self._M)
+            typ, data = self._M.uid("search", "X-GM-RAW", '"in:sent newer_than:%dd"' % int(dias))
+            uids = sorted(int(x) for x in data[0].split()) if typ == "OK" and data and data[0] else []
+            hilos, destinos = set(), set()
+            for i in range(0, len(uids), 50):
+                lote = ",".join(str(u) for u in uids[i:i + 50])
+                typ, resp = self._M.uid("fetch", lote, "(X-GM-THRID BODY.PEEK[HEADER.FIELDS (TO CC)])")
+                for part in resp or []:
+                    if not (isinstance(part, tuple) and len(part) == 2):
+                        continue
+                    m = re.search(rb"X-GM-THRID (\d+)", part[0] or b"")
+                    if m:
+                        hilos.add(m.group(1).decode("ascii"))
+                    cab = email.message_from_bytes(part[1] or b"")
+                    for a in email.utils.getaddresses([cab.get("To", ""), cab.get("Cc", "")]):
+                        if a[1]:
+                            destinos.add(a[1].lower())
+        finally:
+            self._M.select("INBOX", readonly=True)
+        return {"hilos": hilos, "destinos": destinos - MIS_DIRECCIONES, "mias": set(MIS_DIRECCIONES)}
+
+    def primeras_lineas(self, uid, max_chars=600):
+        """Las primeras líneas del cuerpo de un mensaje de INBOX (PEEK: no lo marca leído)."""
+        typ, data = self._M.uid("fetch", str(uid), "(BODY.PEEK[]<0.20000>)")
+        for part in data or []:
+            if isinstance(part, tuple) and len(part) == 2:
+                return _texto_de(part[1] or b"")[:max_chars]
+        return ""
 
     def close(self):
         try:
@@ -592,6 +634,19 @@ def _avisar_default(text, urgente):
     return salida.report_to_titular(text, urgente=urgente, fuente="correo-imap")
 
 
+def _destinatarios(h, frm):
+    """«¿Voy en copia con alguien más?»: los demás destinatarios (sin ella ni el remitente)."""
+    remit = (email.utils.parseaddr(frm)[1] or "").lower()
+    todos = email.utils.getaddresses([_decode(h.get("to", "")), _decode(h.get("cc", ""))])
+    yo = any((a or "").lower() in MIS_DIRECCIONES for _, a in todos)
+    otros = []
+    for nombre, a in todos:
+        a = (a or "").lower()
+        if a and a not in MIS_DIRECCIONES and a != remit and "@" in a:
+            otros.append({"email": a, "nombre": _limpia(nombre) or a.split("@")[0]})
+    return {"en_copia": yo, "con_copia": otros}
+
+
 def _entry(uid, h, cuenta=None):
     """Una cabecera, normalizada. `cuenta` es CRÍTICA desde que buzon.json es multi-cuenta:
     los UID solo son únicos DENTRO de un buzón, así que sin ella dos mensajes distintos de
@@ -615,6 +670,9 @@ def _entry(uid, h, cuenta=None):
         "ned_critico": correo.es_ned_critico(frm, subj_raw),
         "urgente": correo.es_urgente(frm, subj_raw),
         "inyeccion": bool(inj),
+        "thrid": str(h.get("thrid", "") or ""),
+        "automatico": bool(h.get("auto")) or bool(_RE_ASUNTO_AUTO.match(subj_raw or "")),
+        **_destinatarios(h, frm),
     }
 
 
@@ -664,7 +722,8 @@ def _pend_anotar(path, e):
         return
     d["items"].append({"tid": tid, "uid": e["uid"], "remitente": e["remitente"],
                        "remitente_email": e["remitente_email"], "asunto": e["asunto"],
-                       "ned": bool(e["ned_critico"]), "desde": time.time()})
+                       "ned": bool(e["ned_critico"]), "desde": time.time(),
+                       "texto": e.get("aviso_texto", "")})
     if len(d["items"]) > PEND_MAX:
         sys.stderr.write("correo_imap: cola de avisos pendientes llena (%d); cede el más viejo\n" % PEND_MAX)
         d["items"] = d["items"][-PEND_MAX:]
@@ -675,11 +734,14 @@ def _pend_anotar(path, e):
 def _texto_pendientes(items):
     if len(items) == 1:
         i = items[0]
+        if i.get("texto"):                     # un aviso de «conversación viva»/presentación
+            return i["texto"]
         return "📬 Correo nuevo de %s: «%s». Está en tu bandeja." % (i["remitente"], i["asunto"])
     lista = "\n".join("· %s: «%s»" % (i["remitente"], i["asunto"]) for i in items[:PEND_LISTA])
     if len(items) > PEND_LISTA:
         lista += "\n… y %d más (están en tu bandeja)." % (len(items) - PEND_LISTA)
-    return "📬 Mientras no pude avisarte llegaron %d correos urgentes:\n%s" % (len(items), lista)
+    tipo = "urgentes" if all(not i.get("texto") for i in items) else "que te importan"
+    return "📬 Mientras no pude avisarte llegaron %d correos %s:\n%s" % (len(items), tipo, lista)
 
 
 def _reintentar_pendientes(path, avisar, ahora=None):
@@ -720,6 +782,37 @@ def _reintentar_pendientes(path, avisar, ahora=None):
         correo.registrar("aviso-imap", i["tid"], motivo="urgente:%s:cola" % ("ned" if i["ned"] else "cita"))
     _pend_guardar(path, {"items": [], "ultimo_intento": ahora})
     return len(reclamados)
+
+
+TOPE_CUERPOS_VIVO = 10    # cuerpos que se leen por pulso para buscar «os pongo en contacto»
+
+
+def _senales_vivas(mb, nuevas):
+    """{uid: señal} de los correos NUEVOS no urgentes que merecen aviso por «conversación viva» o
+    «presentación» (correo.senal_viva). Fail-soft: si no se puede leer lo enviado o un cuerpo, se
+    sigue con lo que haya (nunca rompe el pulso; peor caso, el comportamiento de antes)."""
+    candidatos = [e for e in nuevas if not e["urgente"] and not e["inyeccion"] and not e["automatico"]
+                  and not correo.es_ruido(e["remitente_email"], e["asunto"])]
+    if not candidatos:
+        return {}
+    ctx = None
+    if hasattr(mb, "contexto_vivo"):
+        try:
+            ctx = mb.contexto_vivo()
+        except Exception as ex:
+            sys.stderr.write("correo_imap: no pude leer lo enviado (%s); sin señal de conversación viva\n" % ex)
+    out, cuerpos = {}, 0
+    for e in candidatos:
+        s = correo.senal_viva(e, ctx)
+        if s is None and cuerpos < TOPE_CUERPOS_VIVO and hasattr(mb, "primeras_lineas"):
+            cuerpos += 1
+            try:
+                s = correo.senal_viva(e, ctx, mb.primeras_lineas(e["uid"]))
+            except Exception:
+                s = None
+        if s:
+            out[e["uid"]] = s
+    return out
 
 
 def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_path=None,
@@ -763,13 +856,17 @@ def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_
     avisos = 0
     if alertar and not baseline:
         nuevas = [e for e in entradas if e["uid"] > last_uid]
+        vivas = _senales_vivas(mb, nuevas)
         for e in sorted(nuevas, key=lambda e: e["uid"]):   # en orden de llegada
-            if not e["urgente"]:
+            viva = vivas.get(e["uid"])
+            if not e["urgente"] and not viva:
                 continue
+            e["aviso_texto"] = "" if e["urgente"] else correo.texto_vivo(viva)
             # Anti-dup: solo avisa si nadie (poller o daemon LLM) avisó ya de este correo.
             if not (dry or correo.reclamar_aviso(e["remitente_email"], e["asunto"])):
                 continue
-            texto = "📬 Correo nuevo de %s: «%s». Está en tu bandeja." % (e["remitente"], e["asunto"])
+            texto = e["aviso_texto"] or ("📬 Correo nuevo de %s: «%s». Está en tu bandeja."
+                                         % (e["remitente"], e["asunto"]))
             llego = False
             try:
                 # rompe silencio nocturno solo si NED-crítico. El resultado SE LEE: `salida` no lanza cuando
@@ -777,7 +874,8 @@ def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_
                 llego = _llega(avisar(texto, e["ned_critico"]))
                 if llego:
                     correo.registrar("aviso-imap", e["message_id"] or str(e["uid"]),
-                                     motivo="urgente:%s" % ("ned" if e["ned_critico"] else "cita"))
+                                     motivo=("urgente:%s" % ("ned" if e["ned_critico"] else "cita"))
+                                     if e["urgente"] else "vivo:%s" % viva["motivo"])
                     avisos += 1
             except Exception:
                 llego = False
@@ -792,6 +890,8 @@ def procesar(mb, *, dry=False, alertar=True, avisar=None, seen_path=None, buzon_
         if not dry:
             avisos += _reintentar_pendientes(_pend_path(seen_path), avisar)
 
+    for e in entradas:
+        e.pop("aviso_texto", None)        # es del aviso, no del buzón
     nuevo_last = max([e["uid"] for e in entradas] + [last_uid]) if entradas else last_uid
     buzon = {"actualizado": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
              "uidvalidity": mb.uidvalidity, "last_uid": nuevo_last,

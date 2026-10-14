@@ -291,6 +291,122 @@ def main():
         else:
             os.environ["BTP_GMAIL_USER"] = _env
 
+    # ── 12. CONVERSACIÓN VIVA y PRESENTACIONES (14-oct-2026) ─────────────────────────────
+    # Avería real: «me están llegando mails y no se me informa». El 14-oct llegaron, y es_urgente
+    # los dejó pasar (urgente=False), dos respuestas de Jordi Puente en un hilo donde {{TITULAR}} había
+    # escrito a las 11:39, dos presentaciones («os pongo en contacto»), la respuesta de marta@fundacion-b.example
+    # y un «Un favor para "Herrera en Cope"» donde info@podcast.example la pone en copia con COPE.
+    # Datos FALSOS con la forma de los reales. Sin esta señal, ninguno de los cinco avisa.
+    class _Vivo(FakeMailbox):
+        def __init__(self, uidvalidity, mensajes, ctx):
+            super().__init__(uidvalidity, mensajes)
+            self._ctx = ctx
+
+        def contexto_vivo(self, dias=None):
+            return self._ctx
+
+        def close(self):
+            pass
+
+    def hv(frm, subject, thrid="", to="{{TITULAR}} <titular.mgp@gmail.com>", cc="", auto=False, mid=None):
+        return {"from": frm, "subject": subject, "date": "Wed, 14 Oct 2026 12:10:00 +0200",
+                "message_id": mid or "<%s@x>" % subject[:12], "flags": "", "thrid": thrid,
+                "to": to, "cc": cc, "auto": auto}
+
+    ctx = {"hilos": {"7001"}, "destinos": {"marta@fundacion-b.example", "jordi@medio-rse.example"},
+           "mias": set(ci.MIS_DIRECCIONES)}
+    previa = {1: hv("Viejo <v@v.example>", "algo antiguo", mid="<viejo@x>")}
+    nuevos = dict(previa)
+    nuevos.update({
+        2: hv("Jordi Puente <jordi@medio-rse.example>", "Re: Colaboración Corresponsables", thrid="7001"),
+        3: hv("Jordi Puente <jordi@medio-rse.example>", "Re: Colaboración Corresponsables", thrid="7001",
+              mid="<j2@x>"),
+        4: hv("Rosa <rosa@puente.example>", "{{TITULAR}} & CRIS contra el cáncer: os pongo en contacto",
+              cc="Equipo <equipo@fundacion-a.example>"),
+        5: hv("Marta <marta@fundacion-b.example>", "Re: Fundación FERO", thrid="9999"),
+        6: hv("Carlos Roca <info@podcast.example>", 'Re: Un favor para "Herrera en Cope"',
+              cc="Cope Prensa <prensa@radio.example>", mid="<cope@x>"),
+        # no deben avisar:
+        7: hv("Desconocido <random@nadie.example>", "Hola, ¿hablamos?"),                       # sin relación
+        8: hv("Boletín <news@lista.example>", "Re: Colaboración Corresponsables", thrid="7001", auto=True),  # máquina
+        9: hv("Yo <titular@gmail.com>", "Re: Colaboración Corresponsables", thrid="7001", mid="<yo@x>"),  # ella
+        10: hv("Otro <otro@otro.example>", "Re: otra cosa", thrid="123456", mid="<otro@x>"),     # hilo ajeno
+    })
+    seen_v, buz_v = os.path.join(_TMP, "seen_v.json"), os.path.join(_TMP, "buzon_v.json")
+    ci.procesar(_Vivo(900, previa, ctx), alertar=True, avisar=lambda t, u: _ENTREGADO,
+                seen_path=seen_v, buzon_path=buz_v)                       # baseline
+    av_v = []
+    rv = ci.procesar(_Vivo(900, nuevos, ctx), alertar=True,
+                     avisar=lambda t, u: (av_v.append((t, u)), _ENTREGADO)[1],
+                     seen_path=seen_v, buzon_path=buz_v)
+    textos = " | ".join(t for t, _ in av_v)
+    check("vivo: ninguno de los 5 era urgente (la avería)", not any(
+        m["urgente"] for m in rv["buzon"]["mensajes"] if m["uid"] in (2, 3, 4, 5, 6)))
+    check("vivo: la respuesta en su hilo avisa «te ha contestado»",
+          "Jordi Puente te ha contestado sobre «Colaboración Corresponsables»" in textos)
+    check("vivo: la 2ª respuesta del mismo hilo no repite el aviso (anti-dup)",
+          textos.count("Jordi Puente te ha contestado") == 1)
+    check("vivo: «os pongo en contacto» avisa «te ha presentado a Equipo»",
+          "Rosa te ha presentado a Equipo" in textos)
+    check("vivo: la respuesta de alguien a quien ella escribió avisa",
+          "Marta te ha contestado sobre «Fundación FERO»" in textos)
+    check("vivo: en copia con un tercero nuevo avisa como presentación",
+          "Carlos Roca te ha presentado a Cope Prensa" in textos)
+    check("vivo: 4 avisos exactos (3 hilos/personas + 1 presentación doble) y ninguno de los negativos",
+          len(av_v) == 4 and "Desconocido" not in textos and "Boletín" not in textos
+          and "Yo te ha" not in textos and "Otro" not in textos)
+    check("vivo: avisa SIN romper el silencio nocturno (no es NED-crítico)", all(u is False for _, u in av_v))
+    check("vivo: el texto del aviso no se cuela en buzon.json",
+          not any("aviso_texto" in m for m in rv["buzon"]["mensajes"]))
+    check("vivo: sin contexto de lo enviado, solo la presentación por asunto (fail-soft)",
+          [m for m in [correo.senal_viva(
+              {"remitente_email": "x@y.example", "remitente": "X", "asunto": "Re: algo", "thrid": "7001"}, None)]
+           if m] == [])
+    check("vivo: una presentación por asunto no necesita contexto",
+          (correo.senal_viva({"remitente_email": "x@y.example", "remitente": "X",
+                              "asunto": "Introducing you to Z"}, None) or {}).get("motivo") == "presentacion")
+    check("vivo: el correo de ella misma no es respuesta",
+          correo.senal_viva({"remitente_email": "titular@gmail.com", "remitente": "Yo", "asunto": "Re: x",
+                             "thrid": "7001"}, ctx) is None)
+    check("vivo: un envío masivo (ella en copia con 8) no es una presentación",
+          correo.senal_viva({"remitente_email": "a@b.com", "remitente": "A", "asunto": "Evento", "en_copia": True,
+                             "con_copia": [{"email": "c%d@d.example" % i, "nombre": "C%d" % i} for i in range(8)]},
+                            ctx) is None)
+
+    # ── 12b. el parseo real de IMAP (THRID, To/Cc, lo enviado), con una conexión falsa ─────
+    class _M:
+        def __init__(self):
+            self.sel = []
+
+        def response(self, k):
+            return "OK", [b"5"]
+
+        def select(self, c, readonly=False):
+            self.sel.append((c, readonly))
+            return "OK", [b"1"]
+
+        def list(self):
+            return "OK", [b'(\\HasNoChildren \\All) "/" "[Gmail]/Todos"']
+
+        def uid(self, cmd, *a):
+            if cmd == "search":
+                return "OK", [b"1 2"]
+            if cmd == "fetch" and "BODY.PEEK[HEADER.FIELDS (TO CC)]" in a[1]:
+                return "OK", [(b"1 (X-GM-THRID 7001 UID 1 BODY[HEADER.FIELDS (TO CC)] {40}", b"To: Marta <Marta@Fundacion-B.example>\r\n\r\n"), b")",
+                              (b"2 (UID 2 BODY[HEADER.FIELDS (TO CC)] {30}", b"Cc: z@z.example\r\n\r\n"), b" X-GM-THRID 8002)"]
+            return "OK", [(b"3 (FLAGS (\\Seen) X-GM-THRID 4242 BODY[HEADER.FIELDS (FROM TO CC SUBJECT)] {10}",
+                           b"From: a <a@b.com>\r\nTo: m@x.example\r\nCc: c@d.com\r\nSubject: hola\r\n\r\n"), b")"]
+
+    _mm = _M()
+    _mb = ci.ImapMailbox(_mm)
+    hh = _mb.fetch_header(3)
+    check("fetch_header lee THRID, To y Cc", hh["thrid"] == "4242" and hh["to"] == "m@x.example" and hh["cc"] == "c@d.com")
+    cv = _mb.contexto_vivo()
+    check("contexto_vivo: hilos y destinos",
+          cv["hilos"] == {"7001"})
+    check("contexto_vivo: destinos en minúscula", "marta@fundacion-b.example" in cv["destinos"] and "z@z.example" in cv["destinos"])
+    check("contexto_vivo: vuelve a INBOX en solo lectura", _mm.sel[-1] == ("INBOX", True))
+
     print("RESULTADO correo_imap.py: %d OK, %d fallos" % (_pass, _fail))
     print("✅ CORREO_IMAP EN VERDE" if _fail == 0 else "❌ revisar fallos")
     return _fail

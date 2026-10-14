@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Higiene diaria de la carpeta Borradores de Gmail (14-oct-2026, plan aprobado por {{TITULAR}}).
+     07:40, determinista, SIN LLM ($0). Duplicados, ya contestados, basura y caducados no
+     protegidos van a la Papelera de Gmail (recuperable 30 días); lo clínico/NED antiguo y los
+     borradores que proponen llamadas se proponen a Vega. NO ENVÍA nada y no avisa a {{TITULAR}}.
+     CREADO, NO CARGADO: encenderlo es gate de {{TITULAR}}, desde casa base y con
+     `python3 tools/activar_daemon.py com.btp.borradores-higiene`. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.borradores-higiene</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/polaris/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/borradores_higiene.py</string>
+    <string>--dry-run</string>
+  </array>
+  <key>StartCalendarInterval</key><dict>
+    <key>Hour</key><integer>7</integer>
+    <key>Minute</key><integer>40</integer>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/borradores-higiene.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/borradores-higiene.err</string>
+</dict></plist>

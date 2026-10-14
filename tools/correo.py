@@ -148,6 +148,77 @@ def es_urgente(sender="", subject=""):
     return bool(RE_CITA.search(_norm(subject)))
 
 
+# ── Conversación viva y presentaciones (14-oct-2026) ─────────────────────────────
+# Avería real: «me están llegando mails y no se me informa». `es_urgente` solo mira si el remitente
+# es NED-crítico o si el asunto lleva una cita, así que el 14-oct no avisó de: dos respuestas en un
+# hilo donde {{TITULAR}} había escrito a las 11:39, dos presentaciones («os pongo en contacto: {{TITULAR}} &
+# CRIS contra el cáncer», «& Fundación FERO»), la respuesta de la persona de la fundación y un «Un favor
+# para "Herrera en Cope"» donde alguien la pone en copia con COPE. Todo eso es correo de una
+# PERSONA que tiene que ver con algo que ELLA movió: se avisa. Dos señales deterministas, sin LLM:
+#   · conversación viva: respuesta en un hilo donde ella envió algo hace ≤14 días, o de una
+#     dirección a la que ella escribió hace ≤14 días;
+#   · presentación: «os pongo en contacto» & co. en el asunto o las primeras líneas, o ella en
+#     copia junto a un tercero que no conoce.
+# No avisa de ruido, de correo automático, de bots de CI, de inyección ni de ella misma.
+VIVO_DIAS = 14
+VIVO_COPIA_MAX = 5      # ella en copia con más gente que esto es un envío en masa, no una presentación
+RE_PRESENTACION = re.compile(
+    r"os pongo en contacto|te pongo en contacto|te presento|os presento|\bintro\b|introducing|"
+    r"\bintroduction\b|putting you in touch|connecting you", re.I)
+
+
+def es_presentacion(*textos):
+    """¿Alguno de estos textos (asunto, primeras líneas) presenta a {{TITULAR}} con alguien?"""
+    return any(RE_PRESENTACION.search(t or "") for t in textos)
+
+
+def senal_viva(e, ctx=None, texto=""):
+    """La señal por la que este correo NUEVO merece un aviso aunque no sea «urgente», o None.
+
+    `e`: entrada del buzón (remitente, remitente_email, asunto, thrid, automatico, inyeccion,
+    con_copia=[{"email","nombre"}], en_copia). `ctx`: {"hilos": {thrid}, "destinos": {email},
+    "mias": {email}} de lo ENVIADO en los últimos VIVO_DIAS días; None si no se pudo leer (entonces
+    solo vale la presentación por texto: sin saber a quién conoce, «tercero nuevo» no se afirma).
+    `texto`: primeras líneas del cuerpo, si se han leído.
+    """
+    snd = (e.get("remitente_email") or "").lower()
+    asunto = e.get("asunto") or ""
+    if not snd or e.get("inyeccion") or e.get("automatico"):
+        return None
+    if snd in ((ctx or {}).get("mias") or ()):
+        return None                                   # un correo de ella misma no es una respuesta
+    if es_ruido(snd, asunto) or es_ci_dev(snd):
+        return None
+    destinos = (ctx or {}).get("destinos") or set()
+    terceros = [t for t in (e.get("con_copia") or []) if t.get("email") not in destinos]
+    nombres = [t.get("nombre") or t.get("email") for t in terceros]
+    if es_presentacion(asunto, texto):
+        return {"motivo": "presentacion", "quien": e.get("remitente") or snd,
+                "terceros": nombres or [t.get("nombre") or t.get("email") for t in e.get("con_copia") or []],
+                "sobre": asunto_base(asunto)}
+    if not ctx:
+        return None
+    if e.get("en_copia") and terceros and len(e.get("con_copia") or []) <= VIVO_COPIA_MAX:
+        return {"motivo": "presentacion", "quien": e.get("remitente") or snd, "terceros": nombres,
+                "sobre": asunto_base(asunto)}
+    en_su_hilo = bool(e.get("thrid")) and e["thrid"] in (ctx.get("hilos") or ())
+    if en_su_hilo or (_RE_PREFIJO_RE.match(asunto) and snd in destinos):
+        return {"motivo": "contestacion", "quien": e.get("remitente") or snd, "sobre": asunto_base(asunto)}
+    if snd in destinos:
+        return {"motivo": "escribio", "quien": e.get("remitente") or snd, "sobre": asunto_base(asunto)}
+    return None
+
+
+def texto_vivo(s):
+    """El aviso, en cristiano."""
+    if s["motivo"] == "contestacion":
+        return "💬 %s te ha contestado sobre «%s»." % (s["quien"], s["sobre"])
+    if s["motivo"] == "escribio":
+        return "💬 %s te ha escrito sobre «%s» (le escribiste hace poco)." % (s["quien"], s["sobre"])
+    quien = ", ".join(s.get("terceros") or []) or "alguien"
+    return "🤝 %s te ha presentado a %s: «%s»." % (s["quien"], quien, s["sobre"])
+
+
 # ── Lista de RUIDO (filtros de Gmail) — remitentes que NO suben al triaje ────────
 # Config como DATO (tools/config/vega_ruido.json): dominios spam/newsletters/recibos
 # que {{TITULAR}} ya filtra en Gmail. Coincidencia por DOMINIO del 'from', SUBDOMINIOS

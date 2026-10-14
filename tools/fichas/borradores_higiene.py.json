@@ -1,0 +1,11 @@
+{
+ "pieza": "borradores_higiene.py",
+ "estado_ficha": "completa",
+ "para": "Higiene diaria de la carpeta Borradores de Gmail: a la Papelera los duplicados, lo ya contestado, la basura y lo caducado no protegido; lo clínico/NED antiguo y los borradores que proponen llamadas van a Vega como propuesta.",
+ "cuando_si": "Se quiere el buzón de Borradores ordenado sin preguntar; o auditar en dry-run qué hay de sobra.",
+ "cuando_no": "Para borrar un borrador concreto a mano (correo_outbox.py delete-draft); para frenar un duplicado recién creado (hook borrador_unico_guard.py).",
+ "reemplaza": "La limpieza manual de borradores (14-oct-26: 99 borradores, unos 60 caducados o contestados) y la norma feedback-borrador-mejorado-borra-el-anterior, que solo tenía mecanismo para duplicados de menos de 1 h.",
+ "test": "tests/test_borradores_higiene.py",
+ "alta": "2026-10-14",
+ "origen": "Plan aprobado por {{TITULAR}} el 14-oct-26 (golden-wiggling-falcon)."
+}

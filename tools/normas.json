@@ -682,7 +682,7 @@
       "slug": "feedback-borrador-mejorado-borra-el-anterior",
       "que": "Al rehacer/mejorar un borrador de correo, BORRAR el anterior — nunca dejar dos versiones del mismo correo en Borradores.",
       "clase": "bloqueo",
-      "mecanismo": ".claude/hooks/borrador_unico_guard.py::clave",
+      "mecanismo": "tools/borradores_higiene.py + tests/test_borradores_higiene.py",
       "fresca": true,
       "heredada": false,
       "aplicable": true,
