@@ -93,29 +93,53 @@ def pr_info(ref, cwd=None):
         return None
 
 
-def ci_estado(rollup):
-    """«verde» | «pendiente» | «rojo» | «sin-checks», a partir de `statusCheckRollup`.
+# Los checks sin los que no hay verde, por nombre (14-oct-26, red-team de `verificacion`). Antes
+# bastaba con que nada fallara, y un check «omitido» contaba como bueno: un PR que editara el
+# propio workflow para que su job saliera `skipped` pasaba por verde sin haber corrido nada.
+CHECKS_EXIGIDOS = ("oxlint", "ciencia-nivel", "deploy-preview")
+
+
+def _nombre(c):
+    return (c.get("name") or c.get("context") or "").lower()
+
+
+def ci_estado(rollup, exigidos=CHECKS_EXIGIDOS):
+    """«verde» | «pendiente» | «rojo» | «sin-checks» | «incompleto», a partir de `statusCheckRollup`.
 
     Hay dos formas mezcladas en la misma lista: CheckRun (`status` + `conclusion`) y
     StatusContext (`state`). La preview de Netlify llega como una de ellas, así que esperar a
-    «verde» incluye que la preview se haya construido."""
+    «verde» incluye que la preview se haya construido.
+
+    Verde exige que cada check de `exigidos` esté, por nombre, y haya acabado en SUCCESS. Los
+    demás pueden salir NEUTRAL u omitidos (Netlify marca «Pages changed» como NEUTRAL); un
+    exigido omitido o neutral no vale. Si todo terminó y falta un exigido: «incompleto»."""
     if not rollup:
         return "sin-checks"
     pendiente = False
+    bien = set()
     for c in rollup:
+        nombre = _nombre(c)
         if "state" in c and "status" not in c:            # StatusContext
             s = (c.get("state") or "").upper()
             if s in ("FAILURE", "ERROR"):
                 return "rojo"
-            if s != "SUCCESS":
+            if s == "SUCCESS":
+                bien.add(nombre)
+            else:
                 pendiente = True
             continue
         if (c.get("status") or "").upper() != "COMPLETED":
             pendiente = True
             continue
-        if (c.get("conclusion") or "").upper() not in ("SUCCESS", "NEUTRAL", "SKIPPED"):
+        conclusion = (c.get("conclusion") or "").upper()
+        if conclusion == "SUCCESS":
+            bien.add(nombre)
+        elif conclusion not in ("NEUTRAL", "SKIPPED"):
             return "rojo"
-    return "pendiente" if pendiente else "verde"
+    if pendiente:
+        return "pendiente"
+    faltan = [e for e in exigidos if not any(e in n for n in bien)]
+    return "incompleto" if faltan else "verde"
 
 
 def esperar_ci(ref, cwd=None, tope_s=None, paso_s=PASO_S, _info=pr_info, _dormir=time.sleep):
@@ -126,7 +150,7 @@ def esperar_ci(ref, cwd=None, tope_s=None, paso_s=PASO_S, _info=pr_info, _dormir
     while True:
         info = _info(ref, cwd)
         estado = ci_estado((info or {}).get("statusCheckRollup")) if info else "sin-checks"
-        if estado in ("verde", "rojo") or time.time() >= limite:
+        if estado in ("verde", "rojo", "incompleto") or time.time() >= limite:
             return estado, info
         _dormir(paso_s)
 
@@ -345,7 +369,9 @@ def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=Fal
     if estado != "verde":
         return cierra({"rojo": "el CI está en rojo",
                        "pendiente": "el CI no ha terminado en el tiempo que dura su permiso",
-                       "sin-checks": "el PR no tiene checks: sin CI no se publica"}[estado])
+                       "sin-checks": "el PR no tiene checks: sin CI no se publica",
+                       "incompleto": "falta en verde algún check obligatorio (%s): sin él no se "
+                                     "publica" % ", ".join(CHECKS_EXIGIDOS)}[estado])
     if (info2 or {}).get("headRefOid") != cabeza:
         return cierra("la cabeza del PR cambió mientras esperaba al CI")
 

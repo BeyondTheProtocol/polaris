@@ -81,10 +81,33 @@ def _fusiona(**kw):
 
 class ElCI(unittest.TestCase):
 
+    # Los checks reales del PR #268 (14-oct-26), en las dos formas en que llegan.
+    REAL = [{"name": "ciencia-nivel", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            {"name": "oxlint", "status": "COMPLETED", "conclusion": "SUCCESS"},
+            {"name": "Pages changed - helptitular-web", "status": "COMPLETED", "conclusion": "NEUTRAL"},
+            {"context": "netlify/helptitular-web/deploy-preview", "state": "SUCCESS"}]
+
     def test_verde_solo_si_todo_termino_bien(self):
-        ok = {"status": "COMPLETED", "conclusion": "SUCCESS"}
-        self.assertEqual("verde", WP.ci_estado([ok, {"state": "SUCCESS"}]))
-        self.assertEqual("verde", WP.ci_estado([ok, {"status": "COMPLETED", "conclusion": "SKIPPED"}]))
+        self.assertEqual("verde", WP.ci_estado(self.REAL))
+        con_omitido = self.REAL + [{"name": "otro", "status": "COMPLETED", "conclusion": "SKIPPED"}]
+        self.assertEqual("verde", WP.ci_estado(con_omitido), "un check NO exigido puede omitirse")
+
+    def test_un_exigido_omitido_no_es_verde(self):
+        """Red-team del 14-oct-26: un PR que edita el workflow para que su job salga `skipped`
+        pasaba por verde sin haber corrido nada."""
+        trucado = [dict(c, conclusion="SKIPPED") if c.get("name") == "ciencia-nivel" else c
+                   for c in self.REAL]
+        self.assertEqual("incompleto", WP.ci_estado(trucado))
+        sin_preview = [c for c in self.REAL if "context" not in c]
+        self.assertEqual("incompleto", WP.ci_estado(sin_preview))
+        neutral = [dict(c, conclusion="NEUTRAL") if c.get("name") == "oxlint" else c for c in self.REAL]
+        self.assertEqual("incompleto", WP.ci_estado(neutral))
+
+    def test_incompleto_no_se_fusiona(self):
+        res, ll = _fusiona(ci="incompleto")
+        self.assertFalse(res["merged"])
+        self.assertEqual([], ll["merge"])
+        self.assertIn("obligatorio", res["motivo_no_merge"])
 
     def test_pendiente_rojo_y_vacio(self):
         ok = {"status": "COMPLETED", "conclusion": "SUCCESS"}
