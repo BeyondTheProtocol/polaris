@@ -378,7 +378,7 @@ def clave(permitir_env=False, crear=False):
 #     o se pone al día. No se puede arreglar desde aquí; está en FIRMANTE.md cómo listarlos.
 # Los permisos nuevos usan otra extensión (`.ok2`, `.lote2`) en el mismo directorio: el barrido
 # de un worktree viejo borra todo `.json` que no pase su HMAC y se los cargaría.
-PUBLICA = None
+PUBLICA = "823a32a7e3e990e1500f6e27ad4f32170a5dd529fea5fd087e46d9259a04c5a3"
 SERVICIO_FIRMANTE = "btp-firmante-ed25519"
 V_PERMISO = 2
 ALG = "ed25519"

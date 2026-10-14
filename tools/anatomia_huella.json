@@ -107,7 +107,7 @@
     "mejora del sistema": 10,
     "memoria y saber": 16,
     "modelos de IA": 19,
-    "muro y seguridad": 37,
+    "muro y seguridad": 38,
     "redes y prensa": 13,
     "salud del sistema": 23
   },
@@ -229,6 +229,7 @@
     "com.btp.enviar-hoy",
     "com.btp.espejo-investigacion",
     "com.btp.evals",
+    "com.btp.firmante",
     "com.btp.git-barrido",
     "com.btp.healthcheck",
     "com.btp.historial-sync",

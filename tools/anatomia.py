@@ -214,6 +214,8 @@ FAMILIAS = [
                           # nace del mensaje de {{TITULAR}} (21-sep-26), firmado y ligado a ese
                           # mensaje desde el 22-sep-26 (`permiso_envio`)
                           "ok_envio", "permiso_envio", "lote_envio",
+                          # quien firma ese permiso (Ed25519, daemon com.btp.firmante, 14-oct-26)
+                          "firmante",
                           "decision_alto_riesgo",
                           # los señuelos del tripwire de exfiltración (24-sep-26)
                           "canarios",
