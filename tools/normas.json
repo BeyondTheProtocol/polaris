@@ -1514,16 +1514,16 @@
       "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: no. Propuesta: no"
     },
     {
-      "slug": "feedback-contacto-contacto-prensa",
-      "que": "{{CONTACTO}} es el canal humano de contacto con periodistas; el gabinete prepara material para ella, NO manda correos en frío desde {{TITULAR}}",
+      "slug": "feedback-prensa-la-lleva-polaris",
+      "que": "Desde el 14-oct-26 la estrategia y la gestión de prensa son de Polaris (prensa + voz-titular); {{CONTACTO}} {{CONTACTO}} ya no coordina ni va en CC",
       "clase": "contexto",
-      "mecanismo": null,
+      "mecanismo": "tests/test_prensa_sin_contacto.py",
       "fresca": true,
       "heredada": false,
       "aplicable": true,
       "auditable": false,
       "repetida": false,
-      "nota": "Fase 0 (31-jul-26): clasificada, SIN mecanizar. Mecanizable: no. Propuesta: —"
+      "nota": "14-oct-26: sustituye a feedback-contacto-contacto-prensa y feedback-borradores-prensa-los-cambia-titular-con-comite. Freno: test que falla si una ficha o memoria vuelve a mandar la prensa por {{CONTACTO}}."
     },
     {
       "slug": "feedback-mensajes-claros-no-cripticos",

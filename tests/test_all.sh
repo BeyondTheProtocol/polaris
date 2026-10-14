@@ -411,6 +411,7 @@ runpy test_escalado_inteligencia.py
 runpy test_normas_registro.py
 runpy test_normas_gracia.py
 runpy test_normas_mecanizadas.py
+runpy test_prensa_sin_contacto.py   # 14-oct · la prensa la lleva Polaris: ninguna ficha o memoria vuelve a mandarla por {{CONTACTO}}
 runpy test_githooks_base.py
 runpy test_githooks_marcas.py
 runpy test_recall_memoria.py

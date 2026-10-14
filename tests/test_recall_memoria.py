@@ -77,7 +77,7 @@ CASOS = [
      ["feedback-auto-mejora", "feedback-entregable-no-vive-solo-en-chat",
       "feedback-automejora-minar-lecciones-no-solo-adoptar"]),
     ("responde a este periodista",
-     ["feedback-contacto-contacto-prensa", "feedback-flujo-redaccion-contactos",
+     ["feedback-prensa-la-lleva-polaris", "feedback-flujo-redaccion-contactos",
       "feedback-prensa-integrada-no-mock-periodico"]),
     ("sube los cambios a producción",
      ["feedback-deploy-netlify-creditos", "feedback-no-tocar-copy-web-sin-ok",
