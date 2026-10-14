@@ -151,6 +151,28 @@ class SuRespuesta(unittest.TestCase):
         self.assertIsNone(salida.cambios_a_aviso_web("cambia esto", self.CITA),
                           "responder a un aviso que no es de la web no es una corrección web")
 
+    def test_un_si_suelto_con_un_texto_esperando_se_explica_y_no_aprueba(self):
+        """14-oct-26: escribió «si» en el chat dos veces, sin responder al aviso, y Vega
+        contestó que no entendía."""
+        import bot_telegram as B
+        nombre, _, _ = _pide()                          # un texto de la web esperando
+        self.assertEqual([nombre], salida.web_pendientes())
+        respuestas, aprobadas = [], []
+        viejos = (salida.react_to_titular, salida.report_to_titular, B.healthcheck.mark_seen,
+                  salida.approve_and_deliver)
+        salida.react_to_titular = lambda *a, **k: None
+        salida.report_to_titular = lambda t, **k: respuestas.append(t) or {"delivered": True}
+        B.healthcheck.mark_seen = lambda *a, **k: None
+        salida.approve_and_deliver = lambda *a: aprobadas.append(a) or {"delivered": True, "reason": ""}
+        try:
+            r = B.handle_message({"text": "si", "message_id": 5})
+        finally:
+            (salida.react_to_titular, salida.report_to_titular, B.healthcheck.mark_seen,
+             salida.approve_and_deliver) = viejos
+        self.assertEqual("si-suelto-web", r)
+        self.assertEqual([], aprobadas, "un sí suelto no aprueba nada")
+        self.assertTrue(any("Responder" in x for x in respuestas))
+
     def test_el_bot_apunta_los_cambios_y_no_los_manda_al_triaje(self):
         import bot_telegram as B
         import web_guardian

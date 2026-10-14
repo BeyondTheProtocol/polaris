@@ -773,6 +773,29 @@ def cambios_a_aviso_web(texto, cita):
     return int(m.group(1)) if m else None
 
 
+def web_pendientes():
+    """Nombres de los borradores web que esperan su «sí» (en pending/, de menos de 48 h)."""
+    try:
+        nombres = [n for n in os.listdir(_sub("pending")) if "-web-publish-" in n and n.endswith(".json")]
+    except OSError:
+        return []
+    out = []
+    for n in sorted(nombres):
+        try:
+            with open(os.path.join(_sub("pending"), n), encoding="utf-8") as f:
+                if not _caducado(json.load(f)):
+                    out.append(n)
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def es_si_suelto(texto, cita):
+    """Un «sí» escrito en el chat SIN responder a ningún mensaje del bot. No aprueba nada: no se
+    sabe a qué aviso va, y podría ser la respuesta a cualquier otra cosa."""
+    return bool(texto) and not cita and bool(_RE_SI.match(texto))
+
+
 def aprobacion_por_respuesta(texto, cita):
     """(borrador, nonce) si su mensaje es un «sí» que responde a un aviso con orden de aprobar;
     None si no. El nonce se lee del mensaje CITADO, que escribió el bot en su chat: no se guarda

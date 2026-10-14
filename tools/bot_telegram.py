@@ -317,6 +317,14 @@ def handle_message(msg):
         res = salida.approve_and_deliver(par[0], par[1])
         responder("✅ " + res["reason"] if res.get("delivered") else "⛔ " + res["reason"])
         return "aprobacion-si:%s" % ("ok" if res.get("delivered") else "no")
+    # Un «sí» SUELTO con un texto de la web esperando (14-oct-26: lo escribió así dos veces y
+    # Vega contestó que no entendía). No se aprueba nada a ciegas, pero se le dice cómo hacerlo.
+    if not msg.get("editado") and salida.es_si_suelto(text, msg.get("cita")) and salida.web_pendientes():
+        responder("🌐 Tienes un texto de la web esperando, pero tu «sí» no va pegado a él. Para "
+                  "publicarlo, mantén pulsado el mensaje «¿apruebas este texto?» → Responder → "
+                  "escribe «sí». Así sé a qué texto dices que sí. Si tu «sí» era para otra cosa, "
+                  "dímelo con alguna palabra más.")
+        return "si-suelto-web"
     # Si NO es un «sí» pero responde a un aviso de la web, son cambios a ese texto: se apuntan
     # para el guardián con su PR, en vez de perderse en el triaje como un mensaje suelto.
     pr_cambios = None if msg.get("editado") else salida.cambios_a_aviso_web(text, msg.get("cita"))
