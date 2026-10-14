@@ -26,6 +26,8 @@ from datetime import datetime, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOK = os.path.join(ROOT, ".claude", "hooks", "salida_guard.py")
+# Los hooks se lanzan con la costura de prueba puesta (raíz de transcripts temporal): ver _corre_hook.py.
+CORRE = os.path.join(ROOT, "tests", "_corre_hook.py")
 OK = os.path.join(ROOT, "tools", "ok_envio.py")
 
 
@@ -35,15 +37,17 @@ class GuardDeSalida(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="salidaguard-")
         # Clave de firma de prueba: los hooks la aceptan por entorno (lo pone el harness), y así
         # ningún test toca el Llavero real. Sesión y transcript falsos, con la forma del real.
-        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp, BTP_OK_ENVIO_CLAVE="c" * 64)
+        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp, BTP_OK_ENVIO_CLAVE="c" * 64,
+                        BTP_TEST_RAIZ_TRANSCRIPTS=self.tmp,
+                        BTP_TEST_MODO="hmac")     # esta batería prueba el HMAC de antes, fijada o no la pública
         self.sesion = "sesion-test"
-        self.transcript = os.path.join(self.tmp, "transcript.jsonl")
+        self.transcript = os.path.join(self.tmp, self.sesion + ".jsonl")   # como los de verdad: <sesión>.jsonl
         open(self.transcript, "w").close()
 
     def _hook(self, payload):
         payload = dict(payload, session_id=payload.get("session_id", self.sesion),
                        transcript_path=payload.get("transcript_path", self.transcript))
-        return subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+        return subprocess.run([sys.executable, CORRE, HOOK], input=json.dumps(payload),
                               capture_output=True, text=True, timeout=60, env=self.env)
 
     def _decision(self, r):
@@ -61,7 +65,7 @@ class GuardDeSalida(unittest.TestCase):
                                 "isSidechain": False, "message": {"role": "user", "content": texto}},
                                ensure_ascii=False) + "\n")
         hook = os.path.join(ROOT, ".claude", "hooks", "ok_envio_prompt.py")
-        return subprocess.run([sys.executable, hook],
+        return subprocess.run([sys.executable, CORRE, hook],
                               input=json.dumps({"prompt": texto, "prompt_id": pid,
                                                 "session_id": self.sesion,
                                                 "transcript_path": self.transcript}),

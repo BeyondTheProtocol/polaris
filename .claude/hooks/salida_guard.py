@@ -591,7 +591,10 @@ def _token_valido(datos=None, entrada=None):
             return None, ("su mensaje en esta sesión no abrió permiso (el que hay es de otra "
                           "sesión). Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo»")
         return None, ""
-    d, motivo, ctx = P.validar(P.clave(permitir_env=True), sesion=sesion)
+    # El transcript contra el que se comprueba tiene que ser el de ESTA sesión según el harness
+    # (su `transcript_path`), no solo el que diga el permiso (14-oct-26).
+    d, motivo, ctx = P.validar(P.llave(permitir_env=True)[0], sesion=sesion,
+                               transcript=datos.get("transcript_path"))
     if not d:
         _log("token_invalido", datos.get("tool_name") or "?", motivo)
         return None, motivo
@@ -604,14 +607,19 @@ def _token_valido(datos=None, entrada=None):
 
 
 def _consumir(d, tool):
+    """True si el uso es de ESTA llamada. Mirar «¿usado?» y apuntarlo es una sola operación con
+    cerrojo (`P.consumir`, 14-oct-26): antes se validaba primero y se apuntaba después, y dos
+    llamadas a la vez pasaban las dos. Si no se puede apuntar, no sale (fail-closed)."""
     try:
-        P.marcar_usado(d, tool)
+        mio = P.consumir(d, tool)
     except Exception:
+        mio = False
         try:
             os.remove(P.token_path(d.get("session_id")))
         except Exception:
             pass
-    _log("permitido", tool, d.get("motivo", ""))
+    _log("permitido" if mio else "token_ya_usado", tool, d.get("motivo", ""))
+    return mio
 
 
 # ── ESCRIBIR EL PERMISO (22-sep-26, hallazgo 3.1) ─────────────────────────────────────────────
@@ -643,6 +651,68 @@ _RE_NOMBRE_BORDE = re.compile(r"cloud_confiados|ledger-\d{4}-\d{2}-\d{2}\.jsonl|
                               r"borde/head\.txt|salida/enviados-|notif/holding-|state/aplazados/", re.I)
 _TRANSCRIPTS = os.path.realpath(os.path.expanduser("~/.claude/projects")).lower()
 _SERVICIO = "btp-ok-envio-mac"
+# Las claves del Llavero que firman el permiso (14-oct-26): la del HMAC de antes y la privada
+# del firmante (`tools/firmante.py`). Las dos igual de cerradas.
+_SERVICIOS = (_SERVICIO, "btp-firmante-ed25519")
+# Programas donde la palabra `security` es solo TEXTO (un commit, un grep, un echo): nombrar la
+# clave ahí no es ir a por ella. Cualquier otro programa que lleve `security` como palabra
+# suelta en la misma orden que nombra la clave puede estar LANZÁNDOLO (`nice`, `timeout`,
+# `caffeinate`, `arch`, `xargs`, `launchctl asuser`, `find -exec`, `script`, `stdbuf`…): antes
+# solo se miraba `security` como PRIMER programa y bastaba un envoltorio delante. Confirmado
+# con test el 13-oct-26 (tests/test_permiso_guard_llavero_socket.py), no solo leyendo.
+_SOLO_NOMBRAN = frozenset(("echo", "printf", "git", "gh", "grep", "egrep", "fgrep", "rg", "ag", "ack",
+                           "cat", "head", "tail", "less", "more", "bat", "wc", "ls", "stat", "file",
+                           "man", "which", "type", "print", "true", "false", "cd", "pushd", "say",
+                           "basename", "dirname", "realpath", "readlink", "diff", "cmp", "jq"))
+# El socket del firmante. Hablarle a mano no da nada que no dé el hook (solo firma lo que el
+# transcript confirma), pero no hay ningún motivo legítimo para hacerlo desde una orden.
+_SOCKET_FIRMANTE = "firmante.sock"
+# Las órdenes de `security` que leen, crean o borran una clave. Si una de estas palabras va en
+# la misma orden que nombra la clave del permiso, da igual cómo se llame el programa que la
+# lleva delante (`S=security; $S find-generic-password …`).
+_LLAVERO_SUB = frozenset(("find-generic-password", "find-internet-password", "dump-keychain",
+                          "delete-generic-password", "add-generic-password", "export"))
+_PROGS_SOCKET = frozenset(("nc", "ncat", "netcat", "socat", "curl", "wget", "telnet", "openssl",
+                           "websocat", "http", "https"))
+_RE_SOCKET_UNIX = re.compile(r"(?:^|\s)-[A-Za-z]*U\b|--unix-socket|--abstract-unix-socket|"
+                             r"UNIX-(?:CONNECT|CLIENT|SENDTO)|unix:", re.I)
+_RE_CODIGO_SOCKET = re.compile(r"AF_UNIX|UNIX-CONNECT|UNIXSocket|IO::Socket::UNIX|UnixStream|"
+                               r"net\.(?:connect|createConnection)|socket\.socket|socketPath|require\(.net.\)", re.I)
+_RE_CODIGO_FIRMANTE = re.compile(r"(?:^|[\s;])(?:import|from)\s+firmante\b|"
+                                 r"__import__\s*\(\s*['\"]firmante|\bfirmante\.pedir\s*\(", re.I)
+_RE_LLAVERO_EN_CODIGO = re.compile(r"security|find-generic|keyring|SecItemCopy|SecKeychain", re.I)
+
+
+def _nombra_servicio(texto):
+    t = (texto or "").lower()
+    return any(svc in t for svc in _SERVICIOS)
+
+
+def _habla_con_firmante(prog, args, cmd):
+    """Motivo si esta orden abre el socket del firmante con un programa de red (también detrás
+    de un envoltorio: `nice nc -U …`); si no, ""."""
+    bajo = cmd.lower()
+    if _SOCKET_FIRMANTE not in bajo and not ("ok_envio" in bajo and _RE_SOCKET_UNIX.search(cmd)):
+        return ""
+    if any(os.path.basename(a) in _PROGS_SOCKET for a in [prog] + list(args)):
+        return "habla con el socket del firmante (el permiso lo pide solo el hook que lee su mensaje)"
+    return ""
+
+
+def _codigo_toca_firmante(codigo, cmd):
+    """Motivo si el código en línea va a por la clave del firmante, importa su cliente o abre su
+    socket; si no, ""."""
+    if not codigo:
+        return ""
+    if "btp-firmante" in codigo.lower() and _RE_LLAVERO_EN_CODIGO.search(codigo):
+        return "código que toca la firma del permiso"
+    if _RE_CODIGO_FIRMANTE.search(codigo):
+        return "código que usa el cliente del firmante (el permiso lo pide solo el hook)"
+    bajo = (codigo + "\n" + (cmd or "")).lower()
+    if _RE_CODIGO_SOCKET.search(codigo) and (_SOCKET_FIRMANTE in bajo or "ok_envio" in bajo
+                                             or "socket_path" in bajo):
+        return "código que habla con el socket del firmante"
+    return ""
 # En código en línea (python -c, heredoc, node -e…) se mira lo que HACE, no lo que nombra: un
 # heredoc que edita este mismo guard contiene todos estos nombres (falso positivo cazado en vivo al
 # escribirlo, 22-sep-26). Cuenta importar la librería de la firma, pedir la clave al Llavero o
@@ -852,17 +922,18 @@ def _escribe_borde_bash(prog, args, cuerpo, bases, cmd):
     return ""
 
 
-def _escribe_bash(cmd, cwd):
+def _escribe_bash(cmd, cwd, _nombra=False):
     """Motivo si el comando escribe algo protegido, lee la clave o lanza el emisor; si no, ""."""
     bases = [cwd or os.getcwd()]
     # El nombre de la clave del MAC en cualquier parte del comando cuenta si ese comando además
     # LLAMA al Llavero: así no se escapa por una variable (`S=btp-ok-envio-mac; security … -s
     # "$S" -w`) y, a la vez, escribirlo en un commit, un grep o una nota sigue siendo escribirlo
     # (falso positivo cazado en vivo: este mismo guard bloqueó el commit que lo explicaba).
-    nombra_clave = _SERVICIO in cmd.lower()
+    # `_nombra`: la orden de FUERA ya nombraba la clave (`S=…; sh -c 'nice security … "$S"'`).
+    nombra_clave = _nombra or _nombra_servicio(cmd)
     # Lo que va dentro de `$(…)`/`…` también se ejecuta (3.ª pasada): `echo $(cp x …/head.txt)`.
     for dentro in _subordenes(cmd):
-        motivo = _escribe_bash(dentro, bases[0])
+        motivo = _escribe_bash(dentro, bases[0], nombra_clave)
         if motivo:
             return motivo
     for pal, cuerpo, redirs in _ordenes(cmd, con_redir=True):
@@ -872,6 +943,8 @@ def _escribe_bash(cmd, cwd):
         if not pal:
             if cuerpo and _RE_CODIGO_CLAVE.search(cuerpo):
                 return "código que toca la firma del permiso"
+            if cuerpo and _codigo_toca_firmante(cuerpo, cmd):
+                return _codigo_toca_firmante(cuerpo, cmd)
             if cuerpo and _aprueba(cuerpo):
                 return "código que aprueba un borrador del outbox (eso lo hace {{TITULAR}} por Telegram)"
             continue
@@ -883,6 +956,29 @@ def _escribe_bash(cmd, cwd):
             if not args:
                 break
             prog, args = os.path.basename(args[0]), args[1:]
+        # El nombre de la clave puede venir partido por comillas (`"btp-ok-envio-""mac"`): el
+        # shell lo junta, así que se mira también en las palabras ya juntadas.
+        nombra_aqui = nombra_clave or _nombra_servicio(" ".join(pal))
+        if nombra_aqui and prog not in _SOLO_NOMBRAN and \
+                any(os.path.basename(a) == "security" for a in [prog] + args):
+            return "security sobre la clave del permiso"
+        if nombra_aqui and prog not in _SOLO_NOMBRAN and any(a in _LLAVERO_SUB for a in args):
+            return "security sobre la clave del permiso"
+        if prog == "eval" and args:                      # `eval "security … <clave> -w"`
+            dentro = _escribe_bash(" ".join(args), bases[0], nombra_clave)
+            if dentro:
+                return dentro
+        # Una shell que ejecuta SU ENTRADA (`echo 'security … <clave> -w' | sh`): lo que corre no
+        # se ve como orden. Si el comando nombra la clave y la palabra `security`, no pasa.
+        shell_sin_guion = (prog in _SHELLS and "-c" not in args and not _operandos(args)) or \
+            (prog not in _SOLO_NOMBRAN and bool(args) and os.path.basename(args[-1]) in _SHELLS)
+        if nombra_clave and shell_sin_guion and re.search(r"\bsecurity\b", cmd):
+            return "una shell que ejecuta su entrada, con security y la clave del permiso en la orden"
+        motivo = _habla_con_firmante(prog, args, cmd)
+        if motivo:
+            return motivo
+        if prog == "firmante.py" and "servir" in args:
+            return "lanza a mano el firmante (solo lo enciende launchd, con tools/activar_daemon.py)"
         if prog == "cd":
             destino = os.path.expanduser(args[0]) if args else os.path.expanduser("~")
             bases = bases + ([destino] if os.path.isabs(destino)
@@ -905,7 +1001,7 @@ def _escribe_bash(cmd, cwd):
                 return "security %s -w sin decir de qué servicio" % sub
             continue
         if prog in _SHELLS and "-c" in args[:-1]:
-            dentro = _escribe_bash(args[args.index("-c") + 1], bases[0])
+            dentro = _escribe_bash(args[args.index("-c") + 1], bases[0], nombra_clave)
             if dentro:
                 return dentro
             continue
@@ -917,11 +1013,22 @@ def _escribe_bash(cmd, cwd):
             libres = _operandos(args)
             if libres and os.path.basename(libres[0]) == "ok_envio_prompt.py":
                 return "lanza a mano el hook que emite el permiso"
+            # El lanzador de los tests corre el hook que se le pase: mismo veredicto (además, él
+            # mismo se niega a correr contra el estado vivo).
+            if len(libres) > 1 and os.path.basename(libres[0]) == "_corre_hook.py" and \
+                    os.path.basename(libres[1]) == "ok_envio_prompt.py":
+                return "lanza a mano el hook que emite el permiso"
+            if libres and os.path.basename(libres[0]) == "firmante.py" and "servir" in libres[1:]:
+                return "lanza a mano el firmante (solo lo enciende launchd, con tools/activar_daemon.py)"
             if _RE_CODIGO_CLAVE.search(codigo):
                 return "código que toca la firma del permiso"
             # Con un script delante (`python3 x.py <<EOF`), el heredoc es la ENTRADA de ese script,
             # datos y no código: el replay del 26-sep lo daba como llamada en una nota archivada.
             ejecuta = codigo if (not libres or libres[0] == "-") else codigo[len(cuerpo or ""):]
+            # Sobre lo que se EJECUTA, no sobre la entrada: una nota archivada que nombra la clave
+            # del firmante y `security` no va a por ella (falso positivo de verificacion, 14-oct).
+            if _codigo_toca_firmante(ejecuta, cmd):
+                return _codigo_toca_firmante(ejecuta, cmd)
             if _aprueba(ejecuta):
                 return "código que aprueba un borrador del outbox (eso lo hace {{TITULAR}} por Telegram)"
             if _escribe_lo_protegido(codigo):
@@ -1032,7 +1139,8 @@ def _escribe_protegido(tool, entrada):
         return _escribe_protegido_bruto(tool, entrada)
     except Exception as e:
         crudo = json.dumps(entrada, ensure_ascii=False, default=str).lower()
-        if "ok_envio" in crudo or ".claude/projects" in crudo or _SERVICIO in crudo \
+        if "ok_envio" in crudo or ".claude/projects" in crudo or _nombra_servicio(crudo) \
+                or _SOCKET_FIRMANTE in crudo \
                 or _RE_NOMBRE_BORDE.search(crudo):
             return "no he podido analizar la llamada (%s) y nombra el permiso" % type(e).__name__
         _log("analisis_fallido", tool, type(e).__name__)
@@ -2539,9 +2647,10 @@ def main():
         return 0
     permiso, por_que_no = _token_valido(datos, datos.get("tool_input"))
     if permiso:
-        _consumir(permiso, tool)
-        _sombra(datos, que, "permitido")
-        return 0
+        if _consumir(permiso, tool):
+            _sombra(datos, que, "permitido")
+            return 0
+        por_que_no = "ese mensaje suyo ya abrió un envío"
     # Lo que MANDA se deniega siempre. Un CLIC (22-sep-26): `ask` si el modo pregunta, y si no
     # (bypass, auto) se AVISA sin bloquear. Antes se denegaba en bypass creyendo que bypass era
     # el lazo 24/7 — no lo es: el lazo no carga este hook (settings.autonomous.json +
@@ -2583,6 +2692,11 @@ if __name__ == "__main__":
         sys.stderr.write("salida_guard: falta _watchdog.py; sigo sin vigilante\n")
     if _watchdog:
         _watchdog.armar(10, 'salida_guard')
+    if P is not None:
+        try:
+            P.relanzar_si_falta_cripto()        # antes de leer la entrada; ver permiso_envio
+        except Exception:
+            pass
     # Fail-open ANTES de saber si la llamada sale fuera (stdin ilegible → no es asunto nuestro);
     # fail-CLOSED después. La diferencia importa: este es el único freno en código en sesión
     # interactiva, y una excepción tras el match —token corrupto, disco lleno al loguear— con

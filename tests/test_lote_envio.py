@@ -63,9 +63,13 @@ class _LoteBase(_Base):
         self._viejo = os.environ.get("BTP_STATE_DIR")
         os.environ["BTP_STATE_DIR"] = self.tmp          # para P/L en proceso (ruta del permiso)
         P.CLAVE_TEST = CLAVE.encode()
+        P.RAIZ_TRANSCRIPTS_TEST = self.tmp              # costura en proceso, nunca por entorno
+        P.MODO_TEST = "hmac"                            # esta batería prueba el HMAC de antes
 
     def tearDown(self):
         P.CLAVE_TEST = None
+        P.RAIZ_TRANSCRIPTS_TEST = None
+        P.MODO_TEST = None
         if self._viejo is None:
             os.environ.pop("BTP_STATE_DIR", None)
         else:
@@ -306,15 +310,19 @@ class ElLoteNoDejaPasarOtraCosa(_LoteBase):
         self.assertIsNone(self._tipea(_batch("a")))
         self.assertEqual(self._permitidos(), [])
 
-    def test_gastados_retocados_a_mano_rompen_la_firma(self):
-        self._tipea(_batch("a"))
+    def test_un_item_gastado_no_resucita_retocando_el_lote(self):
+        """Reescrito el 14-oct-26 (antes: «gastados retocados a mano rompen la firma»). Lo
+        gastado ya no va en el fichero del lote sino en el libro de usos, así que ni vaciar
+        `gastados` ni devolver al disco el lote tal como se abrió, con su firma intacta,
+        vuelve a dejar salir el ítem a."""
         with open(self._lote(), encoding="utf-8") as f:
-            d = json.load(f)
-        d["gastados"] = []                                   # intento de «resucitar» el ítem a
-        with open(self._lote(), "w", encoding="utf-8") as f:
-            json.dump(d, f)
+            recien_abierto = f.read()
         self.assertIsNone(self._tipea(_batch("a")))
-        self.assertEqual(len(self._permitidos()), 1)
+        with open(self._lote(), "w", encoding="utf-8") as f:
+            f.write(recien_abierto)
+        self.assertEqual(self._tipea(_batch("a")), "deny")
+        self.assertIsNone(self._tipea(_batch("b")), "los demás ítems siguen valiendo")
+        self.assertEqual(len(self._permitidos()), 2)
 
     def test_escribir_el_lote_a_mano_lo_deniega_el_muro(self):
         ruta = os.path.join(CASA, "tools", "state", "ok_envio", "x.lote")

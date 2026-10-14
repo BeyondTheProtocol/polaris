@@ -205,9 +205,9 @@ def permiso(que):
     La clave nunca sale del entorno: esta herramienta la lanza el agente."""
     if not P.hay_alguno():
         return None, "nadie lo ha pedido en un mensaje", {}, None
-    k = P.clave(permitir_env=False)
+    k, sin_llave = P.llave(permitir_env=False)     # en modo Ed25519 no hay secreto que leer
     if not k:
-        return None, "sin clave de firma en el Llavero: el permiso no se puede comprobar", {}, None
+        return None, "el permiso no se puede comprobar: " + sin_llave, {}, None
     ses = sesion_actual()
     if not ses:
         return None, ("no sé desde qué sesión se me llama (falta CLAUDE_CODE_SESSION_ID): "
@@ -357,10 +357,13 @@ def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=Fal
         pega = numeros_sin_almohadilla(ctx) or P.comprobar_fusion(ctx, numero, cabeza)
         if pega:
             return cierra(pega)
-    if usos_max > 1:
-        P.gastar_uno(d, k, usos_max)
-    else:
-        P.marcar_usado(d, por)
+    # El uso se reserva ANTES de fusionar y con cerrojo: de dos fusiones a la vez, una sale.
+    try:
+        mio = bool(P.gastar_uno(d, k, usos_max)) if usos_max > 1 else P.consumir(d, por)
+    except Exception:
+        mio = False
+    if not mio:
+        return cierra("ese mensaje suyo ya abrió todo lo que podía abrir")
 
     m = (_merge or _merge_real)(["gh", "pr", "merge", str(numero), "--squash", "--delete-branch",
                                  "--match-head-commit", cabeza], cwd=cwd)

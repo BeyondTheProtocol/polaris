@@ -368,6 +368,11 @@ runpy test_otra_casa_piloto.py    # 10-oct · piloto de aceptación de Grok: cor
 runpy test_laminillas_jaulas_secretos.py # 2-oct · ninguna jaula SBPL (×extras reales) abre secretos ni zona clínica: deny de secretos al FINAL, sandbox-exec con señuelos
 runpy test_nivel_salida.py   # 25-sep · P3 F1: nivel de cada salida EN SOMBRA (anota, no manda)
 runpy test_ok_envio_blindado.py
+runpy test_permiso_guard_llavero_socket.py   # 14-oct · la clave que firma el permiso no sale con un envoltorio delante (nice, timeout, xargs…) y al socket del firmante no se le habla a mano
+runpy test_permiso_firmante.py   # 14-oct · pieza A: el firmante (Ed25519) abre y valida el permiso sin Llavero en la sesión; daemon de prueba en socket temporal
+runpy test_permiso_libro_usos.py   # 14-oct · lo que se gasta de un permiso va al libro con flock: de N usos a la vez pasa uno
+runpy test_permiso_transcript_acotado.py  # 13-oct · el permiso solo se comprueba contra <sesión>.jsonl dentro de ~/.claude/projects (ni /tmp, ni enlaces, ni otra sesión)
+runpy test_permiso_security_ruta.py  # 13-oct · el Llavero se llama por /usr/bin/security: un `security` falso delante en el PATH no cambia nada
 runpy test_lote_envio.py   # 9-oct · una orden envía N DMs leídos: manifiesto en el transcript, 15 min, un uso por ítem, tope 10
 runpy test_correos_publicables.py
 runpy test_entrada_guard.py

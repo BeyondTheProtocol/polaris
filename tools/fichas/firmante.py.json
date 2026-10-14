@@ -1,0 +1,11 @@
+{
+ "pieza": "firmante.py",
+ "estado_ficha": "completa",
+ "para": "Daemon que firma con Ed25519 el permiso de salida cuando {{TITULAR}} da la orden en su mensaje, para que el permiso se abra y se compruebe también en sesiones remotas por SSH, donde el Llavero no se deja leer.",
+ "cuando_si": "Lo llama solo el hook .claude/hooks/ok_envio_prompt.py por su socket Unix cuando hay clave pública fijada en permiso_envio.PUBLICA. A mano solo `estado` (¿está vivo?, ¿qué clave pública tiene?) y, desde una sesión local del Mac, `publica` para el paso de fijar la clave.",
+ "cuando_no": "Para abrir un permiso a mano (no firma nada que el transcript no confirme como orden humana, la última y con la orden), para firmar otros datos (solo tiene una operación: emitir) o para comprobar un permiso (eso es permiso_envio.verificar, sin secreto). No se lanza desde un worktree ni con launchctl a mano: solo tools/activar_daemon.py.",
+ "reemplaza": "La firma HMAC con la clave btp-ok-envio-mac leída dentro de la propia sesión, que por SSH no se podía leer (código 36) y dejaba su «fusiona» sin abrir nada.",
+ "test": "tests/test_permiso_firmante.py",
+ "alta": "2026-10-14",
+ "origen": "Pieza A del muro, aprobada por {{TITULAR}} el 13-oct-2026. Diseño: firma asimétrica (consejero-arquitectura) con las condiciones de verificacion (el daemon no se fía del llamante, fail-closed, un solo uso en el libro)."
+}

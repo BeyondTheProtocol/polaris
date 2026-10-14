@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Firmante del permiso de salida (pieza A del muro, 14-oct-2026). Tiene la clave privada
+     Ed25519 (Llavero, servicio btp-firmante-ed25519) y firma el permiso cuando el transcript
+     confirma una orden de {{TITULAR}}. Tiene que correr en gui/501 (sesion grafica): es donde el
+     Llavero se deja leer; por SSH no. Sin red: solo un socket Unix 0600 en
+     tools/state/ok_envio/firmante.sock. Sin LLM (~0 tokens). El python es el de Homebrew a
+     proposito: /usr/bin/python3 no trae la libreria cryptography. KeepAlive: revive si se cae
+     o tras reinicio. Encender = gate de {{TITULAR}}, SOLO con tools/activar_daemon.py desde casa
+     base. Pasos, fijar la clave publica y marcha atras: tools/launchd/FIRMANTE.md. -->
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.btp.firmante</string>
+  <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>ProgramArguments</key><array>
+    <string>/opt/homebrew/bin/python3</string>
+    <string>/Users/polaris/claudecode/tools/firmante.py</string>
+    <string>servir</string>
+    <string>--crear-clave-si-falta</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>StandardOutPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/firmante.out</string>
+  <key>StandardErrorPath</key><string>/Users/polaris/claudecode/tools/launchd/logs/firmante.err</string>
+</dict></plist>

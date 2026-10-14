@@ -145,6 +145,8 @@ class QuienLoPide(unittest.TestCase):
         import importlib
         import permiso_envio
         permiso_envio.CLAVE_TEST = self.CLAVE
+        permiso_envio.RAIZ_TRANSCRIPTS_TEST = self.tmp      # costura en proceso, nunca por entorno
+        permiso_envio.MODO_TEST = "hmac"                    # esta batería prueba el HMAC de antes
         global WN
         WN = importlib.reload(WN)
 
@@ -157,6 +159,8 @@ class QuienLoPide(unittest.TestCase):
         import importlib
         import permiso_envio
         permiso_envio.CLAVE_TEST = None
+        permiso_envio.RAIZ_TRANSCRIPTS_TEST = None
+        permiso_envio.MODO_TEST = None
         importlib.reload(WN)
 
     def test_la_orden_de_otra_sesion_no_vale_aqui(self):
@@ -185,7 +189,7 @@ class QuienLoPide(unittest.TestCase):
         import datetime as dt
         import uuid
         import permiso_envio
-        transcript = os.path.join(self.tmp, "t.jsonl")
+        transcript = os.path.join(self.tmp, "s1.jsonl")      # como los de verdad: <sesión>.jsonl
         pid = str(uuid.uuid4())
         with open(transcript, "a", encoding="utf-8") as f:
             f.write(json.dumps({"type": "user", "promptId": pid, "origin": {"kind": "human"},

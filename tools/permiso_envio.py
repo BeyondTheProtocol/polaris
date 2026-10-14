@@ -21,11 +21,26 @@ Ahora el fichero es solo un PUNTERO firmado a un mensaje suyo, y lo que manda es
     tenía delante. Si el borrador cambia después de su OK, o el cuerpo que sale no es el que vio,
     no sale.
 
-LÍMITE QUE NO SE ESCONDE. Todo corre con el mismo usuario de macOS. Un proceso con su uid PUEDE,
-en teoría, leer el Llavero o escribir un transcript por una vía que los guards no reconozcan
-(código ofuscado). Lo que esto consigue es que haga falta encadenar tres evasiones distintas
-(escribir el fichero, leer la clave, falsificar el transcript) y que las tres vías obvias estén
-cerradas y con test. No es una garantía criptográfica contra el propio usuario.
+DESDE EL 14-OCT-26 hay dos modos (ver «la firma que se comprueba SIN secreto», más abajo): con
+`PUBLICA` fijada, el permiso lo firma el daemon `tools/firmante.py` con Ed25519 y aquí solo se
+comprueba con la clave pública; sin fijar, sigue el HMAC descrito arriba.
+
+LÍMITE QUE NO SE ESCONDE (corregido el 14-oct-26: antes decía «tres evasiones encadenadas» y
+afirmaba más de lo que el código da). Todo corre con el mismo usuario de macOS, y los guards
+son obstáculo y rastro, no frontera: solo ven lo que una llamada de herramienta deja leer (un
+script en disco, o código ofuscado, no lo ven). Lo que de verdad sostiene el permiso son DOS
+cosas, y basta con que caiga la que toque:
+  · QUE EL TRANSCRIPT NO SE PUEDA ESCRIBIR. Es la única barrera común a los dos modos: quien
+    consiga añadir una línea «humana» al transcript de la sesión obtiene un permiso válido. En
+    modo Ed25519 ni siquiera necesita nada más: el firmante firma lo que el transcript confirma.
+  · EN MODO HMAC, además, QUE LA CLAVE NO SE PUEDA LEER. Escribir el fichero del permiso no es
+    una barrera aparte (lo hace cualquier proceso que el guard no vea). Y hasta el 14-oct-26
+    la lectura de la clave tenía una vía obvia abierta: `nice security …` pasaba el guard
+    (confirmado con test; cerrado ese día junto con otros envoltorios).
+Lo que SÍ está cerrado y con test: las vías obvias de escribir el permiso, su libro y los
+transcripts; leer las claves de firma por `security`, también detrás de un envoltorio; lanzar a
+mano el emisor o el firmante; hablarle a su socket; un transcript fuera de `~/.claude/projects`
+o de otra sesión. No es una garantía criptográfica contra el propio usuario.
 """
 import hashlib
 import hmac
@@ -41,6 +56,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _casa  # noqa: E402
 
 SERVICIO = "btp-ok-envio-mac"
+# Ruta ABSOLUTA (13-oct-26): con el nombre desnudo, el `security` que corre lo elige el PATH de
+# quien lanza el proceso, y uno falso delante devolvería la «clave» que quisiera (o recibiría la
+# nueva en argv al crearla). Test: tests/test_permiso_security_ruta.py.
+SECURITY = "/usr/bin/security"
 VIDA_S = 600
 ORIGENES = ("prompt",)
 AUTOMATICOS = ("<task-notification", "<scheduled-task", "<ci-monitor-event")
@@ -231,8 +250,14 @@ def _sid(sesion):
     return re.sub(r"[^A-Za-z0-9_-]", "", str(sesion or ""))[:64] or "sin-sesion"
 
 
+def _ext():
+    """`.ok2` para los permisos del firmante: el barrido de un worktree con el código de antes
+    borra todo `.json` que no pase su HMAC."""
+    return ".ok2" if modo() == ALG else ".json"
+
+
 def token_path(sesion=""):
-    return os.path.join(dir_permisos(), _sid(sesion) + ".json")
+    return os.path.join(dir_permisos(), _sid(sesion) + _ext())
 
 
 def _legado():
@@ -243,7 +268,7 @@ def _legado():
 def _todos():
     try:
         return [os.path.join(dir_permisos(), n) for n in os.listdir(dir_permisos())
-                if n.endswith(".json")]
+                if n.endswith(_ext())]
     except Exception:
         return []
 
@@ -267,7 +292,7 @@ def _llavero_estado():
     cualquier otro fallo). En el segundo nunca se intenta crear: no arregla nada y, si el Llavero
     se desbloquea luego, habría dos claves."""
     try:
-        r = subprocess.run(["security", "find-generic-password", "-s", SERVICIO, "-w"],
+        r = subprocess.run([SECURITY, "find-generic-password", "-s", SERVICIO, "-w"],
                            capture_output=True, text=True, timeout=5)
     except Exception:
         return None, "ilegible"
@@ -285,7 +310,7 @@ def _llavero_crear():
     valor = secrets.token_hex(32)
     cuenta = os.environ.get("USER") or getpass.getuser()
     try:
-        subprocess.run(["security", "add-generic-password", "-a", cuenta, "-s", SERVICIO,
+        subprocess.run([SECURITY, "add-generic-password", "-a", cuenta, "-s", SERVICIO,
                         "-w", valor], capture_output=True, text=True, timeout=10)
     except Exception:
         return None
@@ -328,6 +353,161 @@ def clave(permitir_env=False, crear=False):
     ok_envio.py) NO lo permite: ese entorno lo elige quien la lanza, y bastaría con
     `BTP_OK_ENVIO_CLAVE=x python3 tools/web_novedad.py` para firmar lo que quisiera."""
     return clave_estado(permitir_env, crear)[0]
+
+
+# ── la firma que se comprueba SIN secreto (14-oct-26, «pieza A») ──────────────────────────────
+# EL PROBLEMA. {{TITULAR}} trabaja desde la app en otro dispositivo, que entra al Mac por SSH. Ahí el
+# Llavero no se deja leer (`security` da el código 36), y tanto abrir el permiso como
+# COMPROBARLO necesitaban la clave del HMAC: su «fusiona» no abría nada.
+# EL ARREGLO. El permiso lo firma con Ed25519 un daemon (`tools/firmante.py`, launchd `gui/501`,
+# que sí lee el Llavero) y aquí se comprueba con la clave PÚBLICA, que no es secreta y va en
+# este fichero. La sesión ya no necesita el Llavero para nada.
+#
+# `PUBLICA` es None hasta que el firmante esté activado y su clave pública se FIJE AQUÍ POR
+# COMMIT (64 hex; el paso exacto, en `tools/launchd/FIRMANTE.md`). Va en código versionado para
+# que cambiarla deje rastro (un diff, un commit), no porque no se pueda: este fichero NO está
+# entre las rutas que los guards deniegan escribir, y cada worktree lee SU copia. En casa base
+# la regla de permisos solo cubre `.claude/hooks/`. Proteger `tools/permiso_envio.py`,
+# `firmante.py`, `lote_envio.py` y `_casa.py` es una propuesta abierta (FIRMANTE.md, «Pendiente»).
+#
+# CONVIVENCIA, sin vía que dure para siempre sin decirlo:
+#   · mientras `PUBLICA` es None manda el HMAC de antes, tal cual (y por SSH sigue sin abrir);
+#   · el commit que fija `PUBLICA` RETIRA el HMAC en ese árbol: un permiso con MAC deja de
+#     valer ahí, y para volver atrás hay que revertir ese commit;
+#   · un worktree nacido antes de ese commit sigue con su código y su HMAC hasta que se cierra
+#     o se pone al día. No se puede arreglar desde aquí; está en FIRMANTE.md cómo listarlos.
+# Los permisos nuevos usan otra extensión (`.ok2`, `.lote2`) en el mismo directorio: el barrido
+# de un worktree viejo borra todo `.json` que no pase su HMAC y se los cargaría.
+PUBLICA = None
+SERVICIO_FIRMANTE = "btp-firmante-ed25519"
+V_PERMISO = 2
+ALG = "ed25519"
+# Costuras de los tests, SOLO en proceso (nunca por entorno, ver `RAIZ_TRANSCRIPTS_TEST`):
+# `PUBLICA_TEST` es la pública de un firmante de prueba; `MODO_TEST` fuerza «hmac» o «ed25519»
+# para que las baterías de cada modo no dependan de si `PUBLICA` ya está fijada.
+PUBLICA_TEST = None
+MODO_TEST = None
+
+
+def publica():
+    """La clave pública contra la que se comprueba, en hex, o None."""
+    return PUBLICA_TEST or PUBLICA
+
+
+def modo():
+    """«ed25519» si hay clave pública fijada; si no, «hmac» (lo de antes)."""
+    if MODO_TEST in ("hmac", ALG):
+        return MODO_TEST
+    return ALG if publica() else "hmac"
+
+
+def kid(pub_hex):
+    """Huella corta de una clave pública: va en el permiso para poder decir «lo firmó otra»."""
+    return hashlib.sha256(bytes.fromhex(pub_hex)).hexdigest()[:16]
+
+
+def _canon2(d):
+    return json.dumps({k: v for k, v in d.items() if k != "firma"}, sort_keys=True,
+                      ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def cripto():
+    """(módulo ed25519 | None, motivo). La librería se importa AQUÍ y no arriba: el `python3`
+    de /usr/bin no la trae y este módulo lo importan también cosas que no firman nada. Si
+    falta, quien comprueba DENIEGA con este motivo; no hay plan B que dé por buena una firma."""
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        return ed25519, ""
+    except Exception:
+        return None, ("a este Python (%s) le falta la librería `cryptography`: no puedo comprobar "
+                      "la firma del permiso. Los hooks tienen que correr con el python3 de "
+                      "Homebrew (/opt/homebrew/bin/python3)" % sys.executable)
+
+
+def relanzar_si_falta_cripto():
+    """Para los HOOKS, antes de leer su entrada. Se lanzan por su shebang (`env python3`) y qué
+    python3 es ese lo decide el PATH que les dé el harness, que no está comprobado en todas las
+    formas de sesión. Si en modo Ed25519 a este intérprete le falta `cryptography` y el de
+    Homebrew existe, el hook se vuelve a lanzar con ese en vez de denegarlo todo. Una sola vez
+    (`BTP_SIN_RELANZAR` lo corta, y solo sirve para cortar: fail-closed)."""
+    if modo() != ALG or cripto()[0] or os.environ.get("BTP_SIN_RELANZAR"):
+        return
+    py = "/opt/homebrew/bin/python3"
+    if os.path.exists(py) and os.path.realpath(py) != os.path.realpath(sys.executable):
+        os.environ["BTP_SIN_RELANZAR"] = "1"
+        os.execv(py, [py] + sys.argv)
+
+
+def verificar(d):
+    """"" si `d` lleva una firma Ed25519 válida de la clave pública fijada; si no, el motivo."""
+    pub = publica()
+    if not pub:
+        return "no hay clave pública del firmante fijada"
+    if not isinstance(d, dict) or d.get("v") != V_PERMISO or d.get("alg") != ALG \
+            or not isinstance(d.get("firma"), str):
+        return "el permiso no es del formato que firma el firmante (¿de una versión anterior?)"
+    ed, motivo = cripto()
+    if not ed:
+        return motivo
+    try:
+        if d.get("kid") != kid(pub):
+            return "el permiso lo firmó otra clave, no la del firmante"
+        ed.Ed25519PublicKey.from_public_bytes(bytes.fromhex(pub)).verify(
+            bytes.fromhex(d["firma"]), _canon2(d))
+    except Exception:
+        return "el permiso no lleva la firma del firmante (escrito a mano, retocado o de otra clave)"
+    return ""
+
+
+def firma_ok(d, k=None):
+    """"" si la firma de `d` vale en el modo vigente (Ed25519 con la pública, o el HMAC de antes
+    con `k`); si no, el motivo."""
+    if modo() == ALG:
+        return verificar(d)
+    return "" if _mac_ok(d, k) else "el permiso no lleva la firma del hook que lee su mensaje"
+
+
+def llave(permitir_env=False):
+    """(lo que hace falta para COMPROBAR un permiso | None, motivo). En modo Ed25519 no hay
+    secreto que leer: basta la pública y la librería. En modo HMAC es la clave del Llavero."""
+    if modo() == ALG:
+        if not publica():
+            return None, "no hay clave pública del firmante fijada"
+        ed, motivo = cripto()
+        return (ALG, "") if ed else (None, motivo)
+    k, estado = clave_estado(permitir_env)
+    if k:
+        return k, ""
+    return None, ("no hay clave de firma en el Llavero" if estado == "no-existe" else
+                  "la clave de firma existe pero esta sesión no puede leerla (Llavero bloqueado "
+                  "o sesión remota por SSH)")
+
+
+def ts_de_linea(valor):
+    """La hora de una línea del transcript (`2026-10-13T10:00:00.123Z`, UTC), como la guarda un
+    permiso: ISO con zona y con sus milisegundos (identifica la línea: dos mensajes suyos no
+    comparten hora). None si no se entiende."""
+    try:
+        t = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if t.tzinfo is None:
+        return None
+    from datetime import timezone
+    return t.astimezone(timezone.utc).isoformat()
+
+
+def edad(ts):
+    """Segundos desde `ts`, o None si no se entiende. Los permisos del firmante llevan la hora
+    con zona (UTC, la de la línea del transcript); los del HMAC, hora local sin zona."""
+    try:
+        t = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if t.tzinfo is None:
+        return (datetime.now() - t).total_seconds()
+    from datetime import timezone
+    return (datetime.now(timezone.utc) - t).total_seconds()
 
 
 def _canon(d):
@@ -419,52 +599,159 @@ def _leer_ruta(ruta, k):
     if not isinstance(d, dict):
         _borrar_ruta(ruta)
         return None, "permiso ilegible"
-    if not _mac_ok(d, k):
+    if modo() == ALG and not cripto()[0]:
+        # Falta la librería en ESTE intérprete: no se puede comprobar, así que no vale; pero el
+        # permiso no se borra, porque el fallo es del entorno y no del permiso.
+        return None, cripto()[1]
+    pega = firma_ok(d, k)
+    if pega:
         # Escrito a mano, con otra clave o retocado: no vale y no se deja ahí para reintentar.
         _borrar_ruta(ruta)
-        return None, "el permiso no lleva la firma del hook que lee su mensaje"
+        return None, pega
     if d.get("origen") not in ORIGENES:
         _borrar_ruta(ruta)
         return None, "el permiso no nació de un mensaje suyo (origen %r)" % d.get("origen")
-    try:
-        edad = (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
-    except Exception:
+    if modo() == ALG and d.get("tipo") != "uso":
+        # El firmante firma SIEMPRE qué es lo que firma. Un `.lote2` copiado a `.ok2` llevaba una
+        # firma buena y valía como permiso general de un uso (verificacion, 14-oct-26).
+        _borrar_ruta(ruta)
+        return None, "ese permiso no es de un solo uso (es de otro tipo: %r)" % d.get("tipo")
+    seg = edad(d.get("ts"))
+    if seg is None:
         _borrar_ruta(ruta)
         return None, "permiso ilegible"
-    if edad > VIDA_S or edad < -60:
+    if seg > VIDA_S or seg < -60:
         _borrar_ruta(ruta)
         return None, "el permiso caducó"
     return d, ""
 
 
-def _usado(d):
+# ── el libro de usos ─────────────────────────────────────────────────────────────────────────
+# TODO lo que se gasta de un permiso vive aquí (14-oct-26), no en el propio permiso:
+#   · línea FINAL (sin `parcial`): ese mensaje suyo ya no abre nada más;
+#   · línea `parcial`: un uso de los varios que admite (web_novedad) o un ítem de un lote.
+# Todo se cuenta por (sesión, mensaje suyo), nunca por emisión del permiso: pedir otra vez la
+# firma del mismo mensaje no devuelve ni un uso ni un ítem.
+# Antes el contador iba DENTRO del permiso y había que refirmarlo en cada uso: quien lo usaba
+# necesitaba la clave de firma, y desde una sesión remota no la hay. Además se miraba «¿usado?»
+# y se apuntaba después, sin cerrojo y reescribiendo el fichero: dos usos a la vez pasaban los
+# dos. Ahora mirar y apuntar es UNA operación bajo `flock`.
+MAX_LIBRO = 500
+
+
+def _linea(d):
+    """La LÍNEA del transcript a la que apunta un permiso del firmante: su hora, que firma el
+    daemon y que quien valida coteja con el transcript. None en los permisos HMAC (ahí `ts` es
+    la hora de emisión)."""
+    return d.get("ts") if (d.get("v") == V_PERMISO and d.get("ts")) else None
+
+
+def _mia(u, d):
+    """¿Ese apunte del libro es del mismo mensaje suyo que `d`? Por `prompt_id`, y además por
+    LÍNEA (sesión + hora de la línea). Un mensaje ENCOLADO se localiza por el hash de su texto y
+    el `prompt_id` lo pone quien llama: sin la línea, tres ids inventados para un solo «Fusiona»
+    daban tres permisos y tres apuntes distintos (verificacion, 14-oct-26)."""
+    if not isinstance(u, dict) or u.get("session_id") != d.get("session_id"):
+        return False
+    if u.get("prompt_id") == d.get("prompt_id"):
+        return True
+    return bool(_linea(d)) and u.get("linea") == _linea(d)
+
+
+def _con_libro(fn, escribir=True):
+    """Corre `fn(entradas)` con el libro bajo cerrojo. `fn` devuelve (resultado, nuevas|None);
+    las nuevas se añaden antes de soltarlo. Se reescribe EN SITIO, sin renombrar: un `rename`
+    dejaría a quien espera el cerrojo esperando sobre un fichero que ya no es el libro."""
+    import fcntl
+    ruta = usados_path()
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    fd = os.open(ruta, (os.O_RDWR | os.O_CREAT) if escribir else os.O_RDONLY, 0o600)
     try:
-        with open(usados_path(), encoding="utf-8") as f:
-            for linea in f:
-                try:
-                    u = json.loads(linea)
-                except Exception:
-                    continue
-                if u.get("session_id") == d.get("session_id") and u.get("prompt_id") == d.get("prompt_id"):
-                    return True
+        fcntl.flock(fd, fcntl.LOCK_EX if escribir else fcntl.LOCK_SH)
+        with os.fdopen(os.dup(fd), "r", encoding="utf-8", errors="replace") as f:
+            lineas = f.read().splitlines()
+        entradas = []
+        for linea in lineas:
+            try:
+                entradas.append(json.loads(linea))
+            except Exception:
+                continue
+        resultado, nuevas = fn(entradas)
+        if nuevas and escribir:
+            lineas = (lineas + [json.dumps(n, ensure_ascii=False) for n in nuevas])[-MAX_LIBRO:]
+            datos = ("\n".join(lineas) + "\n").encode("utf-8")
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.ftruncate(fd, 0)
+            os.write(fd, datos)
+            os.fsync(fd)
+        return resultado
+    finally:
+        os.close(fd)            # cerrar suelta el cerrojo
+
+
+def _apunte(d, por, **mas):
+    a = {"ts": datetime.now().replace(microsecond=0).isoformat(),
+         "session_id": d.get("session_id"), "prompt_id": d.get("prompt_id"),
+         "nonce": d.get("nonce"), "por": por}
+    a.update(mas)
+    if _linea(d):
+        a["linea"] = _linea(d)
+    return a
+
+
+def _usado(d):
+    """¿Ese mensaje suyo ya está gastado del todo?"""
+    try:
+        return _con_libro(lambda es: (any(_mia(u, d) and not u.get("parcial") for u in es), None),
+                          escribir=False)
     except FileNotFoundError:
-        pass
-    return False
+        return False
+
+
+def consumir(d, por=""):
+    """Gasta el permiso entero. True si lo gasta ESTA llamada; False si ya estaba gastado.
+    Atómico: de dos llamadas a la vez, una y solo una recibe True."""
+    def _f(es):
+        if any(_mia(u, d) and not u.get("parcial") for u in es):
+            return False, None
+        return True, [_apunte(d, por)]
+    hecho = _con_libro(_f)
+    borrar(d.get("session_id"))
+    return hecho
 
 
 def marcar_usado(d, por=""):
-    ruta = usados_path()
+    """Lo deja gastado, lo estuviera ya o no. Quien necesite saber si el uso es suyo (antes de
+    dejar salir algo), que llame a `consumir`."""
+    consumir(d, por)
+
+
+def gastar_item(d, item, total, por="lote"):
+    """Un ítem de un lote. True si lo gasta ESTA llamada. Con el último, el lote queda gastado
+    del todo. Lo gastado se cuenta por (sesión, mensaje) y NO por emisión: si el firmante
+    volviera a emitir el lote de ese mismo mensaje (otro `nonce`), lo ya enviado sigue enviado."""
+    def _f(es):
+        mias = [u for u in es if _mia(u, d)]
+        if any(not u.get("parcial") for u in mias):
+            return False, None
+        gastados = {u.get("item") for u in mias if u.get("parcial") and u.get("item")}
+        if item in gastados:
+            return False, None
+        nuevas = [_apunte(d, por, parcial=True, item=item)]
+        if len(gastados) + 1 >= total:
+            nuevas.append(_apunte(d, por))
+        return True, nuevas
+    return _con_libro(_f)
+
+
+def items_gastados(d):
+    """Las huellas ya gastadas de ese lote."""
     try:
-        lineas = open(ruta, encoding="utf-8").read().splitlines()[-499:]
-    except Exception:
-        lineas = []
-    lineas.append(json.dumps({"ts": datetime.now().replace(microsecond=0).isoformat(),
-                              "session_id": d.get("session_id"), "prompt_id": d.get("prompt_id"),
-                              "nonce": d.get("nonce"), "por": por}, ensure_ascii=False))
-    os.makedirs(os.path.dirname(ruta), exist_ok=True)
-    with open(ruta, "w", encoding="utf-8") as f:
-        f.write("\n".join(lineas) + "\n")
-    borrar(d.get("session_id"))
+        return _con_libro(lambda es: ({u.get("item") for u in es if _mia(u, d) and u.get("parcial")
+                                       and u.get("item")},
+                                      None), escribir=False)
+    except FileNotFoundError:
+        return set()
 
 
 def _crudo(entrada):
@@ -545,6 +832,106 @@ def destinatarios(entrada):
     return fuera
 
 
+M_SIN_TRANSCRIPT = "no encuentro el transcript de la sesión"
+M_NO_ESTA = "su mensaje no está en el transcript como prompt humano"
+
+# Costura de los tests, SOLO en proceso (como `CLAVE_TEST`): nunca por entorno. Las tools que
+# comprueban el permiso las lanza el agente con el entorno que él elija; si la raíz saliera de
+# una variable (o de `HOME`, que es lo que mira `expanduser`), bastaría con apuntarla a una
+# carpeta suya para que un transcript escrito a mano contase.
+RAIZ_TRANSCRIPTS_TEST = None
+
+
+def raiz_transcripts():
+    """Donde Claude Code guarda los transcripts, en ruta REAL. La casa del usuario sale de la
+    base de usuarios del sistema (`pwd`), no de `HOME`."""
+    if RAIZ_TRANSCRIPTS_TEST:
+        return os.path.realpath(RAIZ_TRANSCRIPTS_TEST)
+    import pwd
+    return os.path.realpath(os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".claude", "projects"))
+
+
+def ruta_transcript(ruta, session_id):
+    """(ruta real | None, motivo). El transcript que vale es el de ESA sesión y vive donde los
+    escribe el harness (13-oct-26). Antes se abría la ruta que trajera el permiso, fuera la que
+    fuera: con un emisor lanzado a mano (o cualquier vía que firmase un puntero), un fichero
+    escrito en /tmp con una línea «humana» inventada servía de prueba, y /tmp no lo protege
+    ningún guard. Ahora tiene que:
+      · llamarse `<session_id>.jsonl` (el de otra sesión, o el de un subagente, no vale);
+      · no ser un enlace simbólico, ni llegar por uno a un fichero con otro nombre;
+      · estar, ya resuelto, dentro de `~/.claude/projects`."""
+    sid = str(session_id or "")
+    if not sid or _sid(sid) != sid:
+        return None, "el permiso no dice de qué sesión es"
+    nombre = sid + ".jsonl"
+    ruta = str(ruta or "")
+    if not os.path.isabs(ruta) or os.path.basename(ruta) != nombre:
+        return None, "el transcript del permiso no es el de su sesión"
+    if os.path.islink(ruta):
+        return None, "el transcript del permiso es un enlace, no el fichero de la sesión"
+    real = os.path.realpath(ruta)
+    if os.path.basename(real) != nombre:
+        return None, "el transcript del permiso no es el de su sesión"
+    if not real.startswith(raiz_transcripts() + os.sep):
+        return None, "el transcript del permiso no está donde Claude Code guarda los suyos"
+    return real, ""
+
+
+def transcripts_de(sesion):
+    """Las rutas REALES de los transcripts con el nombre de esa sesión (`<raíz>/<proyecto>/
+    <sesión>.jsonl`), cada una pasada por `ruta_transcript`. Puede haber más de una: el mismo id
+    de sesión aparece a veces en dos carpetas de proyecto (26 casos medidos el 14-oct-26)."""
+    raiz = raiz_transcripts()
+    halladas = []
+    try:
+        proyectos = sorted(os.listdir(raiz))
+    except Exception:
+        return []
+    for p in [""] + proyectos:
+        cand = os.path.join(raiz, p, str(sesion) + ".jsonl") if p else os.path.join(raiz, str(sesion) + ".jsonl")
+        if os.path.isfile(cand):
+            real, _motivo = ruta_transcript(cand, sesion)
+            if real:
+                halladas.append(real)
+    return sorted(set(halladas))
+
+
+def confirma(d, transcript=None):
+    """(ok, motivo, ctx): `contexto(d)` y además lo que hace falta para que aguante AUNQUE LA
+    FIRMA NO PROTEGIERA (clave privada filtrada, daemon equivocado):
+      · en modo Ed25519, la hora del permiso es la de su línea en el transcript;
+      · si quien llama sabe cuál es el transcript de la sesión (`transcript`, el que da el
+        harness al guard), la orden tiene que valer TAMBIÉN en ese, y ser la misma línea;
+      · CUALQUIER otra copia `<sesión>.jsonl` que contenga la orden y la rechace, la ANULA. Sin
+        esto, su «espera» dejaba de revocar si existía otra copia del transcript que no la
+        tuviera: bastaba con firmar contra la copia vieja (verificacion, 14-oct-26)."""
+    ok, motivo, ctx = contexto(d)
+    if not ok:
+        return False, motivo, dict()
+    if modo() == ALG and d.get("ts") != ctx.get("ts_linea"):
+        return False, "la hora del permiso no es la de su mensaje en el transcript", dict()
+    sesion = str(d.get("session_id") or "")
+    suyo = os.path.realpath(str(d.get("transcript_path") or ""))
+    if transcript and os.path.basename(str(transcript)) == sesion + ".jsonl":
+        # El daemon no sabe cuál de las copias es la que usa el harness; quien valida sí. La
+        # orden tiene que valer TAMBIÉN ahí, y ser la misma línea (misma hora).
+        real, _motivo = ruta_transcript(str(transcript), sesion)
+        if real != suyo:
+            ok3, m3, c3 = contexto(dict(d, transcript_path=real or str(transcript)))
+            if not ok3:
+                return False, "en el transcript de esta sesión la orden no vale: " + m3, dict()
+            if c3.get("ts_linea") != ctx.get("ts_linea"):
+                return False, "el permiso es de otra línea que la del transcript de esta sesión", dict()
+            ctx = c3
+    for otra in transcripts_de(sesion):
+        if otra == suyo:
+            continue
+        ok2, m2, _c = contexto(dict(d, transcript_path=otra))
+        if not ok2 and m2 not in (M_NO_ESTA, M_SIN_TRANSCRIPT):
+            return False, "otra copia del transcript de la sesión anula la orden: " + m2, dict()
+    return True, "", ctx
+
+
 def contexto(d):
     """Lee el transcript al que apunta el permiso y devuelve (ok, motivo, ctx).
 
@@ -553,10 +940,13 @@ def contexto(d):
     ruta = d.get("transcript_path") or ""
     if not ruta or not d.get("prompt_id"):
         return False, "el permiso no apunta a ningún mensaje suyo", {}
+    ruta, motivo = ruta_transcript(ruta, d.get("session_id"))
+    if not ruta:
+        return False, motivo, {}
     try:
         f = open(ruta, encoding="utf-8")
     except Exception:
-        return False, "no encuentro el transcript de la sesión", {}
+        return False, M_SIN_TRANSCRIPT, {}
     # Primero se recoge TODO en orden; después se elige cuál es su orden. Con los mensajes
     # encolados (sin promptId) la coincidencia se hace por el hash de su texto y puede aparecer
     # después de otro candidato: decidir sobre la marcha, como antes, se quedaba con el primero.
@@ -598,7 +988,7 @@ def contexto(d):
     humanos = [i for i, ev in enumerate(eventos) if ev[0] == "h"]
     candidatos = [i for i in humanos if _es_el_suyo(eventos[i])]
     if not candidatos:
-        return False, "su mensaje no está en el transcript como prompt humano", {}
+        return False, M_NO_ESTA, {}
     i_suyo = candidatos[-1]
     texto = eventos[i_suyo][2]
     if humanos[-1] != i_suyo:
@@ -629,7 +1019,12 @@ def contexto(d):
             drafts[e["draftId"]] = info
         if n == n_suyo - 1:          # hecho en la vuelta a la que ella contesta: lo tenía delante
             en_vista = info
+    e_suyo = eventos[i_suyo][1]
+    crudo = (_crudo(e_suyo) if e_suyo.get("type") == "user" else e_suyo["attachment"]["prompt"]) or ""
     return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(texto)},
+                      # La hora de SU línea (la pone el harness) y el texto tal cual llegó: lo que
+                      # usa el firmante para fechar el permiso y decidir si la orden es de lote.
+                      "ts_linea": ts_de_linea(e_suyo.get("timestamp")), "crudo": crudo,
                       "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
                       "cambios": [e for _, e in cambios], "alcance": alcance(texto),
                       "visto_textos": visto,
@@ -782,9 +1177,10 @@ def comprobar_envio(ctx, entrada, tool=""):
     return ""
 
 
-def validar(k, sesion=None):
+def validar(k, sesion=None, transcript=None):
     """(dict|None, motivo, ctx). Todo menos lo específico de la llamada. `sesion` = la del
-    PreToolUse; None cuando lo comprueba una tool (web_novedad), que no la conoce."""
+    PreToolUse; None cuando lo comprueba una tool (web_novedad), que no la conoce.
+    `transcript` = el `transcript_path` que da el harness al guard (ver `confirma`)."""
     d, motivo = leer(k, sesion)
     if not d:
         if sesion is not None and motivo == "nadie lo ha pedido en un mensaje":
@@ -802,7 +1198,7 @@ def validar(k, sesion=None):
     if _usado(d):
         borrar(d.get("session_id"))
         return None, "ese mensaje suyo ya abrió un envío", {}
-    ok, motivo, ctx = contexto(d)
+    ok, motivo, ctx = confirma(d, transcript)
     if not ok:
         borrar(d.get("session_id"))
         return None, motivo, {}
@@ -810,12 +1206,23 @@ def validar(k, sesion=None):
 
 
 def gastar_uno(d, k, maximo):
-    """Para web_novedad: su petición puede traer hasta `maximo` entradas. Re-firma el contador
-    (retocarlo a mano rompe la firma) y al agotarse lo marca como usado."""
+    """Para web_novedad: su petición puede traer hasta `maximo` entradas. El contador vive en el
+    libro (ver «el libro de usos»): retocar el permiso no devuelve usos, y no hace falta la clave
+    para apuntarlos (`k` se conserva por compatibilidad y no se usa). Lanza `PermissionError` si
+    ya estaba gastado: quien llama no deja salir nada."""
+    def _f(es):
+        mias = [u for u in es if _mia(u, d)]
+        if any(not u.get("parcial") for u in mias):
+            return 0, None
+        n = 1 + sum(1 for u in mias if u.get("parcial") and not u.get("item")
+                   )
+        return n, [_apunte(d, "web_novedad", parcial=n < maximo, uso=n)]
+    n = _con_libro(_f)
+    if not n:
+        borrar(d.get("session_id"))
+        raise PermissionError("ese mensaje suyo ya abrió todo lo que podía abrir")
+    if n >= maximo:
+        borrar(d.get("session_id"))
     d = dict(d)
-    d["usos"] = int(d.get("usos", 0)) + 1
-    if d["usos"] >= maximo:
-        marcar_usado(d, "web_novedad")
-    else:
-        _escribir(firmar(d, k))
+    d["usos"] = n
     return d

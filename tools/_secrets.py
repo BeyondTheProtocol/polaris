@@ -12,12 +12,24 @@ import json
 import os
 import subprocess
 
+# Ruta ABSOLUTA (13-oct-26). Con el nombre desnudo, el `security` que se ejecuta lo elige el PATH
+# de quien lanza la tool: un `security` falso en un directorio anterior recibiría el secreto que
+# se guarda (va en argv) y podría devolver el valor que quisiera al leer.
+# Test: tests/test_permiso_security_ruta.py.
+SECURITY = "/usr/bin/security"
+# Las claves que firman el permiso de salida no se leen ni se escriben por aquí (14-oct-26):
+# `_secrets.get("btp-firmante-ed25519")` desde cualquier script era la vía más corta para
+# sacarlas en una sesión local. Quien las necesita las lee él mismo (permiso_envio, firmante).
+RESERVADOS = frozenset(("btp-ok-envio-mac", "btp-firmante-ed25519"))
+
 
 def _keychain(service):
     """Devuelve el secreto del Llavero o None."""
+    if str(service or "").strip().lower() in RESERVADOS:
+        return None
     try:
         r = subprocess.run(
-            ["security", "find-generic-password", "-s", service, "-w"],
+            [SECURITY, "find-generic-password", "-s", service, "-w"],
             capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
             v = r.stdout.strip()
@@ -52,8 +64,10 @@ def set(service, valor, cuenta=None):
     valor = (valor or "").strip()
     if not valor:
         raise ValueError("secreto vacío: no se guarda")
+    if str(service or "").strip().lower() in RESERVADOS:
+        raise ValueError("esa clave firma el permiso de salida: no se escribe por aquí")
     cuenta = cuenta or os.environ.get("USER") or getpass.getuser()
-    r = subprocess.run(["security", "add-generic-password", "-U", "-a", cuenta,
+    r = subprocess.run([SECURITY, "add-generic-password", "-U", "-a", cuenta,
                         "-s", service, "-w", valor], capture_output=True, text=True, timeout=10)
     if r.returncode != 0:
         raise RuntimeError("el Llavero rechazó el secreto (rc=%d)" % r.returncode)

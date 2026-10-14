@@ -1,6 +1,11 @@
 {
  "_nota": "Fuente unica de daemons launchd. Lee esto ANTES de crear un plist nuevo (que trabajo ya esta cubierto?). Lo usa activar_daemon.py. concern = el TRABAJO, no el label; dos daemons con el mismo concern = duplicado. Regenera con tools/launchd/registro.py regenera (desde casa base).",
  "daemons": {
+  "com.btp.firmante": {
+   "script": "firmante.py",
+   "concern": "firmante-permiso-salida",
+   "nota": "Firma (Ed25519) el permiso de salida cuando el transcript confirma la orden de {{TITULAR}}. gui/501: necesita el Llavero. Ver tools/launchd/FIRMANTE.md."
+  },
   "com.btp.asistente-recordatorio": {
    "script": "run_agent.sh",
    "concern": "asistente-recordatorio",

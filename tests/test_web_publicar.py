@@ -59,9 +59,12 @@ def _fusiona(**kw):
         return _R(kw.pop("merge_rc", 0))
 
     gastos = []
-    viejo_marcar, viejo_uno = WP.P.marcar_usado, WP.P.gastar_uno
-    WP.P.marcar_usado = lambda d, por="": gastos.append(("uno", por))
-    WP.P.gastar_uno = lambda d, k, n: gastos.append(("varios", n))
+    # 14-oct-26: el uso único se gasta con `consumir` (mirar y apuntar bajo cerrojo), que dice si
+    # el uso es de esta llamada. `ya_gastado=True` simula que otra fusión se adelantó.
+    viejo_marcar, viejo_uno = WP.P.consumir, WP.P.gastar_uno
+    libre = not kw.pop("ya_gastado", False)
+    WP.P.consumir = lambda d, por="": (gastos.append(("uno", por)) or libre)
+    WP.P.gastar_uno = lambda d, k, n: (gastos.append(("varios", n)) or (d if libre else None))
     try:
         res = WP.fusionar(
             "auto/x", por="test", cwd=_TMP,
@@ -71,7 +74,7 @@ def _fusiona(**kw):
             _copy=lambda repo, base, cab: kw.pop("copy", ([], [])),
             _fetch=lambda repo, cab: None)
     finally:
-        WP.P.marcar_usado, WP.P.gastar_uno = viejo_marcar, viejo_uno
+        WP.P.consumir, WP.P.gastar_uno = viejo_marcar, viejo_uno
     llamadas["gastos"] = gastos
     return res, llamadas
 
@@ -119,7 +122,7 @@ class SinPermisoNoSale(unittest.TestCase):
 
     def test_sin_sesion_no_hay_permiso(self):
         viejo = (WP.P.hay_alguno, WP.P.clave)
-        WP.P.hay_alguno, WP.P.clave = (lambda: True), (lambda permitir_env=False: b"k")
+        WP.P.hay_alguno, WP.P.llave = (lambda: True), (lambda permitir_env=False: (b"k", ""))
         guardado = os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
         try:
             d, motivo, _, _ = WP.permiso("envio")
@@ -134,15 +137,15 @@ class SinPermisoNoSale(unittest.TestCase):
         """La deuda `web_novedad_permiso_sin_sesion`: `validar(k)` sin sesión cogía el permiso
         válido más reciente de CUALQUIER sesión."""
         pedidas = []
-        viejo = (WP.P.hay_alguno, WP.P.clave, WP.P.validar)
-        WP.P.hay_alguno, WP.P.clave = (lambda: True), (lambda permitir_env=False: b"k")
+        viejo = (WP.P.hay_alguno, WP.P.llave, WP.P.validar)
+        WP.P.hay_alguno, WP.P.llave = (lambda: True), (lambda permitir_env=False: (b"k", ""))
         WP.P.validar = lambda k, sesion=None: (pedidas.append(sesion) or (None, "no", {}))
         guardado = os.environ.get("CLAUDE_CODE_SESSION_ID")
         os.environ["CLAUDE_CODE_SESSION_ID"] = "sesion-de-prueba"
         try:
             WP.permiso("envio")
         finally:
-            WP.P.hay_alguno, WP.P.clave, WP.P.validar = viejo
+            WP.P.hay_alguno, WP.P.llave, WP.P.validar = viejo
             if guardado is None:
                 os.environ.pop("CLAUDE_CODE_SESSION_ID", None)
             else:
@@ -266,6 +269,15 @@ class ElMerge(unittest.TestCase):
         res, _ = _fusiona(merge_rc=1)
         self.assertFalse(res["merged"])
         self.assertIn("merge", res["motivo_no_merge"])
+
+    def test_si_otra_fusion_gasto_el_permiso_antes_no_se_fusiona(self):
+        """14-oct-26: el uso se reserva con cerrojo ANTES de fusionar. Si otra llamada se
+        adelantó, esta no llega a lanzar `gh pr merge`."""
+        for usos in (1, 3):
+            res, ll = _fusiona(ya_gastado=True, usos_max=usos)
+            self.assertFalse(res["merged"])
+            self.assertEqual(ll["merge"], [], "no se lanzó ningún merge")
+            self.assertIn("ya abrió", res["motivo_no_merge"])
 
     def test_queda_apuntado(self):
         _fusiona()

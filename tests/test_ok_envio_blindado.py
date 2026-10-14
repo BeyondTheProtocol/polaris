@@ -34,6 +34,8 @@ HOOKS = os.path.join(ROOT, ".claude", "hooks")
 SALIDA = os.path.join(HOOKS, "salida_guard.py")
 EMISOR = os.path.join(HOOKS, "ok_envio_prompt.py")
 MURO = os.path.join(HOOKS, "muro_guard.py")
+# Los hooks se lanzan con la costura de prueba puesta (raíz de transcripts temporal): ver _corre_hook.py.
+CORRE = os.path.join(ROOT, "tests", "_corre_hook.py")
 CASA = os.path.expanduser("~/claudecode")
 TOKEN_REAL = os.path.join(CASA, "tools", "state", "ok_envio.json")
 # 26-sep-26: un permiso por sesión, en tools/state/ok_envio/<sesión>.json.
@@ -57,7 +59,9 @@ class _Base(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="okenvio-")
-        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp, BTP_OK_ENVIO_CLAVE=CLAVE)
+        self.env = dict(os.environ, BTP_STATE_DIR=self.tmp, BTP_OK_ENVIO_CLAVE=CLAVE,
+                        BTP_TEST_RAIZ_TRANSCRIPTS=self.tmp,
+                        BTP_TEST_MODO="hmac")     # esta batería prueba el HMAC de antes, fijada o no la pública
         self.env.pop("MURO_PROFILE", None)
         self.sesion = str(uuid.uuid4())
         self.transcript = os.path.join(self.tmp, self.sesion + ".jsonl")
@@ -89,7 +93,7 @@ class _Base(unittest.TestCase):
     def _emitir(self, texto, pid, env=None, sesion=None):
         payload = {"hook_event_name": "UserPromptSubmit", "prompt": texto, "prompt_id": pid,
                    "session_id": sesion or self.sesion, "transcript_path": self.transcript}
-        return subprocess.run([sys.executable, EMISOR], input=json.dumps(payload),
+        return subprocess.run([sys.executable, CORRE, EMISOR], input=json.dumps(payload),
                               capture_output=True, text=True, timeout=60, env=env or self.env)
 
     def _ordenar(self, texto, **kw):
@@ -102,7 +106,7 @@ class _Base(unittest.TestCase):
         payload = {"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": entrada,
                    "session_id": sesion or self.sesion, "transcript_path": self.transcript,
                    "cwd": cwd, "permission_mode": "bypassPermissions"}
-        return _decision(subprocess.run([sys.executable, SALIDA], input=json.dumps(payload),
+        return _decision(subprocess.run([sys.executable, CORRE, SALIDA], input=json.dumps(payload),
                                         capture_output=True, text=True, timeout=60, env=self.env))
 
     def _enviar(self, entrada=None, tool="send_message", **kw):
@@ -620,6 +624,8 @@ class WebNovedadNoSeRompe(_Base):
         import permiso_envio
         import web_novedad
         permiso_envio.CLAVE_TEST = CLAVE.encode()
+        permiso_envio.RAIZ_TRANSCRIPTS_TEST = self.tmp
+        permiso_envio.MODO_TEST = "hmac"
         return importlib.reload(web_novedad)
 
     def tearDown(self):
@@ -630,6 +636,8 @@ class WebNovedadNoSeRompe(_Base):
             os.environ["CLAUDE_CODE_SESSION_ID"] = self._sesion_real
         import permiso_envio
         permiso_envio.CLAVE_TEST = None
+        permiso_envio.RAIZ_TRANSCRIPTS_TEST = None
+        permiso_envio.MODO_TEST = None
 
     def test_la_clave_por_entorno_no_vale_para_web_novedad(self):
         """`BTP_OK_ENVIO_CLAVE=x python3 tools/web_novedad.py` no puede validar un permiso
@@ -658,13 +666,24 @@ class WebNovedadNoSeRompe(_Base):
         self.assertFalse(wn.lo_pide_titular()[0])
 
     def test_el_contador_de_usos_no_se_puede_rebobinar(self):
+        """Reescrito el 14-oct-26. Antes el contador iba dentro del permiso, firmado, y
+        retocarlo rompía la firma. Ahora vive en el libro de usos: poner `usos` a cero en el
+        fichero del permiso, tras cada uso, no devuelve ninguno. Salen tres y ni uno más."""
         self._ordenar("añádelo a la cronología: hoy hemos abierto novedades")
         wn = self._wn()
-        self.assertTrue(wn.lo_pide_titular()[0])
         ruta = self._token()
-        d = json.load(open(ruta, encoding="utf-8"))
-        d["usos"] = 0
-        json.dump(d, open(ruta, "w", encoding="utf-8"))
+        copia = open(ruta, encoding="utf-8").read()
+        for i in range(3):
+            self.assertTrue(wn.lo_pide_titular()[0], "uso %d" % (i + 1))
+            if os.path.exists(ruta):
+                d = json.load(open(ruta, encoding="utf-8"))
+                d["usos"] = 0
+                json.dump(d, open(ruta, "w", encoding="utf-8"))
+        self.assertFalse(wn.lo_pide_titular()[0])
+        # Ni siquiera devolviendo al disco el permiso tal como se emitió, con su firma intacta.
+        os.makedirs(os.path.dirname(ruta), exist_ok=True)
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.write(copia)
         self.assertFalse(wn.lo_pide_titular()[0])
 
 
@@ -702,7 +721,7 @@ class DosSesionesNoSePisan(_Base):
                    "tool_input": {"to": ["alguien@hospital.org"], "subject": "s", "body": "b"},
                    "session_id": self.sesion, "transcript_path": self.transcript, "cwd": CASA,
                    "permission_mode": "bypassPermissions"}
-        r = subprocess.run([sys.executable, SALIDA], input=json.dumps(payload),
+        r = subprocess.run([sys.executable, CORRE, SALIDA], input=json.dumps(payload),
                            capture_output=True, text=True, timeout=60, env=self.env)
         self.assertEqual(_decision(r), "deny")
         self.assertIn("no abrió permiso", r.stdout)

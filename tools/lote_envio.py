@@ -228,7 +228,8 @@ def parsear(textos):
 
 # ── el permiso de lote (puntero firmado) ─────────────────────────────────────────────────────
 def ruta(sesion):
-    return os.path.join(P.dir_permisos(), P._sid(sesion) + EXT)
+    """`.lote2` para los lotes que firma el firmante: mismo motivo que `.ok2` en `permiso_envio`."""
+    return os.path.join(P.dir_permisos(), P._sid(sesion) + (EXT + "2" if P.modo() == P.ALG else EXT))
 
 
 def _guardar(d, k):
@@ -337,31 +338,53 @@ def ventana_abierta(transcript_path, prompt_id="", prompt=""):
     return textos
 
 
+def evaluar(prompt, prompt_id, transcript_path):
+    """(qué, items, motivo) sin firmar ni escribir nada. qué: "no" (no hay manifiesto delante:
+    flujo de siempre) | "invalido" | "no-es-orden" | "abre". Lo usan el emisor de antes
+    (`intentar_abrir`) y el firmante, que decide él si la orden es de lote."""
+    textos = ventana_abierta(transcript_path, prompt_id, prompt) if transcript_path else None
+    if textos is None or not any(_INI.search(t) for t in textos):
+        return "no", None, ""
+    items, motivo = parsear(textos)
+    if not items:
+        return "invalido", None, motivo
+    if not es_orden_de_lote(prompt, [it["para"] for it in items]):
+        return "no-es-orden", None, ""
+    return "abre", items, ""
+
+
+def aviso_de(que, motivo="", n=0):
+    """El texto que ve la sesión para cada resultado de `evaluar` (None si no hay nada que decir)."""
+    if que == "invalido":
+        return ("El lote que tenía delante no es válido%s: no se abre ningún lote."
+                % ((" (%s)" % motivo) if motivo else ""))
+    if que == "no-es-orden":
+        return ("Hay un lote de envío delante, pero su mensaje elige, nombra a alguien, cambia, espera "
+                "o no manda claramente enviar TODO el lote: no se abre ningún lote. Solo abre un mensaje "
+                "que sea SOLO la orden corta: " + FRASES_VALIDAS + ". Enséñale el lote tal como "
+                "quedaría y que la dé así.")
+    if que == "abre":
+        return ("🔓 {{TITULAR}} ha dado la orden para el LOTE de %d envíos que tenía delante. Salen SOLO "
+                "esos: por cada uno, UN `browser_batch` con navigate al hilo, "
+                "`type` con el texto exacto y Enter (sin ningún clic), todo con el mismo tabId. 15 "
+                "minutos, cada ítem un solo uso. Mientras dure, teclear o rellenar cualquier otra "
+                "cosa se deniega. Si escribe otro mensaje, el lote se cancela." % n)
+    return None
+
+
 def intentar_abrir(prompt, session_id, prompt_id, transcript_path, k):
     """(abierto, aviso|None). `aviso` None = no había manifiesto delante (flujo de siempre, sin
     ruido). Si hay manifiesto y su orden es de lote, abre el permiso de lote (y el llamador NO abre
     el de un solo uso: este permiso no vale para correo, Bash ni gh)."""
-    textos = ventana_abierta(transcript_path, prompt_id, prompt) if transcript_path else None
-    if textos is None or not any(_INI.search(t) for t in textos):
-        return False, None
-    items, motivo = parsear(textos)
-    if not items:
-        return False, "El lote que tenía delante no es válido (%s): no se abre ningún lote." % motivo
-    if not es_orden_de_lote(prompt, [it["para"] for it in items]):
-        return False, ("Hay un lote de envío delante, pero su mensaje elige, nombra a alguien, cambia, espera "
-                       "o no manda claramente enviar TODO el lote: no se abre ningún lote. Solo abre un mensaje "
-                       "que sea SOLO la orden corta: " + FRASES_VALIDAS + ". Enséñale el lote tal como "
-                       "quedaría y que la dé así.")
+    que, items, motivo = evaluar(prompt, prompt_id, transcript_path)
+    if que != "abre":
+        return False, aviso_de(que, motivo)
     d = {"tipo": "lote", "ts": datetime.now().replace(microsecond=0).isoformat(),
          "session_id": session_id or "", "prompt_id": prompt_id or "",
          "hash_prompt": P._hash_texto(prompt), "transcript_path": transcript_path or "",
          "nonce": secrets.token_hex(8), "n": len(items), "gastados": []}
     _guardar(d, k)
-    return True, ("🔓 {{TITULAR}} ha dado la orden para el LOTE de %d envíos que tenía delante. Salen SOLO "
-                  "esos: por cada uno, UN `browser_batch` con navigate al hilo, "
-                  "`type` con el texto exacto y Enter (sin ningún clic), todo con el mismo tabId. 15 "
-                  "minutos, cada ítem un solo uso. Mientras dure, teclear o rellenar cualquier otra "
-                  "cosa se deniega. Si escribe otro mensaje, el lote se cancela." % len(items))
+    return True, aviso_de("abre", n=len(items))
 
 
 def _leer(k, sesion):
@@ -374,12 +397,11 @@ def _leer(k, sesion):
     except Exception:
         _quitar(sesion)
         return None
-    if not isinstance(d, dict) or not P._mac_ok(d, k):
+    if not isinstance(d, dict) or P.firma_ok(d, k):
         _quitar(sesion)
         return None
-    try:
-        edad = (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
-    except Exception:
+    edad = P.edad(d.get("ts"))
+    if edad is None:
         _quitar(sesion)
         return None
     if d.get("tipo") != "lote" or d.get("session_id") != sesion or edad > VIDA_S or edad < -60:
@@ -504,16 +526,18 @@ def decidir(datos):
     try:
         if not _toca_texto(tool, entrada):
             return None
-        k = P.clave(permitir_env=True)
+        k, sin_llave = P.llave(permitir_env=True)
         if not k:
-            return "denegar", "hay un lote abierto pero no puedo leer la clave que lo firma"
+            return "denegar", "hay un lote abierto pero no puedo comprobar su firma (%s)" % sin_llave
         d = _leer(k, sesion)
         if not d:
             return None          # caducó o no valía: se borra y se vuelve a lo de siempre
         if P._usado(d):
             _quitar(sesion)
             return None
-        ok, _motivo, ctx = P.contexto(d)
+        # `confirma`: su línea y su hora, el transcript que da el harness, y que ninguna otra
+        # copia del transcript de la sesión anule la orden.
+        ok, _motivo, ctx = P.confirma(d, datos.get("transcript_path"))
         if not ok:
             _quitar(sesion)
             return None          # escribió otra cosa después, o el transcript no lo confirma
@@ -521,19 +545,19 @@ def decidir(datos):
         if not items or len(items) != d.get("n"):
             _quitar(sesion)
             return "denegar", "el manifiesto que ella tenía delante ya no es el del lote (%s)" % (motivo or "distinto")
-        gastados = set(d.get("gastados") or [])
+        # Lo gastado vive en el libro (14-oct-26), no en el fichero del lote: apuntar un ítem ya
+        # no exige refirmar, así que no hace falta la clave en la sesión que envía.
+        gastados = P.items_gastados(d)
         pend = [it for it in items if it["huella"] not in gastados]
         if not pend:
             return "denegar", "el lote ya está entero enviado"
         it, motivo = _casa_con_item(tool, entrada, pend)
         if not it:
             return "denegar", "no casa con ningún ítem pendiente del lote: " + motivo
-        d["gastados"] = sorted(gastados | {it["huella"]})
-        if len(d["gastados"]) >= len(items):
-            P.marcar_usado(d, "lote")        # agotado: queda en el libro
-            _quitar(sesion)
-        else:
-            _guardar(d, k)
+        if not P.gastar_item(d, it["huella"], len(items)):
+            return "denegar", "ese ítem del lote ya salió"       # otra llamada se adelantó
+        if len(gastados) + 1 >= len(items):
+            _quitar(sesion)                  # agotado: queda en el libro
         return "permitir", "ítem %d de %d (%s)" % (it["n"], len(items), it["para"])
     except Exception as e:                  # fail-closed: con el lote vivo, ante un error no se teclea
         return "denegar", "no he podido comprobar el lote (%s)" % type(e).__name__

@@ -38,11 +38,11 @@ def estado():
     if not P.hay_alguno():
         print("sin permiso abierto (todo lo que sale al mundo está denegado).")
         return 0
-    d, motivo, _ctx = P.validar(P.clave())
+    d, motivo, _ctx = P.validar(P.llave()[0])
     if not d:
         print("había un fichero de permiso, pero NO vale (%s); lo borro." % motivo)
         return 0
-    quedan = VIDA_S - (datetime.now() - datetime.fromisoformat(d["ts"])).total_seconds()
+    quedan = VIDA_S - (P.edad(d["ts"]) or 0)
     print("permiso ABIERTO para: %s\nle quedan %d s (un solo uso, solo en la sesión donde lo "
           "pidió y solo para lo que aprobó)." % (d.get("motivo", "?"), quedan))
     return 0
