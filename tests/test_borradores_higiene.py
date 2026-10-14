@@ -101,8 +101,9 @@ class FakeIMAP:
                     continue
                 thrid, ts, raw = fuente[u]
                 cab, cuerpo = self._split(raw)
-                meta = ('%d (UID %d X-GM-THRID %s INTERNALDATE "%s" BODY[HEADER] {%d}'
-                        % (u, u, thrid, _fecha(ts).strip('"'), len(cab))).encode()
+                etiqueta = "BODY[HEADER]" if en_drafts else "BODY[HEADER.FIELDS (TO CC)]"   # como Gmail real
+                meta = ('%d (UID %d X-GM-THRID %s INTERNALDATE "%s" %s {%d}'
+                        % (u, u, thrid, _fecha(ts).strip('"'), etiqueta, len(cab))).encode()
                 data.append((meta, cab))
                 if en_drafts:
                     data.append((b" BODY[TEXT]<0> {%d}" % len(cuerpo), cuerpo))
@@ -272,6 +273,22 @@ try:
     check("sin contraseña: _conectar devuelve None", H._conectar("titular.mgp@gmail.com", "svc") is None)
 finally:
     H._secrets.get = _orig[1]
+# 14-oct-26 · la 1ª pasada real marcó 42/42 como basura: Gmail no garantiza el orden de los ítems.
+# (a) el cuerpo llega ANTES que la cabecera → se elige cada literal por su etiqueta, no por posición.
+cab = b"To: Dan <dan@onco.example>\r\nSubject: Curative\r\n\r\n"
+data = [(b'7 (UID 7 X-GM-THRID 55 INTERNALDATE "14-Oct-2026 09:00:00 +0000" BODY[TEXT]<0> {12}', b"Hola Dan, si"),
+        (b" BODY[HEADER] {%d}" % len(cab), cab), b")"]
+d = H._parse_fetch(data)[7]
+check("orden Gmail: _parte coge la cabecera aunque venga 2ª", H._parte(d, b"BODY[HEADER]") == cab)
+check("orden Gmail: _parte coge el cuerpo aunque venga 1º", H._parte(d, b"BODY[TEXT]") == b"Hola Dan, si")
+check("sin la etiqueta pedida devuelve None (no se juzga)", H._parte(d, b"BODY[HEADER.FIELDS") is None)
+
+# (b) freno: si una pasada quiere mover más del 30 % de la bandeja, no mueve nada.
+M, res = correr({i: borrador(1, to="", asunto="x%d" % i) for i in range(1, 11)}, aplicar=True)
+r0 = res["resultados"][0]
+check("freno: 10/10 basura → frenado, 0 movidos", r0.get("frenado") == 10 and not r0["movidos"])
+check("freno: ninguna escritura IMAP", not M.escrituras)
+
 msgs = []
 res = H.pasada(ahora=AHORA, conectar=lambda u, s: None, out=msgs.append)
 check("sin contraseña: se salta con aviso", len(res["saltadas"]) == len(OB.ACCOUNTS) and msgs)

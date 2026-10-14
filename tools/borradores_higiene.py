@@ -59,6 +59,8 @@ DIAS_ESCALAR_PROTEGIDO = 14
 # Huella sha256 de la dirección de la antigua coordinadora de prensa (14-oct-26): sin PII en claro.
 CC_AVISO_SHA = {"8b8fd06095ad30a0aa7d8f1ebe68865f0c34fb8d6b68fabe4b5a07cd3690b4ec"}
 LOTE_FETCH = 25
+FRENO_MIN = 5            # por debajo de esto nunca frena
+FRENO_FRACCION = 0.30    # más del 30 % de la bandeja a la Papelera en una pasada = algo va mal
 
 DOMINIOS_PROTEGIDOS = (
     "{{CENTRO}}.net", "dfci.harvard.edu", "carm.es", "usz.ch", "{{CENTRO}}.ch", "chuv.ch",
@@ -137,7 +139,7 @@ def _parse_fetch(data):
     """Respuesta de un UID FETCH → {uid: {"thrid", "ts", "literales": [bytes, …]}}.
     Mira todos los trozos (Gmail pone UID/THRID antes o después del literal)."""
     out = {}
-    estado = {"literales": None, "meta": []}
+    estado = {"literales": None, "meta": [], "partes": []}
 
     def cierra():
         if estado["literales"] is None:
@@ -155,21 +157,32 @@ def _parse_fetch(data):
             except Exception:
                 ts = 0.0
         out[int(mu.group(1))] = {"thrid": mt.group(1).decode() if mt else "", "ts": ts,
-                                 "literales": estado["literales"]}
+                                 "literales": estado["literales"], "partes": estado["partes"]}
 
     for item in data or []:
         if isinstance(item, tuple):
             prefijo, lit = item[0], item[1]
             if re.match(rb"^\s*\d+ \(", prefijo):
                 cierra()
-                estado["literales"], estado["meta"] = [], []
+                estado["literales"], estado["meta"], estado["partes"] = [], [], []
             if estado["literales"] is not None:
                 estado["meta"].append(prefijo)
                 estado["literales"].append(lit)
+                estado["partes"].append((prefijo, lit))
         elif isinstance(item, bytes) and estado["literales"] is not None:
             estado["meta"].append(item)
     cierra()
     return out
+
+
+def _parte(d, etiqueta):
+    """El literal cuya cabecera de FETCH lleva `etiqueta` (p. ej. b"BODY[HEADER]"), venga en el
+    orden que venga. Gmail no garantiza el orden de los ítems: elegir por posición vació los
+    destinatarios de los 42 borradores reales en la primera pasada (14-oct-26)."""
+    for prefijo, lit in d.get("partes") or []:
+        if etiqueta in prefijo.upper():
+            return lit or b""
+    return None
 
 
 def _uids(M, *criterio):
@@ -221,8 +234,10 @@ def leer_borradores(M):
         d = datos.get(uid)
         if not d or not d["literales"]:
             continue
-        cab = d["literales"][0]
-        texto = _texto_de(cab, d["literales"][1] if len(d["literales"]) > 1 else b"")
+        cab = _parte(d, b"BODY[HEADER]")
+        if cab is None:                       # sin cabecera identificable: no se juzga, no se toca
+            continue
+        texto = _texto_de(cab, _parte(d, b"BODY[TEXT]") or b"")
         h = email.message_from_bytes(cab, policy=email.policy.default)
         borradores.append({
             "uid": uid, "thrid": d["thrid"], "ts": d["ts"],
@@ -245,7 +260,7 @@ def leer_enviados(M, desde_ts):
     datos = _fetch(M, uids, "(X-GM-THRID INTERNALDATE BODY.PEEK[HEADER.FIELDS (TO CC)])")
     out = []
     for d in datos.values():
-        cab = email.message_from_bytes(d["literales"][0] if d["literales"] else b"",
+        cab = email.message_from_bytes(_parte(d, b"BODY[HEADER.FIELDS") or _parte(d, b"BODY[HEADER]") or b"",
                                        policy=email.policy.default)
         out.append({"thrid": d["thrid"], "ts": d["ts"],
                     "to": _emails(str(cab.get("To") or "")) + _emails(str(cab.get("Cc") or ""))})
@@ -431,8 +446,13 @@ def revisar_cuenta(M, cuenta, ahora, aplicar):
     enviados = leer_enviados(M, min(fechas) if fechas else ahora)
     decisiones = clasificar(borradores, enviados, ahora, cuenta)
     movidos = []
+    quieren = [d for d in decisiones if d["accion"] == "papelera"]
+    if len(quieren) > max(FRENO_MIN, FRENO_FRACCION * len(borradores)):
+        # Freno: una pasada que quiere vaciar media bandeja es casi seguro un fallo de lectura,
+        # no basura real. No se mueve nada y se avisa (14-oct-26: la 1ª pasada real marcó 42/42).
+        return {"cuenta": cuenta, "total": len(borradores), "decisiones": decisiones, "movidos": [],
+                "frenado": len(quieren)}
     if aplicar:
-        quieren = [d for d in decisiones if d["accion"] == "papelera"]
         hechos = set(mover_a_papelera(M, carpeta, [d["uid"] for d in quieren]))
         movidos = [d for d in quieren if d["uid"] in hechos]
     return {"cuenta": cuenta, "total": len(borradores), "decisiones": decisiones, "movidos": movidos}
@@ -481,6 +501,9 @@ def _informe(res, aplicar, out=print):
     out("== Higiene de Borradores (%s) ==" % ("APLICADO" if aplicar else "dry-run: no se toca nada"))
     for r in res["resultados"]:
         out("%s: %d borradores" % (r["cuenta"], r["total"]))
+        if r.get("frenado"):
+            out("  ⛔ FRENADO: quería mover %d de %d (> %d %%). No se mueve nada: revisar la lectura."
+                % (r["frenado"], r["total"], int(FRENO_FRACCION * 100)))
         for d in r["decisiones"]:
             etiqueta = {"papelera": "PAPELERA", "escalar": "A VEGA  ", "aviso": "AVISO   "}[d["accion"]]
             marca = " [movido]" if d in r["movidos"] else ""
