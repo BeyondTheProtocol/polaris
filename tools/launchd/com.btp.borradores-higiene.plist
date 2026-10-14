@@ -15,7 +15,7 @@
   <key>ProgramArguments</key><array>
     <string>/usr/bin/python3</string>
     <string>/Users/polaris/claudecode/tools/borradores_higiene.py</string>
-    <string>--dry-run</string>
+    <string>--apply</string>
   </array>
   <key>StartCalendarInterval</key><dict>
     <key>Hour</key><integer>7</integer>

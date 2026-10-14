@@ -289,6 +289,10 @@ r0 = res["resultados"][0]
 check("freno: 10/10 basura → frenado, 0 movidos", r0.get("frenado") == 10 and not r0["movidos"])
 check("freno: ninguna escritura IMAP", not M.escrituras)
 
+# cita de Gmail partida en dos líneas: la «call» del remitente no cuenta como propuesta suya
+txt = "Email works best for me.\n\nOn Tue, Oct 13, 2026 at 11:50 PM Lexie <\nlexie@ia.example> wrote:\n> I'd love to set up a quick call"
+check("cita partida: se corta antes de «wrote:»", "call" not in H._cuerpo_propio(txt) and "Email works" in H._cuerpo_propio(txt))
+
 msgs = []
 res = H.pasada(ahora=AHORA, conectar=lambda u, s: None, out=msgs.append)
 check("sin contraseña: se salta con aviso", len(res["saltadas"]) == len(OB.ACCOUNTS) and msgs)

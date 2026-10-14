@@ -76,6 +76,7 @@ RE_NO_ENVIAR = re.compile(r"NO\s+ENVIAR|descartado", re.I)
 RE_PREFIJO_ASUNTO = re.compile(r"^\s*((re|fwd?|rv|rf|enc)\s*(\[\d+\])?\s*:\s*)+", re.I)
 RE_INICIO_CITA = re.compile(
     r"^(on .{5,200} wrote:|el .{5,200} escribi[oó]:|-{2,}\s*(original|forwarded|mensaje)\b.*)\s*$", re.I)
+RE_CITA_PARTIDA = re.compile(r"(?im)^[ \t]*(on|el)[ \t][^\n]{5,200}\n[^\n]{0,200}(wrote|escribi[oó]):[ \t]*$")
 RE_CIERRE = re.compile(
     r"^(saludos|un abrazo|abrazos|gracias|muchas gracias|best|best regards|regards|kind regards|"
     r"cheers|titular|titular gonz[aá]lez|m\.?)[\s,.!;:-]*$", re.I)
@@ -99,8 +100,13 @@ def _dominio_protegido(addr):
 
 def _cuerpo_propio(texto):
     """Lo que escribió ella: sin líneas citadas (`>`) ni lo que cuelga de «On … wrote:»."""
+    texto = texto or ""
+    # Gmail parte «On Tue, … Lexie <\nlexie@…> wrote:» en dos líneas: se corta también ahí.
+    m = RE_CITA_PARTIDA.search(texto)
+    if m:
+        texto = texto[:m.start()]
     out = []
-    for ln in (texto or "").splitlines():
+    for ln in texto.splitlines():
         if RE_INICIO_CITA.match(ln.strip()):
             break
         if ln.lstrip().startswith(">"):
