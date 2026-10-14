@@ -293,6 +293,13 @@ check("freno: ninguna escritura IMAP", not M.escrituras)
 txt = "Email works best for me.\n\nOn Tue, Oct 13, 2026 at 11:50 PM Lexie <\nlexie@ia.example> wrote:\n> I'd love to set up a quick call"
 check("cita partida: se corta antes de «wrote:»", "call" not in H._cuerpo_propio(txt) and "Email works" in H._cuerpo_propio(txt))
 
+# borrador HTML de Gmail: la cita va en gmail_quote y no debe contar como texto propio
+html = ('<p>Email works best for me.</p><div class="gmail_extra"><div>On Wed, Lexie wrote:<blockquote '
+        'class="gmail_quote">I\'d love to set up a quick call</blockquote></div></div>')
+cab_h = b"To: lexie@ia.example\r\nSubject: Re: x\r\nContent-Type: text/html; charset=utf-8\r\n"
+t = H._texto_de(cab_h, html.encode())
+check("HTML Gmail: la cita en gmail_quote no entra en el texto", "call" not in t and "Email works" in t)
+
 msgs = []
 res = H.pasada(ahora=AHORA, conectar=lambda u, s: None, out=msgs.append)
 check("sin contraseña: se salta con aviso", len(res["saltadas"]) == len(OB.ACCOUNTS) and msgs)

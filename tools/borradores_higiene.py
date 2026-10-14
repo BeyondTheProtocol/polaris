@@ -76,6 +76,7 @@ RE_NO_ENVIAR = re.compile(r"NO\s+ENVIAR|descartado", re.I)
 RE_PREFIJO_ASUNTO = re.compile(r"^\s*((re|fwd?|rv|rf|enc)\s*(\[\d+\])?\s*:\s*)+", re.I)
 RE_INICIO_CITA = re.compile(
     r"^(on .{5,200} wrote:|el .{5,200} escribi[oó]:|-{2,}\s*(original|forwarded|mensaje)\b.*)\s*$", re.I)
+RE_CITA_HTML = re.compile(r"(?is)<div[^>]*class=[\"']?gmail_(?:extra|quote)|<blockquote")
 RE_CITA_PARTIDA = re.compile(r"(?im)^[ \t]*(on|el)[ \t][^\n]{5,200}\n[^\n]{0,200}(wrote|escribi[oó]):[ \t]*$")
 RE_CIERRE = re.compile(
     r"^(saludos|un abrazo|abrazos|gracias|muchas gracias|best|best regards|regards|kind regards|"
@@ -135,6 +136,9 @@ def _texto_de(raw_header, raw_text):
             return ""
         txt = parte.get_content() if parte.get_content_maintype() == "text" else ""
         if parte.get_content_type() == "text/html":
+            # Lo citado de Gmail va en <div class="gmail_extra/gmail_quote"> o <blockquote>: fuera
+            # antes de quitar etiquetas, o se pega al texto propio (14-oct: la «call» de Lexie).
+            txt = RE_CITA_HTML.split(txt, maxsplit=1)[0]
             txt = re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style).*?</\1>", " ", txt))
         return txt
     except Exception:
