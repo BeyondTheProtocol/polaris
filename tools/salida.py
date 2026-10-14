@@ -592,10 +592,11 @@ def _audit(channel, action, dest, veredicto, motivo, n, extra=None):
         sys.stderr.write("salida: aviso, no pude auditar: %r\n" % (e,))
 
 
-def _draft(channel, action, dest, text, reason, avisos=None):
+def _draft(channel, action, dest, text, reason, avisos=None, sellado=None):
     """Escribe el borrador en el outbox (atómico) y devuelve su id. «A un clic».
     Si hay `avisos` de posible fuga (léxico/PII), se guardan en el payload para que
-    {{TITULAR}} los VEA al revisar antes de aprobar."""
+    {{TITULAR}} los VEA al revisar antes de aprobar. `sellado` son datos extra que la aprobación
+    también ata (para la web: PR, commit y huella del texto)."""
     os.makedirs(PENDING, exist_ok=True)
     ts = _now_iso().replace(":", "")
     sufx = _dest_hash("%s|%s|%s" % (channel, dest, text)) or "x"
@@ -605,9 +606,11 @@ def _draft(channel, action, dest, text, reason, avisos=None):
     # `_nuevo_nonce`). El nonce en claro va SOLO a {{TITULAR}} por Telegram (`_avisar_nonce`).
     payload = {"creado": _now_iso(), "canal": channel, "accion": action,
                "dest": dest, "texto": text, "motivo": reason, "estado": "pendiente_OK"}
-    nonce = _nuevo_nonce(payload)
     if avisos:
         payload["avisos_fuga"] = list(avisos)
+    if sellado:
+        payload["sellado"] = sellado
+    nonce = _nuevo_nonce(payload)        # después de todo lo que se sella: la huella lo cubre
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -627,33 +630,63 @@ def _draft(channel, action, dest, text, reason, avisos=None):
 _NONCE_BYTES = 8
 _NONCE_ITER = 200_000
 _NONCE_MAX_FALLOS = 5
+# EL SELLO CUBRE EL CONTENIDO (14-oct-2026, red-team de `verificacion` sobre el plan «guardián de
+# la web» v3). Hasta hoy el sello era solo del nonce: el texto, el destino y el canal quedaban en
+# `pending/*.json` sin proteger, y cualquier proceso con su usuario podía cambiarlos entre el aviso
+# y su «aprobar». Ella aprobaba lo que leyó y salía otra cosa. Afectaba ya a los DM de Instagram.
+# Ahora el sello se calcula sobre nonce + HUELLA del contenido: tocar un campo sellado lo invalida,
+# y rehacer el sello exige el nonce, que solo está en su chat.
+_SELLO_V = 2
+_CAMPOS_SELLADOS = ("canal", "accion", "dest", "texto", "avisos_fuga", "sellado")
+# Un «sí» de hace días no es un «sí» a lo de hoy. Pasado esto, se vuelve a preparar.
+_VIDA_BORRADOR_S = 48 * 3600
 
 
-def _sellar_nonce(nonce):
+def _huella(d):
+    """sha256 del contenido que la aprobación ata, en JSON canónico."""
+    datos = {k: d.get(k) for k in _CAMPOS_SELLADOS}
+    return hashlib.sha256(json.dumps(datos, ensure_ascii=False, sort_keys=True,
+                                     separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def _sellar_nonce(nonce, huella):
     sal = os.urandom(16)
-    h = hashlib.pbkdf2_hmac("sha256", nonce.encode(), sal, _NONCE_ITER).hex()
-    return {"sal": sal.hex(), "h": h, "iter": _NONCE_ITER}
+    h = hashlib.pbkdf2_hmac("sha256", ("%s|%s" % (nonce, huella)).encode(), sal, _NONCE_ITER).hex()
+    return {"sal": sal.hex(), "h": h, "iter": _NONCE_ITER, "v": _SELLO_V}
 
 
 def _nuevo_nonce(d):
-    """Pone en `d` el sello de un nonce nuevo (y quita cualquier nonce en claro). Devuelve el nonce."""
+    """Pone en `d` el sello de un nonce nuevo, atado a su contenido (y quita cualquier nonce en
+    claro). Devuelve el nonce. Se llama DESPUÉS de poner todo lo que se sella."""
     nonce = os.urandom(_NONCE_BYTES).hex()
     d.pop("nonce", None)
-    d["nonce_sello"] = _sellar_nonce(nonce)
+    d["nonce_sello"] = _sellar_nonce(nonce, _huella(d))
     d["fallos"] = 0
     return nonce
 
 
 def _nonce_ok(d, nonce):
     s = d.get("nonce_sello")
-    if not isinstance(s, dict) or not nonce:
-        return False                  # un borrador viejo con nonce en claro ya no se aprueba
+    if not isinstance(s, dict) or not nonce or s.get("v") != _SELLO_V:
+        # Un borrador viejo (nonce en claro, o sello sin contenido) ya no se aprueba: se rehace.
+        return False
     try:
-        h = hashlib.pbkdf2_hmac("sha256", str(nonce).strip().lower().encode(),
+        h = hashlib.pbkdf2_hmac("sha256", ("%s|%s" % (str(nonce).strip().lower(), _huella(d))).encode(),
                                 bytes.fromhex(s["sal"]), int(s.get("iter", _NONCE_ITER))).hex()
     except Exception:
         return False
     return hmac.compare_digest(h, str(s.get("h", "")))
+
+
+def _caducado(d, ahora=None):
+    """True si el borrador tiene más de 48 h o no se sabe cuándo nació."""
+    try:
+        from datetime import datetime
+        creado = datetime.fromisoformat(str(d.get("creado")))
+        ahora = ahora or datetime.now(creado.tzinfo)
+        return (ahora - creado).total_seconds() > _VIDA_BORRADOR_S
+    except Exception:
+        return True
 
 
 def _avisar_nonce(d, name, nonce):
@@ -662,6 +695,8 @@ def _avisar_nonce(d, name, nonce):
     clic» y nadie más tiene el código."""
     if d.get("accion") == REPORT:
         return False
+    if d.get("canal") == "web":
+        return _avisar_web(d, name, nonce)
     try:
         dest = str(d.get("dest") or "")
         txt = ("📤 Hay un borrador esperando tu OK para salir: %s por %s%s.\n"
@@ -672,6 +707,49 @@ def _avisar_nonce(d, name, nonce):
         return bool(report_to_titular(txt, urgente=True).get("delivered"))
     except Exception:
         return False
+
+
+_TOPE_TELEGRAM = 3800      # Telegram corta a 4096; se deja margen para la cola del mensaje
+
+
+def _avisar_web(d, name, nonce):
+    """Para la web el aviso ES el texto que va a publicarse: ella aprueba lo que lee, entero.
+
+    Si no cabe en un mensaje, el texto va antes en trozos y el mensaje que se aprueba lleva la
+    huella sellada, para que se vea que es el mismo. Su «sí» respondiendo a ESTE mensaje lo
+    resuelve el bot leyendo la línea «aprobar …» del mensaje citado; esa línea también vale
+    escrita a mano. Nunca lanza."""
+    try:
+        texto = str(d.get("texto") or "")
+        huella = str((d.get("sellado") or {}).get("huella") or "")[:12]
+        cola = ("\n\n👉 Responde «sí» a ESTE mensaje para publicarlo."
+                "\nSi no, no sale nada. Caduca en 48 h.\naprobar %s %s" % (name, nonce))
+        if len(texto) + len(cola) <= _TOPE_TELEGRAM:
+            return bool(report_to_titular(texto + cola, urgente=True).get("delivered"))
+        trozos = [texto[i:i + _TOPE_TELEGRAM] for i in range(0, len(texto), _TOPE_TELEGRAM)]
+        for i, t in enumerate(trozos, 1):
+            report_to_titular("🌐 Texto para la web (%d/%d)\n\n%s" % (i, len(trozos), t),
+                             categoria="respuesta")
+        cabeza = ("🌐 ¿Apruebas el texto de los %d mensajes de arriba? Huella %s."
+                  % (len(trozos), huella))
+        return bool(report_to_titular(cabeza + cola, urgente=True).get("delivered"))
+    except Exception:
+        return False
+
+
+_RE_SI = re.compile(r"^\s*(s[ií]+|ok|okey|vale|dale|apruebo|aprobado|adelante|publ[ií]ca(?:lo)?)"
+                    r"[\s.!¡👍✅]*$", re.I)
+_RE_ORDEN_EN_CITA = re.compile(r"^aprobar\s+(\S+\.json)\s+([0-9a-f]{16})\s*$", re.M)
+
+
+def aprobacion_por_respuesta(texto, cita):
+    """(borrador, nonce) si su mensaje es un «sí» que responde a un aviso con orden de aprobar;
+    None si no. El nonce se lee del mensaje CITADO, que escribió el bot en su chat: no se guarda
+    en ningún sitio más."""
+    if not texto or not cita or not _RE_SI.match(texto):
+        return None
+    m = _RE_ORDEN_EN_CITA.search(cita)
+    return (m.group(1), m.group(2)) if m else None
 
 
 def _sub(nombre):
@@ -742,8 +820,14 @@ def approve_and_deliver(draft_name, nonce):
         except Exception:
             pass
         _audit(d.get("canal"), d.get("accion"), d.get("dest"), "rechazado", "nonce no coincide", len(d.get("texto") or ""))
-        return _result(False, True, "nonce no coincide: no se entrega")
-    canal, accion, dest, texto = d.get("canal"), d.get("accion"), d.get("dest"), d.get("texto")
+        return _result(False, True, "nonce no coincide (o el borrador cambió después del aviso): "
+                       "no se entrega")
+    if _caducado(d):
+        _audit(d.get("canal"), d.get("accion"), d.get("dest"), "rechazado", "caducado",
+               len(d.get("texto") or ""))
+        return _result(False, True, "el borrador tiene más de 48 h: no se entrega, hay que "
+                       "prepararlo de nuevo")
+    canal, accion, dest, texto =d.get("canal"), d.get("accion"), d.get("dest"), d.get("texto")
     n = len(texto or "")
     # ¿Hay canal de entrega para esto? Lo que no se puede entregar NO se reclama: sigue en pending/.
     # Solo REPORT a {{TITULAR}} tiene canal de entrega hoy, y el DM de Instagram (con allowlist).
@@ -752,7 +836,13 @@ def approve_and_deliver(draft_name, nonce):
     if es_ig and not _ig_dest_ok(dest):
         _audit(canal, accion, dest, "bloqueado", "destinatario IG no permitido", n)
         return _result(False, True, "destinatario de Instagram no permitido (allowlist) — no se envía")
-    if not (es_report or es_ig):
+    # WEB (14-oct-2026, plan guardián v3): publicar un PR de helptitular.com con su «sí» por
+    # Telegram. Solo si el destino es un PR del repo de la web y coincide con el PR sellado.
+    es_web = accion == "publish" and canal == "web"
+    if es_web and not _web_dest_ok(dest, d.get("sellado")):
+        _audit(canal, accion, dest, "bloqueado", "borrador web mal formado", n)
+        return _result(False, True, "el borrador de la web no apunta a un PR válido: no se publica")
+    if not (es_report or es_ig or es_web):
         _audit(canal, accion, dest, "bloqueado", "OUTWARD sin canal de entrega", n)
         return _result(False, True, "no hay canal de entrega para %r (sigue como borrador)" % accion)
 
@@ -768,11 +858,13 @@ def approve_and_deliver(draft_name, nonce):
         return _result(False, True, "otra aprobación lo está entregando ahora mismo: no se repite")
     _audit(canal, accion, dest, "entregando", "reclamado", n, extra={"entrega_id": eid})
 
-    estado, info = _entregar(canal, dest, texto)
+    estado, info = _entregar_web(base, nonce) if es_web else _entregar(canal, dest, texto)
     if estado == "ok":
         os.makedirs(_sub("sent"), exist_ok=True)
         os.replace(en_curso, os.path.join(_sub("sent"), base))
         _audit(canal, accion, dest, "entregado-aprobado", info, n, extra={"entrega_id": eid})
+        if es_web:
+            return _result(True, False, "publicado en la web: %s" % info)
         return _result(True, False, ("DM de Instagram entregado (%s)" if es_ig else "entregado (%s)") % info)
     if estado == "no_salio":
         os.replace(en_curso, path)            # de vuelta a «a un clic»: es seguro reintentar
@@ -842,7 +934,8 @@ def reconciliar(draft_name, decision):
         return {"ok": True, "reason": "dado por entregado: %s" % base}
     for k in ("estado", "incierto_desde", "motivo_incierto", "entrega_id"):
         d.pop(k, None)
-    d.update(estado="pendiente_OK")
+    # Reintentar es un aviso nuevo con un nonce nuevo: su plazo de 48 h empieza otra vez.
+    d.update(estado="pendiente_OK", creado=_now_iso())
     nonce = _nuevo_nonce(d)
     os.makedirs(_sub("pending"), exist_ok=True)
     tmp = os.path.join(_sub("pending"), base + ".tmp")
@@ -935,6 +1028,39 @@ def _ig_user_id(token):
         return igid
     except Exception:
         return None
+
+
+WEB_REPO = "BeyondTheProtocol/titular-{{APELLIDO}}-case"
+_RE_DEST_WEB = re.compile(r"^%s#(\d{1,6})$" % re.escape(WEB_REPO))
+
+
+def _web_dest_ok(dest, sellado):
+    """El destino de un borrador web es «<repo>#<PR>», y ese PR es el mismo que va sellado."""
+    m = _RE_DEST_WEB.match(str(dest or ""))
+    if not m or not isinstance(sellado, dict):
+        return False
+    return sellado.get("pr") == int(m.group(1)) and len(str(sellado.get("sha") or "")) == 40
+
+
+def _entregar_web(borrador, nonce):
+    """(estado, info) como `_entregar`. Fusiona el PR sellado con `web_publicar.fusionar`, que
+    vuelve a comprobar el borrador (ya en sending/), el nonce, el commit y la huella del texto
+    contra GitHub. Si no salió, mira en GitHub: un PR ya fusionado cuenta como entregado."""
+    try:
+        import web_publicar
+        r = web_publicar.fusionar_aprobado(borrador, nonce)
+    except Exception as e:
+        return "incierto", "la publicación falló a mitad: %r" % (e,)
+    if r.get("merged"):
+        return "ok", web_publicar.explica_despliegue(r)
+    motivo = r.get("motivo_no_merge") or r.get("merge_error") or "no se fusionó"
+    if r.get("merge_error"):
+        estado_pr = web_publicar.estado_pr(r.get("numero"))
+        if estado_pr == "MERGED":
+            return "ok", "fusionado (comprobado en GitHub tras un error de la herramienta)"
+        if estado_pr != "OPEN":
+            return "incierto", motivo
+    return "no_salio", motivo
 
 
 def _ig_dest_ok(dest):
@@ -1239,9 +1365,14 @@ def poll_updates(*, timeout=0, limit=20, estado_out=None):
         if chat != self_cid:           # allowlist: solo el chat de {{TITULAR}}
             continue
         voice = msg.get("voice") or msg.get("audio")
+        # El mensaje que ella CITA al responder, solo si lo escribió el bot (14-oct-26: su «sí»
+        # a un aviso de la web). En su chat privado no escribe nadie más que ella y el bot.
+        citado = msg.get("reply_to_message") or {}
+        cita = citado.get("text") if (citado.get("from") or {}).get("is_bot") else None
         out.append({"update_id": uid, "chat_id": chat, "text": msg.get("text"),
                     "date": msg.get("date"), "message_id": msg.get("message_id"),
-                    "kind": "voice" if voice else "text", "voice": voice})
+                    "kind": "voice" if voice else "text", "voice": voice,
+                    "cita": cita, "editado": "edited_message" in upd})
     if max_uid is not None:
         _write_offset(max_uid)
     return out

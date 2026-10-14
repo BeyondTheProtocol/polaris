@@ -66,8 +66,36 @@ def sesion_actual():
     return os.environ.get("CLAUDE_CODE_SESSION_ID") or None
 
 
+FICHERO_TOKEN_GH = os.environ.get("BTP_GH_TOKEN_FILE",
+                                  os.path.expanduser("~/.config/gh-token.env"))
+
+
+def _entorno_gh():
+    """El entorno para `gh`. En las sesiones `GH_TOKEN` ya viene puesto; en el bot de Telegram y
+    en launchd no, y la sesión guardada de `gh` está caída (comprobado el 14-oct-26 con
+    `gh auth status`). Sin esto, su «sí» por Telegram no podría fusionar nada. El token se lee
+    del fichero privado de siempre y solo va al entorno del subproceso: ni se imprime ni se copia."""
+    if os.environ.get("GH_TOKEN"):
+        return None
+    try:
+        with open(FICHERO_TOKEN_GH, encoding="utf-8") as f:
+            for linea in f:
+                linea = linea.strip()
+                if linea.startswith("export "):
+                    linea = linea[len("export "):]
+                if linea.startswith("GH_TOKEN="):
+                    valor = linea.split("=", 1)[1].strip().strip("'\"")
+                    if valor:
+                        return dict(os.environ, GH_TOKEN=valor)
+    except OSError:
+        pass
+    return None
+
+
 def _run(cmd, cwd=None, timeout=180):
-    return subprocess.run(cmd, cwd=cwd or WEB, capture_output=True, text=True, timeout=timeout)
+    env = _entorno_gh() if cmd and cmd[0] == "gh" else None
+    return subprocess.run(cmd, cwd=cwd or WEB, capture_output=True, text=True, timeout=timeout,
+                          env=env)
 
 
 def _registrar(**extra):
@@ -293,6 +321,109 @@ def numeros_sin_almohadilla(ctx):
                     " y ".join("#%d" % n for n in sorted(dudosos))))
 
 
+# ── Los textos que cambia un PR, tal como ella los va a leer en Telegram ─────────────────────
+
+TEXTO_RUTAS = (LOCALES + "/", "content/", "app/data/")
+TOPE_HOJAS_DATOS = 40
+
+
+def _show(repo, ref, f):
+    r = _run(["git", "show", "%s:%s" % (ref, f)], cwd=repo)
+    return r.stdout if r.returncode == 0 else None
+
+
+def textos_del_pr(repo, base, cabeza):
+    """[(fichero, qué, antes, después)] de lo que se LEE y cambia en el rango `base...cabeza`:
+    claves de i18n, líneas de `content/` y valores del panel /datos. Es lo que ella aprueba."""
+    r = _run(["git", "diff", "--name-only", "%s...%s" % (base, cabeza)], cwd=repo)
+    if r.returncode != 0:
+        raise RuntimeError("no pude leer el diff: %s" % (r.stderr or "").strip()[:120])
+    comun = _run(["git", "merge-base", base, cabeza], cwd=repo).stdout.strip() or base
+    out = []
+    for f in sorted(x.strip() for x in r.stdout.splitlines() if x.strip()):
+        if not f.startswith(TEXTO_RUTAS):
+            continue
+        viejo, nuevo = _show(repo, comun, f), _show(repo, cabeza, f)
+        if f.endswith(".json"):
+            try:
+                a = _aplana(json.loads(viejo)) if viejo else {}
+                b = _aplana(json.loads(nuevo)) if nuevo else {}
+            except ValueError:
+                out.append((f, "(no se puede leer)", "", "el fichero no es JSON válido"))
+                continue
+            cambios = [(k, a.get(k, ""), b.get(k, "")) for k in sorted(set(a) | set(b))
+                       if a.get(k) != b.get(k)]
+            tope = TOPE_HOJAS_DATOS if f.startswith("app/data/") else len(cambios)
+            out += [(f, k, x, y) for k, x, y in cambios[:tope]]
+            if len(cambios) > tope:
+                out.append((f, "…", "", "y %d cambios más en este fichero" % (len(cambios) - tope)))
+        else:
+            d = _run(["git", "diff", "--unified=0", "%s...%s" % (base, cabeza), "--", f], cwd=repo)
+            quita = [x[1:] for x in d.stdout.splitlines() if x.startswith("-") and not x.startswith("---")]
+            pone = [x[1:] for x in d.stdout.splitlines() if x.startswith("+") and not x.startswith("+++")]
+            if quita or pone:
+                out.append((f, "", "\n".join(quita).strip(), "\n".join(pone).strip()))
+    return out
+
+
+def render_textos(numero, textos, preview="", cabeza=""):
+    """El mensaje de Telegram: lo que cambia, en claro, ES y EN tal cual. Sin jerga."""
+    lineas = ["🌐 Web · ¿apruebas este texto? (PR #%s)" % numero, ""]
+    for f, que, antes, despues in textos:
+        donde = f.replace("i18n/locales/", "textos ").replace("content/", "").replace(
+            "app/data/caso.json", "panel /datos")
+        lineas.append("📄 %s%s" % (donde, (" · " + que) if que else ""))
+        if antes:
+            lineas.append("   Antes: %s" % antes)
+        lineas.append("   Ahora: %s" % (despues or "(se quita)"))
+        lineas.append("")
+    if preview:
+        lineas.append("Míralo antes: %s" % preview)
+    if cabeza:
+        lineas.append("Versión %s" % cabeza[:12])
+    return "\n".join(lineas).strip()
+
+
+def huella_textos(textos):
+    import hashlib
+    return hashlib.sha256(json.dumps(textos, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def estado_pr(numero):
+    info = pr_info(numero) if numero else None
+    return (info or {}).get("state")
+
+
+def verifica_aprobado(borrador, nonce):
+    """(sellado, "") si `borrador` es un borrador web en `sending/` (ya reclamado por
+    `salida.approve_and_deliver`) cuyo sello casa con `nonce`; (None, motivo) si no.
+
+    Es lo que hace infalsificable la vía de Telegram: sin el nonce, que solo vive en su chat,
+    no hay sellado que valga, aunque alguien llame a `fusionar` desde Python a mano."""
+    import salida
+    ruta = os.path.join(salida._sub("sending"), os.path.basename(str(borrador)))
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return None, "no encuentro el borrador aprobado"
+    if d.get("canal") != "web" or d.get("accion") != "publish":
+        return None, "el borrador no es de la web"
+    if not salida._nonce_ok(d, nonce):
+        return None, "el código no casa con el borrador sellado"
+    if salida._caducado(d):
+        return None, "el borrador tiene más de 48 h"
+    return (d.get("sellado") or {}), ""
+
+
+def fusionar_aprobado(borrador, nonce, **kw):
+    """Fusiona el PR de un borrador web que ella aprobó por Telegram. Lo llama `salida`."""
+    sellado, motivo = verifica_aprobado(borrador, nonce)
+    if not sellado:
+        return {"merged": False, "motivo_no_merge": motivo}
+    return fusionar(sellado.get("pr"), por="telegram", aprobado=(borrador, nonce), tope_ci_s=0, **kw)
+
+
 def gasta_lo_que_quede(por, _permiso=None):
     """Da por usado el permiso de esta sesión si sigue vivo. True si había algo que gastar."""
     d, _motivo, _ctx, _k = (_permiso or permiso)("fusionar")
@@ -316,8 +447,10 @@ def _merge_real(cmd, cwd=None):
 
 def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=False,
              exige_nombrado=False, verifica=None, tope_ci_s=None, tope_despliegue_s=0,
+             aprobado=None,
              _info=pr_info, _ci=esperar_ci, _copy=revisa_copy, _permiso=permiso,
-             _merge=None, _verifica=verificar_despliegue, _fetch=trae):
+             _merge=None, _verifica=verificar_despliegue, _fetch=trae, _textos=textos_del_pr,
+             _verifica_aprobado=None):
     """Fusiona el PR `ref` si pasa TODO lo de arriba. Devuelve un dict; no lanza.
 
     `que`: «envio» (novedad, revertir) o «fusionar» (un PR que ella vio).
@@ -346,7 +479,18 @@ def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=Fal
     if len(cabeza) != 40:
         return cierra("no sé cuál es la cabeza del PR #%s" % numero)
 
-    d, motivo, ctx, k = _permiso(que)          # aquí NO se gasta
+    if aprobado is not None:
+        # Su «sí» por Telegram (14-oct-26): (borrador, nonce). Se verifica AQUÍ, no se acepta un
+        # sellado ya resuelto. Vale para ESTE PR y ESTA cabeza, y nada más; lo que ella leyó
+        # lleva su huella sellada y se recalcula abajo contra GitHub.
+        aprobado, motivo = (_verifica_aprobado or verifica_aprobado)(*aprobado)
+        if not aprobado:
+            return cierra(motivo)
+        if aprobado.get("pr") != numero or aprobado.get("sha") != cabeza:
+            return cierra("el PR o su versión ya no son los del Telegram que aprobó: no sale")
+        d, motivo, ctx, k = {"via": "telegram"}, "", {"prs_suyos": {numero}}, None
+    else:
+        d, motivo, ctx, k = _permiso(que)      # aquí NO se gasta
     res["pedido_por_titular"] = bool(d)
     if not d:
         return cierra(motivo)
@@ -356,6 +500,14 @@ def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=Fal
 
     repo = cwd or WEB
     _fetch(repo, cabeza)
+    if aprobado is not None:
+        # Si `main` se movió debajo, lo que saldría ya no es lo que leyó: la huella no casa.
+        try:
+            ahora = huella_textos(_textos(repo, "origin/" + BASE, cabeza))
+        except Exception as e:
+            return cierra("no pude releer el texto del PR: %s" % e)
+        if ahora != aprobado.get("huella"):
+            return cierra("el texto que saldría ya no es el que aprobaste: no se publica")
     frenan, avisan = _copy(repo, "origin/" + BASE, cabeza)
     res["copy_avisa"] = avisan[:10]
     if frenan:
@@ -375,21 +527,24 @@ def fusionar(ref, *, por, que="envio", cwd=None, usos_max=1, atar_a_lo_visto=Fal
     if (info2 or {}).get("headRefOid") != cabeza:
         return cierra("la cabeza del PR cambió mientras esperaba al CI")
 
-    d, motivo, ctx, k = _permiso(que)          # puede haber caducado durante la espera
-    if not d:
-        res["pedido_por_titular"] = False
-        return cierra("el permiso ya no vale tras esperar al CI (%s)" % motivo)
-    if atar_a_lo_visto:
-        pega = numeros_sin_almohadilla(ctx) or P.comprobar_fusion(ctx, numero, cabeza)
-        if pega:
-            return cierra(pega)
-    # El uso se reserva ANTES de fusionar y con cerrojo: de dos fusiones a la vez, una sale.
-    try:
-        mio = bool(P.gastar_uno(d, k, usos_max)) if usos_max > 1 else P.consumir(d, por)
-    except Exception:
-        mio = False
-    if not mio:
-        return cierra("ese mensaje suyo ya abrió todo lo que podía abrir")
+    if aprobado is None:
+        d, motivo, ctx, k = _permiso(que)      # puede haber caducado durante la espera
+        if not d:
+            res["pedido_por_titular"] = False
+            return cierra("el permiso ya no vale tras esperar al CI (%s)" % motivo)
+        if atar_a_lo_visto:
+            pega = numeros_sin_almohadilla(ctx) or P.comprobar_fusion(ctx, numero, cabeza)
+            if pega:
+                return cierra(pega)
+        # El uso se reserva ANTES de fusionar y con cerrojo: de dos fusiones a la vez, una sale.
+        try:
+            mio = bool(P.gastar_uno(d, k, usos_max)) if usos_max > 1 else P.consumir(d, por)
+        except Exception:
+            mio = False
+        if not mio:
+            return cierra("ese mensaje suyo ya abrió todo lo que podía abrir")
+    # Por Telegram no hay permiso de sesión que gastar: el borrador ya se reclamó de una vez
+    # (pending → sending) en `salida.approve_and_deliver`, con su nonce sellado.
 
     m = (_merge or _merge_real)(["gh", "pr", "merge", str(numero), "--squash", "--delete-branch",
                                  "--match-head-commit", cabeza], cwd=cwd)

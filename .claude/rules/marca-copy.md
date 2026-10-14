@@ -13,7 +13,12 @@ idea → **Producto** → **Diseño** (con todo el design system) + Producto →
 
 Flujo técnico: rama → PR → preview Netlify → fusión. No inventar patrones: se reusa el design system. Detalle: `00_FUENTE-DE-VERDAD/07 · Marca/Proceso-Comite-Web.md`.
 
-**Quién fusiona (frase única, 13-oct-26, OK de {{TITULAR}}):** *fusiona Polaris con el permiso firmado de {{TITULAR}}, atado al commit que vio.* Su «fusiona» es la firma; la mecánica es mía. Vale para un PR suelto (`gh pr merge <N> --match-head-commit <SHA>`) y para el lote semanal (`tools/web_lote.py`). Lo único que fusiona desde Python es `tools/web_publicar.py`.
+**Quién fusiona (frase única, 13-oct-26; ampliada el 14-oct-26 con el plan v3, OK de {{TITULAR}}):** *fusiona Polaris con la firma de {{TITULAR}}, dada en la sesión o respondiendo «sí» a su Telegram, atada a la versión que le llegó.* La mecánica es mía. Vías:
+- **Textos (la normal):** `python3 tools/web_lote.py pedir-ok <PR>` le manda el texto por Telegram; su «sí» respondiendo a ese mensaje lo publica. Ella solo repasa textos ([[feedback-web-solo-repasa-textos-por-telegram]]): no le presentes PRs para fusionar en el chat si pueden ir por aquí.
+- **En sesión:** su «fusiona» sobre un PR suelto (`gh pr merge <N> --match-head-commit <SHA>`) o sobre el lote (`tools/web_lote.py`).
+- **Sin texto:** saldrá solo cuando termine su sombra y ella baje esa clase del nivel C (plan v3, paso 3). Hasta entonces, por las vías de arriba.
+
+Lo único que fusiona desde Python es `tools/web_publicar.py`.
 
 ## 🛑 Copy ya publicado
 Editar copy **ya publicado** (sobre todo hero/H1, taglines y claims) es **gate de salida**: un «dale» rápido NO basta. {{TITULAR}} tiene que entenderlo bien, y ese PR solo sale si **lo nombra por su número** en su mensaje: un «fusiona» genérico no lo arrastra. Detalle: [[feedback-no-tocar-copy-web-sin-ok]].

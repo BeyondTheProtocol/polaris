@@ -96,6 +96,45 @@ def main():
     check(not res.get("delivered") and "bloqueado" in res.get("reason", ""),
           "tras 5 fallos ni el nonce bueno entrega: %r" % res.get("reason"))
 
+    print("── 4b · el sello cubre el CONTENIDO, no solo el nonce (red-team 14-oct-26) ──")
+    # Hasta hoy el texto y el destino quedaban sin proteger en pending/: se podían cambiar entre
+    # el aviso y su «aprobar», y salía otra cosa con su nonce bueno.
+    for campo, valor in (("texto", "otro texto que ella no leyó"), ("dest", "otra-persona"),
+                         ("canal", "telegram"), ("sellado", {"pr": 999})):
+        avisos.clear()
+        n3 = salida._draft("instagram", "contact", DEST, "lo que ella lee", "test",
+                           sellado={"pr": 268, "sha": "a" * 40})
+        bueno3 = [l for l in avisos[0][0].splitlines() if l.startswith("aprobar ")][0].split()[2]
+        ruta3 = os.path.join(salida.PENDING, n3)
+        d3 = json.load(open(ruta3, encoding="utf-8"))
+        d3[campo] = valor
+        with open(ruta3, "w", encoding="utf-8") as f:
+            json.dump(d3, f)
+        antes = len(enviados)
+        res = salida.approve_and_deliver(n3, bueno3)
+        check(not res.get("delivered") and len(enviados) == antes,
+              "cambiar «%s» después del aviso invalida su nonce bueno" % campo)
+    avisos.clear()
+    n4 = salida._draft("instagram", "contact", DEST, "intacto", "test", sellado={"pr": 268})
+    bueno4 = [l for l in avisos[0][0].splitlines() if l.startswith("aprobar ")][0].split()[2]
+    res = salida.approve_and_deliver(n4, bueno4)
+    check(res.get("delivered"), "intacto y con su nonce, sale: %r" % res.get("reason"))
+
+    print("── 4c · un borrador de hace más de 48 h no sale ──")
+    avisos.clear()
+    n5 = salida._draft("instagram", "contact", DEST, "viejo", "test")
+    bueno5 = [l for l in avisos[0][0].splitlines() if l.startswith("aprobar ")][0].split()[2]
+    ruta5 = os.path.join(salida.PENDING, n5)
+    d5 = json.load(open(ruta5, encoding="utf-8"))
+    d5["creado"] = "2026-01-01T09:00:00"        # `creado` no está sellado: lo frena la caducidad
+    with open(ruta5, "w", encoding="utf-8") as f:
+        json.dump(d5, f)
+    antes = len(enviados)
+    res = salida.approve_and_deliver(n5, bueno5)
+    check(not res.get("delivered") and "48 h" in res.get("reason", "") and len(enviados) == antes,
+          "caducado: no sale y se dice por qué")
+    check(salida._caducado({"creado": "no es una fecha"}), "sin fecha legible cuenta como caducado")
+
     print("── 5 · el hook deniega llamar a la aprobación ──")
     env = dict(os.environ, BTP_STATE_DIR=tempfile.mkdtemp(), BTP_OK_ENVIO_CLAVE="c" * 64)
 

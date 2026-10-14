@@ -2,10 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- El guardián de la web (13-oct-2026): detector diario, determinista, sin IA y fuera de la cola.
-     07:35, antes del parte de las 08:12, para que su línea (si la hay) entre en él. Arranca en
-     modo SOMBRA: apunta y no propone ni avisa. PREPARADA SIN ACTIVAR: encenderla es gate de
-     {{TITULAR}}, desde casa base y con `python3 tools/activar_daemon.py com.btp.web-guardian`. Al
-     encenderla, quítala de `_PARKED_HC` en tools/healthcheck.py para que se vigile. -->
+     07:35, antes del parte de las 08:12, para que su línea (si la hay) entre en él. Modo SOMBRA
+     hasta que se revise (hacia el 27-oct): apunta y no propone ni avisa. ENCENDIDA el 13-oct-2026
+     con el OK de {{TITULAR}}, vía `python3 tools/activar_daemon.py com.btp.web-guardian`, y vigilada
+     por healthcheck como el resto. -->
 <plist version="1.0"><dict>
   <key>Label</key><string>com.btp.web-guardian</string>
   <key>WorkingDirectory</key><string>/Users/polaris/claudecode</string>

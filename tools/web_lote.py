@@ -27,6 +27,7 @@ EL PELDAÑO NO SE BAJA A MANO. Quien prepara el lote lo declara, pero si el diff
 borra copy es 3, y si cambia copy existente es al menos 2, diga lo que diga la lista.
 
 Uso:
+  python3 tools/web_lote.py pedir-ok <PR>        # le manda el texto por Telegram; sale con su «sí»
   python3 tools/web_lote.py render lote.json     # valida y escribe el manifiesto para el mensaje
   python3 tools/web_lote.py fusionar lote.json   # tras su orden: fusiona y dice qué salió
 
@@ -176,12 +177,43 @@ def fusionar(items, _fusiona=WP.fusionar, _cierra=WP.gasta_lo_que_quede):
     return out
 
 
+def pedir_ok(numero, _lee=leer_pr, _textos=None, _draft=None):
+    """(borrador, motivo): deja el PR `numero` esperando su «sí» por Telegram (plan v3, 14-oct-26).
+
+    El mensaje que le llega ES el texto que va a publicarse (antes y ahora, ES y EN tal cual),
+    con la preview. Va sellado con el PR, su commit y la huella de ese texto: si algo cambia
+    antes de su «sí», no sale. Sin texto que leer, no se le pide nada."""
+    import salida
+    pr = _lee(numero)
+    if not pr or (pr.get("state") or "").upper() != "OPEN":
+        return None, "el PR #%s no está abierto" % numero
+    if pr.get("ci") != "verde":
+        return None, "el CI del PR #%s está «%s»: no se le pide OK hasta que esté en verde" % (
+            numero, pr.get("ci"))
+    sha = pr.get("headRefOid") or ""
+    textos = (_textos or WP.textos_del_pr)(WP.WEB, "origin/" + WP.BASE, sha)
+    if not textos:
+        return None, "el PR #%s no cambia ningún texto: no hace falta su OK" % numero
+    mensaje = WP.render_textos(numero, textos, pr.get("preview") or "", sha)
+    nombre = (_draft or salida._draft)(
+        "web", "publish", "%s#%d" % (salida.WEB_REPO, numero), mensaje, "guardián de la web",
+        sellado={"pr": numero, "sha": sha, "huella": WP.huella_textos(textos)})
+    return nombre, ""
+
+
 def _carga(ruta):
     with open(ruta, encoding="utf-8") as f:
         return json.load(f)
 
 
 def main(argv):
+    if len(argv) == 2 and argv[0] == "pedir-ok":
+        nombre, motivo = pedir_ok(int(argv[1].lstrip("#")))
+        if not nombre:
+            print("🟡 %s" % motivo)
+            return 1
+        print("📨 Le ha llegado el texto por Telegram (borrador %s). Sale con su «sí»." % nombre)
+        return 0
     if len(argv) != 2 or argv[0] not in ("render", "fusionar"):
         print(__doc__)
         return 2

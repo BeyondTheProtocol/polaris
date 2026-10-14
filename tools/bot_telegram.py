@@ -309,6 +309,15 @@ def handle_message(msg):
     except Exception as e:
         sys.stderr.write("bot: captura de enlaces al buzón falló (ignorado): %r\n" % (e,))
 
+    # «Sí» respondiendo a un aviso (14-oct-26, plan guardián de la web v3): ella no teclea el
+    # código; el bot lo lee del mensaje que ella cita, que escribió él. Un mensaje editado no
+    # aprueba: un «sí» cambiado a posteriori no es el que dio.
+    par = None if msg.get("editado") else salida.aprobacion_por_respuesta(text, msg.get("cita"))
+    if par:
+        res = salida.approve_and_deliver(par[0], par[1])
+        responder("✅ " + res["reason"] if res.get("delivered") else "⛔ " + res["reason"])
+        return "aprobacion-si:%s" % ("ok" if res.get("delivered") else "no")
+
     # Comando de aprobación A4: «aprobar <borrador> <nonce>»
     partes = text.split()
     if partes and partes[0].lower() in ("aprobar", "approve") and len(partes) >= 3:
