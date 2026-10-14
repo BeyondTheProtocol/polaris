@@ -753,10 +753,13 @@ def _avisar_web(d, name, nonce):
 
 _RE_SI = re.compile(r"^\s*(s[ií]+|ok|okey|vale|dale|apruebo|aprobado|adelante|publ[ií]ca(?:lo)?)"
                     r"[\s.!¡👍✅]*$", re.I)
-_RE_ORDEN_EN_CITA = re.compile(r"^aprobar\s+(\S+\.json)\s+([0-9a-f]{16})\s*$", re.M)
+# Sin `$` al final: la casa de estilo añade « 💜» a la última línea del aviso, que es esta. Con
+# `$` el bot no reconoció el primer «sí» real (PR #272, 14-oct-26). `(?![0-9a-f])` basta para no
+# leer un código más largo.
+_RE_ORDEN_EN_CITA = re.compile(r"^aprobar\s+(\S+\.json)\s+([0-9a-f]{16})(?![0-9a-f])", re.M)
 
 
-_RE_AVISO_WEB = re.compile(r"^aprobar\s+\S+-web-publish-\S+\.json\s+[0-9a-f]{16}\s*$", re.M)
+_RE_AVISO_WEB = re.compile(r"^aprobar\s+\S+-web-publish-\S+\.json\s+[0-9a-f]{16}(?![0-9a-f])", re.M)
 _RE_PR_EN_AVISO = re.compile(r"\(PR #(\d{1,6})\)")
 
 

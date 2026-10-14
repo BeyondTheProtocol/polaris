@@ -118,6 +118,21 @@ class SuRespuesta(unittest.TestCase):
             self.assertEqual(("2026-x-web-publish-ab.json", "0123456789abcdef"),
                              salida.aprobacion_por_respuesta(si, self.CITA), si)
 
+    def test_el_aviso_tal_cual_le_llega_tras_la_casa_de_estilo(self):
+        """14-oct-26: el primer «sí» real no se reconoció porque la casa de estilo añade « 💜»
+        a la última línea del aviso, que es la de la orden. Se prueba con el texto que SALE."""
+        import importlib
+        real = importlib.reload(salida)              # sin los parches de otras pruebas
+        try:
+            nombre, _, avisos = _pide()
+            final = real._casa_estilo(avisos[0], voz="calida", tipo="report")
+            par = real.aprobacion_por_respuesta("si", final)
+            self.assertIsNotNone(par, "el bot tiene que reconocer el aviso tal como ella lo recibe")
+            self.assertEqual(nombre, par[0])
+            self.assertEqual(268, real.cambios_a_aviso_web("añade un enlace", final))
+        finally:
+            importlib.reload(salida)
+
     def test_lo_que_no_es_un_si_limpio_no_aprueba(self):
         for no in ("no", "sí, pero cambia la fecha", "espera", "¿esto qué es?", ""):
             self.assertIsNone(salida.aprobacion_por_respuesta(no, self.CITA), no)
