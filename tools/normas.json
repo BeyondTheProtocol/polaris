@@ -3708,6 +3708,30 @@
       "auditable": false,
       "repetida": false,
       "nota": "Clasificada el 11-oct-26. Contexto: es criterio editorial de las piezas explicativas; «tu/mi» + nombre de fármaco es legítimo en casi cualquier otra respuesta, así que un patrón de salida dispararía en falso. Vive en quien redacta el guion."
+    },
+    {
+      "slug": "feedback-web-solo-repasa-textos-por-telegram",
+      "que": "En la web, a {{TITULAR}} solo se le enseñan los TEXTOS (sobre todo cronología), por Telegram; lo que no es texto no le pide nada",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": true,
+      "nota": "Clasificada el 14-oct-26. Clase `contexto` hasta que existan B1 (lo mecánico sale solo, tools/web_b1.py o web_auto.py, sin fusionar) y B2 (aprobación por Telegram, rama guardian-web-outbox-sellado). Cuando estén en casa base, el mecanismo pasa a ser el suyo. Lo repitió el 14-oct: «repetida»."
+    },
+    {
+      "slug": "feedback-web-estructura-cambios-radicales-si",
+      "que": "En helptitular.com se pueden hacer cambios gordos de estructura y de menú sin miedo; manda que se navegue bien y que lo importante esté a la vista",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 14-oct-26. Exige criterio de diseño (comité `diseno`); no hay hook que sepa si una estructura se entiende. Primera aplicación: PR web #269 (índice Herramientas, menú, pie como mapa), fusionado el 14-oct."
     }
   ]
 }
