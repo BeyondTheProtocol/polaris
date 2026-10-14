@@ -3722,6 +3722,18 @@
       "nota": "Clasificada el 14-oct-26. Clase `contexto` hasta que existan B1 (lo mecánico sale solo, tools/web_b1.py o web_auto.py, sin fusionar) y B2 (aprobación por Telegram, rama guardian-web-outbox-sellado). Cuando estén en casa base, el mecanismo pasa a ser el suyo. Lo repitió el 14-oct: «repetida»."
     },
     {
+      "slug": "feedback-web-auditoria-semanal-umami",
+      "que": "Auditoría semanal de la web con Umami (umbrales, máx. 3 propuestas) y novedades de diseño cada 2 semanas; lo visual nuevo le llega por Telegram",
+      "clase": "contexto",
+      "mecanismo": "tools/web_auditoria.py (la corre web_guardian los lunes) + tests/test_web_auditoria.py; procedimiento en .claude/agents/tecnico.md",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": false,
+      "nota": "Clasificada el 14-oct-26, el mismo día. Pedida por {{TITULAR}} y pasada por diseno, que puso umbrales y cadencia quincenal para las novedades de diseño; ella aceptó el dictamen."
+    },
+    {
       "slug": "feedback-web-estructura-cambios-radicales-si",
       "que": "En helptitular.com se pueden hacer cambios gordos de estructura y de menú sin miedo; manda que se navegue bien y que lo importante esté a la vista",
       "clase": "contexto",

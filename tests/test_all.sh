@@ -465,6 +465,7 @@ runpy test_web_publicar.py
 runpy test_web_guardian.py
 runpy test_web_lote.py
 runpy test_web_telegram.py
+runpy test_web_auditoria.py
 runpy test_web_lint.py
 runpy test_caso_publico.py
 runpy test_seguridad_sweep_daemon.py

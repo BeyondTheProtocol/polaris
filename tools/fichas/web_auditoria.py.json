@@ -1,0 +1,11 @@
+{
+ "pieza": "web_auditoria.py",
+ "estado_ficha": "completa",
+ "para": "La auditoría semanal de helptitular.com con Umami: mide las señales que fijó el comité diseno (404, Donar, origen del tráfico, Contacto y Bio-link) contra las 4 semanas previas y dice cuáles pasan el umbral para ser propuesta de cambio.",
+ "cuando_si": "La corre el guardián los lunes (launchd, que sí lee la clave de Umami) y la lee la pasada semanal del guardián para elegir como mucho 3 propuestas. A mano: python3 tools/web_auditoria.py (desde la terminal de {{TITULAR}} o una rutina).",
+ "cuando_no": "Desde una sesión de Claude Code: no lee el Llavero y saldría «sin datos». Tampoco decide cambios ni abre PRs: mide y apunta.",
+ "reemplaza": "Las lecturas sueltas de umami.py hechas a mano para ver cómo va la web.",
+ "test": "tests/test_web_auditoria.py",
+ "alta": "2026-10-14",
+ "origen": "Petición de {{TITULAR}} del 14-oct-2026 («una vez a la semana deberías hacer una auditoría con umami de la web») y dictamen del comité diseno del mismo día, aceptado por ella (opción 1)."
+}

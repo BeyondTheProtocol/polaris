@@ -57,6 +57,13 @@ Se activa con «haz la pasada semanal del guardián de la web». Objetivo: que f
 
 Nunca fusiones la web con un `gh pr merge` suelto dentro de un script: lo único que fusiona desde Python es `tools/web_publicar.py`.
 
+### Auditoría semanal (14-oct-26, pedida por {{TITULAR}}; dictamen de `diseno` aceptado por ella)
+- **Umami, cada semana:** lee `tools/state/web_guardian/auditoria-AAAA-Wss.json`, que deja el guardián los lunes (`tools/web_auditoria.py`; una sesión no puede leer Umami). Solo cuentan las señales que pasan su umbral; si no hay ninguna, el resultado es «sin cambios esta semana», y eso está bien. Lo que la auditoría lista en `no_medido` (embudos, 3D, rebote por dispositivo) no se da por bueno.
+- **Novedades de diseño y representación de datos, cada 2 semanas (no cada semana):** Visualising Data (Andy Kirk), Nightingale (Data Visualization Society), Fundamentals of Data Visualization (Claus Wilke), Data Viz Project y los Information is Beautiful Awards. Fuentes nuevas solo tras abrirlas y comprobarlas.
+- **Filtro antimoda: una idea de fuera solo pasa si cumple las cuatro:** resuelve un problema medido en Umami o un fallo de claridad real; sirve a quien lee con miedo, prisa o es neurodivergente; cumple WCAG 2.2 AA (contraste, teclado, táctil ≥44 px, `prefers-reduced-motion`); encaja en el design system y en el léxico de `marca-copy.md`.
+- **Como mucho 3 propuestas por semana**, por este orden: lo roto (404, gráfico ilegible, accesibilidad), luego la fricción medida, luego la inspiración de fuera. Cada PR cita la señal o la fuente que lo motiva.
+- **Cómo le llega:** con texto, por Telegram para su «sí». **Cualquier cambio visual nuevo (gráficos, 3D, maquetación) o inspirado en una fuente externa también va por Telegram, aunque no toque texto**: es la cara de su web. Solo lo que no tiene ni texto ni cambio visual sale solo tras la sombra.
+
 ## Reglas
 Nada outward-facing (deploy, publicación, envío) sin OK explícito. No exponer credenciales (el acceso DICOM es doctor-facing, nunca público). Ver memoria `feedback-working-rules`.
 

@@ -539,6 +539,18 @@ def main(argv):
         for pr, resultado in atender_pedidos():
             print("📨 PR #%s: %s" % (pr, resultado))
     hoy = datetime.date.today()
+    if "--seco" not in argv and hoy.weekday() == 0:
+        # Los lunes, la auditoría semanal con Umami (14-oct-26). Aquí y no en una sesión: launchd
+        # sí lee la clave de Umami. Si falla, el detector sigue: no es su trabajo principal.
+        try:
+            import web_auditoria
+            if not web_auditoria.hecha_esta_semana(hoy):
+                res = web_auditoria.auditar(hoy)
+                if res["con_datos"]:
+                    web_auditoria.guardar(res)
+                print("📊 auditoría semanal: %s" % res["resumen"])
+        except Exception as e:
+            print("📊 la auditoría semanal falló: %r" % (e,))
     hallazgos = pasada(hoy)
     if "--seco" in argv:
         print("(seco) no se escribe nada")
