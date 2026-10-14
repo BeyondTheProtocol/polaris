@@ -37,7 +37,8 @@ Lee la web publicada por HTTP (el repo es público), no del checkout local: ese 
 compartido, suele estar en otra rama y esto no tiene por qué tocarlo.
 
 Uso:
-  python3 tools/web_guardian.py            # una pasada: detecta y apunta
+  python3 tools/web_guardian.py            # una pasada: atiende encargos, detecta y apunta
+  python3 tools/web_guardian.py pedir-ok <PR>   # encarga que le llegue el texto por Telegram
   python3 tools/web_guardian.py --seco     # detecta e imprime, sin escribir nada
   python3 tools/web_guardian.py estado     # lo último que apuntó
 """
@@ -429,6 +430,56 @@ def pasada(hoy=None, lee=_curl):
     return out
 
 
+# ── encargos de «pídele el OK por Telegram» (14-oct-26) ─────────────────────────────────────
+# Una sesión de Claude Code no puede escribirle a Telegram (no lee el Llavero). Este proceso sí,
+# porque corre en launchd. La sesión deja el encargo y este lo atiende: al momento si se le da un
+# empujón (`activar_daemon.py com.btp.web-guardian --reemplaza --kick`), o en su pasada diaria.
+PEDIDOS = os.path.join(DIR, "pedir_ok")
+VIDA_PEDIDO_S = 48 * 3600
+
+
+def encargar_pedir_ok(numero):
+    os.makedirs(PEDIDOS, exist_ok=True)
+    _escribe(os.path.join(PEDIDOS, "%d.json" % int(numero)),
+             {"pr": int(numero), "ts": datetime.datetime.now().isoformat(timespec="seconds")})
+
+
+def atender_pedidos(_pedir=None, ahora=None):
+    """[(pr, resultado)]. Manda el Telegram de cada PR encargado. Lo que aún no puede salir
+    (CI sin terminar) se queda para la siguiente pasada, hasta 48 h; lo demás se retira."""
+    if not os.path.isdir(PEDIDOS):
+        return []
+    if _pedir is None:
+        import web_lote
+        _pedir = web_lote.pedir_ok
+    ahora = ahora or datetime.datetime.now()
+    out = []
+    for fn in sorted(os.listdir(PEDIDOS)):
+        ruta = os.path.join(PEDIDOS, fn)
+        d = _json(ruta) or {}
+        pr = d.get("pr")
+        try:
+            viejo = (ahora - datetime.datetime.fromisoformat(d.get("ts"))).total_seconds() > VIDA_PEDIDO_S
+        except (TypeError, ValueError):
+            viejo = True
+        nombre, motivo = (None, "encargo ilegible") if not pr else _pedir(pr)
+        reintentar = not nombre and not viejo and ("CI" in motivo or "NO le ha llegado" in motivo)
+        if not reintentar:
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+        out.append((pr, "enviado" if nombre else motivo))
+        try:
+            with open(os.path.join(DIR, "pedidos.jsonl"), "a", encoding="utf-8") as f:
+                f.write(json.dumps({"ts": ahora.isoformat(timespec="seconds"), "pr": pr,
+                                    "borrador": nombre, "motivo": motivo,
+                                    "reintenta": reintentar}, ensure_ascii=False) + "\n")
+        except OSError:
+            pass
+    return out
+
+
 def _pinta(hallazgos):
     if not hallazgos:
         print("la web está al día: ningún hallazgo.")
@@ -446,9 +497,17 @@ def main(argv):
         print("última pasada: %s · modo %s" % (d.get("fecha"), d.get("modo")))
         _pinta(d.get("hallazgos") or [])
         return 0
+    if len(argv) == 2 and argv[0] == "pedir-ok":
+        encargar_pedir_ok(int(argv[1].lstrip("#")))
+        print("📝 encargado. Para que salga ya: "
+              "python3 tools/activar_daemon.py com.btp.web-guardian --reemplaza --kick")
+        return 0
     if argv and argv[0] not in ("--seco",):
         print(__doc__)
         return 2
+    if "--seco" not in argv:
+        for pr, resultado in atender_pedidos():
+            print("📨 PR #%s: %s" % (pr, resultado))
     hoy = datetime.date.today()
     hallazgos = pasada(hoy)
     if "--seco" in argv:

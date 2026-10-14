@@ -258,5 +258,32 @@ class SombraYActivo(unittest.TestCase):
         self.assertEqual([], G.resumen_hoy(hoy=HOY))
 
 
+class LosEncargos(unittest.TestCase):
+    """Una sesión no puede escribirle a Telegram; el guardián, que corre en launchd, sí."""
+
+    def setUp(self):
+        import shutil
+        shutil.rmtree(G.PEDIDOS, ignore_errors=True)
+
+    def test_enviado_se_retira(self):
+        G.encargar_pedir_ok(272)
+        r = G.atender_pedidos(_pedir=lambda n: ("borrador.json", ""))
+        self.assertEqual([(272, "enviado")], r)
+        self.assertEqual([], os.listdir(G.PEDIDOS))
+
+    def test_ci_sin_terminar_se_reintenta_y_lo_definitivo_no(self):
+        G.encargar_pedir_ok(272)
+        G.atender_pedidos(_pedir=lambda n: (None, "el CI del PR #272 está «pendiente»"))
+        self.assertEqual(["272.json"], os.listdir(G.PEDIDOS), "se reintenta en la siguiente pasada")
+        G.atender_pedidos(_pedir=lambda n: (None, "el PR #272 no cambia ningún texto"))
+        self.assertEqual([], os.listdir(G.PEDIDOS))
+
+    def test_un_encargo_viejo_no_se_reintenta_para_siempre(self):
+        G.encargar_pedir_ok(272)
+        luego = datetime.datetime.now() + datetime.timedelta(days=3)
+        G.atender_pedidos(_pedir=lambda n: (None, "el CI está «pendiente»"), ahora=luego)
+        self.assertEqual([], os.listdir(G.PEDIDOS))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

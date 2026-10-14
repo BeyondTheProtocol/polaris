@@ -44,6 +44,9 @@ def _sandbox():
     salida.PENDING = os.path.join(salida.OUTBOX, "pending")
     avisos = []
     salida.report_to_titular = lambda texto, **k: (avisos.append(texto) or {"delivered": True})
+    # Como el bot o launchd: este proceso SÍ puede escribirle (chat y token legibles).
+    salida._self_chatid = lambda: "123"
+    salida.get_secret = lambda *a, **k: "token-de-prueba"
     return avisos
 
 
@@ -69,6 +72,20 @@ class ElAviso(unittest.TestCase):
         self.assertIn("deploy-preview-268", aviso)
         self.assertIn("Responde «sí» a ESTE mensaje", aviso)
         self.assertIn("aprobar %s " % nombre, aviso)
+
+    def test_si_este_proceso_no_puede_escribirle_no_queda_nada_en_disco(self):
+        """14-oct-26, PR #272: desde una sesión (sin Llavero) el aviso se guardó como borrador,
+        con el nonce en claro dentro, y la herramienta dijo que le había llegado."""
+        avisos = _sandbox()
+        salida._self_chatid = lambda: None             # como una sesión de Claude Code
+        llamadas = []
+        salida.report_to_titular = lambda texto, **k: llamadas.append(texto) or {"delivered": False}
+        nombre, motivo = L.pedir_ok(268, _lee=lambda n: _pr(n), _textos=lambda *a: TEXTOS)
+        self.assertIsNone(nombre)
+        self.assertIn("NO le ha llegado", motivo)
+        self.assertEqual([], llamadas, "ni se intenta: report_to_titular lo guardaría en disco")
+        pendientes = os.listdir(salida.PENDING) if os.path.isdir(salida.PENDING) else []
+        self.assertEqual([], pendientes, "ningún borrador con su código se queda esperando")
 
     def test_sin_texto_no_se_le_pide_nada(self):
         nombre, motivo, avisos = _pide(textos=[])

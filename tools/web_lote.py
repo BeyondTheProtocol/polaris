@@ -198,6 +198,10 @@ def pedir_ok(numero, _lee=leer_pr, _textos=None, _draft=None):
     nombre = (_draft or salida._draft)(
         "web", "publish", "%s#%d" % (salida.WEB_REPO, numero), mensaje, "guardián de la web",
         sellado={"pr": numero, "sha": sha, "huella": WP.huella_textos(textos)})
+    if not nombre:
+        return None, ("el Telegram NO le ha llegado: este proceso no puede escribirle (una sesión "
+                      "de Claude Code no lee el Llavero). Encárgalo al guardián: "
+                      "python3 tools/web_guardian.py pedir-ok %d" % numero)
     return nombre, ""
 
 

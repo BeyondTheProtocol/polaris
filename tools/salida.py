@@ -615,7 +615,16 @@ def _draft(channel, action, dest, text, reason, avisos=None, sellado=None):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
-    _avisar_nonce(payload, name, nonce)
+    avisado = _avisar_nonce(payload, name, nonce)
+    if channel == "web" and not avisado:
+        # Un borrador web que ella no ha visto no puede quedarse esperando un «sí»: se retira y
+        # quien lo pidió se entera (14-oct-26: el aviso del PR #272 no llegó y nadie lo supo).
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        _audit(channel, action, dest, "retirado", "el aviso no le llegó", len(text or ""))
+        return None
     return name
 
 
@@ -719,6 +728,11 @@ def _avisar_web(d, name, nonce):
     huella sellada, para que se vea que es el mismo. Su «sí» respondiendo a ESTE mensaje lo
     resuelve el bot leyendo la línea «aprobar …» del mensaje citado; esa línea también vale
     escrita a mano. Nunca lanza."""
+    # Si este proceso no puede escribirle (una sesión de Claude Code no lee el Llavero: código 36),
+    # NO se intenta: `report_to_titular` guardaría el aviso como borrador en disco, y con él el
+    # nonce en claro, que solo puede vivir en su chat. Pasó el 14-oct-26 con el PR #272.
+    if not (_self_chatid() and get_secret("btp-telegram-token", SECRETS, "token")):
+        return False
     try:
         texto = str(d.get("texto") or "")
         huella = str((d.get("sellado") or {}).get("huella") or "")[:12]
