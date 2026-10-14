@@ -124,6 +124,48 @@ class SuRespuesta(unittest.TestCase):
         self.assertIsNone(salida.aprobacion_por_respuesta("sí", None), "un sí suelto no aprueba")
         self.assertIsNone(salida.aprobacion_por_respuesta("sí", "un mensaje cualquiera del bot"))
 
+    AVISO_WEB = ("🌐 Web · ¿apruebas este texto? (PR #272)\n…\n"
+                 "aprobar 2026-10-14T140235-web-publish-a4d6f96bc0ad.json 0123456789abcdef")
+
+    def test_una_respuesta_con_cambios_es_una_correccion_de_ese_pr(self):
+        """14-oct-26: «añade link a x…» respondiendo al aviso del #272 se perdió en el triaje."""
+        self.assertEqual(272, salida.cambios_a_aviso_web(
+            "añade link a x anunciando que ya he empezado", self.AVISO_WEB))
+        self.assertIsNone(salida.cambios_a_aviso_web("sí", self.AVISO_WEB), "un sí aprueba, no corrige")
+        self.assertIsNone(salida.cambios_a_aviso_web("cambia esto", None))
+        self.assertIsNone(salida.cambios_a_aviso_web("cambia esto", self.CITA),
+                          "responder a un aviso que no es de la web no es una corrección web")
+
+    def test_el_bot_apunta_los_cambios_y_no_los_manda_al_triaje(self):
+        import bot_telegram as B
+        import web_guardian
+        apuntados, respuestas = [], []
+        viejos = (salida.react_to_titular, salida.report_to_titular, B.healthcheck.mark_seen,
+                  web_guardian.encargar_cambios)
+        salida.react_to_titular = lambda *a, **k: None
+        salida.report_to_titular = lambda t, **k: respuestas.append(t) or {"delivered": True}
+        B.healthcheck.mark_seen = lambda *a, **k: None
+        web_guardian.encargar_cambios = lambda n, t: apuntados.append((n, t))
+        try:
+            r = B.handle_message({"text": "añade link a x", "cita": self.AVISO_WEB, "message_id": 9})
+        finally:
+            (salida.react_to_titular, salida.report_to_titular, B.healthcheck.mark_seen,
+             web_guardian.encargar_cambios) = viejos
+        self.assertEqual("cambios-web:272", r)
+        self.assertEqual([(272, "añade link a x")], apuntados)
+        self.assertTrue(any("PR #272" in x and "No se publica nada" in x for x in respuestas))
+
+    def test_encargar_cambios_lo_deja_para_quien_lo_aplique(self):
+        import web_guardian
+        import shutil
+        shutil.rmtree(web_guardian.CAMBIOS, ignore_errors=True)
+        web_guardian.encargar_cambios(272, "añade link a x")
+        pend = web_guardian.cambios_pendientes()
+        self.assertEqual(1, len(pend))
+        self.assertEqual(272, pend[0]["pr"])
+        with open(web_guardian.BUZON, encoding="utf-8") as f:
+            self.assertIn("PR #272", f.read().splitlines()[-1])
+
     def test_el_bot_aprueba_con_su_si_y_no_con_un_mensaje_editado(self):
         import bot_telegram as B
         llamadas = []

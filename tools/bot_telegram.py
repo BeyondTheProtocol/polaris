@@ -317,6 +317,18 @@ def handle_message(msg):
         res = salida.approve_and_deliver(par[0], par[1])
         responder("✅ " + res["reason"] if res.get("delivered") else "⛔ " + res["reason"])
         return "aprobacion-si:%s" % ("ok" if res.get("delivered") else "no")
+    # Si NO es un «sí» pero responde a un aviso de la web, son cambios a ese texto: se apuntan
+    # para el guardián con su PR, en vez de perderse en el triaje como un mensaje suelto.
+    pr_cambios = None if msg.get("editado") else salida.cambios_a_aviso_web(text, msg.get("cita"))
+    if pr_cambios:
+        try:
+            import web_guardian
+            web_guardian.encargar_cambios(pr_cambios, text)
+            responder("📝 Entendido: cambios al texto de la web (PR #%d). No se publica nada; te "
+                      "mando la versión nueva para que la apruebes." % pr_cambios)
+            return "cambios-web:%d" % pr_cambios
+        except Exception as e:
+            sys.stderr.write("bot: no pude apuntar los cambios web (%r); sigue al triaje\n" % (e,))
 
     # Comando de aprobación A4: «aprobar <borrador> <nonce>»
     partes = text.split()

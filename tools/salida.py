@@ -756,6 +756,20 @@ _RE_SI = re.compile(r"^\s*(s[ií]+|ok|okey|vale|dale|apruebo|aprobado|adelante|p
 _RE_ORDEN_EN_CITA = re.compile(r"^aprobar\s+(\S+\.json)\s+([0-9a-f]{16})\s*$", re.M)
 
 
+_RE_AVISO_WEB = re.compile(r"^aprobar\s+\S+-web-publish-\S+\.json\s+[0-9a-f]{16}\s*$", re.M)
+_RE_PR_EN_AVISO = re.compile(r"\(PR #(\d{1,6})\)")
+
+
+def cambios_a_aviso_web(texto, cita):
+    """El número de PR si su mensaje RESPONDE a un aviso de la web y no es un «sí»: entonces es
+    una corrección a ese texto (14-oct-26, PR #272: «añade link a x…» se perdió en el triaje).
+    None si no responde a un aviso web o si es un «sí»."""
+    if not texto or not cita or _RE_SI.match(texto) or not _RE_AVISO_WEB.search(cita):
+        return None
+    m = _RE_PR_EN_AVISO.search(cita)
+    return int(m.group(1)) if m else None
+
+
 def aprobacion_por_respuesta(texto, cita):
     """(borrador, nonce) si su mensaje es un «sí» que responde a un aviso con orden de aprobar;
     None si no. El nonce se lee del mensaje CITADO, que escribió el bot en su chat: no se guarda

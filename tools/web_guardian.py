@@ -444,6 +444,36 @@ def encargar_pedir_ok(numero):
              {"pr": int(numero), "ts": datetime.datetime.now().isoformat(timespec="seconds")})
 
 
+CAMBIOS = os.path.join(DIR, "cambios")
+
+
+def encargar_cambios(numero, texto):
+    """Apunta los cambios que ella pidió respondiendo al aviso del PR `numero`. Su texto es suyo
+    (viene de su chat), pero se guarda como DATO: quien lo aplique lo trata como instrucciones de
+    contenido para ese PR, no como órdenes de sistema. Deja además una propuesta en el buzón de
+    Vega para que una sesión lo recoja (hasta que la cadena de agentes del paso 2 lo haga sola)."""
+    os.makedirs(CAMBIOS, exist_ok=True)
+    ahora = datetime.datetime.now().isoformat(timespec="seconds")
+    ruta = os.path.join(CAMBIOS, "%d-%s.json" % (int(numero), ahora.replace(":", "")))
+    _escribe(ruta, {"pr": int(numero), "texto": str(texto)[:4000], "ts": ahora})
+    import _lock
+    with _lock.lock("vega-propuestas", timeout=20.0):
+        os.makedirs(os.path.dirname(BUZON), exist_ok=True)
+        with open(BUZON, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": ahora, "origen": ORIGEN,
+                                "titulo": "Web: {{TITULAR}} pide cambios al texto del PR #%d" % int(numero),
+                                "nota": str(texto)[:300],
+                                "ruta": os.path.relpath(ruta, _casa.casa_base())},
+                               ensure_ascii=False) + "\n")
+    return ruta
+
+
+def cambios_pendientes():
+    if not os.path.isdir(CAMBIOS):
+        return []
+    return [_json(os.path.join(CAMBIOS, f)) for f in sorted(os.listdir(CAMBIOS)) if f.endswith(".json")]
+
+
 def atender_pedidos(_pedir=None, ahora=None):
     """[(pr, resultado)]. Manda el Telegram de cada PR encargado. Lo que aún no puede salir
     (CI sin terminar) se queda para la siguiente pasada, hasta 48 h; lo demás se retira."""
