@@ -3674,6 +3674,18 @@
       "nota": "Clasificada el 10-oct-26. Contexto: es un permiso de autonomía y un modo de trabajar, no un patrón en una respuesta. El incumplimiento («te presento tres cambios como opciones a elegir») es indistinguible por forma de una pregunta legítima de alcance o de una decisión que sí es suya (clínica, hacia fuera, gasto), y hay que saber si el plan estaba aprobado y en ejecución. Cualquier regex daría falso verde o ruido. Sin garantía, y se dice así."
     },
     {
+      "slug": "feedback-borrar-regenerable-decido-yo",
+      "que": "En limpiezas de disco borro sin pedir OK item a item lo regenerable o recuperable (cachés, modelos públicos sin uso, worktrees fusionados, runtimes); lo único, clínico, de mensajería personal o que reinicia la casa base sigue en el gate",
+      "clase": "contexto",
+      "mecanismo": null,
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 15-oct-26. Contexto: permiso de autonomía con borde. Que algo sea «regenerable» o «copia única» depende de comprobaciones fuera del texto de la respuesta (lsof, referencias en tools, si existe otra copia), así que el gate no puede distinguir por forma un borrado legítimo de uno que no lo es. El freno duro de lo clínico sigue en clinico_guard.py y el de los worktrees en singleton_guard.py. Sin garantía, y se dice así."
+    },
+    {
       "slug": "feedback-pruebas-del-ensayo-ya-las-valoro-su-equipo",
       "que": "Las pruebas que pide y lee su propio equipo (cribado de un ensayo, control previo a una dosis) se dan por valoradas; no se le presentan como «no consta si se valoró» ni se montan preguntas de «¿lo visteis?»",
       "clase": "contexto",
