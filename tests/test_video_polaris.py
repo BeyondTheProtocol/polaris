@@ -302,6 +302,24 @@ class TestVozV4(unittest.TestCase):
         from revisa_tomas import plano
         self.assertNotEqual(plano("We're still going for N-E-D."), plano("We're still going for NED."))
 
+    def test_pitch_de_terceros_no_hereda_la_marca_de_polaris(self):
+        # Pitch.tsx (15-oct-2026, primer uso: ClinicOmics para inversores) pinta la marca de OTRO desde el guion
+        tsx, root, nar = leer("remotion/src/Pitch.tsx"), leer("remotion/src/Root.tsx"), leer("narrado.py")
+        self.assertIn('id="Pitch"', root)
+        for polaris in ("STAR_D", "Fraunces", "berenjena", "#FF6B47", "#2D1B3D", "lightLeak", "helptitular"):
+            self.assertNotIn(polaris, tsx, f"{polaris}: un tercero no lleva nuestra identidad")
+        self.assertIn("(T as any).tema", tsx, "los colores y el logo salen del guion")
+        self.assertIn('T["tema"] = g["tema"]', nar, "narrado.py tiene que pasar el tema al timeline")
+        # ™ en superíndice a la derecha (regla de marca de ClinicOmics) y palabras con guion sin partir (PD-L1)
+        self.assertIn("<sup", tsx)
+        self.assertIn("whiteSpace: 'nowrap'", tsx)
+        # ninguna cifra cuenta en pantalla: un fotograma con «6×» camino del 7× es un dato falso (15-oct-2026)
+        self.assertNotRegex(tsx, r"Math\.round\([^)]*\*\s*(cuenta|progreso|x)\b", "contador sobre una cifra")
+        self.assertIn("mascara(", tsx, "las cifras se descubren con máscara, sin valores intermedios")
+        # nunca el mismo texto dos veces: sin subtítulos donde lo dicho ya está escrito en grande
+        for tipo in ("portada", "cierre", "golpes", "cita", "lista"):
+            self.assertRegex(tsx, rf"\[[^\]]*'{tipo}'[^\]]*\]\.includes\(c\.escena\.tipo\)\) continue")
+
 
 if __name__ == "__main__":
     r = unittest.main(exit=False, verbosity=0).result

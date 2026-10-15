@@ -217,10 +217,12 @@ def main(guion, build):
             frases.append({"t0": tr["t0"], "t1": tr["t1"], "texto": f.get("pantalla") or f["texto"],
                            "palabras": [{"w": w["w"], "a": round(tr["t0"] + w["a"], 3), "b": round(tr["t0"] + w["b"], 3)}
                                         for w in pal[f"{c['id']}-{i}"]]})
-        caps.append({k: c[k] for k in ("id", "kicker", "titulo", "escena")} | {"t0": frases[0]["t0"], "t1": frases[-1]["t1"], "frases": frases})
+        caps.append({k: c.get(k, "") for k in ("id", "kicker", "titulo", "escena")} | {"t0": frases[0]["t0"], "t1": frases[-1]["t1"], "frases": frases})
     cifras = json.load(open(os.path.join(AQUI, "remotion", "public", "cifras.json"), encoding="utf-8"))
     cifras.update(g.get("cifras_extra", {}))  # cifras propias del vídeo (p. ej. alcance de un post), en el guion y no a mano
     T = {"slug": g["slug"], "idioma": g["idioma"], "total": tv["total"], "fps": 30, "capitulos": caps, "cifras": cifras}
+    if g.get("tema"):  # marca de un vídeo que no es de Polaris (p. ej. un pitch de terceros): la pinta Pitch.tsx
+        T["tema"] = g["tema"]
     if g.get("aviso"):  # aviso de voz clonada (art. 50.4 RIA): Narrado.tsx lo pinta desde el fotograma 0
         T["aviso"] = g["aviso"] | {"entrada": g["entrada"]}
     os.makedirs(PUBLICO, exist_ok=True)
