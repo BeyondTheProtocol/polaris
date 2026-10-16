@@ -15,6 +15,7 @@ PY="$REPO/.venv/bin/python3"; [ -x "$PY" ] || PY="$(command -v python3 || echo p
 OWUI_PORT="${OWUI_PORT:-3030}"; LC_PORT="${LC_PORT:-3031}"
 OWUI_TS="${OWUI_TS:-3040}";     LC_TS="${LC_TS:-3041}"   # puertos del relay Tailscale (móvil)
 COLIMA_DNS="${BTP_COLIMA_DNS:-1.1.1.1 8.8.8.8}"          # DNS propio: colima no arranca tras NordVPN sin esto
+COLIMA_PERFIL="${BTP_COLIMA_PROFILE:-default}"           # start, status y ssh miran ESTE perfil, el mismo los tres
 VM_MTU="${BTP_VM_MTU:-1280}"                              # MTU de la VM: descargas grandes caen en agujero negro bajo VPN con 1500
 
 c_red(){ printf '\033[31m%s\033[0m\n' "$*"; }
@@ -30,17 +31,24 @@ have_colima(){ command -v colima >/dev/null 2>&1; }
 # a 1280. Bajo NordVPN, sin DNS propio colima NO arranca, y con MTU 1500 las descargas
 # grandes (imágenes de varios GB) caen en agujero negro. Inofensivo sin VPN. Idempotente.
 # Ver [[reference-colima-docker-nordvpn-dns-mtu]]. Desactivable con BTP_SKIP_COLIMA=1.
+# Un `--dns` POR IP: `colima start [profile] [flags]` lee una IP suelta como nombre de perfil. Así
+# nació el perfil fantasma «8.8.8.8» (7,7 GiB, 15-oct-26). El perfil va con `--profile` en las tres
+# llamadas porque `colima ssh` no lo acepta posicional. Test: tests/test_interfaces_colima.py.
 ensure_colima(){
   [ "${BTP_SKIP_COLIMA:-0}" = "1" ] && return 0
   have_colima || return 0
+  local ip ips=() dns=()
+  read -r -a ips <<<"$COLIMA_DNS"
+  for ip in ${ips[@]+"${ips[@]}"}; do dns+=(--dns "$ip"); done   # bash 3.2 + set -u: array vacío
   if ! docker_ok; then
-    c_yel "Docker apagado → arranco colima (DNS propio + MTU $VM_MTU, para VPN)…"
-    colima start --dns ${COLIMA_DNS} >/dev/null 2>&1 || { c_red "❌ no pude arrancar colima"; return 1; }
+    c_yel "Docker apagado → arranco colima «${COLIMA_PERFIL}» (DNS propio + MTU $VM_MTU, para VPN)…"
+    colima --profile "$COLIMA_PERFIL" start ${dns[@]+"${dns[@]}"} >/dev/null 2>&1 \
+      || { c_red "❌ no pude arrancar colima"; return 1; }
   fi
-  colima status >/dev/null 2>&1 || return 0
-  local cur; cur="$(colima ssh -- cat /sys/class/net/eth0/mtu 2>/dev/null || echo '')"
+  colima --profile "$COLIMA_PERFIL" status >/dev/null 2>&1 || return 0
+  local cur; cur="$(colima --profile "$COLIMA_PERFIL" ssh -- cat /sys/class/net/eth0/mtu 2>/dev/null || echo '')"
   if [ "$cur" != "$VM_MTU" ]; then
-    colima ssh -- sudo ip link set dev eth0 mtu "$VM_MTU" 2>/dev/null \
+    colima --profile "$COLIMA_PERFIL" ssh -- sudo ip link set dev eth0 mtu "$VM_MTU" 2>/dev/null \
       && c_grn "✅ MTU de la VM a $VM_MTU (descargas grandes bajo VPN)" \
       || c_yel "⚠️  no pude ajustar el MTU de la VM → descargas grandes podrían cortarse bajo VPN"
   fi

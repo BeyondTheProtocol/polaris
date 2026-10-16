@@ -601,6 +601,7 @@ runpy test_auto_mejora_turnos.py
 runpy test_cola_turnos.py
 runpy test_evals.py
 runpy test_borde_gateway.py
+runpy test_interfaces_colima.py   # 16-oct · interfaces.sh: un --dns por IP (la 2ª ya no crea el perfil «8.8.8.8») y start/status/ssh en el mismo perfil
 runpy test_yt_inbox.py
 runpy test_mcp_server.py
 run   test_git_barrido_poda.sh  # 22-sep · la poda diaria no depende de que el modelo esté disponible
