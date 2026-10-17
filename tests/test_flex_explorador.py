@@ -178,7 +178,39 @@ def export_sintetico(d):
     escribe_json(os.path.join(d, "web", "manifiesto.json"),
                  {"version": 1, "sello": "sin_verificar", C.CLAVE_OK_TITULAR: False, "lesiones": list(C.LESIONES), "ficheros": fich,
                   "modo_sondas": C.ETIQUETA_MODO["todas"]})
+    # «Loupe público»: un Zarr por lesión con TODOS los genes y su suelo (el mismo constructor que exporta.py)
+    idx = list(obs.index)
+    for les, ids in (("higado", idx[:Lh["n"]]), ("hueso", idx[Lh["n"]:])):
+        escribe_zarr_sintetico(os.path.join(d, C.ZARR_DIR, "%s.zarr" % les), les, Ls[les], ids)
     return Ls
+
+
+def suelo_todos_sintetico(les, L):
+    ST = C._suelo_todos()
+    n, G = L["X"].shape
+    grupo = np.asarray(L["grupo"]).astype(str)
+    g_ids = C.grupos_zarr(les, grupo)
+    umi = np.asarray(L["X"].sum(axis=1)).ravel().astype(np.int64) + 1
+    ref = np.isin(grupo, C.GRUPOS[les]["referencia"])
+    excl = np.zeros(G, bool)
+    excl[-2:] = True                                  # dos genes «sin sonda»
+    return ST.calcula(L["X"], rng.dirichlet(np.ones(G)), 1.5, umi, rng.uniform(0, .01, n), rng.integers(0, 4, G),
+                      grupo, g_ids, ref, rng.uniform(0, 2, int(ref.sum())), excl), umi
+
+
+def escribe_zarr_sintetico(p, les, L, ids):
+    todos, umi = suelo_todos_sintetico(les, L)
+    C.escribe_zarr_lesion(p, les, L["X"], umi, GENES, ["ENSG%011d" % i for i in range(len(GENES))], L["grupo"],
+                          L["tipo_c"], L["umap"], ids, todos, C.version_contrato("todas"), "todas")
+
+
+def reescribe_zarr(p, f, csr=False):
+    """Lee el Zarr, aplica f(AnnData) y lo vuelve a escribir con los trozos del contrato (y, si csr, X en csr)."""
+    a = an.read_zarr(p)
+    f(a)
+    shutil.rmtree(p)
+    a.write_zarr(p)
+    C.fija_X_zarr(p, sp.csr_matrix(a.X) if csr else sp.csc_matrix(a.X))
 
 
 def valida(d):
@@ -252,7 +284,75 @@ def main():
           C.cadena_prohibida("x ab12345m1 y", {"ab12345m1"}) == "identificador_de_muestra_o_pool", "la forma completa del id sigue prohibida en cualquier cadena")
     check(C.cadena_prohibida("MARCH10", PROHIB) is None and C.cadena_prohibida("17-oct-26", PROHIB) == "fecha", "mes+año es fecha; MARCH10 no")
 
+    # 1b) Zarr por lesión («Loupe público»): pasa, todos los genes, X en csc, suelo en cada gen con sonda
+    zh, zb = res.get("zarr/higado.zarr", {}), res.get("zarr/hueso.zarr", {})
+    check(zh.get("n_celulas") == N["higado"] and zb.get("n_celulas") == N["hueso"]
+          and zh.get("n_genes") == len(GENES) and zh.get("n_genes_sin_sonda") == 2,
+          "zarr sintéticos pasan el validador (células por lesión, TODOS los genes, 2 sin sonda)")
+    import zarr
+    zg = zarr.open_group(os.path.join(base, "zarr", "higado.zarr"), mode="r")
+    check(zg["X"].attrs["encoding-type"] == "csc_matrix" and zg["X"]["data"].chunks[0] <= C.ZARR_CHUNK,
+          "zarr: X en csc_matrix con trozos del contrato (la web lee gen a gen)")
+    check(C.sig3(np.array([1234.5, 0.012345, 99.95])).tolist() == [float("%.3g" % x) for x in (1234.5, 0.012345, 99.95)],
+          "sig3 vectorizado = «%.3g» de la web")
+
     # 2) mutantes
+    zh = os.path.join("zarr", "higado.zarr")
+    zb = os.path.join("zarr", "hueso.zarr")
+    d = copia(base)
+    reescribe_zarr(os.path.join(d, zh), lambda a: None, csr=True)
+    debe_fallar(d, "zarr: X en csr (la web recorrería la matriz entera por gen)", "csc_matrix")
+
+    d = copia(base)
+
+    def _sin_suelo(a):
+        a.var.iloc[3, a.var.columns.get_loc(C.PREFIJO_SUELO + "otras")] = np.nan
+    reescribe_zarr(os.path.join(d, zh), _sin_suelo)
+    debe_fallar(d, "zarr: un gen con sonda sin suelo en un grupo", "sin suelo")
+
+    d = copia(base)
+
+    def _excluido_con_valor(a):
+        a.uns["genes_sin_sonda"] = np.array(list(a.uns["genes_sin_sonda"])[:1], dtype=object)
+    reescribe_zarr(os.path.join(d, zh), _excluido_con_valor)
+    debe_fallar(d, "zarr: un gen sin sonda que deja de declararse (queda sin suelo)", "sin suelo")
+
+    d = copia(base)
+
+    def _barcode_en_var(a):
+        v = list(a.var_names)
+        v[5] = "AAACCCAAGAAACACT-1"
+        a.var_names = v
+    reescribe_zarr(os.path.join(d, zh), _barcode_en_var)
+    debe_fallar(d, "zarr: un barcode 10x en var", "barcode_10x")
+
+    d = copia(base)
+
+    def _tumor(a):
+        g = a.obs["grupo"].astype(str).values.copy()
+        g[np.where(g == "otras")[0][:5]] = "tumor"
+        a.obs["grupo"] = g
+    reescribe_zarr(os.path.join(d, zh), _tumor)
+    debe_fallar(d, "zarr: «tumor» en un grupo del hígado", "tumor")
+
+    d = copia(base)
+
+    def _uns_extra(a):
+        a.uns["nota"] = "x"
+    reescribe_zarr(os.path.join(d, zh), _uns_extra)
+    debe_fallar(d, "zarr: una clave de uns fuera del contrato", "uns fuera del contrato")
+
+    d = copia(base)
+
+    def _celulas_del_higado(a):
+        a.obs_names = C.indice_secuencial(a.n_obs)       # índices válidos y ordenados, pero los del hígado
+    reescribe_zarr(os.path.join(d, zb), _celulas_del_higado)
+    debe_fallar(d, "zarr: el del hueso con índices de células del hígado", "no son las de esa lesión")
+
+    d = copia(base)
+    shutil.rmtree(os.path.join(d, zb))
+    debe_fallar(d, "zarr: falta el del hueso", "no existe")
+
     d = copia(base)
     a = an.read_h5ad(os.path.join(d, "explorador.h5ad"))
     a.obs["barcode"] = ["x"] * a.n_obs

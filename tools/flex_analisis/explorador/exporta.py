@@ -51,6 +51,7 @@ import gc  # noqa: E402
 import importlib.util  # noqa: E402
 import json  # noqa: E402
 import math  # noqa: E402
+import shutil  # noqa: E402
 import time  # noqa: E402
 
 import numpy as np  # noqa: E402
@@ -60,6 +61,7 @@ RAIZ_REPO = os.path.dirname(os.path.dirname(os.path.dirname(AQUI)))
 HOME = os.path.expanduser("~")
 sys.path.insert(0, AQUI)
 import _contrato as C  # noqa: E402
+import _suelo_todos as ST  # noqa: E402  («Loupe público»: suelo y referencia de TODOS los genes)
 
 sys.path.insert(0, os.path.join(AQUI, "..", "cierre"))
 import _c  # noqa: E402  (trae tribunal/_comun como _c.TC y pone tribunal/ en sys.path)
@@ -95,6 +97,7 @@ UMAP_PARAMS = {"normalizacion": "normalize_total(target_sum=1e4) + log1p sobre X
 MODO = "todas"
 PROHIBIDAS = set()
 ESCRITOS = []
+ZINFO = {}                          # resumen de los Zarr por lesión, para el informe
 T0 = time.time()
 
 
@@ -587,6 +590,15 @@ def procesa_lesion(t, ps, cv, ctx):
             suelo[g][gid_] = _r(np.mean(1 - np.exp(-lam)), 3) if m.any() else 0.0
         refd[g] = _r(np.sum(w * (v[ref] > 0)) / max(w.sum(), 1e-12), 4)
     L.update(expr=expr, suelo=suelo, referencia=refd, veredicto=C.veredictos_lesion(t, genes))
+    # «Loupe público» (plan aprobado por la titular, 17-oct): suelo y referencia de TODOS los genes con la misma
+    # fórmula. Fail-closed: tiene que reproducir exactamente los de los genes de la web y no dejar ningún gen
+    # con sonda sin suelo (condición del comité médico para abrir los 18.132 genes).
+    todos = ST.calcula(X, p_amb, rho, umi, delta_adn, nu, grupo, g_ids, ref, w, excl_sin_sonda)
+    malos = ST.coincide_con_web(todos, [str(s) for s in simb], suelo, refd)
+    if malos:
+        raise RuntimeError("%s: el suelo de todos los genes no reproduce el de la web (%d discrepancias)" % (t, len(malos)))
+    ST.valida_completo(todos, len(simb))
+    L.update(suelo_todos=todos, umi=umi)
 
     # CNV
     if t == "hueso":
@@ -729,6 +741,12 @@ def informe(Ls, resumen_u3, h5info, validadores, ruta_h5, pool):
         "(fórmula de tribunal/_adn.py: delta medio × nº de sondas dentro de exón / UMI medio; recalculada y cotejada con tribunal/adn.json, tolerancia 2 %), "
         "la de Cell Ranger (adn.json, cell_ranger_referencia) y la del grupo de interés de este export. `sondas` = [unión, total] por gen.",
         "Tipos celulares: el `tipo` de las cachés (anotación de A) mapeado a ^[a-z_]+$ (T -> linfocito_t, NK -> nk, B -> linfocito_b).",
+        "TODOS LOS GENES («Loupe público», plan aprobado por la titular el 17-oct; condición del comité médico): suelo ambiental por grupo y "
+        "referencia emparejada para cada gen con sonda, con la MISMA fórmula que los genes de la web (_suelo_todos.py; fail-closed: reproduce "
+        "exactamente los de la web y ningún gen con sonda queda sin suelo). Van en var de un AnnData-Zarr por lesión (zarr/<lesión>.zarr): "
+        "X = CP10k a 3 cifras significativas, como `expr` de la web, en csc_matrix con trozos de %d elementos para que la página lea gen a gen "
+        "(Vitessce 4.1.0 lee csc por columna; csr le obliga a recorrer la matriz entera). Vive FUERA de web/: publicarlo es un paso aparte "
+        "(condiciones del laboratorio y decisión de la titular)." % C.ZARR_CHUNK,
         "Validador, excepciones declaradas: (1) solo en el manifiesto PUBLICADO (sello verificado + ok_titular true), el valor de fecha_ok, y solo si es "
         "AAAA-MM-DD de calendario, no cuenta como fecha y se enmascara en la copia que pasa por puerta_n1 (A4; la clave ok_titular ya no necesita excepción, C1); "
         "(2) el índice secuencial c00000…cNNNNN queda exento de las tiras de 5 cifras de los ids (un índice denso contiene por construcción toda cifra menor que n); "
@@ -767,13 +785,15 @@ def informe(Ls, resumen_u3, h5info, validadores, ruta_h5, pool):
            "reproduccion_acta": {t: Ls[t]["reproduccion_acta"] for t in C.LESIONES},
            "seleccion": {t: Ls[t]["seleccion"] for t in C.LESIONES}, "loo": {t: Ls[t]["loo"] for t in C.LESIONES},
            "adn": {t: {"web": Ls[t]["adn"], "meta": Ls[t]["adn_meta"]} for t in C.LESIONES},
-           "pool_crudo_higiene": pool,
+           "pool_crudo_higiene": pool, "zarr": ZINFO,
            "quitado": quitado, "decisiones": decisiones, "post_hoc": post_hoc, "validadores": validadores}
     md = ["> ⚠️ %s" % aviso1, "",
           "# INFORME DE LIMPIEZA · explorador single-cell (export curado, zona clínica) · modo_sondas = %s" % inf["modo_sondas"], "",
           "Estado: %s. Versión: %s." % (inf["estado"], inf["version"]), "",
           "## Qué hay", "- `%s` (%s)" % (os.path.basename(ruta_h5), json.dumps(h5info, ensure_ascii=False)),
-          "- `web/manifiesto.json`, `web/higado.json`, `web/hueso.json`", "", "## sha256 y tamaño (KB)"]
+          "- `web/manifiesto.json`, `web/higado.json`, `web/hueso.json`",
+          "- `%s/higado.zarr`, `%s/hueso.zarr` (todos los genes, fuera de web/; %s)" % (
+              C.ZARR_DIR, C.ZARR_DIR, json.dumps(ZINFO, ensure_ascii=False)), "", "## sha256 y tamaño (KB)"]
     for k in inf["sha256"]:
         md.append("- `%s` · %s · %s KB" % (k, inf["sha256"][k], inf["tamano_kb"][k]))
     md += ["", "## Células y grupos"]
@@ -831,9 +851,33 @@ def informe(Ls, resumen_u3, h5info, validadores, ruta_h5, pool):
 def borra_escritos():
     for p in set(ESCRITOS):
         try:
-            os.remove(p)
+            if os.path.isdir(p):
+                shutil.rmtree(p)
+            else:
+                os.remove(p)
         except OSError:
             pass
+
+
+def zarrs(Ls):
+    """«Loupe público»: un AnnData-Zarr por lesión con TODOS los genes (X en csc, gen a gen), fuera de web/."""
+    n_h = Ls["higado"]["n"]
+    idx = C.indice_secuencial(n_h + Ls["hueso"]["n"])
+    out = {}
+    for t, ids in (("higado", idx[:n_h]), ("hueso", idx[n_h:])):
+        L = Ls[t]
+        p = os.path.join(OUT, C.ZARR_DIR, "%s.zarr" % t)
+        if os.path.exists(p):
+            shutil.rmtree(p)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        ESCRITOS.append(p)
+        info = C.escribe_zarr_lesion(p, t, L["X"], L["umi"], L["simbolo"], L["gene_ids"], L["grupo"], L["tipo_c"],
+                                     L["umap"], ids, L["suelo_todos"], C.version_contrato(MODO), MODO)
+        tam = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(p) for f in fs)
+        n_f = sum(len(fs) for _, _, fs in os.walk(p))
+        out[t] = {**info, "n_genes_sin_sonda": len(L["suelo_todos"]["excluidos"]), "tamano_mb": _r(tam / 2 ** 20, 1),
+                  "n_ficheros": n_f}
+    return out
 
 
 # ── Órdenes ─────────────────────────────────────────────────────────────────────────────────────
@@ -854,6 +898,7 @@ def exportar(a):
     for t in C.LESIONES:
         Ls[t] = procesa_lesion(t, ps, cv, ctx)
     ruta_h5, h5info = h5ad(Ls)
+    ZINFO.update(zarrs(Ls))
     for t in C.LESIONES:
         web_json(Ls[t])
     fich = [{"ruta": "%s.json" % t, "sha256": C.sha256_fichero(os.path.join(OUT, "web", "%s.json" % t))} for t in C.LESIONES]
@@ -951,10 +996,15 @@ def main(argv=None):
     p.add_argument("orden", choices=["exportar", "validar", "diagnostico"])
     p.add_argument("--sondas", choices=list(C.MODOS_SONDAS), default="todas",
                    help="todas = cuentas de Cell Ranger (base del acta; por defecto); spliced = solo sondas de unión exón-exón (literal, no recomendado)")
+    p.add_argument("--prueba", action="store_true",
+                   help="escribe en <salida>/_prueba: ensayo de un cambio sin pisar el export vigente (si la validación falla, "
+                        "borra solo lo de esta ejecución, que con esto nunca es lo vigente)")
     a = p.parse_args(argv)
     MODO = a.sondas
     global OUT
     OUT = OUT_BASE if MODO == "todas" else os.path.join(OUT_BASE, "solo_spliced")
+    if a.prueba:
+        OUT = os.path.join(OUT, "_prueba")
     preparar()
     return {"exportar": exportar, "validar": validar, "diagnostico": diagnostico}[a.orden](a) or 0
 

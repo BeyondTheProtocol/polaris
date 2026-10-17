@@ -781,6 +781,198 @@ def valida_csv(path, prohibidas=()):
     return {"lineas": texto.count("\n") + 1}
 
 
+# ── Zarr por lesión («Loupe público», plan aprobado por la titular el 17-oct-2026) ──────────────────────
+# TODOS los genes, legibles gen a gen desde la web. Vive FUERA de web/: publicarlo es un paso consciente aparte
+# (condiciones del laboratorio + decisión de la titular), no algo que viaje con la carpeta de la página.
+# U1 (verificado en ObsFeatureMatrixAnndataLoader.js de @vitessce/zarr 4.1.0): Vitessce lee una csc_matrix
+# columna a columna por indptr; con csr_matrix recorre `indices` y `data` enteros en cada selección.
+ZARR_DIR = "zarr"
+ZARR_OBS_COLS = ["grupo", "tipo_celular"]
+ZARR_OBSM = ["X_umap"]
+ZARR_UNS_KEYS = ("version", "lesion", "modo_sondas", "genes_sin_sonda")
+ZARR_VAR_FIJAS = ["ensembl", "referencia_emparejada"]
+PREFIJO_SUELO = "suelo__"
+ZARR_CHUNK = 65536      # elementos por trozo de X/indices y X/data: un gen cae en 1-2 trozos
+
+
+def _suelo_todos():
+    if AQUI not in sys.path:
+        sys.path.insert(0, AQUI)
+    import _suelo_todos as ST
+    return ST
+
+
+def grupos_zarr(lesion, grupo):
+    """Columnas de suelo, en el orden de g_ids de exporta.py: interés, referencias presentes, otras."""
+    g = GRUPOS[lesion]
+    presentes = set(np.asarray(grupo).astype(str))
+    return [g["interes"]] + [r for r in g["referencia"] if r in presentes] + [g["otras"]]
+
+
+def sig3(x):
+    """«%.3g» vectorizado (las cifras de expresión de la web van a 3 cifras significativas)."""
+    x = np.asarray(x, float)
+    out = np.zeros_like(x)
+    nz = x != 0
+    f = 10.0 ** (2 - np.floor(np.log10(np.abs(x[nz]))))
+    out[nz] = np.round(x[nz] * f) / f
+    return out
+
+
+def escribe_zarr_lesion(path, lesion, X, umi, simbolos, ensembl, grupo, tipo_c, umap, indices, suelo_todos,
+                        version, modo):
+    """AnnData-Zarr de UNA lesión: X = CP10k a 3 cifras (como `expr` de la web) en csc_matrix con trozos de
+    ZARR_CHUNK; obs = grupo + tipo_celular con el índice secuencial del h5ad; obsm = X_umap; var = ensembl,
+    referencia emparejada y suelo por grupo de TODOS los genes (`suelo_todos` = salida de _suelo_todos.calcula);
+    uns = version, lesion, modo_sondas, genes_sin_sonda."""
+    import anndata as an
+    import pandas as pd
+    import scipy.sparse as sp
+    X = sp.csr_matrix(X, dtype=np.float64)
+    X = (sp.diags(1e4 / np.asarray(umi, float)) @ X).tocsr()
+    X.data = sig3(X.data)
+    X = X.astype(np.float32).tocsc()
+    X.eliminate_zeros()
+    X.sort_indices()
+    grupos = grupos_zarr(lesion, grupo)
+    if list(suelo_todos["grupos"]) != grupos:
+        raise ValueError("los grupos del suelo no siguen el orden del contrato")
+    cols = {"ensembl": np.asarray(ensembl).astype(str),
+            "referencia_emparejada": np.asarray(suelo_todos["referencia"], float)}
+    for k, gid in enumerate(grupos):
+        cols[PREFIJO_SUELO + gid] = np.asarray(suelo_todos["suelo"], float)[:, k]
+    var = pd.DataFrame(cols, index=pd.Index(np.asarray(simbolos).astype(str)))
+    var.index = an.utils.make_index_unique(var.index)
+    obs = pd.DataFrame({"grupo": pd.Categorical(np.asarray(grupo).astype(str)),
+                        "tipo_celular": pd.Categorical(np.asarray(tipo_c).astype(str))},
+                       index=pd.Index([str(i) for i in indices]))
+    uns = {"version": str(version), "lesion": lesion, "modo_sondas": ETIQUETA_MODO[modo],
+           "genes_sin_sonda": np.array([str(var.index[i]) for i in suelo_todos["excluidos"]], dtype=object)}
+    a = an.AnnData(X=X, obs=obs, var=var, uns=uns, obsm={"X_umap": np.asarray(umap, np.float32)})
+    with an.settings.override(zarr_write_format=2):   # v2 fijado: anndata pasará a v3 por defecto; U1 se verificó con v2
+        a.write_zarr(path)
+    fija_X_zarr(path, X)
+    return {"n_celulas": int(a.n_obs), "n_genes": int(a.n_vars), "nnz_millones": round(X.nnz / 1e6, 3)}
+
+
+def fija_X_zarr(path, X):
+    """Reescribe X del Zarr con trozos de ZARR_CHUNK (write_zarr no los deja elegir en una matriz dispersa) y
+    vuelve a consolidar los metadatos (write_zarr los consolida y write_elem no edita un almacén consolidado)."""
+    import zarr
+    from anndata.io import write_elem
+    zm = os.path.join(path, ".zmetadata")
+    if os.path.exists(zm):
+        os.remove(zm)
+    g = zarr.open_group(path, mode="r+", use_consolidated=False)
+    del g["X"]
+    write_elem(g, "X", X, dataset_kwargs={"chunks": (ZARR_CHUNK,)})
+    zarr.consolidate_metadata(path)
+
+
+def _cadenas_zarr(path):
+    """(dónde, cadena) de TODO el árbol Zarr: nombres de fichero y carpeta, todo el JSON de metadatos
+    (.zattrs/.zarray/.zgroup/zarr.json) y los arrays de texto."""
+    import zarr
+    out = []
+    for d, subdirs, files in os.walk(path):
+        rel = os.path.relpath(d, path)
+        for nombre in subdirs + files:
+            out.append((os.path.join(rel, nombre), nombre))
+        for f in files:
+            if f in (".zattrs", ".zarray", ".zgroup", ".zmetadata", "zarr.json"):
+                with open(os.path.join(d, f), encoding="utf-8") as fh:
+                    out.extend(_cadenas_json(json.load(fh), os.path.join(rel, f)))
+    for nombre, obj in zarr.open_group(path, mode="r").members(max_depth=None):
+        if isinstance(obj, zarr.Array) and obj.dtype.kind in ("O", "S", "U", "T"):
+            out.extend((nombre, _str_de(v)) for v in np.asarray(obj[...]).ravel())
+    return out
+
+
+def valida_zarr_lesion(path, lesion, prohibidas=()):
+    """Fail-closed sobre el Zarr de una lesión: estructura, X en csc, vocabulario, suelo y referencia en TODO
+    gen con sonda, y todas las cadenas del árbol por los patrones propios y puerta_n1."""
+    import anndata as an
+    import zarr
+    q = "zarr %s" % lesion
+    if not os.path.isdir(path):
+        raise ValidacionFallida("%s: no existe" % q)
+    if not os.path.isfile(os.path.join(path, ".zgroup")) or os.path.exists(os.path.join(path, "zarr.json")):
+        raise ValidacionFallida("%s: no es Zarr v2 (el formato con el que se verificó la lectura gen a gen)" % q)
+    g = zarr.open_group(path, mode="r")
+    if _str_de(g.attrs.get("encoding-type", "")) != "anndata":
+        raise ValidacionFallida("%s: raíz sin encoding anndata" % q)
+    # anndata 0.12 escribe raw como un array «null» y los demás como dicts vacíos: eso y nada más
+    if "raw" in g and not (isinstance(g["raw"], zarr.Array) and _str_de(g["raw"].attrs.get("encoding-type", "")) == "null"):
+        raise ValidacionFallida("%s: lleva raw" % q)
+    for k in ("layers", "obsp", "varm", "varp"):
+        if k in g and (not isinstance(g[k], zarr.Group) or len(list(g[k].keys())) > 0):
+            raise ValidacionFallida("%s: %s no está vacío" % (q, k))
+    if "obsm" not in g or sorted(g["obsm"].keys()) != ZARR_OBSM:
+        raise ValidacionFallida("%s: obsm fuera del contrato" % q)
+    X = g["X"]
+    if not isinstance(X, zarr.Group) or _str_de(X.attrs.get("encoding-type", "")) != "csc_matrix":
+        raise ValidacionFallida("%s: X no es csc_matrix (la web tendría que recorrer la matriz entera por gen)" % q)
+    for k in ("indices", "data"):
+        if X[k].chunks[0] > ZARR_CHUNK:
+            raise ValidacionFallida("%s: trozos de X/%s mayores que %d" % (q, k, ZARR_CHUNK))
+    data = np.asarray(X["data"][...])
+    if data.dtype.kind != "f" or (data.size and (not np.isfinite(data).all() or data.min() < 0)):
+        raise ValidacionFallida("%s: X con valores no finitos o negativos" % q)
+    a = an.read_zarr(path)
+    if list(a.obs.columns) != ZARR_OBS_COLS:
+        raise ValidacionFallida("%s: columnas de obs fuera del contrato" % q)
+    idx = [str(i) for i in a.obs_names]
+    if not all(RE_INDICE.match(i) for i in idx) or len(set(idx)) != len(idx) or idx != sorted(idx):
+        raise ValidacionFallida("%s: el índice de obs no es el secuencial c00000…" % q)
+    if set(a.uns.keys()) != set(ZARR_UNS_KEYS) or a.uns["lesion"] != lesion \
+            or a.uns["modo_sondas"] not in ETIQUETA_MODO.values():
+        raise ValidacionFallida("%s: uns fuera del contrato" % q)
+    grupo, tipo = a.obs["grupo"].astype(str).values, a.obs["tipo_celular"].astype(str).values
+    try:
+        comprueba_vocabulario(np.full(len(idx), lesion), grupo, tipo)
+    except ValueError as e:
+        raise ValidacionFallida("%s: %s" % (q, e))
+    grupos = grupos_zarr(lesion, grupo)
+    if list(a.var.columns) != ZARR_VAR_FIJAS + [PREFIJO_SUELO + x for x in grupos]:
+        raise ValidacionFallida("%s: columnas de var fuera del contrato" % q)
+    if a.var_names.duplicated().any():
+        raise ValidacionFallida("%s: símbolos repetidos en var" % q)
+    sin = {str(s) for s in np.asarray(a.uns["genes_sin_sonda"]).ravel()}
+    excl = [int(i) for i in np.where(np.isin(a.var_names.astype(str), list(sin)))[0]]
+    if len(excl) != len(sin):
+        raise ValidacionFallida("%s: genes_sin_sonda que no están en var" % q)
+    res = {"grupos": grupos, "suelo": a.var[[PREFIJO_SUELO + x for x in grupos]].to_numpy(float),
+           "referencia": a.var["referencia_emparejada"].to_numpy(float), "excluidos": excl}
+    try:
+        _suelo_todos().valida_completo(res, a.n_vars)
+    except ValueError as e:
+        raise ValidacionFallida("%s: %s" % (q, e))
+    um = np.asarray(a.obsm["X_umap"])
+    if um.shape != (a.n_obs, 2) or not np.isfinite(um).all():
+        raise ValidacionFallida("%s: X_umap fuera del contrato" % q)
+    cadenas = _cadenas_zarr(path)
+    for donde, c in cadenas:
+        m = cadena_prohibida(c, prohibidas)
+        if m:
+            raise ValidacionFallida("%s %s: %s" % (q, donde, m))
+        if RE_TITULAR_H5.search(c):
+            raise ValidacionFallida("%s %s: nombre de la titular" % (q, donde))
+    n_unicas, toleradas = _puerta_lote([c for _, c in cadenas], q, ignorar_capas=("casi_titular",))
+    return {"n_celulas": int(a.n_obs), "n_genes": int(a.n_vars), "n_genes_sin_sonda": len(excl), "grupos": grupos,
+            "indices": idx, "n_cadenas": len(cadenas), "n_cadenas_unicas_puerta": n_unicas,
+            "tokens_casi_titular_tolerados_como_vocabulario": toleradas}
+
+
+def _indices_h5ad(path):
+    """{lesión: índices de obs} del h5ad, para cotejar los Zarr con él."""
+    import h5py
+    with h5py.File(path, "r") as f:
+        idx = f["obs"]["_index"].asstr()[()]
+        d = f["obs"]["lesion"]
+        les = np.asarray(d["categories"].asstr()[()])[d["codes"][()]] if isinstance(d, h5py.Group) else d.asstr()[()]
+    return {l: [str(i) for i in np.asarray(idx)[np.asarray(les) == l]] for l in LESIONES}
+
+
 def valida_salidas(out_dir, prohibidas=(), con_informe=True):
     """Todas las salidas del export. Lanza ValidacionFallida en el primer fallo; devuelve el resumen."""
     res = {}
@@ -789,6 +981,12 @@ def valida_salidas(out_dir, prohibidas=(), con_informe=True):
     modo = {v: k for k, v in ETIQUETA_MODO.items()}[res["web/manifiesto.json"]["modo_sondas"]]
     for les in LESIONES:
         res["web/%s.json" % les] = valida_web_lesion(os.path.join(out_dir, "web", "%s.json" % les), prohibidas, modo)
+    por_lesion = _indices_h5ad(os.path.join(out_dir, "explorador.h5ad"))
+    for les in LESIONES:
+        z = valida_zarr_lesion(os.path.join(out_dir, ZARR_DIR, "%s.zarr" % les), les, prohibidas)
+        if z.pop("indices") != por_lesion[les]:
+            raise ValidacionFallida("zarr %s: sus células no son las de esa lesión en el h5ad" % les)
+        res["%s/%s.zarr" % (ZARR_DIR, les)] = z
     if con_informe:
         res["INFORME_LIMPIEZA.json"] = {"n_cadenas": valida_json_generico(os.path.join(out_dir, "INFORME_LIMPIEZA.json"), prohibidas)[1]}
         res["INFORME_LIMPIEZA.md"] = valida_texto(os.path.join(out_dir, "INFORME_LIMPIEZA.md"), prohibidas)
