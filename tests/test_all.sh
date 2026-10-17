@@ -580,6 +580,7 @@ runpy test_healthcheck_alerta_str.py
 runpy test_bucles_colgados.py
 runpy test_chrome_headless_cierra.py   # 26-sep · el ayudante de Chrome headless lo cierra siempre (Chrome real, solo casa base)
 runpy test_healthcheck_cpu.py   # 26-sep · CPU saturada dos vueltas seguidas avisa; un pico no
+runpy test_ccd_huerfanos.py   # 16-oct · sesiones ccd-cli de versiones viejas se cierran; pesados juntos avisan
 runpy test_tests_afectados.py   # 26-sep · test_all --cambiados elige bien las baterías
 runpy test_activar_daemon.py
 runpy test_activar_daemon_deshabilitado.py

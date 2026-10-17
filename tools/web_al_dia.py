@@ -44,7 +44,9 @@ import _casa  # noqa: E402
 DIR = os.path.join(_casa.state_dir(), "web_guardian")
 TONOS_ABIERTOS = ("pendiente", "curso")
 HILO_ABIERTO = ("esperando", "en_curso", "por_confirmar", "pendiente")
-RE_AFECTA = re.compile(r"^\s*afecta:\s*([\w-]+)", re.M | re.I)
+# «afecta: ciencia-wes» o «afecta: ciencia-wes → resultados»: la nota dice además A QUÉ estado pasa.
+RE_AFECTA = re.compile(r"^\s*afecta:\s*([\w-]+)(?:\s*(?:→|->)\s*([a-z_]+))?", re.M | re.I)
+DESTINO_POR_DEFECTO = {"avanza": "hecho", "retrocede": "en_curso"}
 DIAS_NOTAS = 60
 
 
@@ -52,17 +54,19 @@ def _h(*partes):
     return hashlib.sha256("|".join(str(p) for p in partes).encode()).hexdigest()[:12]
 
 
-def hecho(clave, carril, prioridad, titulo, detalle, evidencia=None):
-    """Un hecho. Sin evidencia nace `por_confirmar`: se apunta, no se propone."""
+def hecho(clave, carril, prioridad, titulo, detalle, evidencia=None, datos=None):
+    """Un hecho. Sin evidencia nace `por_confirmar`: se apunta, no se propone. `datos` es lo que
+    el redactor necesita para escribir el cambio (N1: ids, estados, nº de PR; nunca texto clínico)."""
     return {"clave": clave, "carril": carril, "prioridad": int(prioridad), "titulo": titulo,
-            "detalle": detalle, "evidencia": evidencia or "",
+            "detalle": detalle, "evidencia": evidencia or "", "datos": datos or {},
             "estado": "encolado" if evidencia else "por_confirmar"}
 
 
 # ── carril A: estados de /ciencia que el Tablero contradice ─────────────────────────────────
 
 def hechos_estados(mapa, hilos, notas_afecta):
-    """`hilos` = {id: hilo de seguimiento.json}; `notas_afecta` = {id del mapa: ruta de la nota}."""
+    """`hilos` = {id: hilo de seguimiento.json}; `notas_afecta` = {id del mapa: ruta de la nota}
+    o {id: (ruta, destino)} cuando la nota dice a qué estado pasa."""
     out = []
     for a in (mapa or {}).get("afirmaciones") or []:
         f = a.get("fuente") or {}
@@ -77,11 +81,14 @@ def hechos_estados(mapa, hilos, notas_afecta):
         else:
             continue
         valor = (a.get("valor") or {}).get("es")
+        nota = notas_afecta.get(a["id"])
+        ruta, destino = nota if isinstance(nota, tuple) else (nota, None)
         out.append(hecho(
             "estado:%s:%s:%s" % (a["id"], tono, estado), "A", 1,
             "/ciencia dice «%s» y su hilo está «%s»" % (valor, estado),
             "%s (%s). Si es así, la web afirma algo que ya no es verdad." % (a["id"], sentido),
-            evidencia=notas_afecta.get(a["id"])))
+            evidencia=ruta, datos={"id": a["id"], "sentido": sentido,
+                                    "destino": destino or DESTINO_POR_DEFECTO[sentido]}))
     return out
 
 
@@ -92,7 +99,8 @@ def hechos_datos(hallazgos_guardian):
     for g in hallazgos_guardian or []:
         if g.get("clave") == "datos-atrasados":
             out.append(hecho("datos:" + _h(g.get("detalle")), "B", 2, g.get("titulo"),
-                             g.get("detalle"), evidencia="guardián: datos-atrasados"))
+                             g.get("detalle"), evidencia="guardián: datos-atrasados",
+                             datos={"peldano": g.get("peldano")}))
     return out
 
 
@@ -109,7 +117,8 @@ def hechos_informes(lineas, desde):
         fecha, carpeta = m.group(1), m.group(2).strip()
         out.append(hecho("informe:" + _h(fecha, carpeta, linea), "C", 3,
                          "Informe nuevo (%s) sin entrada en la cronología" % carpeta,
-                         "del %s" % fecha, evidencia="bóveda"))
+                         "del %s" % fecha, evidencia="bóveda",
+                         datos={"tipo": "informe", "fecha": fecha, "carpeta": carpeta}))
     return out
 
 
@@ -148,7 +157,10 @@ def hechos_prs(prs, desde):
         out.append(hecho("pr:%s:%s" % (amb, ps[0].get("number")), "C", 3,
                          "Página o sección nueva sin entrada en la cronología (%s)" % amb,
                          "; ".join("PR #%s: %s" % (x.get("number"), (x.get("title") or "")[:80])
-                                   for x in ps), evidencia="GitHub"))
+                                   for x in ps), evidencia="GitHub",
+                         datos={"tipo": "pr", "ambito": amb,
+                                "prs": [{"number": x.get("number"), "title": x.get("title"),
+                                         "fecha": (x.get("mergedAt") or "")[:10]} for x in ps]}))
     return out
 
 
@@ -187,7 +199,8 @@ def registrar(hechos, modo, hoy, dir_=None):
             continue
         vistos[h["clave"]] = {"estado": h["estado"], "carril": h["carril"],
                               "prioridad": h["prioridad"], "titulo": h["titulo"],
-                              "evidencia": h["evidencia"], "desde": hoy.isoformat()}
+                              "detalle": h["detalle"], "evidencia": h["evidencia"],
+                              "datos": h.get("datos") or {}, "desde": hoy.isoformat()}
         nuevos.append(h)
     tmp = ruta + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -226,7 +239,8 @@ def leer_notas_afecta(raiz=None, hoy=None, dias=DIAS_NOTAS):
                     continue
                 with open(ruta, encoding="utf-8", errors="ignore") as f:
                     for m in RE_AFECTA.finditer(f.read(20000)):
-                        out.setdefault(m.group(1), os.path.relpath(ruta, raiz))
+                        rel = os.path.relpath(ruta, raiz)
+                        out.setdefault(m.group(1), (rel, m.group(2).lower()) if m.group(2) else rel)
             except OSError:
                 continue
     return out

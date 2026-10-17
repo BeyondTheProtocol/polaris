@@ -1,5 +1,5 @@
 {
-  "_doc": "Lo que helptitular.com afirma y puede caducar. Lo lee y lo comprueba tools/web_mapa.py; plan docs/plan-web-al-dia.md §2. `valor` es lo PUBLICADO hoy: si la web cambia a mano, se cambia aquí (lo exige el test). `fuente` ata cada afirmación a lo interno; null = aún sin atar. `transiciones` vacío = nada se propone solo hasta que voz-titular y diseno aprueben las frases (ES y EN escritas aparte).",
+  "_doc": "Lo que helptitular.com afirma y puede caducar. Lo lee y lo comprueba tools/web_mapa.py; plan docs/plan-web-al-dia.md §2. `valor` es lo PUBLICADO hoy: si la web cambia a mano, se cambia aquí (lo exige el test). `fuente` ata cada afirmación a lo interno; null = aún sin atar. `transiciones`: frases de cada estado destino, escritas por voz-titular (ES y EN aparte) y aprobadas por diseno el 17-oct-2026 con dos correcciones (organoides «resultados» sin «cribado»; IHQ EN «some markers missing»). Un destino sin frase no se propone.",
   "sembrado": "2026-10-17 desde origin/main",
   "a_mano": {
     "_doc": "Fuera del automático siempre (plan §7.7): deciden por dónde entra y navega la gente, o son identidad.",
@@ -37,7 +37,23 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "enviado": {
+          "es": "Enviada al laboratorio ({mes} {año})",
+          "en": "Shipped to the lab ({month} {year})",
+          "tono": "curso"
+        },
+        "en_curso": {
+          "es": "En el laboratorio",
+          "en": "At the lab",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-panel-tejido",
@@ -59,7 +75,18 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Nueva muestra en el laboratorio",
+          "en": "New sample at the lab",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-wes",
@@ -81,7 +108,23 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Material en el laboratorio",
+          "en": "Material at the lab",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-scrna-flex",
@@ -107,7 +150,23 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Análisis en marcha",
+          "en": "Analysis under way",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-ihq-extendida",
@@ -129,7 +188,23 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Parcial: faltan marcadores",
+          "en": "Partial: some markers missing",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        },
+        "no_posible": {
+          "es": "No queda tejido para el resto",
+          "en": "Not enough tissue left for the rest",
+          "tono": "no"
+        }
+      }
     },
     {
       "id": "ciencia-hla-alta-resolucion",
@@ -154,7 +229,23 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "enviado": {
+          "es": "Muestra enviada ({mes} {año})",
+          "en": "Sample shipped ({month} {year})",
+          "tono": "curso"
+        },
+        "en_curso": {
+          "es": "En el laboratorio",
+          "en": "At the lab",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-epigenetica",
@@ -176,7 +267,33 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "enviado": {
+          "es": "Material enviado ({mes} {año})",
+          "en": "Material shipped ({month} {year})",
+          "tono": "curso"
+        },
+        "en_curso": {
+          "es": "Material en el laboratorio",
+          "en": "Material at the lab",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        },
+        "no_posible": {
+          "es": "No hay material suficiente",
+          "en": "Not enough material",
+          "tono": "no"
+        }
+      }
     },
     {
       "id": "ciencia-biopsia-liquida",
@@ -198,7 +315,18 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Nueva extracción en análisis",
+          "en": "New draw being analysed",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho (última extracción, {mes} {año})",
+          "en": "Done (latest draw, {month} {year})",
+          "tono": "hecho"
+        }
+      }
     },
     {
       "id": "ciencia-inmunopeptidomica",
@@ -220,7 +348,33 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "pendiente": {
+          "es": "Ya es posible, según material",
+          "en": "Possible now, material permitting",
+          "tono": "pendiente"
+        },
+        "en_curso": {
+          "es": "Material en el laboratorio",
+          "en": "Material at the lab",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        },
+        "no_posible": {
+          "es": "No posible hoy",
+          "en": "Not possible today",
+          "tono": "no"
+        }
+      }
     },
     {
       "id": "ciencia-fosfoproteomica",
@@ -242,7 +396,33 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "pendiente": {
+          "es": "Ya es posible, según material",
+          "en": "Possible now, material permitting",
+          "tono": "pendiente"
+        },
+        "en_curso": {
+          "es": "Material en el laboratorio",
+          "en": "Material at the lab",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        },
+        "no_posible": {
+          "es": "No posible hoy",
+          "en": "Not possible today",
+          "tono": "no"
+        }
+      }
     },
     {
       "id": "ciencia-organoides",
@@ -264,7 +444,28 @@
         "nota_archivada",
         "informe"
       ],
-      "transiciones": {}
+      "transiciones": {
+        "en_curso": {
+          "es": "Cultivo en marcha ({mes} {año})",
+          "en": "Organoids growing ({month} {year})",
+          "tono": "curso"
+        },
+        "resultados": {
+          "es": "Primeros resultados ({mes} {año})",
+          "en": "First results ({month} {year})",
+          "tono": "curso"
+        },
+        "hecho": {
+          "es": "Hecho ({mes} {año})",
+          "en": "Done ({month} {year})",
+          "tono": "hecho"
+        },
+        "no_posible": {
+          "es": "No posible hoy",
+          "en": "Not possible today",
+          "tono": "no"
+        }
+      }
     }
   ]
 }

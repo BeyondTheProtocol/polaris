@@ -17,10 +17,10 @@ QUÉ ES
     · **deriva** — el valor publicado coincide con el del mapa. Si alguien cambia la web a mano,
       el mapa tiene que seguirlo, o el detector compararía contra un estado que ya no existe.
 
-QUÉ NO HACE TODAVÍA
-  Detectar que una fuente cambió y proponer el texto nuevo es la pieza siguiente del plan (detector
-  en la pasada del guardián). Las frases de transición las aprueban antes `voz-titular` y `diseno`;
-  hasta entonces `transiciones` va vacío y nada se propone solo.
+QUIÉN LO USA
+  `web_al_dia.py` (detecta que la fuente de una afirmación cambió) y `web_redactor.py` (escribe el
+  estado nuevo con la frase de `transiciones`, que aprobaron `voz-titular` y `diseno` el 17-oct-26).
+  Un destino sin frase aprobada no se propone.
 
 Uso:
   python3 tools/web_mapa.py comprobar      # cobertura + deriva contra la web publicada (rc=1 si falla)

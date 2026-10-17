@@ -347,6 +347,19 @@ def al_dia(hallazgos, hoy, m, seco=False):
             print("   ⚠️  " + a)
     except Exception as e:
         print("🗞️  web al día falló: %r" % (e,))
+        return
+    if seco:
+        return
+    # El redactor convierte lo encolado en UN cambio esperando su «sí» (en sombra, solo lo apunta).
+    try:
+        import web_redactor
+        for linea in web_redactor.redactar(m, hoy, web_publicar.WEB):
+            print("   ✍️  " + linea)
+        if m == "activo":
+            for pr, resultado in atender_pedidos():     # el encargo recién hecho sale ya
+                print("📨 PR #%s: %s" % (pr, resultado))
+    except Exception as e:
+        print("✍️  el redactor falló: %r" % (e,))
 
 
 # ── la pasada real: aquí, y solo aquí, se lee de fuera ───────────────────────────────────────

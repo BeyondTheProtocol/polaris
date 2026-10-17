@@ -648,6 +648,267 @@ def run_chrome(*, dry_run=None, umbral_seg=None, ps_runner=None):
     return alertas, info
 
 
+# ── Sesiones ccd-cli de versiones viejas (16-oct-2026, deuda `ccd_cli_huerfano`) ─────────────
+# Cuando la app de Claude se actualiza, las sesiones remotas lanzadas con la versión anterior
+# (`~/.claude/remote/ccd-cli/<versión>-<hash>`) siguen vivas días, hijas del servidor remoto e
+# inactivas. El 16-oct había 17 de la 2.1.293 de 2 a 6 días: el swap llegó a 11,5 de 12 GB y las
+# sesiones nuevas no arrancaban. Cerrarlas con SIGTERM bajó el swap ~1,5 GB y no rompió nada.
+#
+# CANDIDATO = proceso de nuestro uid que:
+#   · tiene como ejecutable `~/.claude/remote/ccd-cli/<ver>-<hash>` (primer token, anclado);
+#   · es hijo directo del servidor remoto `~/.claude/remote/srv/<…>/server` (por ruta, no pid);
+#   · su versión es ANTERIOR (comparación numérica) a la más nueva que está corriendo; si solo
+#     corre una versión, no hay candidatos;
+#   · lleva más de UMBRAL_CCD_SEG vivo (24 h);
+#   · su CPU acumulada (`ps time`) no se ha movido desde la vuelta anterior de healthcheck
+#     (~30 min): una sesión esperando una respuesta larga del modelo tiene %cpu ~0 un rato, pero
+#     no media hora seguida sin un tic;
+#   · ningún descendiente gasta CPU ni es un análisis clínico. Si alguno lo es, NO se toca:
+#     solo se avisa (matar media hora de cómputo de {{TITULAR}} es irreversible).
+# Fuera de alcance A PROPÓSITO: el `claude` local de la app (Application Support/Claude/
+# claude-code/<ver>/…). El 16-oct los análisis pesados (barrida, CellBender) colgaban de uno de
+# versión vieja; el ancla a `remote/ccd-cli` es lo que impide arrastrarlos.
+UMBRAL_CCD_SEG = int(os.environ.get("BTP_CCD_UMBRAL_SEG") or 24 * 3600)
+CCD_SOLO_AVISO = os.environ.get("BTP_CCD_SOLO_AVISO") == "1"
+# Separación mínima entre las dos muestras de CPU. Una pasada manual entre dos vueltas de
+# healthcheck no puede acortar la ventana de «quieta» a un minuto.
+CCD_VENTANA_MIN_SEG = int(os.environ.get("BTP_CCD_VENTANA_SEG") or 20 * 60)
+CCD_CPU_DESC_MAX = 1.0          # %cpu de un descendiente a partir del cual "está trabajando"
+CCD_STATE = os.path.join(_casa.state_dir(), "healthcheck", "ccd_huerfanos.json")
+_RE_CCD_BIN = re.compile(r"^\S*/\.claude/remote/ccd-cli/(\d+(?:\.\d+)*)-[0-9a-f]+(?=\s|$)")
+_RE_SRV_REMOTO = re.compile(r"^\S*/\.claude/remote/srv/[^/\s]+/server(?=\s|$)")
+# Lo que nunca se arrastra en un cierre: análisis clínicos y bioinformáticos, y cualquier cosa
+# que trabaje sobre una carpeta privada.
+_RE_CLINICO = re.compile(r"PRIVADO|\.claude-science|laminillas-sala|cellbender|barrida"
+                         r"|flex_analisis|nescore", re.IGNORECASE)
+
+
+def _version_tupla(v):
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except Exception:
+        return None
+
+
+def _cputime_a_seg(t):
+    """`ps time` de macOS: "m:ss.cc", "h:mm:ss.cc" o "d-hh:mm:ss". None si no se entiende."""
+    try:
+        dias = 0
+        if "-" in t:
+            d, t = t.split("-", 1)
+            dias = int(d)
+        partes = [float(x) for x in t.split(":")]
+        if not partes or len(partes) > 3:
+            return None
+        while len(partes) < 3:
+            partes.insert(0, 0.0)
+        h, m, s = partes
+        return dias * 86400 + h * 3600 + m * 60 + s
+    except Exception:
+        return None
+
+
+def _listar_ps_ccd(ps_runner=None):
+    """[{pid, ppid, etime, uid, pcpu, cputime, cmd}] o None si `ps` no es fiable."""
+    runner = ps_runner or (lambda: subprocess.run(
+        [_PS, "-axo", "pid=,ppid=,etime=,uid=,pcpu=,time=,command="],
+        capture_output=True, text=True, timeout=10,
+    ).stdout)
+    try:
+        salida_ps = runner()
+    except Exception:
+        return None
+    if not isinstance(salida_ps, str):
+        return None
+    procesos = []
+    for linea in salida_ps.splitlines():
+        partes = linea.strip().split(None, 6)
+        if len(partes) < 7:
+            continue
+        try:
+            procesos.append({"pid": int(partes[0]), "ppid": int(partes[1]), "etime": partes[2],
+                             "uid": int(partes[3]), "pcpu": float(partes[4]),
+                             "cputime": _cputime_a_seg(partes[5]), "cmd": partes[6]})
+        except ValueError:
+            continue
+    return procesos or None
+
+
+def _descendientes(pid, hijos_de):
+    vistos, pila = {}, [pid]
+    while pila:
+        for h in hijos_de.get(pila.pop(), []):
+            if h["pid"] not in vistos:
+                vistos[h["pid"]] = h
+                pila.append(h["pid"])
+    return list(vistos.values())
+
+
+def detectar_ccd(ps_runner=None, umbral_seg=None, prev_cpu=None):
+    """(candidatos, protegidos, cpu_ahora, info). candidatos es None si `ps` no fue fiable.
+
+    `prev_cpu` = {pid: cputime} de la vuelta anterior. Sin vuelta anterior no hay candidatos
+    (hace falta ver la CPU quieta dos veces): fail-safe hacia NO MATAR."""
+    umbral = UMBRAL_CCD_SEG if umbral_seg is None else umbral_seg
+    prev_cpu = prev_cpu or {}
+    lista = _listar_ps_ccd(ps_runner)
+    if lista is None:
+        return None, [], {}, {}
+    mi_uid = os.getuid()
+    por_pid = {p["pid"]: p for p in lista}
+    hijos_de = {}
+    for p in lista:
+        hijos_de.setdefault(p["ppid"], []).append(p)
+    # Mi propia cadena de padres: nunca me cierro a mí ni a quien me lanzó.
+    propios, x = set(), os.getpid()
+    while x and x not in propios:
+        propios.add(x)
+        x = por_pid.get(x, {}).get("ppid", 0)
+
+    ccd = []
+    for p in lista:
+        m = _RE_CCD_BIN.match(p["cmd"])
+        if m and p["uid"] == mi_uid:
+            ver = _version_tupla(m.group(1))
+            if ver:
+                ccd.append((p, m.group(1), ver))
+    cpu_ahora = {str(p["pid"]): p["cputime"] for p, _, _ in ccd if p["cputime"] is not None}
+    info = {"versiones": sorted({v for _, v, _ in ccd}, key=_version_tupla)}
+    if not ccd:
+        return [], [], cpu_ahora, info
+    nueva = max(t for _, _, t in ccd)
+    info["actual"] = ".".join(str(n) for n in nueva)
+
+    candidatos, protegidos = [], []
+    for p, ver_s, ver in ccd:
+        if ver >= nueva or p["pid"] in propios:
+            continue
+        padre = por_pid.get(p["ppid"])
+        if not padre or not _RE_SRV_REMOTO.match(padre["cmd"]):
+            continue
+        etime_seg = _etime_a_seg(p["etime"])
+        if etime_seg is None or etime_seg < umbral:
+            continue
+        antes = prev_cpu.get(str(p["pid"]))
+        if p["cputime"] is None or antes is None or p["cputime"] - float(antes) > 0.05:
+            continue                                   # no la he visto quieta dos vueltas
+        c = dict(p, version=ver_s, etime_seg=etime_seg)
+        desc = _descendientes(p["pid"], hijos_de)
+        clinicos = [d for d in desc if _RE_CLINICO.search(d["cmd"])]
+        ocupados = [d for d in desc if d["pcpu"] > CCD_CPU_DESC_MAX]
+        if clinicos or ocupados:
+            c["motivo"] = "análisis clínico debajo" if clinicos else "un hijo está trabajando"
+            protegidos.append(c)
+            continue
+        candidatos.append(c)
+    return candidatos, protegidos, cpu_ahora, info
+
+
+def _parar_ccd(p, dry_run=False, wait=WAIT_SIGKILL):
+    """SIGTERM a la sesión vieja; SIGKILL solo a ESE pid si sigue viva tras `wait`. Nunca lanza."""
+    registro = {"tipo": "ccd_cli_huerfano", "pid": p["pid"], "version": p.get("version"),
+                "etime": p.get("etime"), "etime_seg": p.get("etime_seg")}
+    if dry_run:
+        registro.update(parado=False, accion="dry-run: no se tocó")
+        return registro
+    try:
+        os.kill(p["pid"], signal.SIGTERM)
+    except ProcessLookupError:
+        registro.update(parado=True, accion="ya no existía")
+        _log_auditable(registro)
+        return registro
+    except Exception as e:
+        registro.update(parado=False, accion="error al enviar SIGTERM: %r" % e)
+        _log_auditable(registro)
+        return registro
+    accion = "SIGTERM"
+    deadline = time.time() + wait
+    while _existe(p["pid"]) and time.time() < deadline:
+        time.sleep(0.1)
+    if _existe(p["pid"]):
+        try:
+            os.kill(p["pid"], signal.SIGKILL)
+            accion = "SIGTERM+SIGKILL"
+        except Exception:
+            pass
+        time.sleep(0.2)
+    vivo = _existe(p["pid"])
+    registro.update(parado=not vivo, accion=accion if not vivo else accion + " (sigue viva)")
+    _log_auditable(registro)
+    return registro
+
+
+def run_ccd(*, dry_run=None, umbral_seg=None, ps_runner=None, state_path=None, ahora=None):
+    """Mismo contrato que run(): (alertas, info). Guarda la CPU acumulada de cada sesión para
+    compararla en la vuelta siguiente (en dry-run también: así el primer modo activo ya sabe)."""
+    if dry_run is None:
+        dry_run = SOLO_AVISO or CCD_SOLO_AVISO
+    umbral = UMBRAL_CCD_SEG if umbral_seg is None else umbral_seg
+    state_path = state_path or CCD_STATE
+    prev = {}
+    try:
+        with open(state_path, encoding="utf-8") as fh:
+            prev = json.load(fh)
+    except Exception:
+        pass
+    if not isinstance(prev, dict):
+        prev = {}
+    ahora = time.time() if ahora is None else ahora
+    alertas, info = [], {"umbral_seg": umbral, "dry_run": dry_run}
+    try:
+        edad = ahora - float(prev.get("ts") or 0)
+    except Exception:
+        edad = -1
+    comparable = isinstance(prev.get("cpu"), dict) and edad >= CCD_VENTANA_MIN_SEG
+    candidatos, protegidos, cpu_ahora, det = detectar_ccd(
+        ps_runner=ps_runner, umbral_seg=umbral, prev_cpu=prev["cpu"] if comparable else None)
+    if candidatos is None:
+        info["ps_error"] = True
+        return alertas, info
+    info.update(det, candidatos=len(candidatos), protegidos=len(protegidos),
+                muestra_previa_seg=round(edad) if comparable else None)
+    try:
+        if not (0 <= edad < CCD_VENTANA_MIN_SEG):   # muestra reciente: se conserva la vieja
+            os.makedirs(os.path.dirname(state_path), exist_ok=True)
+            tmp = state_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"cpu": cpu_ahora, "ts": ahora}, fh)
+            os.replace(tmp, state_path)
+    except Exception:
+        pass
+
+    if protegidos:
+        alertas.append(("ccd_viejo_protegido",
+                        "🧟 %d sesión(es) de Claude de una versión vieja llevan más de %s vivas, "
+                        "pero no las cierro porque tienen trabajo debajo (%s): pid %s. Ciérralas "
+                        "tú cuando acabe."
+                        % (len(protegidos), _fmt_dur(umbral),
+                           "; ".join(sorted({p["motivo"] for p in protegidos})),
+                           ", ".join(str(p["pid"]) for p in protegidos))))
+    if not candidatos:
+        return alertas, info
+    resultados = [_parar_ccd(p, dry_run=dry_run) for p in candidatos]
+    info["resultado"] = resultados
+    parados = [r for r in resultados if r.get("parado")]
+    versiones = ", ".join(sorted({p["version"] for p in candidatos}, key=_version_tupla))
+    if dry_run:
+        alertas.append(("ccd_huerfano_detectado",
+                        "🧟 %d sesión(es) de Claude de la versión %s (la actual es %s) llevan más "
+                        "de %s quietas (dry-run, no se tocaron): pid %s."
+                        % (len(candidatos), versiones, det.get("actual"), _fmt_dur(umbral),
+                           ", ".join(str(p["pid"]) for p in candidatos))))
+    elif parados:
+        # Sin deuda.visto a propósito: cada actualización de la app deja sesiones viejas. Que
+        # aparezcan no es una regresión; cerrarlas es justo el trabajo de esto.
+        alertas.append(("ccd_huerfano_parado",
+                        "🧟 Cerré %d sesión(es) de Claude que se quedaron colgadas de la versión "
+                        "%s (la actual es %s): llevaban más de %s quietas y ocupaban memoria. "
+                        "pid %s. Registro en tools/state/healthcheck/bucles_colgados.jsonl."
+                        % (len(parados), versiones, det.get("actual"), _fmt_dur(umbral),
+                           ", ".join(str(r["pid"]) for r in parados))))
+    return alertas, info
+
+
 # ── Enganche al patrón de healthcheck.py: run() → (alertas, info) ────────────────────────────
 def run(*, dry_run=None, umbral_seg=None, ps_runner=None, bajo_claude_fn=None):
     if dry_run is None:
@@ -725,7 +986,9 @@ def main(argv):
     dry = "--dry-run" in argv
     alertas, info = run(dry_run=True if dry else None)
     ch_alertas, ch_info = run_chrome(dry_run=True if dry else None)
-    print(json.dumps({"alertas": alertas + ch_alertas, "info": info, "chrome": ch_info},
+    cc_alertas, cc_info = run_ccd(dry_run=True if dry else None)
+    print(json.dumps({"alertas": alertas + ch_alertas + cc_alertas, "info": info,
+                      "chrome": ch_info, "ccd": cc_info},
                      ensure_ascii=False, indent=2))
     return 0
 

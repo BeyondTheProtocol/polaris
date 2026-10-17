@@ -910,6 +910,27 @@ RECURSOS_SWAP_GB = 10.0     # swap usado a partir del cual esto ya no es uso nor
 RECURSOS_SWAP_TIBIO_GB = 6.0
 RECURSOS_LIBRE_PCT = 12.0   # ...si además queda poca memoria libre, es ahogo de verdad
 RECURSOS_VORAZ_FRAC = 0.75  # un proceso que pide 3/4 de la RAM de la máquina ya va al swap
+RECURSOS_PESADO_GB = 3.0    # 16-oct-26: CellBender (~5 GB) + barrida (~3,4) + Chrome (~5) juntos
+RECURSOS_PESADOS_JUNTOS = 2  # ...a partir de cuántos pesados a la vez se avisa
+
+
+def _etiqueta_proceso(pid, nombre_top):
+    """Nombre legible para el aviso: el script si es un intérprete (`top` solo dice «Python»),
+    si no el ejecutable. Solo el nombre de fichero: nunca la ruta (puede ser una carpeta privada)."""
+    try:
+        cmd = subprocess.run(["/bin/ps", "-o", "command=", "-p", str(pid)], capture_output=True,
+                             text=True, timeout=5).stdout.strip()
+    except Exception:
+        return nombre_top
+    if not cmd:
+        return nombre_top
+    toks = cmd.split()
+    for t in toks[1:]:
+        base = os.path.basename(t)
+        if base.endswith(".py") or base in ("cellbender", "llama-server"):
+            return base
+    exe = os.path.basename(toks[0])
+    return exe if exe and len(exe) <= 40 else nombre_top
 
 
 def _ram_fisica_gb():
@@ -999,15 +1020,37 @@ def _check_recursos():
         swap_gb >= RECURSOS_SWAP_TIBIO_GB and libre_pct == libre_pct
         and libre_pct <= RECURSOS_LIBRE_PCT)
 
+    # Varios pesados a la vez (16-oct-26): CellBender, la barrida de laminillas y Chrome corrían
+    # juntos sin cerrojo común y el swap llegó a 11,5 de 12 GB. Ninguno era voraz por sí solo,
+    # así que el aviso de arriba llegaba tarde. Esto avisa cuando coinciden y el swap ya aprieta
+    # (con poco swap, un Chrome y un modelo local juntos son uso sano). Tampoco mata nada.
+    pesados = [g for g in gordos if g[0] >= RECURSOS_PESADO_GB]
+    juntos = (len(pesados) >= RECURSOS_PESADOS_JUNTOS and swap_gb >= RECURSOS_SWAP_TIBIO_GB)
+
     info = {"swap_usado_gb": round(swap_gb, 1), "libre_pct": libre_pct, "ahogo": ahogo,
-            "voraz": voraz, "ram_gb": ram_gb, "gordos": gordos[:3], "ts": time.time()}
+            "voraz": voraz, "ram_gb": ram_gb, "gordos": gordos[:3], "pesados": pesados,
+            "pesados_juntos": juntos, "ts": time.time()}
     try:
         _ensure()
-        _write_atomic(state_p, dict(info, aviso_ts=prev.get("aviso_ts", 0)))
+        _write_atomic(state_p, dict(info, aviso_ts=prev.get("aviso_ts", 0),
+                                    juntos_aviso_ts=prev.get("juntos_aviso_ts", 0)))
     except Exception:
         pass
 
     if not (ahogo and prev.get("ahogo")):       # hace falta la segunda vuelta seguida
+        if juntos and prev.get("pesados_juntos") and (
+                time.time() - prev.get("juntos_aviso_ts", 0)) / 3600.0 >= RECURSOS_INTERVAL_H:
+            try:
+                _write_atomic(state_p, dict(info, aviso_ts=prev.get("aviso_ts", 0),
+                                            juntos_aviso_ts=time.time()))
+            except Exception:
+                pass
+            quienes = ", ".join("%s (pid %d, %.1f GB)" % (_etiqueta_proceso(pid, n), pid, gb)
+                                for gb, pid, n in pesados)
+            return (["Hay %d procesos pesados a la vez y el swap ya va por %.1f GB: %s. Juntos "
+                     "pueden dejar la casa base sin memoria. Si alguno puede esperar, mejor uno "
+                     "detrás de otro. No he tocado nada." % (len(pesados), swap_gb, quienes)],
+                    dict(info, aviso="pesados_juntos"))
         return [], info
     if (time.time() - prev.get("aviso_ts", 0)) / 3600.0 < RECURSOS_INTERVAL_H:
         return [], dict(info, throttled=True)
@@ -3865,6 +3908,17 @@ def run():
         alertas.extend(ch_alertas)
     except Exception as e:
         chk["chrome_huerfano_error"] = "%r" % e
+
+    # 3e-ter-bis. SESIONES ccd-cli DE VERSIONES VIEJAS (16-oct-26): tras actualizarse la app,
+    #     17 sesiones remotas de la versión anterior seguían vivas días; con los análisis
+    #     pesados el swap llegó a 11,5 de 12 GB y las sesiones nuevas no arrancaban. Activo por
+    #     defecto; BTP_CCD_SOLO_AVISO=1 (o BTP_BUCLE_SOLO_AVISO=1) lo deja en aviso.
+    try:
+        cc_alertas, cc_info = bucles_colgados.run_ccd()
+        chk["ccd_huerfanos"] = cc_info
+        alertas.extend(cc_alertas)
+    except Exception as e:
+        chk["ccd_huerfanos_error"] = "%r" % e
 
     # 3d-quater. DRIFT DE DAEMONS (item #2): las tres capas DEFINIDO/INSTALADO/CARGADO cruzadas con
     #     REGISTRO.json. Determinista, SURFACEA y NO auto-arregla. Cubre lo que B1 no ve (roster salido
