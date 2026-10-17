@@ -1,0 +1,7 @@
+{
+ "estado": "ENMIENDA_2 de REGLAS_HIGADO_CELULA_v1. Escrita DESPUÉS de correr el control positivo de REFCON en el hueso (G1 pasó: mediana 0,857 frente a p95 0,259; G2 dio NaN) y ANTES de inferir o leer nada de REFCON en el hígado. Corrige un hueco de implementación, no un umbral.",
+ "que_paso": "REFCON deja NaN en genes sin predicción (su propio clasificador los imputa antes de usarlos). Las reglas no decían cómo tratarlos y el código los propagaba: la media por brazo salía NaN y G2 dio r = NaN. G1 no se vio afectado (los genes del amplicón 8p11 no tenían NaN).",
+ "cambio": "Antes del log2, los NaN del cociente de REFCON se imputan con la convención del propio REFCON (refcon.downstream.common.impute: media del gen entre las células del mismo tejido; gen sin ningún valor → cociente 1). Se aplica igual en hueso e hígado y a todo uso posterior (G1, G2, score, brazos). La salida informa cuántas celdas y genes tenían NaN.",
+ "por_que_esta_y_no_otra": "Es la regla del autor del método, fijada antes de ver ningún resultado del hígado; no se eligió entre alternativas mirando G2.",
+ "efecto": "G2 se recalcula con esta regla. Si G2 falla, REFCON queda «no aplicable» como decían las reglas."
+}

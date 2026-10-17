@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/higado_celula/refcon_run.py",
+ "estado_ficha": "completa",
+ "para": "Inferencia de copias por célula SIN referencia con REFCON (Gencturk y Cicek, preprint 2026, código MIT commit 04d9d24, checkpoints de Zenodo verificados) sobre las cuentas crudas del Flex de hueso e hígado, por trozos, en el entorno refcon, dentro de sandbox-exec sin red. Prueba de determinismo en 256 células y clasificador propio de REFCON como fila secundaria.",
+ "cuando_si": "Solo como paso de preparación de la fase 2 del hígado célula a célula (procesa flex_refcon), y el hígado solo si el control positivo del hueso (gate_refcon) lo declara aplicable.",
+ "cuando_no": "No para decidir el veredicto D1 (es una vía adicional). No modifica el código de REFCON ni descarga nada: los checkpoints ya están auditados en ~/.claude-science/refcon/04d9d24.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_flex_higado_celula.py",
+ "alta": "2026-10-17",
+ "origen": "Decisión D2b de {{TITULAR}} (17-oct-2026): REFCON solo si su código es público e instalable sin egress de datos."
+}

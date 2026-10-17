@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/higado_celula/higado_celula.py",
+ "estado_ficha": "completa",
+ "para": "Fase 2 del hígado célula a célula del Flex: llamada maligna con dos criterios prerregistrados (estándar tipo ChromaLogic/v4 con control de dobletes y estricto sin genes de linaje), batería de éxito D3 (AUC, FP con Wilson, r por brazo con el hueso, estabilidad de dianas, fracción frente a la H&E), prueba del residuo con scDblFinder, matriz scCDC, vía REFCON con control positivo en el hueso y dianas recalculadas. Reglas en REGLAS_HIGADO_CELULA_v1.json, congeladas antes del código.",
+ "cuando_si": "Para reproducir o auditar el veredicto célula a célula del hígado por criterio (dobletes una vez, gate_refcon y REFCON una vez; final desde cachés, dos veces idéntico).",
+ "cuando_no": "No reabre lo ya probado (cierre, ambiente, vías propias) ni cambia sus reglas; no es Clonalscope (espera al WES). Nada fuera de REGLAS_HIGADO_CELULA_v1 sin declararlo post hoc. Nunca con cómputo externo: corre dentro de sandbox-exec sin red.",
+ "reemplaza": "Nada; amplía tools/flex_analisis/ambiente/ambiente.py (protocolo v4) y reutiliza sus funciones sin copiarlas.",
+ "test": "tests/test_flex_higado_celula.py",
+ "alta": "2026-10-17",
+ "origen": "Plan «Flex hígado célula a célula» (17-oct-2026) y decisiones D1-D3 de {{TITULAR}}: «toma las decisiones que mejor hagan el análisis, es muy importante que sea perfecto»."
+}

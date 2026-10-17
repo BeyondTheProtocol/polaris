@@ -1,0 +1,107 @@
+{
+ "estado": "REGLAS_HIGADO_CELULA_v1: fase 2 de la línea «Flex hígado célula a célula» (plan docs/flex/PLAN_HIGADO_CELULA_A_CELULA_2026-10-17.md y su adenda archivada). Fijadas el 17-oct-2026 ANTES de escribir el código de cálculo, con las decisiones D1-D3 de {{TITULAR}} del mismo día. EXPLORATORIO, NO CIEGO: se conocen el cierre, higado_dianas, ambiente (v4) y las vías propias (lo visto está en visto_antes_de_fijar). Todo lo que se haga y no esté aquí es POST HOC y va a la lista POST_HOC de la salida y del acta.",
+
+ "visto_antes_de_fijar": [
+  "ambiente.json (sha256 9c235868e5e23d2b7e24410e46f519ed21a7c432303134eaeb8ddcdaef8723a0), matriz cruda, v4: AUC pool frente a hepatocitos 0,999 y frente a periportales 0,999; FP 0/490 periportales y 1/159 H2; llamadas 6.245/13.320 en el pool y 6.831/14.804 en no-referencia; QC v4 deja 17.627 de 19.047.",
+  "v4 sin genes de linaje (cruda): AUC 0,873/0,861; FP 5/490 (1,02 %) y 3/159; 2.739 llamadas en el pool; 5.543 genes usados, 5.196 quitados por linaje.",
+  "Por tanto, ANTES de fijar C5 se sabe que la v4 estándar llama el 38,8 % de las células QC (6.831/17.627) y el 46,9 % del pool: las dos cifras caen fuera de 58-82 %. El denominador de C5 se fija por la definición de la H&E (todos los núcleos), no por el resultado; con cualquiera de los dos denominadores C5 da lo mismo para la v4 previa. La exclusión de dobletes (D1) se decidió sin conocer su efecto sobre los 5 FP del estricto.",
+  "AMBIENTE_v1 sobre las matrices descontaminadas: ninguna es válida (CellBender FPR 0/0,01/0,05 y soupx_auto: EXITO falso; SoupX y DecontX: RETENCION falsa).",
+  "vias.json (sha256 d60eacac411b202058ba5841341166d17ea1c5a47c315fffcda65cc46e0dd6a0): ventana 8p11 con 6 sondas silentes en 2 genes; UMI silentes = 14 en todo el pool (13.577 células), 0 en hepatocitos, 6 en inmune/endotelio/estroma.",
+  "REFCON (Gencturk y Cicek, preprint bioRxiv 10.64898/2026.08.03.742406): código público, licencia MIT, github.com/ciceklab/refcon commit 04d9d2490dbbb5d8db83b53b0d465748c25f9b0d; checkpoints de Zenodo 10.5281/zenodo.21644534, checkpoints.zip md5 073401fc8770fad7814d6937a3c3ae61 (coincide con Zenodo), sha256 53fe0cb1814749b7d2166bfaf123a9b43976b7b8a535954c27739fb455abe921. Pickles auditados con pickletools sin cargarlos: solo globals torch._utils._rebuild_tensor_v2, torch.FloatStorage, torch.LongStorage, collections.OrderedDict, numpy dtype/scalar y _codecs.encode. El código de inferencia no abre red (solo fetch_data.py, que no se usa). Prueba sintética sin datos de la paciente: MPS bajo sandbox-exec sin red, dos ejecuciones bit a bit idénticas, ganancia plantada detectada.",
+  "scDblFinder 1.24.10 (bioconda; xgboost 3.4.2.1) en datos sintéticos: 90/90 dobletes plantados detectados, 0 falsos, origen A+B correcto, dos ejecuciones idénticas con semilla. scCDC 1.4 (GitHub ZJU-UoE-CCW-LAB/scCDC commit 75a3b6190cc360adfa5c650a61cc0be1fa7daaa4) instalado desde el clon auditado; ddpcr 1.16.0 compilado desde CRAN (solo se usa su quiet())."
+ ],
+
+ "codigo_reutilizado": {
+  "nota": "Las funciones del protocolo v4 se usan tal cual, sin copiarlas, desde los ficheros con estos sha256. Si cambia cualquiera, la salida lo registra y es POST HOC.",
+  "tools/flex_analisis/ambiente/_amb_final.py": "a3c3af297bf482334a8053839f638caa0825970f963f6b4d837a3312bd7ed2ae (qc_v4, zonas, grupos_v4, genes_v4, infercnv_v4, corr_con, llamada_v4, linaje, exito, dianas, jacc, obj)",
+  "tools/flex_analisis/ambiente/REGLAS_HIGADO_v4.json": "234a49ff26057f3334fed68fc15c32201475287358e1147c573651c322996e01",
+  "tools/flex_analisis/ambiente/REGLAS_AMBIENTE_v1.json": "4a51e4eac13fe0ed46b4e718a8a572d1ffb091df4a1189085ace1415c7e90d2a",
+  "tools/flex_analisis/cierre/_final.py": "173283961d259cd80b1b03867b020200209a42cb3b458a300c59fee7e8b0c442 (T, auc, brazos_genes, valores_brazo, centra, tablas)",
+  "tools/flex_analisis/cierre/_c.py": "7e490f06d18eb4b2d07285d14d321180518fd5d419cbb7d38f2bd8fe072d47e8 (wilson, w, guarda, guarda_npz, sha256)",
+  "tools/flex_analisis/tribunal/_comun.py": "99fd202151f5aec23f93b86c824cb5a642f37580390e1ff05a5b364c7386dfe7"
+ },
+
+ "datos_y_muro": {
+  "entrada": "Matrices crudas del hígado (19.047 células) y del hueso (1.993) de las cachés del cierre; tipos de A; matriz CellBender FPR 0,01 de la caché del ambiente solo para la prueba del residuo. Nada más.",
+  "ventanilla": "Solo por `python3 tools/lector_clinico.py procesa flex_higado_celula -- <paso>` (entorno nescore) y `procesa flex_refcon -- <paso>` (entorno refcon). Fuera de la ventanilla (sin BTP_VENTANILLA=1) los scripts no arrancan. Se re-ejecutan con python -I.",
+  "egress": "0 por construcción: cada proceso (Python, Rscript y REFCON) corre dentro de `sandbox-exec -p '(version 1)(allow default)(deny network*)'`. Si sandbox-exec no está, no corre.",
+  "salidas": "~/Clinico-PRIVADO/flex/higado_celula/ (cachés en cache/). stdout: solo agregados, ni barcodes ni identificadores de bloque.",
+  "semilla": 20261016
+ },
+
+ "D1_criterios": {
+  "estandar_PRINCIPAL": {
+   "definicion": "Protocolo HIGADO_v4 sobre la matriz CRUDA, con las funciones de _amb_final.py: QC (genes >= 500, Scrublet <= 0,25, contaminación DecontX <= 0,7) + zonación + referencia (pericentrales + NK + endotelio + mieloide + fibroblasto_estelar) con hold-out del 20 % de la parte no hepatocitaria partido en H1 (umbral) y H2 (FP) + infercnvpy (ventana 100, paso 10) + correlación de Pearson por célula con el consenso del pool (media, no iterativo) + umbral p98,5 de H1. Genes: genes_v4 (autosomas con CP10k pseudobulk >= 0,1), genes de linaje INCLUIDOS.",
+   "control_de_dobletes": "Se añade al QC: fuera toda célula que scDblFinder (configuración abajo) clasifique «doublet». Se excluye de todo: referencia, hold-out, controles y pool. Es un control de exclusión, como el de ChromaLogic: no lleva umbral propio. Su efecto se mide en C4 (variante sin exclusión) y se informa la composición de dobletes entre las llamadas (fracción global, por origen, y razón de odds llamadas frente a no llamadas dentro del pool, con IC de Katz). No se usa un umbral de enriquecimiento global porque, con un ~70 % de tumor, los dobletes con tumor se concentran en las llamadas por composición y no por fallo del método."
+  },
+  "estricto_SENSIBILIDAD": {
+   "definicion": "Idéntico al estándar (con el mismo control de dobletes), con genes = genes_v4 & ~linaje, donde linaje = _amb_final.linaje(L0, B0, L0) calculado SIEMPRE sobre las matrices CRUDAS del hígado y del hueso, para que el conjunto de genes no cambie entre variantes."
+  },
+  "redaccion": "La conclusión se escribe literalmente «con el criterio estándar: <veredicto>; con el estricto: <veredicto>», con los veredictos que salgan de las reglas de abajo, sin elegir a posteriori."
+ },
+
+ "dobletes_scDblFinder": {
+  "entorno": "~/.claude-science/conda/envs/dobletes (R 4.5.3, scDblFinder 1.24.10, xgboost 3.4.2.1). Lock en lock_dobletes_explicit.txt y lock_dobletes_R.csv.",
+  "entrada": "Cuentas crudas de las 19.047 células del hígado (caché del cierre), todos los genes del panel.",
+  "parametros": "scDblFinder(sce, clusters = tipo de A, dbr = 0.06, resto por defecto, BPPARAM = SerialParam(RNGseed = 20261016)); set.seed(20261016); OMP_NUM_THREADS = 1. dbr 0,06 = el expected_doublet_rate de Scrublet en HIGADO_v4; no hay una cifra de 10x verificada para la tasa de dobletes intra-muestra de este Flex (declarado).",
+  "salida": "clase (singlet/doublet), score, mostLikelyOrigin y originAmbiguous por célula, en caché (sin barcodes: por índice de fila de la caché del cierre).",
+  "sensibilidad": "dbr = NULL (por defecto del paquete, 1 % por cada 1.000 células). Solo para la prueba del residuo; no cambia los criterios."
+ },
+
+ "residuo_D2a": {
+  "pregunta": "¿Explican los dobletes heterotípicos el residuo que CellBender no quita (testigos tumorales en el nulo)?",
+  "nulo": "NK + endotelio + mieloide del hígado, las 19.047 células sin QC (misma medida que AMBIENTE_v1).",
+  "testigo_mas": ">= 1 UMI de ESR1, ANKRD30A, TFF1, SCGB2A2 o KRT19 en la matriz CellBender FPR 0,01 (primaria); en la cruda se informa.",
+  "medidas": "E = |testigo+ y doublet| / |testigo+| con Wilson; razón de odds de ser doublet en testigo+ frente a testigo− con IC de Katz; fracción testigo+ con y sin dobletes; mostLikelyOrigin de los dobletes del nulo (cuántos implican epitelial o no_asignado).",
+  "lectura": "«Los dobletes explican el residuo» si E >= 0,5. «Explican una parte» si 0,2 <= E < 0,5 y el IC de la razón de odds excluye 1. «No lo explican» en el resto.",
+  "simetrico_informativo": "Lo mismo para HEP5 (>= 1 UMI) en las células del pool por exclusión del cierre (matriz CellBender FPR 0,01); se informa, no decide."
+ },
+
+ "scCDC": {
+  "entorno": "el mismo de dobletes; scCDC 1.4, commit 75a3b6190cc360adfa5c650a61cc0be1fa7daaa4.",
+  "parametros": "Seurat CreateSeuratObject(cuentas crudas) con Idents = tipo de A, por separado en hígado y hueso; ContaminationDetection(restriction_factor 0.5, min.cell 100, percent.cutoff 0.2) y ContaminationCorrection(auc_thres 0.9, min.cell 50): todo por defecto. Si la detección para con «No contaminated genes found», se informa y no hay matriz scCDC.",
+  "validez": "La matriz corregida pasa la batería de AMBIENTE_v1 con _amb_final.exito (EXITO y RETENCION, incluida la retención de FGFR1 en las 68 del hueso). Si no es válida, se informa y NO entra en C4.",
+  "informa": "Lista de genes contaminantes (GCG) y si entre ellos están HEP5 y los testigos."
+ },
+
+ "criterios_D3": {
+  "C1_AUC": "AUC (Mann-Whitney, _final.auc) de la correlación con el consenso: pool frente a TODOS los hepatocitos QC (decide; comparable con v4) >= 0,6 Y pool frente a periportales/reactivos QC >= 0,6. Compañera que no decide: pool frente a hepatocitos que NO están en la referencia. IC95 de Hanley-McNeil.",
+  "C2_controles": "FP en periportales/reactivos <= 1 % Y FP en H2 <= 2 %. Decide la estimación puntual; se informa la cota superior de Wilson al lado.",
+  "C3_clon_hueso": "r de Pearson > 0,3 entre el perfil medio por brazo de las células llamadas del pool y la plantilla del hueso (68 malignas limpias). Brazos y genes: _final.brazos_genes del cierre (genes con CP10k >= 0,5 en las dos lesiones, sin chr8, chr11, X, Y; sin genes de linaje; brazos con >= 20 genes). Valores: _final.centra(_final.valores_brazo(L, genes, brazo, validos, referencia_del_criterio)). IC95 bootstrap de 1.000 réplicas sobre las células llamadas (semilla). Informativos, no deciden: r con genes de linaje incluidos (sin chr8/chr11), r con chr8 y chr11 incluidos (amplicones aparte), y r de los hepatocitos y de las no llamadas del pool como control.",
+  "C4_estabilidad_dianas": "Fracción detectada (>= 1 UMI, matriz cruda) de ANKRD30A, TPBG y ERBB3 en las llamadas del pool. Rango < 10 puntos para LAS TRES, tomado sobre todos los conjuntos de llamadas VÁLIDOS de esta fase: la base del criterio, su variante sin exclusión de dobletes, su variante en la matriz scCDC si es válida, el otro criterio si pasa C1 y C2, y REFCON si es aplicable y pasa C1 y C2. Es un mismo número para todos los criterios: si dos definiciones válidas dan dianas distintas, las dos quedan frágiles. SLC39A6, ERBB2 y TACSTD2 se informan sin regla.",
+  "C5_poblacional": "Fracción llamada = (llamadas fuera de referencia y hold-out) / (todas las células QC del hígado, dobletes ya excluidos) dentro de [0,58; 0,82] (H&E del mismo bloque). Decide la estimación puntual; Wilson al lado. Se informa también sobre el pool.",
+  "C6_8p11": "RETIRADO desde el principio por falta de potencia: el plan exige >= 100 UMI silentes de 8p11 por grupo (>= 200 en el pool) y hay 14 en todo el pool (vias.json). No cuenta ni a favor ni en contra. No se amplía el conjunto de sondas silentes para rescatar potencia (las unspliced de genes expresados llevan pre-ARNm). La salida recalcula el total para comprobarlo."
+ },
+
+ "veredicto": {
+  "NO_RESUELTO": "falla C1 o C2 en la base (matriz cruda, dobletes excluidos).",
+  "RESUELTO": "pasan C1, C2, C3, C4 y C5 en la base, y no hay una matriz alternativa VÁLIDA en la que falle C1 o C2.",
+  "FRAGIL": "pasan C1 y C2 en la base pero falla alguno de C3, C4 o C5, o falla C1 o C2 en una matriz alternativa válida. Se listan los criterios que fallan."
+ },
+
+ "REFCON_D2b": {
+  "condicion": "Se ejecuta porque el código es público e instalable y la inferencia no necesita red. No decide D1: es una vía adicional que se informa con la misma batería.",
+  "entorno": "~/.claude-science/conda/envs/refcon (python 3.12; torch 2.10.0, numpy 2.3.5, scipy 1.16.3, pandas 2.3.3, scikit-learn 1.8.0, anndata 0.12.10, scanpy 1.12.0, h5py 3.15.1: las versiones del artículo). Código en ~/.claude-science/refcon/04d9d24 sin modificar (sha256 de cada fichero en el lock). Lock en lock_refcon_explicit.txt y lock_refcon_pip.txt.",
+  "entrada": "Cuentas crudas de las 19.047 células del hígado y las 1.993 del hueso; genes de autosomas (chr1-chr22) con coordenada GRCh38 de la caché, ordenados por (cromosoma, inicio), con chromosome/start/end/abspos/chr_boundary; sin filtro de expresión. En trozos de 2.000 células (la inferencia es por célula: InstanceNorm por célula).",
+  "inferencia": "scripts/infer.py sin cambios (ensemble ens3, device mps, cell-batch 16), bajo sandbox-exec sin red. Se guarda ens3_cn por trozo en caché con su sha256.",
+  "determinismo": "La inferencia es un paso de preparación que se corre UNA vez y se cachea con su sha. Reproducibilidad: las primeras 256 células del hueso (orden de la caché) se infieren dos veces; se exige diferencia máxima absoluta <= 1e-4 en el cociente de copias. Las dos ejecuciones idénticas del requisito se aplican a la etapa final desde cachés.",
+  "control_positivo_hueso": "ANTES de inferir el hígado. G1: mediana en las 68 malignas del hueso de la media de log2(cociente) en los genes del amplicón 8p11 de HIGADO_v4 > percentil 95 de lo mismo en la referencia limpia del hueso. G2: r de Pearson > 0,3 entre el perfil medio por brazo REFCON de las 68 (log2, menos la media de la referencia del hueso, centrado por célula, brazos y genes de _final.brazos_genes) y la plantilla de expresión del hueso del cierre. Si falla G1 o G2: «REFCON no aplicable a este Flex», el hígado no se infiere y se informa así.",
+  "lectura_en_el_higado": "Misma batería C1-C5 con el MISMO QC, grupos, H1 y H2 que el criterio estándar: score = correlación de Pearson por célula entre su perfil log2(cociente) en genes_v4 y la media del pool (consenso); umbral p98,5 de H1. Versión estricta: mismos genes sin los de linaje (los genes de linaje siguen en la entrada del modelo: límite declarado). C3 de REFCON: perfil por brazo de las llamadas frente a la plantilla REFCON de las 68 del hueso (decide para la vía); frente a la plantilla de expresión, se informa.",
+  "clasificador_propio": "scripts/classify.py (call_sample) con sus valores por defecto sobre las 19.047 células: fila secundaria, no decide (usa marcadores de SCEVAN, que dependen del linaje, y umbrales ajustados en melanoma y colorrectal). Si no cabe en memoria, se declara no ejecutado."
+ },
+
+ "dianas_final": {
+  "genes": ["ANKRD30A", "TPBG", "ERBB3", "SLC39A6", "ERBB2", "TACSTD2"],
+  "metodo": "En las llamadas fuera de referencia de cada criterio (base) y de REFCON si es aplicable: _amb_final.dianas sobre la matriz cruda (regla del cierre: fracción con Wilson, suelo de ambiente, por encima del suelo, referencia emparejada, supera la referencia; «sostenida» = por encima del suelo y supera la referencia). Se informa la diferencia estándar frente a estricto."
+ },
+
+ "estadistica": "Proporciones: Wilson 95 %. AUC: Hanley-McNeil. r: bootstrap percentil de 1.000 réplicas (semilla). Razón de odds: Katz con +0,5 si hay ceros.",
+
+ "reproducibilidad": "La etapa final corre dos veces desde cachés (directorio canónico y _rep2); se exige sha256 idéntico de todas las salidas. MANIFIESTO_HIGADO_CELULA.json con salidas, scripts, cachés, sha de estas reglas, locks y commit. Test tests/test_flex_higado_celula.py en tests/test_all.sh.",
+
+ "fuera_de_esta_fase": {
+  "Clonalscope": "Diferido al WES del hígado (necesita su prior de segmentos).",
+  "FISH_IHQ": "No es decisión de Polaris: va como pregunta para la oncóloga.",
+  "8p11_por_ADN": "Retirado por potencia (C6)."
+ }
+}

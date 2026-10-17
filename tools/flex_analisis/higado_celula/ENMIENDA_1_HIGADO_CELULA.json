@@ -1,0 +1,14 @@
+{
+ "estado": "ENMIENDA_1 de REGLAS_HIGADO_CELULA_v1 (sha256 da55dd8c074a9c6aa8934f4b92007417176b3b32221df0238aa4f4bf42522d6c, commit 51a25fd0). Aclaraciones de implementación escritas al programar, ANTES de correr ningún cálculo sobre datos (ni dobletes, ni REFCON, ni la etapa final). No cambian umbrales ni criterios; fijan lecturas que el texto dejaba ambiguas.",
+ "aclaraciones": [
+  {"clave": "C4_CONJUNTO", "texto": "El rango de C4 se toma sobre la UNIÓN de los conjuntos de llamadas de todas las vías que pasan C1 y C2 en su base: para estándar y estricto, {base, sin exclusión de dobletes, scCDC si la matriz es válida}; para REFCON, solo su base (REFCON usa el QC y los grupos del estándar; no se calcula una variante REFCON sin exclusión). Es un único número para todas las vías. Una vía que falla C1 o C2 queda NO RESUELTO y no entra en el conjunto."},
+  {"clave": "EXCLUSION_DOBLETES", "texto": "La exclusión de dobletes se hace pasando a _amb_final.grupos_v4 una copia del QC con ngen = -1 en las células doublet: mismas semánticas que un filtro más de QC y el mismo procedimiento aleatorio del hold-out."},
+  {"clave": "REPRODUCCION_V4", "texto": "La variante estándar sin exclusión de dobletes es exactamente la v4 de ambiente.json (cruda). Se comprueba que reproduce 6.245/13.320 en el pool, 0/490 periportales y 1/159 en H2; si no, se marca POST HOC y se informa la diferencia."},
+  {"clave": "CONJUNTOS", "texto": "«Llamadas del pool» (C3, C4) = llamada y grupo pool de grupos_v4. Numerador de C5 = llamada y no_ref (fuera de referencia y hold-out). Las dianas finales se leen en llamada y no_ref (conjunto malignas_v4, como en ambiente)."},
+  {"clave": "BRAZOS_INFORMATIVOS", "texto": "r «con genes de linaje»: misma regla que _final.brazos_genes sin el filtro de linaje (sin chr8/chr11). r «con amplicones»: misma regla con el filtro de linaje y con chr8 y chr11 permitidos. La implementación local se comprueba contra _final.brazos_genes (con filtro y sin chr8/chr11 debe dar idéntico)."},
+  {"clave": "REFCON_GENES", "texto": "En la entrada de REFCON los nombres de gen son símbolos únicos (duplicados con sufijo -1, -2…), porque su clasificador busca marcadores por símbolo; el gene_id va en una columna. La etapa final empareja por el orden fijo de genes_autosomas, no por nombre."},
+  {"clave": "REFCON_BRAZOS", "texto": "Perfiles por brazo de REFCON: media de log2(max(cociente, 1e-3)) en los genes de _final.brazos_genes presentes en REFCON, menos la media de la referencia (del hueso o del criterio), centrado por célula."},
+  {"clave": "RESIDUO_OR", "texto": "Razón de odds del residuo = (dobletes/singletes entre testigo+) / (dobletes/singletes entre testigo−), con Katz."},
+  {"clave": "SCCDC_HUESO", "texto": "Si scCDC no da matriz del hueso (sin GCG), la batería de validez de AMBIENTE_v1 usa el hueso crudo para su parte del hueso, y se declara."}
+ ]
+}

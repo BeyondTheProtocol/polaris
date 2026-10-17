@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/higado_celula/dobletes_posthoc2.R",
+ "estado_ficha": "completa",
+ "para": "scDblFinder en el Flex del hígado con la configuración de su viñeta para Flex (dbr.sd = 1), sin clusters con removeUnidentifiable = FALSE (homotípicos) y el cruce de las dos; post hoc 2 (P3). Lee los binarios CSC del paso canónico y escribe por índice de fila, nunca barcodes.",
+ "cuando_si": "Solo lanzado por _hc_posthoc2.py (paso p3_dobletes de flex_hc_posthoc2), dentro del sandbox sin red y con el Rscript del entorno dobletes.",
+ "cuando_no": "No a mano sobre datos de la paciente fuera de la ventanilla. No sustituye a dobletes.R (la exclusión de la fase 2 sigue siendo dbr 0,06): es sensibilidad informativa.",
+ "reemplaza": "Nada.",
+ "test": "tests/test_flex_higado_celula.py",
+ "alta": "2026-10-17",
+ "origen": "Red-team del 17-oct: scDblFinder por clústeres no ve dobletes tumor+tumor y no se corrió con dbr.sd = 1, el ajuste de sus autores para Flex."
+}

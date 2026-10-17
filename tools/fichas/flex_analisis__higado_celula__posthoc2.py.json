@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/higado_celula/posthoc2.py",
+ "estado_ficha": "completa",
+ "para": "Post hoc 2 declarados de la fase 2 del hígado célula a célula (POSTHOC_2_PLAN.json, commiteado antes del código): sensibilidad de C3 con spike-in de las 68 malignas del hueso y mitades, composición y reparto estratificado de H1/H2, scDblFinder en configuración Flex y sin clusters, clasificador propio de REFCON en submuestras y qué son las llamadas con HEP5. No cambian ningún veredicto.",
+ "cuando_si": "Para reproducir o auditar los controles post hoc 2 por la ventanilla (procesador flex_hc_posthoc2): p3_dobletes y p4_refcon una vez; final dos veces desde cachés; manifiesto.",
+ "cuando_no": "No decide veredictos ni cambia la vara de REGLAS_HIGADO_CELULA_v1. No regenera el MANIFIESTO canónico. Nunca fuera de sandbox-exec sin red ni sin la ventanilla.",
+ "reemplaza": "Nada. Es un fichero aparte (no amplía higado_celula.py) para que el código de la ejecución canónica de la fase 2 conserve sus sha256; importa _hc_final, _amb_final y _final sin copiarlos.",
+ "test": "tests/test_flex_higado_celula.py",
+ "alta": "2026-10-17",
+ "origen": "Red-team del 17-oct sobre la fase 2 (5 lentes, crítico y juez): controles post hoc baratos que pidió; {{TITULAR}}: «toma las decisiones que mejor hagan el análisis, es muy importante que sea perfecto»."
+}

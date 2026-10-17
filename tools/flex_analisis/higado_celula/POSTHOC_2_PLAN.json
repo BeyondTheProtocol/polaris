@@ -1,0 +1,110 @@
+{
+ "estado": "POSTHOC_2_PLAN: controles POST HOC baratos que pidió el red-team del 17-oct sobre la fase 2 del hígado célula a célula. Escrito y commiteado ANTES de escribir su código y ANTES de calcular nada. Todos son post hoc DECLARADOS: NO cambian ningún veredicto de la fase 2 (estándar NO RESUELTO, estricto NO RESUELTO; REFCON estándar NO RESUELTO, REFCON estricto FRÁGIL), no tocan REGLAS_HIGADO_CELULA_v1 ni sus enmiendas, no reescriben ninguna salida canónica y no regeneran MANIFIESTO_HIGADO_CELULA.json. Cambian, si acaso, la LECTURA del acta.",
+
+ "base": {
+  "reglas_sha256": "da55dd8c074a9c6aa8934f4b92007417176b3b32221df0238aa4f4bf42522d6c",
+  "enmienda1_sha256": "aa690fe78ff7fa8f3652dd608977cb3c3f52a543f8613033a16fbb74426a0ce4",
+  "enmienda2_sha256": "c86293f60250f99ff8f5b2ba918983d45a9af0dded375041ba2064e7fa200962",
+  "commit_ejecucion_canonica": "5b3f8f859fce4cd9242df18353af1532c52443b9",
+  "salidas_canonicas_sha256": {
+   "higado_celula.json": "0af8adf25dbb024c079136eec67f8ef5c1a4553b591e217b27aa8c691fe7d9f8",
+   "posthoc_semillas_holdout.csv": "cfda38c5bbdfb2b156cd48dee6106755f296874f095c696be8ca3ac71eae5a58",
+   "metricas_higado_celula.csv": "bc16242a7ce42d4c2b2cca6909a348685d263d97975b42ba9eaf46e9e3dc9f1b"
+  },
+  "codigo_canonico_intacto": "dobletes.R, _hc.py, _hc_dobletes.py, _hc_final.py, refcon_run.py e higado_celula.py NO se modifican: se importan. El código de estos post hoc va en ficheros nuevos (posthoc2.py, _hc_posthoc2.py, _hc_p4_refcon.py, dobletes_posthoc2.R) y la salida registra el sha256 de cada uno.",
+  "visto_antes_de_escribir_esto": "El acta de la fase 2 con el bloque del red-team y el informe completo del red-team (5 lentes, crítico y juez). Ninguna cifra de estos post hoc se conocía al escribir este plan."
+ },
+
+ "muro": {
+  "ventanilla": "Un procesador sancionado nuevo, flex_hc_posthoc2 (entorno nescore), con los mismos frenos que flex_higado_celula: re-ejecución con -I, solo con BTP_VENTANILLA=1, salida y cachés en zona clínica, y todo dentro de sandbox-exec (deny network*) mediante _hc.arranque. Lanza como hijos, dentro del mismo sandbox, el Rscript del entorno dobletes (P3) y el python del entorno refcon (P4). El hijo de refcon se niega a correr sin BTP_VENTANILLA=1 y HC_SANDBOX=1.",
+  "egress": "0 por construcción (sandbox heredado por los hijos). La salida registra HC_SANDBOX y que el proceso intentó abrir un socket y fue denegado (prueba positiva del sandbox, sin destino real: connect a 127.0.0.1:9).",
+  "salidas": "~/Clinico-PRIVADO/flex/higado_celula/posthoc2/ (segunda ejecución en ~/Clinico-PRIVADO/flex/higado_celula/_posthoc2_rep2/). Cachés en ~/Clinico-PRIVADO/flex/higado_celula/cache/posthoc2/. Ninguna salida lleva barcodes, índices de fila ni ids de bloque: solo agregados y filas anónimas (las FP de H2). Los índices de fila solo viven en caché.",
+  "stdout": "Solo agregados."
+ },
+
+ "semillas": {
+  "semilla_base": 20261016,
+  "P1_mitades": "numpy default_rng(20261016 + 101)",
+  "P1_submuestras_pool": "numpy default_rng(20261016 + 102)",
+  "P2_holdout": "las mismas que el post hoc canónico: grupos_semilla(L0, qc, 20261016 + s, excluir = dobletes dbr006) con s = 1..20, más s = 0 (la partición base canónica, que es idéntica a grupos_v4 con exclusión: se comprueba)",
+  "P3_R": "set.seed(20261016) y SerialParam(RNGseed = 20261016), como el canónico",
+  "P4_submuestras": "numpy default_rng(20261016 + 104)"
+ },
+
+ "P1_sensibilidad_C3": {
+  "pregunta": "¿Qué r por brazo alcanza un clon VERDADERO pasado por la tubería del hígado? ¿Era 0,3 alcanzable?",
+  "recordatorio": "C3 NO usa inferCNV: es expresión por brazo (_final.valores_brazo: log1p CP10k, media por brazo menos la media de la referencia, centrado por célula) con los brazos de ctx.arm['primaria'] (sin genes de linaje, sin chr8/chr11/X/Y). La inferCNV con spike-in solo contesta «¿se llaman las 68?».",
+  "entradas": "Ctx canónico de _hc_final (QC, dobletes dbr006, grupos base, genes, linaje, brazos y plantillas): nada se recalcula sobre la matriz ampliada. Las 68 = trib_maligna_T_limpio_T del hueso. Se exige gene_ids idéntico entre hígado y hueso (assert).",
+  "a_spike_in_llamada": {
+   "metodo": "Matriz ampliada = 19.047 células del hígado + las 68 al final, con todas las máscaras de grupo en False para las 68. Se corre _amb_final.infercnv_v4 (mismo código, misma referencia hepática de la base) para estándar y estricto. El consenso del pool y el umbral p98,5 de H1 son los de la ejecución SIN spike-in (se recalculan y se comprueba que reproducen la base canónica: pool 8.756/12.561 y H2 5/141 en el estándar; 3.246/12.561, pp 5/426 y H2 2/141 en el estricto). Score de las 68 = correlación de su fila de la inferCNV ampliada con ese consenso.",
+   "chequeo_de_perturbacion": "infercnvpy fija el umbral de ruido por trozo de 5.000 células: añadir 68 al final cambia el último trozo. Se informa, para las filas del hígado de la ejecución ampliada frente a la canónica, max|Δscore| y el Jaccard de las llamadas del pool.",
+   "informa": "Fracción de las 68 llamadas (Wilson) con el umbral de cada criterio; mediana de su score frente a la del pool, la de H1 y el umbral."
+  },
+  "b_r_por_brazo": {
+   "circular": "r entre la media de las 68 centradas con la REFERENCIA HEPÁTICA de la base (valores_brazo sobre la matriz ampliada con la referencia del hígado) y la plantilla canónica (las mismas 68 centradas con la referencia ósea). Cota superior: plantilla y prueba son las mismas células. Se informa para primaria, con_linaje y con_amplicones.",
+   "mitades": "1.000 particiones aleatorias de las 68 en A (34) y B (34). Plantilla_B = media de B centradas con la referencia ósea (como la plantilla canónica). Para cada partición: r_hep_A = r(media de A con referencia hepática, plantilla_B): un clon verdadero de 34 células por la tubería del hígado; r_hueso_A = r(media de A con referencia ósea, plantilla_B): techo de ruido con 34 + 34 células; r_llam34 = r(media de 34 llamadas del pool del estándar base al azar, plantilla_B): n emparejado; r_nollam34 = lo mismo con 34 no llamadas del pool; r_llam_todas = r(media de todas las llamadas del pool, plantilla_B). Brazos: primaria (los que deciden C3).",
+   "resumen": "Mediana, percentiles 2,5 y 97,5 y fracción de particiones con r > 0,3 de cada serie."
+  },
+  "lectura_a_priori_NO_DECIDE": [
+   "«0,3 alcanzable por un clon verdadero de 34 células con la referencia hepática» si la mediana de r_hep_A >= 0,3; «no alcanzable» si su percentil 97,5 < 0,3; «a veces» en el resto (se da la fracción).",
+   "Coste de la referencia hepática = mediana(r_hueso_A) − mediana(r_hep_A).",
+   "A n emparejado: si la mediana de r_llam34 cae dentro del intervalo 2,5-97,5 de r_hep_A, las llamadas se parecen al clon del hueso tanto como el propio clon por la tubería del hígado; si cae por debajo del percentil 2,5, se parecen menos que un clon verdadero. Se compara igual r_nollam34.",
+   "Las 68 se usan para fijar el filtro de linaje (_amb_final.linaje incluye |log2FC| > 1 entre las 68 y su referencia): el filtro quita los genes que más distinguen a ese clon. Límite declarado, no se corrige."
+  ]
+ },
+
+ "P2_particion_H1_H2": {
+  "composicion": "Recuento por tipo (NK, endotelio, mieloide, fibroblasto_estelar) de H1 y H2 en la base y en las semillas 1-20 (partición aleatoria del post hoc canónico).",
+  "barrido_estratificado_EMPAREJADO": "Mismas semillas (0-20), mismas extracciones del rng para el hold-out (por tanto misma referencia, misma inferCNV y mismo score por célula); solo cambia el reparto H1/H2: en lugar de rng.choice(hold, len//2), dentro de cada tipo y en el orden NULO + fibroblasto_estelar se elige floor(n_t/2) para H1 con el mismo rng; el resto va a H2 (con n_t impar, la célula sobrante va a H2). Se cachea el score por semilla y criterio y se aplica el umbral p98,5 de H1 dos veces (aleatoria y estratificada).",
+  "reproducibilidad": "La partición aleatoria tiene que reproducir posthoc_semillas_holdout.csv canónico (FP_H2_k, FP_pp_k, llamadas_pool por semilla y criterio): se comprueba y se registra; si no reproduce, se informa la diferencia y no se lee el barrido.",
+  "por_semilla": "Para las dos particiones: composición de H1 y H2, FP en H2 (total y por tipo), FP en periportales, umbral, C2, C1 (AUC pool frente a hepatocitos y frente a periportales; no depende del reparto), fracción sobre QC y C5 (banda 0,58-0,82), y etiqueta informativa sin C3 ni C4: NO RESUELTO si falla C1 o C2; FRÁGIL si pasan C1 y C2 y falla C5; «RESUELTO posible (C3 y C4 sin calcular)» si pasan C1, C2 y C5. Número de semillas que pasan C2 y C5 a la vez.",
+  "desequilibrio": "Distancia de variación total entre las proporciones de tipo de H1 y H2 (0,5·Σ|p1−p2|) por semilla; mediana en semillas que pasan C2 frente a las que fallan, en la partición aleatoria; correlación de Spearman con FP_H2_k.",
+  "FP_de_la_base": "Para el estándar base: las 5 FP de H2 y las células de H1 por encima del umbral; para el estricto base: sus FP de H2 y de periportales. Por célula, en filas anónimas ordenadas por score: tipo, UMI, genes detectados, UMI de testigos (ESR1, ANKRD30A, TFF1, SCGB2A2, KRT19) en CellBender FPR 0,01 y en la cruda, testigo+ (>= 1 UMI), score de scDblFinder dbr006 (todas son singletes de dbr006 POR CONSTRUCCIÓN, porque la base los excluye: se informa el score continuo y su percentil dentro de H2) y clase en las configuraciones de P3, y margen del score sobre el umbral. Comparador: lo mismo agregado en las no llamadas de H2.",
+  "lectura_a_priori_NO_DECIDE": [
+   "Si el barrido estratificado pasa C2 en >= 15/20 frente a 10/20 del aleatorio, C2 medía sobre todo el sorteo de tipos; si la diferencia es <= 3 semillas, el ruido de C2 es el del cuantil con n ≈ 140, no el reparto de tipos.",
+   "«C2 falla en controles con ARN tumoral» si >= 3 de las 5 FP de H2 del estándar son testigo+ en CellBender y su fracción supera la de las no llamadas de H2 (se da el exacto de Fisher, informativo)."
+  ]
+ },
+
+ "P3_dobletes_configuracion_Flex": {
+  "script": "dobletes_posthoc2.R (nuevo), sobre los mismos binarios exportados por el paso canónico (cache/dobletes/higado_*.bin), entorno dobletes (scDblFinder 1.24.10), OMP_NUM_THREADS = 1.",
+  "configuraciones": {
+   "dbrsd1": "scDblFinder(sce, clusters = tipo de A, dbr = 0.06, dbr.sd = 1): la de la viñeta para Flex («base the thresholding entirely on the classification accuracy»). Pedida.",
+   "sinclusters": "scDblFinder(sce, clusters = NULL, dbr = 0.06, removeUnidentifiable = FALSE; dbr.sd por defecto): la de la viñeta para dobletes homotípicos. Pedida.",
+   "sinclusters_dbrsd1": "scDblFinder(sce, clusters = NULL, dbr = 0.06, dbr.sd = 1, removeUnidentifiable = FALSE): cruce de las dos. Añadido por diseño factorial, declarado aquí."
+  },
+  "informa": "Por configuración: % de dobletes (Wilson) global y por tipo de A; % en el pool QC (grupos sin exclusión) y entre las llamadas del estándar sin exclusión (fuera de referencia), y razón de odds llamadas/no llamadas en el pool (Katz), con la función canónica composicion_dobletes; % entre las llamadas del pool del estándar base (que ya excluyó los dobletes de dbr006); E del residuo con la función canónica residuo() (CellBender FPR 0,01 primaria y cruda) y la lectura de la regla D2a, que aquí es INFORMATIVA; solapamiento (Jaccard) con dbr006. Proxy de homotípicos: fracción de llamadas del pool del estándar base con UMI > 2 × la mediana de UMI del pool base (singletes de dbr006), frente a la de las no llamadas.",
+  "lectura_a_priori_NO_DECIDE": [
+   "«El 9,0 % era cota inferior en el pool» se confirma si alguna configuración sin clusters da más dobletes en el pool que dbr006 con IC de Wilson sin solape.",
+   "La lectura de E (explican / una parte / no explican) con dbr.sd = 1 se da como sensibilidad del residuo, junto a las dos ya publicadas (0,06 y por defecto)."
+  ]
+ },
+
+ "P4_clasificador_REFCON": {
+  "que": "scripts/classify.py de REFCON (refcon.downstream.classify.call_sample, valores por defecto, código sin modificar en ~/.claude-science/refcon/04d9d24) sobre submuestras del hígado, con la inferencia ens3 ya cacheada (trozos del hígado) y las cuentas crudas de genes autosómicos (mismo orden y nombres que la entrada de REFCON).",
+  "submuestras": "nescore elige los índices (default_rng(20261016 + 104).permutation de las 19.047 células) y los deja en caché; el hijo de refcon solo etiqueta. 3 réplicas DISJUNTAS de N células, uniformes sobre todas las células (el clasificador es relativo a la muestra: z-score entre células, filtro de genes > 10 %, GMM).",
+  "N_y_memoria": "Memoria libre medida en el hijo justo antes de cargar (vm_stat: free + inactive + speculative + purgeable, la misma fórmula que el paso canónico), sin otro cálculo pesado en marcha. Necesita estimada = 6 × N × genes × 8 B (la del paso canónico). N = el mayor de 5.000, 4.000 y 3.000 que cabe; si ni 3.000 cabe, P4 se declara NO EJECUTABLE y se informa así.",
+  "informa": "Por réplica: estado (labeled o PURE_soft; las etiquetas −1 se cuentan), diploides confiables y sus tipos de A, K, correlaciones por clúster; fracción aneuploide en el pool, hepatocitos QC, periportales, H1, H2, referencia y cada tipo del nulo; fracción aneuploide fuera de referencia sobre QC (como C5, banda orientativa 0,58-0,82); concordancia en el pool con las llamadas de inferCNV estándar y estricto base y con las de REFCON estándar y estricto (receta v4 sobre los cocientes, recalculadas con la función canónica): % de acuerdo y kappa de Cohen. Rango entre réplicas.",
+  "lectura_a_priori_NO_DECIDE": [
+   "«El clasificador propio separa» si en las tres réplicas la fracción aneuploide en hepatocitos QC <= 5 % y en el pool >= 50 %; «no separa» si no. Heurística declarada aquí, no un criterio de la fase.",
+   "«Estable» si el rango entre réplicas de la fracción aneuploide del pool es < 10 puntos."
+  ]
+ },
+
+ "P5_llamadas_con_HEP5": {
+  "definicion": "Llamadas del estándar base fuera de referencia (no_ref) que no están en el pool y no son hepatocitos: epitelial/no_asignado de QC con >= 2 genes HEP5 (ALB, APOA1, SERPINA1, HP, TF) detectados. Se exige reproducir 628 y, como denominador, 812 (epitelial/no_asignado en no_ref con >= 2 HEP5). Lo mismo para el estricto base (279), informativo.",
+  "informa": "Frente a las llamadas del pool, los hepatocitos QC y las 184 no llamadas con HEP5: recuento por tipo de A; UMI y genes (mediana e IQR); UMI de HEP5 y nº de HEP5 detectados; fracción que conserva >= 2 HEP5 en CellBender FPR 0,01; testigo+ en CellBender y en la cruda; score de scDblFinder dbr006 (todas singletes de dbr006 POR CONSTRUCCIÓN) y fracción doblete en las configuraciones de P3; origen más probable en las configuraciones con clusters.",
+  "lectura_a_priori_NO_DECIDE": [
+   "Si < 50 % de las 628 conservan >= 2 HEP5 en CellBender, su HEP5 es mayoritariamente ambiente; si >= 50 %, no es solo ambiente (doblete físico o estado hepatocyte-like, que estos datos no separan).",
+   "«Compatibles con multipletes» si su UMI mediana es > 1,5 × la de las llamadas del pool Y su fracción de dobletes en alguna configuración de P3 supera la de las llamadas del pool."
+  ]
+ },
+
+ "reproducibilidad": "P3 (R) y P4 (refcon) son pasos de preparación: corren una vez y se cachean con sha256. La etapa de cálculo (P1, P2, P3 resumen, P4 evaluación, P5) corre DOS veces desde cachés (posthoc2/ y _posthoc2_rep2/) y se exige sha256 idéntico de todas las salidas. MANIFIESTO_POSTHOC2.json en posthoc2/: salidas, dos ejecuciones, cachés, sha256 de este plan, de cada script usado (no solo el commit), de las reglas y de las salidas canónicas de las que parte (que siguen intactas). Test tests/test_flex_higado_celula.py ampliado (ya está en tests/test_all.sh).",
+
+ "no_hace": [
+  "No cambia la vara (hold-out mayor, otro corte de C2, otro 0,3): eso es plan de {{TITULAR}}, no un post hoc.",
+  "No vuelve a correr C1-C5 con las nuevas exclusiones de dobletes de P3 (solo informa su composición).",
+  "No regenera MANIFIESTO_HIGADO_CELULA.json (su recorrido recogería posthoc2/)."
+ ]
+}

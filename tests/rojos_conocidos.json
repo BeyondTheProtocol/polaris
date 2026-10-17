@@ -2,5 +2,18 @@
   "version": 1,
   "_para_que": "Rojos CONOCIDOS de la suite: cuentan como conocidos (no como nuevos) solo con deuda abierta, dueno, caducidad <= 14 dias y la firma completa del fallo. Detalle y condiciones: tests/_rojos_conocidos.py. Editar este fichero exige la suite COMPLETA. Las baterias del nucleo del muro (test_fuga*, test_halt*, test_gate*, test_muro*...) estan VETADAS salvo `ok_titular` {fecha, cita}.",
   "_como_se_anade": "1) python3 tools/deuda.py abrir \"<clave>\" \"<que es>\"  2) python3 tests/_rojos_conocidos.py proponer <carpeta de rojos de la pasada>  3) pegar la entrada con la clave de deuda, dueno y caduca (max 14 dias).",
-  "entradas": []
+  "entradas": [
+    {
+      "bateria": "test_deuda_escalada.py",
+      "deuda": "suite-nocturna-test_deuda_escalada.py",
+      "dueno": "tecnico",
+      "desde": "2026-10-17",
+      "caduca": "2026-10-31",
+      "firma": [
+        "AssertionError: N hallazgo(s) detectados varias veces y SIN CERRAR. No se puede decir «todo en verde» con esto abierto — ciérralos con un test (`deuda.py cerrar",
+        "FAIL: test_no_hay_deuda_escalada_sin_cerrar (__main__.DeudaReal)"
+      ],
+      "por_que": "Rojo por diseño mientras el libro de deuda de casa base tenga hallazgos escalados (49 el 17-oct). Ajeno a la rama del explorador flex; lo vio la lente de muro del red-team del 17-oct. Se cierra cerrando deudas escaladas, no aquí."
+    }
+  ]
 }

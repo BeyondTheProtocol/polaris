@@ -222,6 +222,25 @@ FLEX = {
     # infercnvpy). El script se re-ejecuta con `-I` y su stdout solo lleva agregados.
     "flex_b": ("tools/flex_analisis/b/flex_b.py",
                os.path.join(HOME, ".claude-science", "conda", "envs", "nescore", "bin", "python")),
+    # Explorador single-cell (17-oct-26, plan del explorador para oncólogos moleculares): export CURADO
+    # real (h5ad desde cero + web/*.json + informe de limpieza) SOLO en `explorador/` de la zona clínica
+    # del Flex, con validador fail-closed (árbol HDF5 entero + JSON + puerta_n1). Mismo env y mismas
+    # reglas que flex_b: -I, BTP_VENTANILLA, stdout solo agregados.
+    "flex_explorador": ("tools/flex_analisis/explorador/exporta.py",
+                        os.path.join(HOME, ".claude-science", "conda", "envs", "nescore", "bin", "python")),
+    # Fase 2 del hígado célula a célula (17-oct-26, REGLAS_HIGADO_CELULA_v1). Lee las cachés del cierre y escribe solo
+    # en `higado_celula/`. Los dos scripts se re-ejecutan con -I y DENTRO de `sandbox-exec (deny network*)`: egress 0
+    # por construcción, no por promesa. `flex_refcon` corre REFCON (MIT, commit 04d9d24, checkpoints auditados) en su
+    # propio entorno con torch; `flex_higado_celula` hace el resto en nescore (y lanza R del entorno dobletes).
+    "flex_higado_celula": ("tools/flex_analisis/higado_celula/higado_celula.py",
+                           os.path.join(HOME, ".claude-science", "conda", "envs", "nescore", "bin", "python")),
+    "flex_refcon": ("tools/flex_analisis/higado_celula/refcon_run.py",
+                    os.path.join(HOME, ".claude-science", "conda", "envs", "refcon", "bin", "python")),
+    # Post hoc 2 declarados de esa fase (POSTHOC_2_PLAN.json, red-team del 17-oct). Mismos frenos (-I, ventanilla, zona
+    # clínica, sandbox sin red); lanza como hijos enjaulados el Rscript de `dobletes` y el python de `refcon`. Escribe
+    # solo en `higado_celula/posthoc2/` (o `_posthoc2_rep2/`) y en `cache/posthoc2/`. No cambia ningún veredicto.
+    "flex_hc_posthoc2": ("tools/flex_analisis/higado_celula/posthoc2.py",
+                         os.path.join(HOME, ".claude-science", "conda", "envs", "nescore", "bin", "python")),
 }
 PROCESADORES.update(FLEX)
 
