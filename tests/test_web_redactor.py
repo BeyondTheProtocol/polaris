@@ -173,9 +173,9 @@ class Ciclo(unittest.TestCase):
     def corre(self, modo, hoy=HOY, estado_pr="OPEN"):
         return R.redactar(modo, hoy, "/no/repo", dir_=self.dir, _textos=TEXTOS, _mapa=MAPA,
                           _ask=ask_fijo(ENTRADA),
-                          _crear=lambda p: self.creados.append(p) or 300 + len(self.creados),
+                          _crear=lambda p, *_: self.creados.append(p) or 300 + len(self.creados),
                           _ci=lambda n: ("verde", {}), _encargar=self.encargos.append,
-                          _estado_pr=lambda n: estado_pr)
+                          _estado_pr=lambda n: estado_pr, _cambios=lambda n: [])
 
     def test_sombra_solo_apunta(self):
         self.vistos("sombra", **{"estado:wes": hecho_a()})
@@ -203,8 +203,8 @@ class Ciclo(unittest.TestCase):
     def test_ci_rojo_no_encarga_telegram(self):
         self.vistos("activo", **{"estado:wes": hecho_a()})
         R.redactar("activo", HOY, "/no/repo", dir_=self.dir, _textos=TEXTOS, _mapa=MAPA,
-                   _crear=lambda p: 400, _ci=lambda n: ("rojo", {}), _encargar=self.encargos.append,
-                   _estado_pr=lambda n: "OPEN")
+                   _crear=lambda p, *_: 400, _ci=lambda n: ("rojo", {}), _encargar=self.encargos.append,
+                   _estado_pr=lambda n: "OPEN", _cambios=lambda n: [])
         self.assertEqual(self.encargos, [])
 
     def test_recordatorios_uno_y_otro_solo_si_es_prioridad_1(self):
@@ -234,6 +234,124 @@ class Ciclo(unittest.TestCase):
         self.corre("activo", estado_pr="MERGED")
         self.assertEqual(self.lee("activo")["estado:wes"]["estado"], "publicado")
         self.assertFalse(os.path.exists(os.path.join(self.dir, "al_dia_pr_vivo_activo.json")))
+
+
+PIEZA_A = {"clave": "estado:wes", "carril": "A", "id": "ciencia-wes",
+           "es": "Primeros resultados (octubre 2026)", "en": "First results (October 2026)",
+           "tono": "curso", "antes": "Material en el laboratorio"}
+PIEZA_C = dict(ENTRADA, clave="pr:c", carril="C", fecha_es="17 oct 2026", fecha_en="Oct 17, 2026")
+
+
+class SusCambios(unittest.TestCase):
+    def test_aplica_lo_que_pide(self):
+        nueva = dict(PIEZA_A, es="Primeros resultados")
+        piezas, motivo = R.aplicar_sus_cambios([PIEZA_A], "quita la fecha", TEXTOS,
+                                               _ask=lambda _p: json.dumps({"piezas": [nueva]}))
+        self.assertEqual(motivo, "")
+        self.assertEqual(piezas[0]["es"], "Primeros resultados")
+        self.assertEqual(piezas[0]["antes"], "Material en el laboratorio")   # no se toca
+
+    def test_quitar_uno(self):
+        piezas, _ = R.aplicar_sus_cambios([PIEZA_A, PIEZA_C], "quita el 2", TEXTOS,
+                                          _ask=lambda _p: json.dumps({"piezas": [PIEZA_A]}))
+        self.assertEqual([p["clave"] for p in piezas], ["estado:wes"])
+
+    def test_no_cuela_un_cambio_nuevo(self):
+        intruso = dict(PIEZA_A, clave="estado:otro")
+        piezas, motivo = R.aplicar_sus_cambios([PIEZA_A], "x", TEXTOS,
+                                               _ask=lambda _p: json.dumps({"piezas": [intruso]}))
+        self.assertIsNone(piezas)
+        self.assertIn("no estaba", motivo)
+
+    def test_lo_que_vuelve_pasa_el_lint_y_el_tag(self):
+        clin = dict(PIEZA_C, descripcion_es="NY-BR-1 aparece en el 58% de las células tumorales.")
+        self.assertIsNone(R.aplicar_sus_cambios([PIEZA_C], "x", TEXTOS,
+                                                _ask=lambda _p: json.dumps({"piezas": [clin]}))[0])
+        tag = dict(PIEZA_C, tag_es="Novedades")
+        self.assertIsNone(R.aplicar_sus_cambios([PIEZA_C], "x", TEXTOS,
+                                                _ask=lambda _p: json.dumps({"piezas": [tag]}))[0])
+
+    def test_rehace_los_ficheros_desde_las_piezas(self):
+        plan = R.plan_desde_piezas([dict(PIEZA_A, es="Primeros resultados"), PIEZA_C], MAPA, TEXTOS)
+        self.assertIn("status: 'Primeros resultados'", plan["ficheros"]["content/es/science.yml"])
+        self.assertIn("title: Abro la página célula a célula", plan["ficheros"]["content/es/timeline.yml"])
+
+    def test_retira_solo_los_borradores_de_ese_pr(self):
+        pend = os.path.join(tempfile.mkdtemp(), "pending")
+        os.makedirs(pend)
+        for nombre, pr in (("a-web-publish-1.json", 301), ("b-web-publish-2.json", 302),
+                           ("c-mail-contact-3.json", 301)):
+            with open(os.path.join(pend, nombre), "w") as f:
+                json.dump({"sellado": {"pr": pr}}, f)
+        self.assertEqual(R.retirar_borradores_web(301, _pending=pend), 1)
+        self.assertEqual(sorted(os.listdir(pend)), ["b-web-publish-2.json", "c-mail-contact-3.json"])
+        self.assertEqual(os.listdir(os.path.join(os.path.dirname(pend), "retirado")),
+                         ["a-web-publish-1.json"])
+
+
+class BucleDeCambios(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.cambios_dir = os.path.join(self.dir, "cambios")
+        os.makedirs(self.cambios_dir)
+        self.rehechos, self.retirados, self.encargos = [], [], []
+        with open(os.path.join(self.dir, "al_dia_vistos_activo.json"), "w") as f:
+            json.dump({"estado:wes": dict(hecho_a(), estado="propuesto")}, f)
+        with open(os.path.join(self.dir, "al_dia_pr_vivo_activo.json"), "w") as f:
+            json.dump({"pr": 301, "claves": ["estado:wes"], "desde": "2026-10-17", "recordatorios": 0,
+                       "ci": "verde", "vueltas": 0, "rama": "auto/web-al-dia-2026-10-17",
+                       "piezas": [PIEZA_A]}, f)
+
+    def cambio(self, texto, n=0):
+        with open(os.path.join(self.cambios_dir, "301-2026-10-18T10000%d.json" % n), "w") as f:
+            json.dump({"pr": 301, "texto": texto}, f)
+
+    def corre(self, nueva_es="Primeros resultados"):
+        return R.redactar("activo", HOY + datetime.timedelta(days=1), "/no/repo", dir_=self.dir,
+                          _textos=TEXTOS, _mapa=MAPA,
+                          _ask=lambda _p: json.dumps({"piezas": [dict(PIEZA_A, es=nueva_es)]}),
+                          _crear=lambda p, r, n: self.rehechos.append((p, r, n)) or n,
+                          _ci=lambda n: ("verde", {}), _encargar=self.encargos.append,
+                          _estado_pr=lambda n: "OPEN", _retirar=self.retirados.append,
+                          _cambios=lambda n: R.cambios_suyos(n, _dir=self.cambios_dir))
+
+    def vivo(self):
+        with open(os.path.join(self.dir, "al_dia_pr_vivo_activo.json")) as f:
+            return json.load(f)
+
+    def test_su_cambio_rehace_el_mismo_pr_y_retira_el_telegram_viejo(self):
+        self.cambio("quita la fecha")
+        self.corre()
+        p, rama, n = self.rehechos[0]
+        self.assertEqual((rama, n), ("auto/web-al-dia-2026-10-17", 301))
+        self.assertIn("status: 'Primeros resultados'", p["ficheros"]["content/es/science.yml"])
+        self.assertEqual(self.retirados, [301])
+        self.assertEqual(self.encargos, [301])
+        self.assertEqual(self.vivo()["vueltas"], 1)
+        self.assertEqual(os.listdir(os.path.join(self.cambios_dir, "aplicados")),
+                         ["301-2026-10-18T100000.json"])
+        self.corre()                                # ya aplicado: no se rehace otra vez
+        self.assertEqual(len(self.rehechos), 1)
+
+    def test_a_la_cuarta_vuelta_no_se_aplica(self):
+        v = self.vivo()
+        v["vueltas"] = 3
+        with open(os.path.join(self.dir, "al_dia_pr_vivo_activo.json"), "w") as f:
+            json.dump(v, f)
+        self.cambio("otra vez")
+        notas = self.corre()
+        self.assertEqual(self.rehechos, [])
+        self.assertIn("buzón", notas[0])
+        self.assertTrue(os.listdir(os.path.join(self.cambios_dir, "sin_aplicar")))
+
+    def test_ci_que_se_pone_verde_despues_encarga_el_telegram(self):
+        v = self.vivo()
+        v["ci"] = "pendiente"
+        with open(os.path.join(self.dir, "al_dia_pr_vivo_activo.json"), "w") as f:
+            json.dump(v, f)
+        self.corre()
+        self.assertEqual(self.encargos, [301])
+        self.assertEqual(self.vivo()["ci"], "verde")
 
 
 class CrearPrContraGitDePega(unittest.TestCase):

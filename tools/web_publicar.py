@@ -366,16 +366,37 @@ def textos_del_pr(repo, base, cabeza):
     return out
 
 
+def _par_es(f):
+    """La ruta en español de un fichero en inglés (`content/en/x.yml` → `content/es/x.yml`), o None."""
+    if f.startswith("content/en/"):
+        return "content/es/" + f[len("content/en/"):]
+    if f == LOCALES + "/en.json":
+        return LOCALES + "/es.json"
+    return None
+
+
 def render_textos(numero, textos, preview="", cabeza=""):
-    """El mensaje de Telegram: lo que cambia, en claro, ES y EN tal cual. Sin jerga."""
+    """El mensaje de Telegram: lo que cambia, en claro. Sin jerga.
+
+    El inglés NO se le enseña cuando su fichero en español también cambia (17-oct-2026, {{TITULAR}}:
+    «si el cambio que te apruebo en español tú automáticamente lo traduces»). Se cuenta en una
+    línea y SIGUE dentro de la huella sellada (`huella_textos` recibe todos los textos): lo que
+    sale es exactamente lo que aprobó, también en inglés. Si solo cambia el inglés, se enseña."""
+    con_es = {f for f, _q, _a, _d in textos}
+    ocultos = [t for t in textos if _par_es(t[0]) in con_es]
     lineas = ["🌐 Web · ¿apruebas este texto? (PR #%s)" % numero, ""]
-    for f, que, antes, despues in textos:
+    for f, que, antes, despues in (t for t in textos if t not in ocultos):
         donde = f.replace("i18n/locales/", "textos ").replace("content/", "").replace(
             "app/data/caso.json", "panel /datos")
         lineas.append("📄 %s%s" % (donde, (" · " + que) if que else ""))
         if antes:
             lineas.append("   Antes: %s" % antes)
         lineas.append("   Ahora: %s" % (despues or "(se quita)"))
+        lineas.append("")
+    if ocultos:
+        s = "" if len(ocultos) == 1 else "s"
+        lineas.append("🇬🇧 Inglés: %d cambio%s adaptado%s del español, incluido%s en lo que apruebas."
+                      % (len(ocultos), s, s, s))
         lineas.append("")
     if preview:
         lineas.append("Míralo antes: %s" % preview)

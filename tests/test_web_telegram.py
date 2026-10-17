@@ -371,6 +371,18 @@ class LeerElTextoDelPR(unittest.TestCase):
         self.assertIn("Ahora: octubre de", msg)
         self.assertEqual(WP.huella_textos(textos), WP.huella_textos(list(textos)))
 
+    def test_el_ingles_va_sellado_pero_no_se_le_enseña_si_cambia_el_español(self):
+        """17-oct-26, {{TITULAR}}: el inglés se hace solo a partir del español que aprueba."""
+        textos = [("content/es/science.yml", "", "Material en el laboratorio", "Primeros resultados"),
+                  ("content/en/science.yml", "", "Material at the lab", "First results"),
+                  ("i18n/locales/en.json", "footer.x", "a", "b")]
+        msg = WP.render_textos(300, textos)
+        self.assertIn("Ahora: Primeros resultados", msg)
+        self.assertNotIn("First results", msg)
+        self.assertIn("Inglés: 1 cambio adaptado del español", msg)
+        self.assertIn("Ahora: b", msg)               # solo cambia en inglés: se enseña
+        self.assertNotEqual(WP.huella_textos(textos), WP.huella_textos(textos[:1]))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

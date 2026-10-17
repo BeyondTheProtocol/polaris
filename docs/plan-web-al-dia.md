@@ -191,7 +191,8 @@ Telegram con antes/después ─ «sí» ─ fusionar_aprobado ─ despliegue ver
 
 Decisiones de implementación:
 - **Un informe clínico nuevo no se redacta solo:** contarlo exige leerlo y que `comite-medico` lo mire (matiz de Vega). Queda `necesita_humano` y va al parte.
-- **El Telegram enseña también el inglés:** `web_lote.pedir_ok` renderiza todo el diff. Que salga solo el español (§0) depende de un ajuste en `web_publicar.render_textos`, todavía pendiente.
-- **Bucle de cambios:** si responde con cambios, siguen yendo al buzón de Vega (`encargar_cambios`). Rehacer el PR solo con sus cambios es la pieza siguiente.
+- **El Telegram enseña solo el español:** `web_publicar.render_textos` oculta el cambio en inglés cuando su fichero en español también cambia, y lo cuenta en una línea («🇬🇧 Inglés: N cambios adaptados del español, incluidos en lo que apruebas»). La huella sellada sigue cubriendo los dos idiomas.
+- **Bucle de cambios:** si responde con correcciones, el redactor las aplica con Claude sobre las piezas del PR vivo, valida lo que vuelve (mismas piezas o menos, tags existentes, lint), rehace ese PR en su rama `auto/`, retira el Telegram viejo (`outbox/retirado/`) y encarga el nuevo. Máximo 3 vueltas; a partir de ahí quedan en el buzón de Vega.
+- **CI tardío:** si al crear el PR el CI no estaba en verde, cada pasada lo vuelve a mirar y encarga el Telegram en cuanto lo está.
 - **Modo activo:** se enciende con `{"modo": "activo"}` en `state/web_guardian/modo.json`, después de 7 días de sombra y de enseñar 3 propuestas reales.
 - **Bug que cazó el test de integración:** `web_novedad._git` hace `strip()` y cortaba la primera ruta de `git status --porcelain`. El redactor usa `git diff --name-only`.

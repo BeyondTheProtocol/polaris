@@ -25,6 +25,12 @@ dos PRs sobre el mismo fichero invalidan su «sí» sellado al rebasar. El PR vi
 Si no contesta: un recordatorio a los 3 días; si algo de lo que lleva es prioridad 1 (la web dice
 algo falso), otro a los 7. Luego, silencio: queda en el parte.
 
+SUS CAMBIOS. Si responde al Telegram con correcciones («quita el 2», «dilo más corto»), el bot
+las apunta (`web_guardian.encargar_cambios`). En la pasada siguiente el redactor las aplica con
+Claude sobre las piezas del PR vivo, valida lo que vuelve (mismas piezas o menos, tags existentes,
+lint), rehace ESE PR en su rama `auto/`, retira el Telegram viejo y le manda el nuevo. Máximo 3
+vueltas; a la cuarta quedan en el buzón de Vega.
+
 LA FIRMA. Este fichero NUNCA fusiona ni mira el permiso de sesión: abre el PR, espera al CI y
 encarga `pedir_ok`, que sella PR + commit + huella del texto. Publica su «sí» y solo su «sí».
 
@@ -230,7 +236,7 @@ def insertar_entradas(textos, entradas):
 def preparar(hechos, mapa, textos, hoy, _ask=None):
     """{"ficheros": {rel: contenido nuevo}, "datos": bool, "hechos": [claves que van],
         "cambios": [{clave, que, antes, despues}], "fuera": [(clave, estado, motivo)]}"""
-    out = {"ficheros": {}, "datos": False, "hechos": [], "cambios": [], "fuera": []}
+    out = {"ficheros": {}, "datos": False, "hechos": [], "cambios": [], "fuera": [], "piezas": []}
     actual = dict(textos)
     filas = {a["id"]: a for a in (mapa or {}).get("afirmaciones") or []}
     entradas = []
@@ -253,12 +259,16 @@ def preparar(hechos, mapa, textos, hoy, _ask=None):
                     actual[rel] = aplicar_estado(actual[rel], a["componente"][idioma], t[idioma], t["tono"])
                 out["cambios"].append({"clave": clave, "que": "/ciencia · %s" % a["componente"]["es"],
                                        "antes": a["valor"]["es"], "despues": t["es"]})
+                out["piezas"].append({"clave": clave, "carril": "A", "id": a["id"], "es": t["es"],
+                                      "en": t["en"], "tono": t["tono"], "antes": a["valor"]["es"]})
             elif h["carril"] == "B":
                 out["datos"] = True
                 m = re.search(r"\d{4}-\d{2}-\d{2}", h.get("detalle") or "")
                 out["cambios"].append({"clave": clave, "que": "/datos",
                                        "antes": "panel generado el %s" % (m.group(0) if m else "?"),
                                        "despues": "regenerado con lo de hoy"})
+                out["piezas"].append({"clave": clave, "carril": "B",
+                                      "antes": out["cambios"][-1]["antes"]})
             elif h["carril"] == "C":
                 e, motivo = redactar_entrada(h, actual, _ask)
                 if not e:
@@ -268,6 +278,7 @@ def preparar(hechos, mapa, textos, hoy, _ask=None):
                 entradas.append(e)
                 out["cambios"].append({"clave": clave, "que": "cronología (nueva)", "antes": "",
                                        "despues": "%s · %s" % (e["titulo_es"], e["descripcion_es"])})
+                out["piezas"].append(dict(e, clave=clave, carril="C"))
             else:
                 continue
             out["hechos"].append(clave)
@@ -277,6 +288,127 @@ def preparar(hechos, mapa, textos, hoy, _ask=None):
         actual.update(insertar_entradas(actual, entradas))
     out["ficheros"] = {k: v for k, v in actual.items() if v != textos.get(k)}
     return out
+
+
+# ── sus cambios: «responde con el cambio» (bucle, plan §7.4) ─────────────────────────────────
+
+VUELTAS_MAX = 3
+CAMPOS_C = ("tag_es", "titulo_es", "descripcion_es", "tag_en", "titulo_en", "descripcion_en")
+
+
+def plan_desde_piezas(piezas, mapa, textos):
+    """Rehace ficheros y resumen a partir de piezas ya escritas (sin volver a redactar)."""
+    filas = {a["id"]: a for a in (mapa or {}).get("afirmaciones") or []}
+    actual, cambios, entradas, datos = dict(textos), [], [], False
+    for p in piezas:
+        if p["carril"] == "A":
+            a = filas[p["id"]]
+            for idioma in ("es", "en"):
+                rel = "content/%s/science.yml" % idioma
+                actual[rel] = aplicar_estado(actual[rel], a["componente"][idioma], p[idioma], p["tono"])
+            cambios.append({"clave": p["clave"], "que": "/ciencia · %s" % a["componente"]["es"],
+                            "antes": p.get("antes", ""), "despues": p["es"]})
+        elif p["carril"] == "B":
+            datos = True
+            cambios.append({"clave": p["clave"], "que": "/datos", "antes": p.get("antes", ""),
+                            "despues": "regenerado con lo de hoy"})
+        elif p["carril"] == "C":
+            entradas.append(p)
+            cambios.append({"clave": p["clave"], "que": "cronología (nueva)", "antes": "",
+                            "despues": "%s · %s" % (p["titulo_es"], p["descripcion_es"])})
+    if entradas:
+        actual.update(insertar_entradas(actual, entradas))
+    return {"ficheros": {k: v for k, v in actual.items() if v != textos.get(k)}, "datos": datos,
+            "cambios": cambios, "hechos": [p["clave"] for p in piezas], "piezas": piezas, "fuera": []}
+
+
+def aplicar_sus_cambios(piezas, pedido, textos, _ask=None):
+    """(piezas nuevas, motivo). Su respuesta al Telegram es SUYA (viene de su chat), pero se trata
+    como instrucciones de CONTENIDO para estas piezas, nunca como órdenes de sistema: lo que vuelve
+    se valida campo a campo (mismas claves o menos, tags existentes, tono válido) y pasa el lint."""
+    import web_novedad as N
+    tags_es = N.tags_existentes(textos.get("content/es/timeline.yml") or "")
+    tags_en = N.tags_existentes(textos.get("content/en/timeline.yml") or "")
+    numeradas = [dict(p, n=i + 1) for i, p in enumerate(piezas)]
+    prompt = (
+        "{{TITULAR}} ha revisado estos cambios para su web y ha contestado con lo que quiere cambiar. "
+        "Aplica SOLO lo que pide.\n\nCambios propuestos (JSON, numerados):\n%s\n\n"
+        "Su respuesta, literal: «%s»\n\n"
+        "Reglas: devuelve la MISMA lista con sus cambios aplicados; si pide quitar uno, quítalo de "
+        "la lista; no toques `clave`, `carril`, `id` ni `antes`. Los de carril B solo se quedan o "
+        "se quitan. En A, `es` y `en` son el estado corto y `tono` uno de pendiente/curso/hecho/no. "
+        "En C, tags de %s (es) y %s (en). Si cambia el español, adapta el inglés (no lo traduzcas "
+        "palabra a palabra). Nada de cifras clínicas, dosis, marcadores ni nombres de médicos o "
+        "instituciones; nunca «ingeniera» ni «{{CONTACTO}}». Devuelve SOLO un JSON: {\"piezas\": [...]}."
+        % (json.dumps(numeradas, ensure_ascii=False), str(pedido)[:2000], tags_es, tags_en))
+    r = _json_de((_ask or _ask_claude)(prompt))
+    nuevas = (r or {}).get("piezas") if isinstance(r, dict) else None
+    if not isinstance(nuevas, list):
+        return None, "Claude no devolvió las piezas"
+    originales = {p["clave"]: p for p in piezas}
+    limpias = []
+    for p in nuevas:
+        o = originales.get((p or {}).get("clave"))
+        if not o or p.get("carril") != o["carril"]:
+            return None, "la respuesta trae un cambio que no estaba"
+        q = dict(o)
+        if o["carril"] == "A":
+            q.update(es=str(p.get("es") or ""), en=str(p.get("en") or ""), tono=p.get("tono"))
+            if not q["es"] or not q["en"] or q["tono"] not in ("pendiente", "curso", "hecho", "no"):
+                return None, "estado de /ciencia incompleto"
+            fallos = lint_texto(q["es"]) + lint_texto(q["en"])
+        elif o["carril"] == "C":
+            q.update({k: str(p.get(k) or "") for k in CAMPOS_C})
+            if not all(q[k] for k in CAMPOS_C) or q["tag_es"] not in tags_es or q["tag_en"] not in tags_en:
+                return None, "entrada incompleta o con un tag que no existe"
+            fallos = (lint_texto(q["titulo_es"] + ". " + q["descripcion_es"])
+                      + lint_texto(q["titulo_en"] + ". " + q["descripcion_en"]))
+        else:
+            fallos = []
+        if fallos:
+            return None, "web_lint: " + "; ".join("%s: %s" % f for f in fallos)
+        limpias.append(q)
+    return limpias, ""
+
+
+def retirar_borradores_web(numero, _pending=None):
+    """Retira los Telegram de la web que esperan su «sí» para el PR `numero` (los mueve a
+    `outbox/retirado/`). Dirección segura: solo impide que algo salga, nunca hace salir nada.
+    Sin esto, un «sí» al texto viejo lo rechazaría el commit, pero ella lo vería como un fallo."""
+    import salida
+    pend = _pending or salida._sub("pending")
+    destino = os.path.join(os.path.dirname(pend), "retirado")
+    n = 0
+    try:
+        nombres = [x for x in os.listdir(pend) if "-web-publish-" in x and x.endswith(".json")]
+    except OSError:
+        return 0
+    for x in nombres:
+        ruta = os.path.join(pend, x)
+        d = _lee(ruta, {})
+        if (d.get("sellado") or {}).get("pr") == numero:
+            os.makedirs(destino, exist_ok=True)
+            os.replace(ruta, os.path.join(destino, x))
+            n += 1
+    return n
+
+
+def cambios_suyos(numero, _dir=None):
+    """[(ruta, texto)] de lo que ella respondió al Telegram del PR `numero` (lo apunta el bot vía
+    `web_guardian.encargar_cambios`)."""
+    import web_guardian
+    d = _dir or web_guardian.CAMBIOS
+    try:
+        nombres = sorted(x for x in os.listdir(d) if x.startswith("%d-" % numero) and x.endswith(".json"))
+    except OSError:
+        return []
+    return [(os.path.join(d, x), (_lee(os.path.join(d, x), {}) or {}).get("texto") or "") for x in nombres]
+
+
+def _archiva_cambio(ruta, sub):
+    destino = os.path.join(os.path.dirname(ruta), sub)
+    os.makedirs(destino, exist_ok=True)
+    os.replace(ruta, os.path.join(destino, os.path.basename(ruta)))
 
 
 # ── el PR ───────────────────────────────────────────────────────────────────────────────────
@@ -294,18 +426,23 @@ def fuera_de_lista(rutas):
     return [r for r in rutas if r not in PERMITIDOS]
 
 
-def crear_pr(plan, hoy, repo):
-    """Nº del PR, o lanza. Worktree propio desde origin/main; nunca el árbol de {{TITULAR}}."""
+def crear_pr(plan, hoy, repo, rama=None, numero=None):
+    """Nº del PR, o lanza. Worktree propio desde origin/main; nunca el árbol de {{TITULAR}}.
+    Con `rama` y `numero` rehace ESE PR (sus cambios): misma rama desde origin/main, push forzado
+    solo a esa rama `auto/`, sin abrir otro PR."""
     import web_novedad as N
 
     def git(*a, cwd=None):
         return N._git(*a, cwd=cwd or repo)
 
-    rama = "auto/web-al-dia-%s" % hoy.isoformat()
+    rehacer = bool(rama and numero)
+    rama = rama or "auto/web-al-dia-%s" % hoy.isoformat()
+    if not rama.startswith("auto/"):
+        raise RuntimeError("el redactor solo escribe en ramas auto/ (%s)" % rama)
     wt = tempfile.mkdtemp(prefix="webaldia-")
     try:
         git("fetch", "origin", "main")
-        git("worktree", "add", "-b", rama, wt, "origin/main")
+        git("worktree", "add", "-B" if rehacer else "-b", rama, wt, "origin/main")
         for rel, contenido in plan["ficheros"].items():
             with open(os.path.join(wt, rel), "w", encoding="utf-8") as f:
                 f.write(contenido)
@@ -329,6 +466,9 @@ def crear_pr(plan, hoy, repo):
                   "«sí» de {{TITULAR}} por Telegram.\n\n" + "\n".join(
                       "- %s: «%s» → «%s»" % (c["que"], c["antes"], c["despues"]) for c in plan["cambios"]))
         git("commit", "-q", "-m", asunto, "-m", cuerpo, cwd=wt)
+        if rehacer:
+            git("push", "-q", "--force", "origin", rama, cwd=wt)
+            return numero
         git("push", "-q", "origin", rama, cwd=wt)
         r = subprocess.run(["gh", "pr", "create", "--base", "main", "--head", rama, "--title",
                             asunto, "--body", cuerpo], cwd=wt, capture_output=True, text=True,
@@ -374,8 +514,29 @@ def seguir_pr(vivo, vistos, hoy, _estado_pr, _encargar):
     return True, "PR #%s esperando su «sí» (%d d)" % (vivo["pr"], dias)
 
 
+def _rehacer(vivo, vistos, pedido, mapa, textos, hoy, crear, ci, encargar, retirar, ask):
+    """Una vuelta del bucle de cambios sobre el PR vivo. Devuelve la nota."""
+    piezas, motivo = aplicar_sus_cambios(vivo.get("piezas") or [], pedido, textos, ask)
+    if piezas is None:
+        return False, "sus cambios al PR #%s no se pudieron aplicar solos (%s): quedan en el buzón de Vega" % (vivo["pr"], motivo)
+    quitadas = [c for c in vivo["claves"] if c not in {p["clave"] for p in piezas}]
+    _marca(vistos, quitadas, "descartado", motivo="lo quitó ella")
+    if not piezas:
+        return True, "quitó todos los cambios del PR #%s" % vivo["pr"]
+    plan = plan_desde_piezas(piezas, mapa, textos)
+    crear(plan, vivo["rama"], vivo["pr"])
+    retirar(vivo["pr"])
+    estado_ci, _ = ci(vivo["pr"])
+    vivo.update(claves=plan["hechos"], piezas=piezas, vueltas=vivo.get("vueltas", 0) + 1,
+                desde=hoy.isoformat(), recordatorios=0, ci=estado_ci)
+    if estado_ci == "verde":
+        encargar(vivo["pr"])
+        return True, "PR #%s rehecho con sus cambios (vuelta %d); Telegram nuevo encargado" % (vivo["pr"], vivo["vueltas"])
+    return True, "PR #%s rehecho con sus cambios; CI «%s»" % (vivo["pr"], estado_ci)
+
+
 def redactar(modo, hoy, repo, dir_=None, _ask=None, _textos=None, _crear=None, _ci=None,
-             _encargar=None, _estado_pr=None, _mapa=None):
+             _encargar=None, _estado_pr=None, _mapa=None, _cambios=None, _retirar=None):
     """Una vuelta del redactor. Devuelve una lista de líneas de lo que hizo. Nunca fusiona."""
     import _lock
     dir_ = dir_ or DIR
@@ -387,8 +548,39 @@ def redactar(modo, hoy, repo, dir_=None, _ask=None, _textos=None, _crear=None, _
         if modo == "activo" and vivo:
             import web_guardian
             import web_publicar
-            sigue, nota = seguir_pr(vivo, vistos, hoy, _estado_pr or web_publicar.estado_pr,
-                                    _encargar or web_guardian.encargar_pedir_ok)
+            encargar = _encargar or web_guardian.encargar_pedir_ok
+            ci = _ci or (lambda n: web_publicar.esperar_ci(str(n)))
+            estado = (_estado_pr or web_publicar.estado_pr)(vivo["pr"])
+            pendientes = (_cambios or cambios_suyos)(vivo["pr"]) if estado == "OPEN" else []
+            if pendientes:
+                ruta, pedido = pendientes[-1]          # la última respuesta suya manda
+                if vivo.get("vueltas", 0) >= VUELTAS_MAX:
+                    notas.append("PR #%s: %d vueltas ya; sus cambios quedan en el buzón de Vega"
+                                 % (vivo["pr"], VUELTAS_MAX))
+                    sub = "sin_aplicar"
+                else:
+                    if _mapa is None:
+                        import web_mapa
+                        _mapa = web_mapa.cargar()
+                    textos = _textos if _textos is not None else textos_publicados(repo)
+                    ok, nota = _rehacer(vivo, vistos, pedido, _mapa, textos, hoy,
+                                        _crear or (lambda p, r, n: crear_pr(p, hoy, repo, r, n)),
+                                        ci, encargar, _retirar or retirar_borradores_web, _ask)
+                    notas.append(nota)
+                    sub = "aplicados" if ok else "sin_aplicar"
+                for r, _t in pendientes:
+                    if os.path.exists(r):
+                        _archiva_cambio(r, sub)
+                _escribe(ruta_vivo, vivo)
+                _escribe(os.path.join(dir_, "al_dia_vistos_%s.json" % modo), vistos)
+                return notas
+            if estado == "OPEN" and vivo.get("ci") != "verde":
+                # el CI no estaba en verde al crearlo: sin esto, no se le pedía nunca el «sí»
+                vivo["ci"], _ = ci(vivo["pr"])
+                if vivo["ci"] == "verde":
+                    encargar(vivo["pr"])
+                    notas.append("PR #%s: CI ya en verde; Telegram encargado" % vivo["pr"])
+            sigue, nota = seguir_pr(vivo, vistos, hoy, lambda _n: estado, encargar)
             notas.append(nota)
             if sigue:
                 _escribe(ruta_vivo, vivo)
@@ -419,11 +611,13 @@ def redactar(modo, hoy, repo, dir_=None, _ask=None, _textos=None, _crear=None, _
             _marca(vistos, plan["hechos"], "propuesto_sombra")
             notas.append("sombra: habría propuesto %d cambio(s)" % len(plan["cambios"]))
         else:
-            numero = (_crear or (lambda p: crear_pr(p, hoy, repo)))(plan)
+            numero = (_crear or (lambda p, r=None, n=None: crear_pr(p, hoy, repo, r, n)))(plan)
             import web_publicar
             estado_ci, _info = (_ci or (lambda n: web_publicar.esperar_ci(str(n))))(numero)
             _escribe(ruta_vivo, {"pr": numero, "claves": plan["hechos"], "desde": hoy.isoformat(),
-                                 "recordatorios": 0, "ci": estado_ci})
+                                 "recordatorios": 0, "ci": estado_ci, "vueltas": 0,
+                                 "rama": "auto/web-al-dia-%s" % hoy.isoformat(),
+                                 "piezas": plan["piezas"]})
             _marca(vistos, plan["hechos"], "propuesto", pr=numero)
             if estado_ci == "verde":
                 import web_guardian
