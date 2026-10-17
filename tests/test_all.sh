@@ -373,6 +373,7 @@ runpy test_permiso_firmante.py   # 14-oct · pieza A: el firmante (Ed25519) abre
 runpy test_permiso_libro_usos.py   # 14-oct · lo que se gasta de un permiso va al libro con flock: de N usos a la vez pasa uno
 runpy test_permiso_transcript_acotado.py  # 13-oct · el permiso solo se comprueba contra <sesión>.jsonl dentro de ~/.claude/projects (ni /tmp, ni enlaces, ni otra sesión)
 runpy test_permiso_security_ruta.py  # 13-oct · el Llavero se llama por /usr/bin/security: un `security` falso delante en el PATH no cambia nada
+runpy test_ok_envio_asentimiento.py   # 17-oct · un «sí» suyo a UNA línea «🔐 Propuesta de salida» abre esa salida y solo esa; drive.py share --anyone-reader detrás del freno
 runpy test_lote_envio.py   # 9-oct · una orden envía N DMs leídos: manifiesto en el transcript, 15 min, un uso por ítem, tope 10
 runpy test_correos_publicables.py
 runpy test_entrada_guard.py

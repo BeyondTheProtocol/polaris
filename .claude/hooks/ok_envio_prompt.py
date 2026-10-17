@@ -12,7 +12,8 @@ o un documento no pueden escribir en el prompt del usuario.
 
 QUÉ HACE
   Mira cada mensaje de {{TITULAR}}. Si contiene una orden de envío **explícita** («envía…», «mándalo»,
-  «publica…», «respóndele»), abre un permiso de UN SOLO USO, 10 minutos, FIRMADO (HMAC con una
+  «publica…», «respóndele»), o es un «sí» / «pues hazlo» a UNA línea «🔐 Propuesta de salida» de
+  mi último turno (17-oct-26, ver ASENTIMIENTO en permiso_envio), abre un permiso de UN SOLO USO, 10 minutos, FIRMADO (HMAC con una
   clave del Llavero) y ligado a esta sesión y a este `prompt_id`. Quien lo usa lo vuelve a buscar
   en el transcript: tiene que ser un prompt humano, el último suyo y con la orden. Un fichero
   escrito a mano no vale (hallazgo 3.1, 22-sep-26: antes bastaba `origen: "prompt"`).
@@ -37,8 +38,18 @@ CERRADO = ("El freno de salida sigue CERRADO. Díselo tal cual y deja el envío 
            "borrador; no lo rodees.")
 
 
-def _aviso_abierto(abre):
+def _aviso_propuesta(p):
+    """Lo abierto por un «sí» suyo a una línea «🔐 Propuesta de salida» (17-oct-26)."""
+    return ("🔓 {{TITULAR}} ha dicho que sí a tu propuesta de salida (%s · %s): el freno queda abierto "
+            "para **UNA** llamada, 10 minutos, y SOLO para eso. El PR, el SHA, el FILE_ID o las "
+            "direcciones salen de esa línea y de nada más. Si lo que ibas a hacer no es exactamente "
+            "eso, no lo hagas: vuelve a proponérselo." % (p["tipo"], p["objeto"][:160]))
+
+
+def _aviso_abierto(abre, propuesta=None):
     """Qué le digo a la sesión que ha quedado abierto, según lo que pidió."""
+    if propuesta:
+        return _aviso_propuesta(propuesta)
     if "envio" in abre:
         return ("🔓 {{TITULAR}} ha pedido un envío en este mensaje: el freno de salida queda abierto para "
                 "**UNA** llamada, 10 minutos, en esta sesión. Vale solo para lo que ella aprobó: "
@@ -88,7 +99,7 @@ def _di(aviso):
     return 0
 
 
-def _por_firmante(P, datos, prompt):
+def _por_firmante(P, datos, prompt, propuesta=None):
     """Modo Ed25519: el permiso NO lo firma este hook (no tiene con qué): se lo pide al firmante,
     que lo comprueba contra el transcript y lo escribe él. Aquí solo se avisa, y «abierto» se dice
     únicamente si el permiso está en disco y su firma pasa con la clave pública."""
@@ -121,12 +132,16 @@ def _por_firmante(P, datos, prompt):
             if d and d.get("prompt_id") == prompt_id:
                 if L and r["lote"] in ("invalido", "no-es-orden"):
                     aviso_lote = L.aviso_de(r["lote"])
-                return _di(_aviso_abierto(P.alcance(prompt)) + ("\n\n" + aviso_lote if aviso_lote else ""))
+                return _di(_aviso_abierto(P.alcance(prompt), propuesta)
+                           + ("\n\n" + aviso_lote if aviso_lote else ""))
         return _di("⚠️ El socket del firmante dice que abrió el permiso, pero en disco no hay ninguno "
                    "que pase la comprobación de firma para este mensaje. " + CERRADO)
-    return _di("⏳ {{TITULAR}} ha dado una orden de salida en este mensaje. El firmante todavía no ve su "
-               "mensaje en el transcript; abrirá el permiso en cuanto aparezca (segundos), para **UNA** "
-               "llamada, 10 minutos, y solo para lo que ella aprobó. Si al usarlo el freno sigue "
+    # No se afirma que la orden sea de ella (17-oct-26): este mensaje puede venir de otra sesión o
+    # de un agente, y eso solo lo decide el firmante al ver la línea en el transcript.
+    return _di("⏳ Este mensaje tiene forma de orden de salida. El firmante todavía no ve la línea en "
+               "el transcript; si es un mensaje TECLEADO por {{TITULAR}}, abrirá el permiso en cuanto "
+               "aparezca (segundos), para **UNA** llamada, 10 minutos, y solo para lo que ella aprobó. "
+               "Si lo envió otra sesión o un agente, no abrirá nada. Si al usarlo el freno sigue "
                "cerrado, díselo tal cual; no lo rodees.")
 
 
@@ -140,10 +155,19 @@ def main():
         import permiso_envio as P
     except Exception:
         return 0                     # sin la librería no hay permiso: los envíos siguen parados
+    propuesta = None
     if not P.es_orden(prompt):
-        return 0
+        # Un «sí», «pues hazlo», «dale»… (17-oct-26) solo abre algo si contesta a UNA línea
+        # «🔐 Propuesta de salida» de mi último turno. Si no la hay, se calla: no se molesta al
+        # firmante con cada «sí» de una conversación. Esto solo filtra; quien decide es `contexto`.
+        if not P.es_asentimiento(prompt):
+            return 0
+        propuesta = P.propuesta_previa(datos.get("transcript_path"), datos.get("session_id"),
+                                       datos.get("prompt_id"))
+        if not propuesta:
+            return 0
     if P.modo() == P.ALG:
-        return _por_firmante(P, datos, prompt)
+        return _por_firmante(P, datos, prompt, propuesta)
     k, estado = P.clave_estado(permitir_env=True, crear=True)
     if not k:
         # Dos fallos distintos (9-oct-26): decirlos igual mandaba a buscar una clave que existe.
@@ -175,7 +199,7 @@ def main():
                      datos.get("transcript_path"), k)
         except Exception:
             return 0
-        aviso = _aviso_abierto(P.alcance(prompt))
+        aviso = _aviso_abierto(P.alcance(prompt), propuesta)
     if k and aviso_lote:
         aviso = aviso + "\n\n" + aviso_lote
     print(json.dumps({"hookSpecificOutput": {

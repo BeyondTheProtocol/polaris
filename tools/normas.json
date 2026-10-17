@@ -3780,6 +3780,18 @@
       "auditable": true,
       "repetida": true,
       "nota": "Clasificada el 16-oct-26. Repetida el mismo día (nodo final v11, bloque del 7× v16). El test falla si Pitch.tsx pinta background: C.azul."
+    },
+    {
+      "slug": "feedback-propuesta-de-salida-linea",
+      "que": "Al proponer una salida, terminar con UNA línea «🔐 Propuesta de salida: <tipo> · <objeto>» para que su «sí» la abra",
+      "clase": "salida",
+      "mecanismo": "tests/test_ok_envio_asentimiento.py",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": true,
+      "nota": "Clasificada el 17-oct-26 al nacer (su «pues hazlo» para el vídeo de Anthropic no abrió el freno; 5 deudas de la misma clase)."
     }
   ]
 }

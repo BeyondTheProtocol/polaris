@@ -38,9 +38,10 @@ def estado():
     if not P.hay_alguno():
         print("sin permiso abierto (todo lo que sale al mundo está denegado).")
         return 0
+    P.SOLO_LECTURA = True        # consultar no borra nada, tampoco el de otra sesión (17-oct-26)
     d, motivo, _ctx = P.validar(P.llave()[0])
     if not d:
-        print("había un fichero de permiso, pero NO vale (%s); lo borro." % motivo)
+        print("hay un fichero de permiso, pero NO vale (%s). No lo toco: consultar no borra." % motivo)
         return 0
     quedan = VIDA_S - (P.edad(d["ts"]) or 0)
     print("permiso ABIERTO para: %s\nle quedan %d s (un solo uso, solo en la sesión donde lo "
@@ -59,6 +60,7 @@ def abrir(_motivo):
     """
     print("Este permiso ya no se abre por comando, a propósito.\n"
           "Lo abre {{TITULAR}} al pedir el envío en su mensaje («envíalo», «mándaselo», «publícalo»),\n"
+          "o con un «sí» a una línea «🔐 Propuesta de salida: <tipo> · <objeto>» de tu mensaje,\n"
           "vía .claude/hooks/ok_envio_prompt.py. Si ella lo ha pedido y esto sigue denegando,\n"
           "es un bug del hook: díselo en vez de rodearlo.", file=sys.stderr)
     return 1

@@ -142,6 +142,11 @@ ORDEN_FUSIONAR = re.compile(
     r"haz\s+(?:el\s+)?merge\b"
     r")", re.I)
 
+# «Merge» en inglés (26-sep, #235; deuda `ok-envio-no-reconoce-merge-en-ingles`), SOLO como
+# mensaje entero: «merge conflict en la rama» o «merge the branch locally» no son órdenes
+# (verificacion, 17-oct-26). Mismo candado que «fusiona»: el PR y su SHA tienen que estar delante.
+MERGE_SOLO = re.compile(r"\s*merge(?:\s+it)?[\s.!]*", re.I)
+
 # Órdenes de ABRIR un PR (27-sep-26, deuda `ok_envio_no_entiende_abre_pr`). Dentro de casa base
 # `gh pr create/edit/comment/ready/review` es salida, pero su frase natural no abría nada: escribió
 # «abre pr» y «fusiona y abre pr» (26-sep), antes «Haz pr y enséñame el preview» y «y haz tú el pr»
@@ -200,7 +205,171 @@ def solo_suyo(texto):
     return INYECTADO.sub(" ", texto or "").strip()
 
 
-TODO = frozenset({"envio", "programar", "fusionar", "pr"})
+# `push` y `drive` (17-oct-26): subir commits que publican y compartir un fichero de Drive con
+# enlace. Una orden explícita («publícalo», «envíalo») los cubre como cubría todo; un «sí» a una
+# propuesta (ver ASENTIMIENTO) abre SOLO el de la propuesta.
+TODO = frozenset({"envio", "programar", "fusionar", "pr", "push", "drive"})
+# Lo que abre una orden explícita de envío. `drive` NO (verificacion, 17-oct-26): un «envíalo» para
+# un correo no puede servir para hacer público un fichero de Drive que salió en pantalla. Hacer
+# público algo con enlace pide su «sí» a una línea `compartir-drive` con ese FILE_ID.
+EXPLICITO = TODO - {"drive"}
+
+
+# ── ASENTIMIENTO A UNA PROPUESTA (17-oct-26) ─────────────────────────────────────────────────
+# El vocabulario fijo dejaba fuera órdenes suyas clarísimas: «pues hazlo» (17-oct, compartir un
+# vídeo de Drive), «sube» (push, 26-sep, 3 veces), «Merge», «sí». Cinco deudas de la misma clase.
+# Ampliar la lista de verbos no lo arregla: «sí» o «hazlo» no dicen QUÉ aprueban. Lo dice lo que
+# ella tenía delante. Así que:
+#   · el asistente, cuando propone una salida, escribe UNA línea con forma fija
+#       🔐 Propuesta de salida: <tipo> · <objeto>
+#     (tipos: enviar, publicar, subir, fusionar, abrir-pr, programar, compartir-drive; el objeto
+#     lleva lo que ata la salida: PR + SHA, FILE_ID, destinatario…);
+#   · si su mensaje ENTERO es un asentimiento corto («sí», «pues hazlo», «dale», «compártelo»,
+#     «Merge»…) y en mi último turno hay EXACTAMENTE una línea así, y está en mi último bloque de
+#     texto, se abre el permiso SOLO para el tipo de esa línea (nunca un lote, nunca «todo»).
+# Lo que no cambia: el permiso sigue naciendo solo de un prompt HUMANO de esta sesión (un texto
+# de una herramienta, un subagente u otra sesión no es su prompt), un uso, 10 minutos, y atado al
+# objeto (PR+SHA, borrador que vio, FILE_ID). Un asentimiento ENCOLADO a mitad de turno no cuenta:
+# pudo escribirlo antes de que la propuesta apareciera.
+# LÍMITE DECLARADO: la frontera de confianza es el texto del asistente que ella lee, igual que con
+# el borrador `en_vista`. Si una inyección consiguiera que el asistente escribiera una propuesta
+# mala y ella dijera «sí» sin leerla, saldría eso y solo eso.
+PROPUESTA = re.compile(
+    r" {0,3}(?:[-*][ \t]+)?(?:\*\*|__)?🔐\s*(?:\*\*|__)?\s*propuesta\s+de\s+salida\s*(?:\*\*|__)?\s*:"
+    r"\s*(?:\*\*|__)?\s*(enviar|publicar|subir|fusionar|abrir-pr|programar|compartir-drive)\b\s*"
+    r"(?:\*\*|__)?\s*[·:|—–-]\s*(\S.*?)\s*(?:\*\*|__)?\s*", re.I)
+TIPOS_PROPUESTA = {"enviar": "envio", "publicar": "envio", "subir": "push", "fusionar": "fusionar",
+                   "abrir-pr": "pr", "programar": "programar", "compartir-drive": "drive"}
+# Lo que la vuelve ilegible a la vista y no a la regex (verificacion, 17-oct-26): selectores de
+# variante, espacios de ancho cero, marcas de dirección. Se quitan ANTES de buscar, y cualquier
+# línea que tras eso mencione «propuesta de salida» cuenta como candidata, sea válida o no.
+_INVISIBLES = re.compile("[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f"
+                         "\u2028-\u202f\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0"
+                         "\U000e0000-\U000e0fff]")
+
+
+def _limpia(t):
+    """NFKC y sin invisibles: lo que se ve igual, se compara igual."""
+    import unicodedata
+    return _INVISIBLES.sub("", unicodedata.normalize("NFKC", t or ""))
+_MENCION = re.compile(r"propuesta\s+de\s+salida", re.I)
+
+# Las palabras de un asentimiento. El mensaje entero tiene que estar hecho SOLO de estas (máximo
+# 6 palabras y 60 caracteres), y al menos una tiene que ser de `_SI`. Una palabra fuera de la
+# lista («pero», «no», «mañana», «quieres») y ya no es un asentimiento: «sí, pero no lo envíes»,
+# «si quieres», «no lo hagas», «hazlo mañana» no abren nada. Una PREGUNTA («¿sí?») tampoco, ni un
+# emoji que no sea de los de decir que sí, ni «vale ya» (que en su boca es «basta»).
+_SI = frozenset("""hazlo hazla adelante dale sí si vale ok okay okey venga perfecto confirmo
+confirmado aprobado compártelo compartelo compártela compartela compártelos súbelo subelo súbela
+subela súbelos sube publícalo publicalo publícala publicala mándalo mandalo envíalo envialo
+fusiónalo fusionalo fusiona merge mergéalo mergealo mergea yes yep do go""".split())
+# Sin «ya» (verificacion, 17-oct-26): «venga ya», «vale ya» en su boca son «ni hablar».
+_RELLENO = frozenset("""pues claro genial bien guay de acuerdo por favor porfa tú tu it ahead
+please eso así asi entonces y""".split())
+_PALABRA = re.compile(r"[a-záéíóúüñ]+")
+# Solo letras, espacios, `. , ; ! ¡` y los emojis de decir que sí. Cualquier otra cosa, fuera.
+_PERMITIDO = re.compile(r"[a-záéíóúüñ\s.,;!¡]|💜|❤️|❤|👍|✅|🙏|👌|💪|🚀")
+
+
+def es_asentimiento(texto):
+    """¿Su mensaje ENTERO es un asentimiento corto? (No dice a qué: eso lo dice la propuesta.)"""
+    if es_automatico(texto):
+        return False
+    t = solo_suyo(texto).lower().strip()
+    if not t or len(t) > 60 or FRENA.search(t) or _PERMITIDO.sub("", t):
+        return False
+    palabras = _PALABRA.findall(t)
+    if not palabras or len(palabras) > 6:
+        return False
+    if any(p not in _SI and p not in _RELLENO for p in palabras):
+        return False
+    if "vale" in palabras and "ya" in palabras:
+        return False
+    return any(p in _SI for p in palabras)
+
+
+def _sin_cercas(texto):
+    """El texto con los bloques ``` ... ``` vaciados (una línea dentro de código es una cita)."""
+    return re.sub(r"```.*?(?:```|\Z)", lambda m: "\n" * m.group(0).count("\n"), texto, flags=re.S)
+
+
+def propuesta_unica(textos):
+    """La propuesta a la que contesta un «sí», o None (17-oct-26, endurecida tras `verificacion`).
+
+    Vale SOLO si:
+      · en todo el turno hay UNA sola línea que mencione «propuesta de salida» (contando citas,
+        bloques de código y variantes con caracteres invisibles: si hay otra, aunque no sea
+        válida, no vale ninguna);
+      · esa línea es una propuesta bien formada, en su propia línea, sin cita (`>`) ni código;
+      · es la ÚLTIMA línea no vacía del ÚLTIMO bloque de texto: lo último que ella leyó. Un
+        «sí» a una pregunta escrita debajo de la línea no es un sí a la línea;
+      · si es `enviar`, el objeto nombra al menos una dirección (la salida se ata a ella)."""
+    textos = [_limpia(t) for t in (textos or [])]
+    if not textos:
+        return None
+    menciones = [(i, l) for i, t in enumerate(textos) for l in t.split("\n")
+                 for _m in _MENCION.finditer(l)]
+    if len(menciones) != 1 or menciones[0][0] != len(textos) - 1:
+        return None
+    ultimo = _sin_cercas(textos[-1])
+    lineas = [l for l in ultimo.split("\n") if l.strip()]
+    if not lineas or lineas[-1] != menciones[0][1]:
+        return None
+    m = PROPUESTA.fullmatch(lineas[-1])
+    if not m:
+        return None
+    tipo, objeto = m.group(1).lower(), re.sub(r"<[^>]*>", " ", m.group(2)).strip()
+    if tipo == "enviar" and not EMAIL.search(objeto):
+        return None
+    return dict(tipo=tipo, objeto=objeto, alcance=TIPOS_PROPUESTA[tipo])
+
+
+def alcance_por_propuesta(texto, visto):
+    """(alcance, propuesta|None): lo que abre un asentimiento suyo a lo que tenía delante."""
+    if not es_asentimiento(texto):
+        return set(), None
+    p = propuesta_unica(visto)
+    if not p:
+        return set(), None
+    return {p["alcance"]}, p
+
+
+def es_candidata(texto):
+    """Para el hook: ¿merece la pena mirar? Orden explícita, o asentimiento (que solo abrirá si
+    hay propuesta delante)."""
+    return es_orden(texto) or es_asentimiento(texto)
+
+
+def propuesta_previa(transcript_path, session_id, prompt_id=None):
+    """La propuesta única del último turno del asistente ANTES de su mensaje, leída del transcript
+    (solo lectura). La usa el hook para callar ante un «sí» que no contesta a ninguna: así no se
+    molesta al firmante con cada «sí» de una conversación normal. No decide nada: quien firma
+    vuelve a mirarlo todo en `contexto`."""
+    ruta, _m = ruta_transcript(transcript_path, session_id)
+    if not ruta:
+        return None
+    textos = []
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            for linea in f:
+                try:
+                    e = json.loads(linea)
+                except Exception:
+                    continue
+                if not isinstance(e, dict):
+                    continue
+                if _es_humano(e) or _es_humano_encolado(e):
+                    if prompt_id and e.get("promptId") == prompt_id:
+                        break                    # su mensaje ya está: lo de antes es lo que vio
+                    textos = []
+                    continue
+                if e.get("type") == "assistant" and not e.get("isSidechain"):
+                    for b in (e.get("message") or {}).get("content") or []:
+                        if isinstance(b, dict) and b.get("type") == "text":
+                            textos.append(b.get("text") or "")
+    except Exception:
+        return None
+    return propuesta_unica(textos)
 
 
 def alcance(texto):
@@ -214,10 +383,10 @@ def alcance(texto):
         return set()
     out = set()
     if ORDEN.search(texto):
-        out |= TODO
+        out |= EXPLICITO
     if ORDEN_PROGRAMAR.search(texto):
         out.add("programar")
-    if ORDEN_FUSIONAR.search(texto):
+    if ORDEN_FUSIONAR.search(texto) or MERGE_SOLO.fullmatch(texto):
         out.add("fusionar")
     if ORDEN_PR.search(texto):
         out.add("pr")
@@ -233,7 +402,7 @@ def permite(ctx, que):
     alcance (formato anterior) se lee como envío, que lo cubría todo; un alcance VACÍO no cubre
     nada (antes `or` lo convertía en permiso total)."""
     a = (ctx or {}).get("alcance")
-    return que in (TODO if a is None else a)
+    return que in (EXPLICITO if a is None else a)
 
 
 def dir_permisos():
@@ -564,7 +733,17 @@ def borrar(sesion=""):
     _borrar_ruta(token_path(sesion))
 
 
+# Consultar no destruye (17-oct-26, deuda `ok-envio-caduca-antes-de-usar`): `ok_envio.py --estado`
+# llamaba a `validar` sin sesión, que toma el permiso más reciente de CUALQUIER sesión y lo borra si
+# no confirma; una consulta podía llevarse el permiso de otra sesión. Con esto a True no se borra
+# nada. Ponerlo no abre nada: un permiso caducado, gastado o falso sigue sin valer, solo se queda
+# en disco hasta que lo barra quien lo use.
+SOLO_LECTURA = False
+
+
 def _borrar_ruta(ruta):
+    if SOLO_LECTURA:
+        return
     try:
         os.remove(ruta)
     except Exception:
@@ -993,11 +1172,18 @@ def contexto(d):
     texto = eventos[i_suyo][2]
     if humanos[-1] != i_suyo:
         return False, "después de esa orden escribió otra cosa", {}
-    if not es_orden(texto):
-        return False, "su mensaje no contiene una orden de envío", {}
+    encolado = eventos[i_suyo][1].get("type") == "attachment"
     antes = [i for i in humanos if i < i_suyo]
     previo = antes[-1] if antes else -1
-    if eventos[i_suyo][1].get("type") == "attachment" and len(antes) >= 1:
+    alc, propuesta = alcance(texto), None
+    if not alc and not encolado:
+        # Un «sí» suyo vale solo para la propuesta ÚNICA de mi último turno (ver ASENTIMIENTO).
+        # Encolado no: pudo escribirlo antes de que la propuesta apareciera.
+        alc, propuesta = alcance_por_propuesta(
+            texto, [ev[1] for ev in eventos[previo + 1:i_suyo] if ev[0] == "t"])
+    if not alc:
+        return False, "su mensaje no contiene una orden de envío", {}
+    if encolado and len(antes) >= 1:
         # Encolado a mitad de turno: el turno lo abrió OTRO mensaje suyo, y lo que ella tenía
         # delante al escribir la orden es también mi respuesta ANTERIOR a ese mensaje (ahí estaban
         # el PR y su SHA en el caso real, #247 y #248). Se amplía una vuelta, no más.
@@ -1021,12 +1207,22 @@ def contexto(d):
             en_vista = info
     e_suyo = eventos[i_suyo][1]
     crudo = (_crudo(e_suyo) if e_suyo.get("type") == "user" else e_suyo["attachment"]["prompt"]) or ""
+    if propuesta:
+        # Un «sí» aprueba LA PROPUESTA, no todo lo que hubiera en pantalla: el PR, el SHA, las
+        # direcciones y el FILE_ID salen solo de su línea.
+        obj = propuesta["objeto"]
+        return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(obj)},
+                          "ts_linea": ts_de_linea(e_suyo.get("timestamp")), "crudo": crudo,
+                          "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
+                          "cambios": [e for _, e in cambios], "alcance": alc, "propuesta": propuesta,
+                          "visto_textos": [obj], "prs_suyos": set(), "prs_vistos": _prs(obj),
+                          "shas_vistos": _shas(obj)}
     return True, "", {"texto": texto, "emails": {m.lower() for m in EMAIL.findall(texto)},
                       # La hora de SU línea (la pone el harness) y el texto tal cual llegó: lo que
                       # usa el firmante para fechar el permiso y decidir si la orden es de lote.
                       "ts_linea": ts_de_linea(e_suyo.get("timestamp")), "crudo": crudo,
                       "en_vista": en_vista, "hilos": hilos, "drafts": drafts,
-                      "cambios": [e for _, e in cambios], "alcance": alcance(texto),
+                      "cambios": [e for _, e in cambios], "alcance": alc, "propuesta": propuesta,
                       "visto_textos": visto,
                       "prs_suyos": _prs(texto), "prs_vistos": _prs("\n".join(visto)),
                       "shas_vistos": _shas(texto + "\n" + "\n".join(visto))}
@@ -1140,15 +1336,19 @@ def comprobar_envio(ctx, entrada, tool=""):
                         if (tool or "") == "Bash" else (False, None))
     es_pr = (tool or "") == "Bash" and not es_merge and bool(_PR_ABRE.search(entrada.get("command") or ""))
     que = ("programar" if PROGRAMAN.search(tool or "")
-           else "fusionar" if es_merge else "pr" if es_pr else "envio")
+           else "fusionar" if es_merge else "pr" if es_pr
+           else "push" if "_push_shas" in entrada else "envio")
     if tool and not permite(ctx, que):
         a = (ctx or {}).get("alcance") or set()
         if que == "envio":
-            pidio = " y ".join({"programar": "programar", "fusionar": "fusionar", "pr": "abrir un PR"}[x]
-                               for x in ("programar", "fusionar", "pr") if x in a) or "otra cosa"
+            pidio = " y ".join({"programar": "programar", "fusionar": "fusionar", "pr": "abrir un PR",
+                                "push": "subir commits", "drive": "compartir en Drive"}[x]
+                               for x in ("programar", "fusionar", "pr", "push", "drive") if x in a
+                               ) or "otra cosa"
             return "ella pidió %s, no enviar ni publicar" % pidio
         return ("su orden no cubre programar una tarea" if que == "programar"
                 else "su orden no cubre abrir ni editar un PR" if que == "pr"
+                else "su orden no cubre subir commits (push)" if que == "push"
                 else "su orden no cubre fusionar un PR")
     if que == "fusionar":
         return comprobar_fusion(ctx, numero, sha_de_merge(entrada.get("command")))
@@ -1157,6 +1357,20 @@ def comprobar_envio(ctx, entrada, tool=""):
     if "_push_shas" in entrada:
         return comprobar_push(ctx, entrada.get("_push_shas"))
     destinos = destinatarios(entrada)
+    prop = (ctx or {}).get("propuesta")
+    if prop:
+        # Un «sí» a una propuesta ata la salida a SU objeto (verificacion, 17-oct-26): `enviar`
+        # solo a las direcciones de la línea; `publicar` no manda nada a nadie por correo.
+        if prop["tipo"] == "publicar":
+            # Publicar en su web va por `web_novedad` / el merge del PR, que tienen su candado.
+            # Por aquí (un correo, un POST, un MCP que escribe fuera) un «sí» a «publicar» no
+            # abre nada: no hay objeto que ate a qué host o a quién (verificacion, 17-oct-26).
+            return ("ella aprobó publicar, no esta salida (%s): publicar va por web_novedad o por "
+                    "el merge del PR" % (tool or "?"))
+        if prop["tipo"] == "enviar" and (not destinos or destinos - ctx.get("emails", set())):
+            return "ella aprobó enviar a %s, no a %s" % (
+                ", ".join(sorted(ctx.get("emails", set()))) or "nadie",
+                ", ".join(sorted(destinos)) or "un destino que no se ve en la llamada")
     if ctx.get("emails") and destinos - ctx["emails"]:
         return "va a %s y ella nombró %s" % (", ".join(sorted(destinos - ctx["emails"])),
                                              ", ".join(sorted(ctx["emails"])))
@@ -1177,6 +1391,28 @@ def comprobar_envio(ctx, entrada, tool=""):
     return ""
 
 
+# Un FILE_ID de Drive: 25+ caracteres de [A-Za-z0-9_-] (los de hoy tienen 33).
+_ID_DRIVE = re.compile(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{25,}(?![A-Za-z0-9_-])")
+
+
+def comprobar_drive(ctx, file_id):
+    """"" si compartir `file_id` con enlace es lo que ella aprobó; si no, el motivo (17-oct-26).
+    El alcance tiene que cubrir `drive` y el FILE_ID tiene que estar, ENTERO, en lo que ella
+    aprobó: la línea de propuesta si contestó con un «sí», o su texto y lo que tenía delante si
+    dio la orden con palabras."""
+    if not permite(ctx, "drive"):
+        return "su orden no cubre compartir un fichero de Drive"
+    fid = str(file_id or "")
+    if not _ID_DRIVE.fullmatch(fid):
+        return "eso no parece el FILE_ID de un fichero de Drive"
+    donde = [(ctx or {}).get("texto") or ""] + list((ctx or {}).get("visto_textos") or [])
+    if not any(fid in _ID_DRIVE.findall(t) for t in donde):
+        return ("el fichero %s no estaba en lo que ella aprobó; escribe la línea "
+                "«🔐 Propuesta de salida: compartir-drive · %s · cualquiera con el enlace, lector» "
+                "y pídele un sí" % (fid, fid))
+    return ""
+
+
 def validar(k, sesion=None, transcript=None):
     """(dict|None, motivo, ctx). Todo menos lo específico de la llamada. `sesion` = la del
     PreToolUse; None cuando lo comprueba una tool (web_novedad), que no la conoce.
@@ -1187,14 +1423,16 @@ def validar(k, sesion=None, transcript=None):
             # Su mensaje AQUÍ no abrió ninguno (si otra sesión tiene el suyo, ese no se toca):
             # hay que decirle qué frase lo abre.
             motivo = ("su mensaje en esta sesión no abrió permiso. "
-                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR»")
+                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR», o un «sí» "
+                      "a una línea «🔐 Propuesta de salida: <tipo> · <objeto>» de tu último mensaje")
         return None, motivo, {}
     if sesion is not None and sesion != d.get("session_id"):
         # Segunda red: el fichero de MI sesión con el session_id de otra (copiado o renombrado a
         # mano) no vale. La firma cubre session_id, así que renombrar no hereda su permiso.
         borrar(sesion)
         return None, ("su mensaje en esta sesión no abrió permiso (el que hay es de otra sesión). "
-                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR»"), {}
+                      "Lo abren: «publícalo», «envíalo», «fusiónalo», «prográmalo», «abre el PR», o un «sí» "
+                      "a una línea «🔐 Propuesta de salida: <tipo> · <objeto>» de tu último mensaje"), {}
     if _usado(d):
         borrar(d.get("session_id"))
         return None, "ese mensaje suyo ya abrió un envío", {}

@@ -40,6 +40,8 @@ Uso CLI:
   python3 tools/drive.py meta <FILE_ID>
   python3 tools/drive.py mkdir <NOMBRE> [PARENT_ID]       # crea carpeta (idempotente)
   python3 tools/drive.py upload <RUTA> [FOLDER_ID]        # sube fichero desde disco
+  python3 tools/drive.py share <FILE_ID> --anyone-reader  # «cualquiera con el enlace, lector»
+                                                          # (detrás del freno de salida: un sí suyo)
 """
 import json
 import os
@@ -519,6 +521,111 @@ def _gate_subida(ruta_local=None, contenido=None, nombre=None):
         raise RuntimeError("subida BLOQUEADA por el borde: contenido sensible a Drive.")
 
 
+# ---------------------------------------------------------------------------
+# Compartir con enlace (17-oct-26)
+# ---------------------------------------------------------------------------
+# {{TITULAR}} pidió dejar el vídeo para Anthropic «visible para quien tenga el enlace» y no había forma
+# sancionada: `share_file` del conector solo comparte por email, y rodear el freno con una llamada
+# propia a la API está prohibido por el muro. Esto es esa forma, y va detrás del MISMO freno que
+# un correo: un permiso de ESTA sesión, abierto por un mensaje suyo, que cubra `drive` y nombre
+# este FILE_ID (`permiso_envio.comprobar_drive`). La propia tool valida y GASTA el permiso antes
+# de llamar a la API (un solo consumidor, como `web_novedad`): `salida_guard` no lo intercepta.
+# Solo hace una cosa: `anyone` + `reader`. Nunca escritor, nunca una carpeta (un enlace a una
+# carpeta expone todo lo que haya o vaya a haber dentro).
+MIME_CARPETA = "application/vnd.google-apps.folder"
+
+
+def _permiso_drive(file_id):
+    """(permiso|None, motivo). Un permiso SUYO que apruebe compartir ESTE fichero.
+
+    No se mira la sesión (red-team de verificacion, 17-oct-26): la que llega a una tool es
+    `CLAUDE_CODE_SESSION_ID`, que el agente puede poner a mano, así que atarse a ella no ataba
+    nada. Lo que ata es lo que ella aprobó: se recorre cada permiso, se valida CONTRA SU PROPIA
+    sesión y su transcript (`validar`), y solo vale si cubre `drive` y nombra este FILE_ID. Desde
+    otra sesión, como mucho se comparte el fichero que ella aprobó, una vez: lo mismo que pidió."""
+    import permiso_envio as P
+    if not P.hay_alguno():
+        return None, ("nadie lo ha pedido en un mensaje. Termina tu mensaje con la línea "
+                      "«🔐 Propuesta de salida: compartir-drive · %s · cualquiera con el enlace, "
+                      "lector» y pídele un sí" % file_id)
+    k, sin_llave = P.llave(permitir_env=False)
+    if not k:
+        return None, "el permiso no se puede comprobar: " + sin_llave
+    motivo = "ningún mensaje suyo aprobó compartir este fichero"
+    for ruta in P._todos():
+        try:
+            with open(ruta, encoding="utf-8") as f:
+                sesion = str(json.load(f).get("session_id") or "")
+        except Exception:
+            continue
+        if not sesion or P.token_path(sesion) != ruta:
+            continue
+        d, m, ctx = P.validar(k, sesion)
+        if not d:
+            motivo = m or motivo
+            continue
+        discrepa = P.comprobar_drive(ctx, file_id)
+        if not discrepa:
+            return d, ""
+        motivo = discrepa
+    return None, motivo
+
+
+def _registrar_share(evento, file_id, motivo=""):
+    """Rastro en el mismo registro que el guard de salida (solo añade una línea)."""
+    try:
+        import _casa
+        from datetime import datetime
+        ruta = os.path.join(_casa.state_dir(), "salida_guard.jsonl")
+        with open(ruta, "a", encoding="utf-8") as f:
+            f.write(json.dumps(dict(ts=datetime.now().replace(microsecond=0).isoformat(),
+                                    resultado=evento, tool="drive.share", motivo=motivo,
+                                    file_id=file_id), ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def share_anyone_reader(file_id, _svc=None, _permiso=None):
+    """Deja `file_id` como «cualquiera con el enlace, lector» y devuelve su enlace.
+    Lanza RuntimeError si no hay permiso suyo para ESTE fichero o si no se debe compartir."""
+    _check_halt()
+    d, motivo = (_permiso or _permiso_drive)(file_id)
+    if not d:
+        _registrar_share("denegado", file_id, motivo)
+        raise RuntimeError("🛑 No comparto: " + motivo)
+    svc = _svc or _service_write()
+    meta = svc.files().get(fileId=file_id, fields="id,name,mimeType,webViewLink").execute()
+    if meta.get("mimeType") == MIME_CARPETA:
+        _registrar_share("denegado", file_id, "es una carpeta")
+        raise RuntimeError("🛑 No comparto una CARPETA con enlace: expondría todo lo que haya dentro. "
+                           "Comparte el fichero concreto.")
+    try:
+        ZC = _politica_clinica()
+    except Exception as e:
+        raise RuntimeError("🛑 No comparto: no pude cargar la política clínica (%r)." % e)
+    nombre = meta.get("name") or ""
+    if ZC.es_ruta_clinica(nombre, cwd="/"):
+        _registrar_share("denegado", file_id, "nombre clínico")
+        raise RuntimeError("🛑 No comparto con enlace algo que por su nombre es clínico (%s)." % nombre)
+    try:
+        import borde
+    except Exception:
+        raise RuntimeError("🛑 No comparto: no pude importar borde (la puerta de egress).")
+    if not borde.guard_cli(nombre, "google-drive", etiqueta="drive-enlace"):
+        _registrar_share("denegado", file_id, "borde")
+        raise RuntimeError("🛑 No comparto: el borde marca el nombre como sensible.")
+    # Se GASTA antes de llamar a la API: de dos llamadas a la vez pasa una, y un fallo de red
+    # después no devuelve el uso (ella vuelve a decir que sí, no se reintenta solo).
+    import permiso_envio as P
+    if not P.consumir(d, "drive.share:" + file_id):
+        _registrar_share("token_ya_usado", file_id)
+        raise RuntimeError("🛑 No comparto: ese mensaje suyo ya abrió una salida.")
+    svc.permissions().create(fileId=file_id, body={"type": "anyone", "role": "reader"},
+                             fields="id", supportsAllDrives=True).execute()
+    _registrar_share("permitido", file_id, d.get("motivo", ""))
+    return meta.get("webViewLink") or ("https://drive.google.com/file/d/%s/view" % file_id)
+
+
 def update_content(file_id, content, mime_type="text/html"):
     """Actualiza el contenido de un archivo existente."""
     _gate_subida(contenido=content, nombre=str(file_id))
@@ -737,6 +844,19 @@ def main(argv):
         result = make_folder(argv[1], parent)
         print("📁 Carpeta: %s  id=%s\n   %s" % (
             result.get("name"), result["id"], result.get("webViewLink", "")))
+        return 0
+
+    if cmd == "share":
+        if len(argv) < 3 or argv[2] != "--anyone-reader":
+            print("uso: drive.py share <FILE_ID> --anyone-reader   (necesita un sí suyo a la línea "
+                  "«🔐 Propuesta de salida: compartir-drive · <FILE_ID> · …»)", file=sys.stderr)
+            return 2
+        try:
+            enlace = share_anyone_reader(argv[1])
+        except RuntimeError as e:
+            print(str(e), file=sys.stderr)
+            return 1
+        print("🔗 Compartido: cualquiera con el enlace, lector\n   %s" % enlace)
         return 0
 
     if cmd == "upload":
