@@ -331,6 +331,24 @@ def _linea_de_cambios(hall, suyos, hoy):
                "; ".join(h["titulo"] for h in hall if h.get("peldano", 1) >= 2)[:220])]
 
 
+def al_dia(hallazgos, hoy, m, seco=False):
+    """Los HECHOS que la web aún no cuenta (`web_al_dia.py`, plan «web al día», 17-oct-26). Si
+    falla, el guardián sigue: es una capa encima, no su trabajo principal. Pero se dice."""
+    try:
+        import web_al_dia
+        import web_publicar
+        nuevos, avisos = web_al_dia.pasada(hallazgos, ULTIMA.get("informes"), ULTIMA.get("desde"),
+                                           m, hoy, web_publicar.WEB, seco=seco)
+        print("🗞️  web al día (%s%s): %d hecho%s%s" % (m, ", seco" if seco else "", len(nuevos),
+              "" if len(nuevos) == 1 else "s", "" if seco else " nuevo" + ("" if len(nuevos) == 1 else "s")))
+        for h in nuevos:
+            print("   [P%d %s · %s] %s" % (h["prioridad"], h["carril"], h["estado"], h["titulo"]))
+        for a in avisos:
+            print("   ⚠️  " + a)
+    except Exception as e:
+        print("🗞️  web al día falló: %r" % (e,))
+
+
 # ── la pasada real: aquí, y solo aquí, se lee de fuera ───────────────────────────────────────
 
 def _curl(url):
@@ -376,11 +394,16 @@ def _prensa_en_registro():
     return len(filas) or None
 
 
+# Lo que la pasada ya leyó y necesita `web_al_dia` (17-oct-26): así no se pide dos veces.
+ULTIMA = {}
+
+
 def pasada(hoy=None, lee=_curl):
     """Todos los hallazgos de hoy. Una señal que falla no calla a las demás: se convierte en un
     hallazgo «no pude mirar X», porque un detector mudo se lee como «todo bien»."""
     hoy = hoy or datetime.date.today()
     out, es, eventos = [], [], []
+    ULTIMA.clear()
 
     def intenta(nombre, f):
         try:
@@ -417,7 +440,9 @@ def pasada(hoy=None, lee=_curl):
     if es:
         def informes():
             import vega_vision
-            return senal_informes(vega_vision._informes(hoy), ultima_fecha(es))
+            lineas = vega_vision._informes(hoy)
+            ULTIMA.update(informes=lineas, desde=ultima_fecha(es))
+            return senal_informes(lineas, ULTIMA["desde"])
         intenta("informes", informes)
 
     intenta("en-vivo", lambda: senal_en_vivo(lee))
@@ -554,8 +579,11 @@ def main(argv):
     hallazgos = pasada(hoy)
     if "--seco" in argv:
         print("(seco) no se escribe nada")
+        al_dia(hallazgos, hoy, modo(), seco=True)
     else:
-        print("modo %s · %d hallazgos apuntados" % (guardar(hallazgos, hoy), len(hallazgos)))
+        m = guardar(hallazgos, hoy)
+        print("modo %s · %d hallazgos apuntados" % (m, len(hallazgos)))
+        al_dia(hallazgos, hoy, m)
     _pinta(hallazgos)
     return 0
 

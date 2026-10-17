@@ -3888,6 +3888,18 @@
       "auditable": false,
       "repetida": false,
       "nota": "Clasificada el 17-oct-26 (vencida en el registro). Candidata a bloqueo (hook PreToolUse sobre update_draft con id «s:»); hasta que exista, depende del criterio."
+    },
+    {
+      "slug": "feedback-cifras-dianas-se-publican-cotejadas",
+      "que": "Las cifras de dianas SÍ se publican en la web (cronología y /ciencia incluidas), cotejadas literalmente contra su fuente publicada o sellada; el redactor nunca las teclea",
+      "clase": "lint-doc",
+      "mecanismo": "tools/web_lint.py::revisar_cifras_diana",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": false,
+      "nota": "17-oct-26, respuesta de {{TITULAR}} a los UNKNOWNS del plan web al día. Mecanismo previsto: cotejo de cifra-diana en web_lint contra public/celula/resultados.json (plan docs/plan-web-al-dia.md §6), con test de regresión 58% vs 50 aprox. Mecanizada el mismo día: tests/test_web_lint.py::CifrasDeDianasCotejadas."
     }
   ]
 }

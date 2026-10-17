@@ -75,6 +75,59 @@ Escenas (`Narrado.tsx`):
 - Se descarga a `07 · Marca/Videos-Polaris/flow/`, se revisa fotograma a fotograma y se copia sin audio a `remotion/public/narrado/flow/`.
 - En el guion va como `"video"` en la escena `portada` o `cierre`.
 
+## Vídeo de Orellana: volver a montar el taller (4-oct-2026)
+
+`remotion/public`, `node_modules` y `out/` no están en git. El worktree del rodaje se podó entre el 3 y el 4 de octubre (ya estaba fusionado y limpio) y con él se fueron los recursos, los clips procesados y las tomas de voz. Desde entonces las fuentes viven fuera del worktree, en `_data/orellana-video-2026-10-02-fuera-de-rag/produccion/`, y el taller se rehace con una orden:
+
+```bash
+python3 tools/video_polaris/taller_orellana.py      # recursos, fotos, clips de ambiente, tiempos de la v8, música, efectos, npm ci
+```
+
+| Qué cambia | Cómo se renderiza | Voz |
+|---|---|---|
+| Solo la imagen (una escena, un rótulo, un fondo) | editar `guiones/orellana-circulo.es.json` o `Narrado.tsx`, `taller_orellana.py` y `AUDIO_DE=<máster v8> DESTINO=… bash remotion/render.sh vN Narrado orellana-circulo` | la pista del máster, copiada sin recodificar |
+| Pausas, música o efectos | `narrado.py guiones/orellana-circulo.es.json <produccion>/build-orellana-v4` y `render.sh` sin `AUDIO_DE` | las mismas tomas: van firmadas y no se vuelven a pedir |
+| Lo que dice | lo mismo, con su OK al texto | se piden a ElevenLabs el capítulo que cambia y sus vecinos (el anterior y los dos siguientes: la firma de cada toma incluye el texto de al lado), 3 tomas de cada uno. El resto no se toca |
+
+Comprobado el 4-oct: con los tiempos de la v8 y `AUDIO_DE`, el render sale con el audio idéntico al de la v8 (mismo MD5) y la imagen igual fotograma a fotograma (SSIM medio 0,9996; el peor, 0,995).
+
+**Las tomas perdidas se recuperan del historial de ElevenLabs** (solo lectura, no gasta): `produccion/recupera_tomas.py` las baja y `produccion/instala_tomas.py` las coloca con su firma. En el historial, las de Eleven v4 salen **sin `voice_id` y sin texto**: si se filtra por voz no aparecen. Van en orden de petición, capítulo a capítulo, a, b, c. Con las 33 recuperadas, `narrado.py` volvió a dar la línea de tiempo de la v8 palabra por palabra.
+
+Para mirar un render: `hoja.sh` (hoja de contactos), `huecos.py` (tramos con el escenario vacío) y `vertical.py` (máster vertical con el aviso de voz).
+
+### v9 (4-oct-2026): su voz en una sola toma y sus propios vídeos
+
+{{TITULAR}} pidió «que toda la voz tenga continuidad en todo el tiempo que se habla». Lo que se aprendió:
+
+| Qué | Cómo queda |
+|---|---|
+| Voz | `"toma_unica": "entera"`: toda la narración en UNA petición a Eleven v4 (2.400 caracteres caben). Las pausas se estiran solo dentro del silencio y el volumen se iguala por capítulo (la toma arranca alta y va bajando 4,5 dB). `continuidad.py <build>` mide tono, volumen y ritmo por capítulo |
+| Ritmo | La toma entera corre un 9 % más que las tomas por capítulo, y la v4 **no admite `speed`** (lo acepta y lo ignora). No se usa `atempo`: se da aire entre frases (`pausa_entre_frases`) |
+| Palabras mal acentuadas | La v4 dice «neuroendócrina» 2 de cada 3 veces, «cáncer de mamá» 1 de cada 2 y «Billón de Protocol» 6 de cada 10. Whisper lo delata en la grafía: `evitar` y `exigir` en el guion. Una tilde donde va el acento (`decir`: «neuroendocrína») lo corrigió en todas las tomas |
+| Ninguna toma limpia | De diez, ninguna. `mezcla_tomas.py` compone la toma base con los capítulos de otra toma ENTERA, cortando en el silencio; en el guion, `"tomas": {"entera": "<letra>"}` |
+| Exactitud | `difflib` con `autojunk` da cifras absurdas en textos de más de 200 caracteres: siempre `autojunk=False` |
+| Sus vídeos (cámara DJI) | 300 clips en Drive («Vídeos DJI — brutos para presentación»); la cuenta de servicio no los ve, hay que entrar con el OAuth de usuario. Barrido por dentro (un fotograma cada 4 s) antes de elegir: la miniatura engaña. Los elegidos, en `produccion/dji-hoy/clips` |
+| Privacidad de los planos | **Mirar a resolución completa antes de usar un plano.** La consola de radioterapia enseñaba nombres y un número de historia de otros pacientes; el portátil, su nombre y fecha de nacimiento; el congreso, a terceros. `foco_lesion` desenfoca todo menos la lesión |
+
+Escenas nuevas de `Narrado.tsx`: `fondos` (varios planos por capítulo, anclados a palabras), `clip`, `visores2`, `alcance`, `carrera`, `marca`.
+
+### v10 (5-oct-2026): los planos los elige ella, viéndolos
+
+{{TITULAR}}: «vamos a elegir los clips primero y luego ponemos bien los vídeos». Misma voz y mismo texto que la v9; cambian las escenas.
+
+| Qué | Cómo queda |
+|---|---|
+| Elegir | Una página de miniaturas no le sirvió: quiere los tramos **reproducibles en el chat**, numerados por posición, y contesta con una captura del que comenta. Proxies de 960×540 sin sonido; los finalistas y quién decidió cada uno, en `produccion/dji-hoy/para-elegir/finalistas/finalistas.json` |
+| El inventario mentía | El del 4-oct se hizo mientras aún subían ficheros: 300 clips de 467. Faltaban los de más de 1 GB (mesa redonda, sala y consola de la SBRT) y toda la tanda del 23-jun al 4-jul. Antes de decir «no hay clip de X», rehacer el inventario |
+| Planos limpios | Escena `clips`: varios planos **a corte** en una ventana, anclados a palabras (`desde`), sin velo ni palabras grandes; `rotulo` es una píldora pequeña. Palabras grandes solo en cuatro frases |
+| Encuadre que sigue | `planos_seguidos.py`: en un plano a pulso de una pantalla, el recorte sigue a lo que importa fotograma a fotograma (`pantalla_tac` por un rótulo verde del programa; `tarjeta` por el bloque oscuro) |
+| Tapar sin que se note | `tapa()` desenfoca rectángulos con el borde difuminado (caras al fondo, un monitor de pared); `acerca()` va de plano entero a un encuadre cerrado. En `zoompan` hay que poner `fps=30` antes y `setpts=N/(30*TB)` después, o repite cada fotograma mil veces |
+| Lo que se coló esta vez | A 1080p se leía un terminal con el principio de una clave de API (plano de su monitor: ahora desenfocado). A 540p no se veía: **la comprobación se hace al tamaño final** |
+| «IA» dicho en inglés | La v4 lee a veces «IA» como en inglés (3 tomas de 14) y Whisper escribe «IA» igual, así que `evitar`/`exigir` no lo ven; lo oyó {{TITULAR}}. `ia_es.py <build> [letras]` lo mide: en español la palabra acaba en /a/ y dura 0,22 s; en inglés acaba en /i/ y dura 0,33 s. Pasarlo a toda toma antes de elegirla |
+| El giro de los visores 3D a trompicones | Tres causas, las tres medidas (`mide_giro.py` sobre la secuencia; cambio entre fotogramas seguidos sobre el vídeo): (1) la captura va a 20 fps dentro de 30, con un fotograma repetido de cada tres: `giros_fluidos()` del taller la reparte a paso parejo; (2) la secuencia no cierra el bucle (del último al primero hay un salto): `Secuencia` con `desde` va y vuelve; (3) **todo el escenario saltaba 1 px cada medio segundo** porque la flotación iba en `top` y el navegador la redondea al píxel: ahora va en `transform`. Nunca animar con `top`/`left` algo que se mueve despacio |
+| Sin planos borrosos | No le gustan los planos desenfocados enteros. Antes de tapar, buscar un encuadre que deje fuera lo que no puede verse (`lesion_cerca` en `planos_seguidos.py`) u otro plano |
+| Variante con subtítulos en todas las frases (7-oct) | Los subtítulos quitan solos lo que ya está escrito en pantalla; para la variante que los saca siempre, `REMOTION_SUBS_SIEMPRE=1` delante del render y `AUDIO_DE=<máster>` para copiar la misma pista de audio: `REMOTION_SUBS_SIEMPRE=1 DESTINO=… AUDIO_DE=…v10-1920x1080-BORRADOR.mp4 bash render.sh v10-subtitulos Narrado orellana-circulo`. En la v10 son 39 frases más; comprobado fotograma a fotograma que no pisan nada |
+
 ## Voz en Eleven v4, inglés americano (v19, 29-sep-2026)
 
 {{TITULAR}} oyó la v4 frente a la v2 a ciegas y dijo «me parece espectacular de verdad». Lo que hay que saber:

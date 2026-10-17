@@ -96,8 +96,10 @@ def _terminos_web(repo=None):
         return None
 
 
-def revisar(texto, *, repo=None):
-    """[(clase, motivo)] — vacío significa publicable. Fail-closed por diseño."""
+def revisar(texto, *, repo=None, cifras=None):
+    """[(clase, motivo)] — vacío significa publicable. Fail-closed por diseño.
+
+    `cifras`: las cifras de dianas selladas ({gen: [(valor, aprox)]}); por defecto, las publicadas."""
     fallos = []
     if not isinstance(texto, str) or len(texto.strip()) < MIN_LARGO:
         return [("formato", "texto vacío o demasiado corto para publicarse")]
@@ -131,11 +133,130 @@ def revisar(texto, *, repo=None):
         if rx.search(texto):
             fallos.append(("voz", motivo))
 
+    # 7. cifras de dianas: se publican, pero solo si casan con una cifra ya sellada
+    fallos.extend(revisar_cifras_diana(texto, cifras=cifras, repo=repo))
+
     return fallos
 
 
-def publicable(texto, *, repo=None):
-    return not revisar(texto, repo=repo)
+# ── Cifras de dianas (17-oct-2026, decisión de {{TITULAR}}) ───────────────────────────────────────
+# {{TITULAR}}: «son datos correctos y quiero enseñarlos porque ya me está pasando gente estudios».
+# Las cifras de dianas SÍ salen, también en la cronología y en /ciencia. Lo que no puede pasar es
+# que salga una cifra tecleada: el mismo día la nota interna decía «NY-BR-1 58 %» y la web había
+# publicado ≈50 de cada 100. Así que una cifra junto a una diana solo es publicable si coincide
+# con un valor de un bloque `sello: verificado` + `ok_titular: true` de `public/celula/resultados.json`
+# (lo que ella ya aprobó en /celula-a-celula). Antes de esto el lint ni la veía (deuda
+# `web-lint-no-caza-diana-con-porcentaje`). Marcadores diagnósticos, variantes y dosis siguen
+# parados más arriba: esto abre las dianas, nada más.
+
+RE_PORCENTAJE = re.compile(r"(?<![\w.,])(\d{1,3}(?:[.,]\d+)?)\s?(?:%|por\s?ciento|de\s+cada\s+100\b)",
+                           re.I)
+# NY-BR-1, 5T4, HER3, TROP2, MAGE-A4: mayúsculas con cifra o guion. Sin ellos («PRAME») solo
+# cuentan si la fuente los conoce.
+RE_GEN = re.compile(r"(?<![\w-])((?:[A-Z][A-Z0-9]*|\d+[A-Z][A-Z0-9]*)(?:-[A-Z0-9]+)*)(?![\w-])")
+# Códigos que parecen genes y no lo son: ensayos (TB06, NCT…), bloques de resultados (R3).
+RE_NO_ES_GEN = re.compile(r"^(?:TB\d+|R\d+|NCT\d+|TROPION\S*|COVID-?\d+|L\d|C\d)$")
+RE_APROX = re.compile(r"≈|~|\baprox|\balrededor\s+de\b|\bunas?\b|\bcerca\s+de\b|\ben\s+torno\s+a\b|"
+                      r"\bcasi\b|\bpor\s+encima\s+de\b", re.I)
+VENTANA = 80
+RESULTADOS = "public/celula/resultados.json"
+
+
+def _clave_gen(g):
+    return re.sub(r"[^A-Z0-9]", "", str(g).upper())
+
+
+def cifras_de_resultados(datos):
+    """{gen: [(valor, aprox)]} de los bloques verificados y aprobados de `resultados.json`."""
+    out = {}
+
+    def recorre(o):
+        if isinstance(o, dict):
+            if "gen" in o and isinstance(o.get("por_100"), (int, float)):
+                out.setdefault(_clave_gen(o["gen"]), []).append(
+                    (float(o["por_100"]), bool(o.get("aprox") or o.get("menos_de"))))
+            for v in o.values():
+                recorre(v)
+        elif isinstance(o, list):
+            for v in o:
+                recorre(v)
+
+    for bloque in ((datos or {}).get("bloques") or {}).values():
+        if isinstance(bloque, dict) and bloque.get("sello") == "verificado" and bloque.get("ok_titular") is True:
+            recorre(bloque.get("datos"))
+    return out
+
+
+_CACHE = {}
+
+
+def cifras_permitidas(repo=None):
+    """Las cifras publicables, leídas de lo PUBLICADO (`origin/main`) y no del checkout, que suele
+    estar en otra rama. None si no se puede leer: entonces ninguna cifra de diana pasa."""
+    repo = repo or "/Users/polaris/projects/titular-{{APELLIDO}}-case"
+    if repo in _CACHE:
+        return _CACHE[repo]
+    crudo = None
+    try:
+        import subprocess
+        r = subprocess.run(["git", "-C", repo, "show", "origin/main:" + RESULTADOS],
+                           capture_output=True, text=True, timeout=20)
+        if r.returncode == 0:
+            crudo = r.stdout
+    except Exception:
+        crudo = None
+    try:
+        res = cifras_de_resultados(json.loads(crudo)) if crudo else None
+    except ValueError:
+        res = None
+    _CACHE[repo] = res
+    return res
+
+
+def revisar_cifras_diana(texto, *, cifras=None, repo=None):
+    """[(\"cifra-diana\", motivo)] por cada cifra junto a una diana que no casa con lo sellado.
+
+    `cifras` = {gen: [(valor, aprox)]}; si no se pasa, se lee de la web publicada."""
+    if not isinstance(texto, str):
+        return []
+    hallazgos = []
+    conocidas = None
+    for m in RE_PORCENTAJE.finditer(texto):
+        inicio = max(0, m.start() - VENTANA)
+        trozo = texto[inicio:m.start()]
+        # la diana es la más cercana ANTES de la cifra, sin cruzar un punto
+        trozo = re.split(r"[.;:]\s", trozo)[-1]
+        if conocidas is None:
+            conocidas = cifras if cifras is not None else cifras_permitidas(repo)
+        genes = [g for g in RE_GEN.findall(trozo) if not RE_NO_ES_GEN.match(g)
+                 and (re.search(r"[\d-]", g) or (conocidas and _clave_gen(g) in conocidas))]
+        if not genes:
+            continue
+        gen = genes[-1]
+        valor = float(m.group(1).replace(",", "."))
+        dicho = "%s … %s" % (gen, m.group(0).strip())
+        if conocidas is None:
+            hallazgos.append(("cifra-diana", "«%s»: no pude leer las cifras selladas (%s), así "
+                              "que ninguna cifra de diana sale sola" % (dicho, RESULTADOS)))
+            continue
+        validas = conocidas.get(_clave_gen(gen)) or []
+        if not validas:
+            hallazgos.append(("cifra-diana", "«%s»: esa diana no tiene ninguna cifra sellada y "
+                              "aprobada en %s" % (dicho, RESULTADOS)))
+            continue
+        casan = [a for v, a in validas if abs(v - valor) < 1e-9]
+        if not casan:
+            hallazgos.append(("cifra-diana", "«%s» no coincide con lo publicado y sellado (%s)"
+                              % (dicho, ", ".join("%g%s" % (v, " aprox." if a else "")
+                                                  for v, a in sorted(set(validas))))))
+        elif all(casan) and not RE_APROX.search(texto[inicio:m.end()]):
+            hallazgos.append(("cifra-diana", "«%s»: la cifra publicada es aproximada y el texto "
+                              "la da como exacta (pon «unas», «≈» o «alrededor de»)" % dicho))
+    return hallazgos
+
+
+def publicable(texto, *, repo=None, cifras=None):
+    return not revisar(texto, repo=repo, cifras=cifras)
 
 
 # ── Excepción auditada: el panel clínico /datos (24-sep-2026) ───────────────────────────────

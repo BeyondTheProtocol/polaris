@@ -1,5 +1,5 @@
 {
-  "_nota": "Guion APROBADO por {{TITULAR}} frase a frase el 3-oct-2026 (A6). No se cambia una frase sin su OK. Fuente y revisiones: 00_FUENTE-DE-VERDAD/05 · Legal-Finanzas/guion-final-aprobado-del-vídeo-de-orellana-a6-2026-10-03.md. Voz clonada declarada en pequeño, por decisión de {{TITULAR}} (3-oct): etiqueta en una esquina los primeros 9 s (legal: el art. 50.4 del RIA pide avisar como tarde al empezar) y nota de créditos al final. Verificación lo prefería más grande y durante todo el vídeo; decidió ella. «texto» es lo que dice el clon; «pantalla», el subtítulo cuando difiere.",
+  "_nota": "A7.1 (4-oct-2026, tras la revisión de marketing, diseño, verificación+legal y voz+cuidado): PROPUESTA sobre el guion A6 que {{TITULAR}} aprobó el 3-oct, con sus cambios del 4-oct (OMS desplegada, «Polaris no decide» dicho en voz, «ayuda» en vez de «vuestra ayuda», un cierre más largo) y cuatro frases nuevas que contestan a lo que preocupa al Círculo. Las frases nuevas están PENDIENTES de su OK: no sale nada fuera sin él. Fuente del A6: 00_FUENTE-DE-VERDAD/05 · Legal-Finanzas/guion-final-aprobado-del-vídeo-de-orellana-a6-2026-10-03.md. Voz: Eleven v4 en UNA toma de toda la narración (toma_unica: entera), porque pidió continuidad en todo el tiempo que se habla. El comité de verificación no sostiene «tengo tres años y llevo dos»: la frase del tiempo no da cifra de vida (verificacion-A7-pronostico.md). Voz clonada declarada en pequeño, por decisión suya del 3-oct. «texto» es lo que dice el clon; «pantalla», el subtítulo cuando difiere; «decir», la grafía para la voz.",
   "slug": "orellana-circulo",
   "idioma": "es",
   "voice_id": "51aLNh96A9WJZODzYIyP",
@@ -11,12 +11,16 @@
     "style": 0.2,
     "tempo": 1.0
   },
-  "toma_unica": "capitulo",
+  "toma_unica": "entera",
   "enlazado": true,
-  "n_tomas": 3,
-  "tomas": {},
-  "pausa_entre_frases": 0.35,
-  "pausa_entre_capitulos": 0.9,
+  "n_tomas": 6,
+  "evitar": [
+    "neuroendócrina",
+    "ingeniería",
+    "de mamá"
+  ],
+  "pausa_entre_frases": 0.5,
+  "pausa_entre_capitulos": 0.85,
   "entrada": 2.0,
   "salida": 5.5,
   "musica": "musica-elevenlabs-tech-65s.mp3",
@@ -25,7 +29,11 @@
     "hasta": 9
   },
   "cifras_extra": {
-    "vistas_higado": 863526
+    "vistas_total": 1469689,
+    "vistas_x": 1030094,
+    "vistas_linkedin": 149385,
+    "vistas_instagram": 155110,
+    "vistas_tiktok": 135100
   },
   "capitulos": [
     {
@@ -51,31 +59,41 @@
         "tipo": "pasos",
         "pasos": [
           {
-            "tipo": "imagen",
-            "src": "orellana/retrato-horizontal.jpg"
-          },
-          {
-            "tipo": "golpes",
-            "desde": "raro",
+            "tipo": "ficha",
+            "src": "orellana/retrato-vertical.jpg",
+            "foco": "50% 12%",
+            "rol": "35 años",
             "palabras": [
               {
-                "txt": "RARO",
+                "txt": "{{DIAGNOSTICO}}",
+                "en": "cancer",
+                "grande": true
+              },
+              {
+                "txt": "Raro",
                 "en": "raro"
               },
               {
-                "txt": "METASTÁSICO",
+                "txt": "Metastásico",
                 "en": "metast"
+              },
+              {
+                "txt": "Con una parte neuroendocrina",
+                "en": "con",
+                "acento": true
               }
-            ]
+            ],
+            "vertical": true
           },
           {
             "tipo": "puntos",
-            "desde": "parte",
+            "desde": "segun",
             "en": "dos",
             "fuertes": 2,
             "flojas": 3,
             "txt": "entre 2 y 5 de cada 100",
-            "lbl": "cánceres de mama · según la OMS"
+            "lbl": "cánceres de mama · Organización Mundial de la Salud",
+            "en_lbl": "organizacion"
           }
         ]
       },
@@ -90,8 +108,8 @@
           "texto": "Y metastásico."
         },
         {
-          "texto": "Con una parte neuroendocrina, algo que, según la o eme ese, solo tienen entre el dos y el cinco por ciento de los cánceres de mama.",
-          "pantalla": "Con una parte neuroendocrina, algo que, según la OMS, solo tienen entre el dos y el cinco por ciento de los cánceres de mama."
+          "texto": "Con una parte neuroendocrina, algo que, según la Organización Mundial de la Salud, solo tienen entre el dos y el cinco por ciento de los cánceres de mama.",
+          "decir": "Con una parte neuroendocrína, algo que, según la Organización Mundial de la Salud, solo tienen entre el dos y el cinco por ciento de los cánceres de mama."
         }
       ]
     },
@@ -100,46 +118,38 @@
       "kicker": "",
       "titulo": "",
       "escena": {
-        "tipo": "pasos",
-        "pasos": [
+        "tipo": "clips",
+        "cortes": [
           {
-            "tipo": "golpes",
-            "palabras": [
-              {
-                "txt": "INVESTIGAR",
-                "en": "investigar"
-              },
-              {
-                "txt": "CON IA",
-                "en": "ia",
-                "acento": true
-              }
-            ]
+            "src": "narrado/dji/trabajando.mp4",
+            "inicio_s": 2
           },
           {
-            "tipo": "diagrama",
+            "src": "narrado/dji/prueba-imagen.mp4",
             "desde": "pedi",
-            "nodos": [
-              {
-                "t": "Prueba",
-                "s": "adelantada",
-                "en": "prueba"
-              },
-              {
-                "t": "Biopsia",
-                "s": "Zúrich",
-                "en": "biopsia"
-              },
-              {
-                "t": "{{CENTRO}}",
-                "s": "Harvard",
-                "en": "dana"
-              }
-            ]
+            "rotulo": "Prueba adelantada",
+            "en": "prueba"
+          },
+          {
+            "src": "narrado/dji/{{CIUDAD}}-camino.mp4",
+            "desde": "de",
+            "rotulo": "Biopsia · Zúrich",
+            "en": "biopsia"
+          },
+          {
+            "src": "narrado/dji/consulta.mp4",
+            "desde": "equipo",
+            "rotulo": "Se suma un equipo de {{CENTRO}} · Harvard",
+            "en": "dana"
+          },
+          {
+            "src": "narrado/dji/biopsia.mp4",
+            "desde": "se",
+            "inicio_s": 4.4,
+            "rotulo": "Se suma un equipo de {{CENTRO}} · Harvard",
+            "en": "dana"
           }
-        ],
-        "fondo": "narrado/stock/teclado.mp4",
-        "fondo_dur": 10.07
+        ]
       },
       "frases": [
         {
@@ -149,7 +159,8 @@
           "texto": "Y dio resultado."
         },
         {
-          "texto": "Pedí adelantar una prueba que miró la parte neuroendocrina de mi tumor."
+          "texto": "Pedí adelantar una prueba que miró la parte neuroendocrina de mi tumor.",
+          "decir": "Pedí adelantar una prueba que miró la parte neuroendocrína de mi tumor."
         },
         {
           "texto": "Conseguí una biopsia en Zúrich."
@@ -185,22 +196,29 @@
             ]
           },
           {
-            "tipo": "foto",
+            "tipo": "clips",
             "desde": "soy",
-            "src": "titular-ingeniera.png",
-            "nombre": "{{TITULAR}} {{APELLIDO}}",
-            "rol": "ingeniera de software"
-          },
-          {
-            "tipo": "golpes",
-            "desde": "polaris",
-            "palabras": [
+            "cortes": [
               {
-                "txt": "POLARIS",
-                "en": "polaris",
-                "acento": true
+                "src": "narrado/dji/google-puerta.mp4",
+                "inicio_s": 0.8
+              },
+              {
+                "src": "narrado/dji/google-trabajando.mp4",
+                "desde": "elegi"
+              },
+              {
+                "src": "narrado/dji/estrella.mp4",
+                "desde": "asi"
               }
             ]
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/monitor-casa.mp4",
+            "hasta": "soy",
+            "velo": 0.85
           }
         ]
       },
@@ -227,22 +245,8 @@
         "tipo": "pasos",
         "pasos": [
           {
-            "tipo": "golpes",
-            "palabras": [
-              {
-                "txt": "POLARIS",
-                "en": "polaris"
-              },
-              {
-                "txt": "UN EQUIPO",
-                "en": "equipo"
-              },
-              {
-                "txt": "DÍA Y NOCHE",
-                "en": "dia",
-                "acento": true
-              }
-            ]
+            "tipo": "clip",
+            "src": "narrado/dji/panel.mp4"
           },
           {
             "tipo": "lista",
@@ -266,8 +270,14 @@
             ]
           }
         ],
-        "fondo": "narrado/stock/escritorio.mp4",
-        "fondo_dur": 12.13
+        "fondos": [
+          {
+            "src": "narrado/dji/panel-fondo.mp4",
+            "desde": "lee",
+            "inicio_s": 4.6,
+            "velo": 1.15
+          }
+        ]
       },
       "frases": [
         {
@@ -283,9 +293,29 @@
       "kicker": "",
       "titulo": "",
       "escena": {
-        "tipo": "cita",
-        "texto": "Polaris no decide. Deciden mis médicos.",
-        "en": "sobre"
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clip",
+            "src": "narrado/dji/tac-pantalla.mp4",
+            "texto": "Entender mi enfermedad",
+            "en": "entender"
+          },
+          {
+            "tipo": "clip",
+            "desde": "llegar",
+            "src": "narrado/dji/cuaderno.mp4",
+            "texto": "Mejores preguntas",
+            "en": "mejores"
+          },
+          {
+            "tipo": "cita",
+            "desde": "polaris",
+            "en": "polaris",
+            "texto": "Polaris no decide. Deciden mis médicos.",
+            "grande": true
+          }
+        ]
       },
       "frases": [
         {
@@ -293,6 +323,12 @@
         },
         {
           "texto": "Y a llegar a cada consulta con mejores preguntas."
+        },
+        {
+          "texto": "Polaris no decide."
+        },
+        {
+          "texto": "Deciden mis médicos."
         }
       ]
     },
@@ -304,8 +340,9 @@
         "tipo": "pasos",
         "pasos": [
           {
-            "tipo": "visores",
-            "en_zoom": "huesos",
+            "tipo": "visores2",
+            "en_diana": "elegir",
+            "diana": "Mis médicos lo usaron de apoyo para elegir la biopsia",
             "piezas": [
               {
                 "dir": "higado",
@@ -313,25 +350,54 @@
                 "nombre": "Hígado"
               },
               {
-                "dir": "vertebra3",
-                "n": 150,
-                "nombre": "Hueso"
+                "dir": "mama",
+                "n": 240,
+                "nombre": "Mama",
+                "en": "ver"
               },
               {
                 "src": "esqueleto.png",
-                "nombre": "Esqueleto"
+                "nombre": "Esqueleto",
+                "en": "polaris"
+              },
+              {
+                "dir": "vertebra3",
+                "n": 150,
+                "nombre": "Vértebra",
+                "en": "huesos"
               }
             ]
           },
           {
-            "tipo": "contadores",
+            "tipo": "alcance",
             "desde": "desarrolle",
-            "items": [
+            "k": "vistas_total",
+            "millones": true,
+            "pre": "más de",
+            "lbl": "visualizaciones e impresiones de mis mapas 3D · a 4 de octubre",
+            "redes": [
               {
-                "k": "vistas_higado",
-                "lbl": "visualizaciones del visor del hígado en X"
+                "nombre": "X",
+                "txt": "1,03 M"
+              },
+              {
+                "nombre": "Instagram",
+                "txt": "155 mil"
+              },
+              {
+                "nombre": "LinkedIn",
+                "txt": "149 mil"
+              },
+              {
+                "nombre": "TikTok",
+                "txt": "135 mil"
               }
-            ]
+            ],
+            "prensa": {
+              "cita": "El mapa que la ingeniera ha creado de su metástasis.",
+              "pie": "El Español · pie de foto · 19 jun 2026",
+              "en": "sorpresa"
+            }
           }
         ]
       },
@@ -351,41 +417,79 @@
       ]
     },
     {
+      "id": "antes",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/dji/micro.mp4"
+          },
+          {
+            "src": "narrado/dji/mesa-redonda.mp4",
+            "desde": "su"
+          },
+          {
+            "src": "narrado/dji/podcast.mp4",
+            "desde": "yo"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "No soy la primera paciente que investiga su propio cáncer."
+        },
+        {
+          "texto": "Otros lo hicieron con mucho dinero y grandes equipos."
+        },
+        {
+          "texto": "Yo lo hago con IA y con mis médicos.",
+          "decir": "Yo lo hago con IA, y con mis médicos."
+        }
+      ]
+    },
+    {
       "id": "tiempo",
       "kicker": "",
       "titulo": "",
       "escena": {
-        "tipo": "dias",
-        "en": "cada",
-        "txt": "Cada día cuenta.",
-        "meses": [
+        "tipo": "pasos",
+        "pasos": [
           {
-            "m": "ABR",
-            "d": 30
+            "tipo": "clips",
+            "cortes": [
+              {
+                "src": "narrado/dji/medicacion.mp4",
+                "texto": "Todo esto, en seis meses",
+                "en": "seis"
+              },
+              {
+                "src": "narrado/dji/sbrt-rapido.mp4",
+                "desde": "cada",
+                "inicio_s": 1
+              }
+            ]
           },
           {
-            "m": "MAY",
-            "d": 31
-          },
+            "tipo": "carrera",
+            "desde": "llevo",
+            "inicio": "ENE 2024",
+            "meses": 32,
+            "txt": "2 años y 8 meses",
+            "lbl": "con {{DIAGNOSTICO}}",
+            "en": "llevo",
+            "en_carrera": "carrera",
+            "txt2": "Una carrera",
+            "hoy": "OCT 2026"
+          }
+        ],
+        "fondos": [
           {
-            "m": "JUN",
-            "d": 30
-          },
-          {
-            "m": "JUL",
-            "d": 31
-          },
-          {
-            "m": "AGO",
-            "d": 31
-          },
-          {
-            "m": "SEP",
-            "d": 30
-          },
-          {
-            "m": "OCT",
-            "d": 3
+            "src": "narrado/dji/sbrt-rapido.mp4",
+            "desde": "llevo",
+            "inicio_s": 4.6,
+            "velo": 1.0
           }
         ]
       },
@@ -395,6 +499,12 @@
         },
         {
           "texto": "La enfermedad no espera."
+        },
+        {
+          "texto": "Llevo casi tres años con metástasis y de mi subtipo apenas hay datos."
+        },
+        {
+          "texto": "Esto es una carrera."
         }
       ]
     },
@@ -406,14 +516,34 @@
         "tipo": "pasos",
         "pasos": [
           {
-            "tipo": "imagen",
-            "src": "orellana/retrato-vertical.jpg"
+            "tipo": "clip",
+            "src": "narrado/dji/puente.mp4"
+          },
+          {
+            "tipo": "clip",
+            "desde": "ayude",
+            "src": "orellana/escalera-detalle.jpg",
+            "texto": "Muchos más pacientes",
+            "en": "muchos"
           },
           {
             "tipo": "cita",
             "desde": "casos",
             "en": "casos",
             "texto": "Que los casos raros dejen de ser notas a pie de página."
+          },
+          {
+            "tipo": "cita",
+            "desde": "preparamos",
+            "en": "preparamos",
+            "texto": "Lo que preparamos mis médicos y yo con Polaris no se puede quedar en teoría."
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/ensayo.mp4",
+            "desde": "preparamos",
+            "velo": 0.9
           }
         ]
       },
@@ -437,12 +567,13 @@
         "tipo": "pasos",
         "pasos": [
           {
-            "tipo": "puntos",
+            "tipo": "marca",
+            "lamina": "orellana/lamina.png",
+            "nombre": "Beyond the protocol",
+            "lbl": "Tecnología al alcance de cualquier paciente",
             "en": "beyond",
-            "fuertes": 1,
-            "flojas": 99,
-            "txt": "Beyond the Protocol",
-            "lbl": "una asociación abierta a otros pacientes"
+            "pre": "Quiero crear",
+            "en_lbl": "tecnologia"
           },
           {
             "tipo": "diagrama",
@@ -451,7 +582,7 @@
               {
                 "t": "Puertas",
                 "s": "hoy cerradas",
-                "en": "puertas",
+                "en": "ayuda",
                 "puerta": true
               },
               {
@@ -472,15 +603,24 @@
             ]
           }
         ],
-        "fondo": "narrado/stock/puerta.mp4",
-        "fondo_dur": 19.23
+        "fondos": [
+          {
+            "src": "narrado/stock/puerta.mp4",
+            "desde": "necesito",
+            "ancla": {
+              "en": "abrir",
+              "clip_s": 9.6
+            },
+            "velo": 0.75
+          }
+        ]
       },
       "frases": [
         {
-          "texto": "Por eso quiero crear Beyond the Protocol, una asociación abierta a otros pacientes, que sostenga esto entre muchas personas."
+          "texto": "Por eso quiero crear Beyond the Protocol, una asociación de tecnología al alcance de cualquier paciente. Las asociaciones de pacientes ya acompañan. Esta pondrá las herramientas para que cada uno entienda su caso, sepa qué pruebas existen y qué preguntar a sus médicos."
         },
         {
-          "texto": "Y necesito vuestra ayuda para abrir puertas que ahora mismo están cerradas, las de quien decide en hospitales, laboratorios y fundaciones, para llevarlo a cabo."
+          "texto": "Y necesito ayuda para abrir puertas que ahora mismo están cerradas, las de quien decide en hospitales, laboratorios y fundaciones, para llevarlo a cabo."
         }
       ]
     },
@@ -491,19 +631,41 @@
       "escena": {
         "tipo": "cierre",
         "titular": "No pido garantías, pido oportunidades.",
+        "sub": "Y la que más importa es ganar tiempo, para mí y para otros pacientes.",
+        "en_sub": "importa",
         "url": "helptitular.com/colabora",
         "pie": "{{TITULAR}} {{APELLIDO}} · ingeniera de software",
-        "credito": "Todo este vídeo lo ha creado Polaris, también la voz: un clon de la mía hecho con IA.",
-        "video": "narrado/flow/cierre.mp4"
+        "credito": "Este vídeo lo ha montado Polaris, también la voz: un clon de la mía hecho con IA.",
+        "video": "narrado/flow/cierre.mp4",
+        "foto": "orellana/retrato-vertical.jpg",
+        "foco": "50% 12%"
       },
       "frases": [
         {
           "texto": "No pido garantías, pido oportunidades."
         },
         {
+          "texto": "Y la que más importa es ganar tiempo, para mí y para otros pacientes."
+        },
+        {
           "texto": "Gracias."
         }
       ]
     }
-  ]
+  ],
+  "exigir": [
+    "beyond the protocol",
+    "ingeniera de software",
+    "dana.farber",
+    "llevaba desde",
+    "con mis médicos",
+    "al alcance de cualquier paciente",
+    "esta pondrá las herramientas",
+    "qué pruebas existen"
+  ],
+  "_toma": "v9 (4-oct-2026): de diez tomas enteras de Eleven v4 ninguna salió limpia (seis decían «Billón de Protocol», cinco «cáncer de mamá», una «ingeniería»); la buena fue la «l» = toma «j» con el capítulo «construir» de la «b». v10 (6-oct-2026): cambia la frase de la asociación. De cuatro tomas enteras nuevas, tres decían «Billon de Protocol»; la «c» lo dice bien y clava el capítulo. La «n» es la «l» de la v9 (en el build v10 entra como «e») con los capítulos «peticion» y «cierre» de la «c», cortados en el silencio entre capítulos: mezcla_tomas.py <guion> <build v10> n e peticion=c cierre=c. Así solo hay una costura (ilusión → petición: +0,5 semitonos, −1 % de ritmo, medido con continuidad.py); con solo «peticion» había dos y el paso al cierre saltaba 2,4 semitonos en vez de 2,0. · 6-oct, «IA» en español ({{TITULAR}}: «en la voz dice IA en inglés»): la toma «j» de la v9 lo decía en inglés en «investigar» y en «antes»; Whisper escribe «IA» igual, así que no lo delataba (se mide con ia_es.py). La «p» es la «e» con «investigar» y «antes» de la toma «b» de la v9 (en el build v10, «f») y «peticion» y «cierre» de la «c»: mezcla_tomas.py <guion> <build v10> p e investigar=f antes=f peticion=c cierre=c.",
+  "_nota_v10": "v10 (5-oct-2026): mismas frases y misma voz que la A7.1; cambian las escenas. Los planos son los que {{TITULAR}} eligió uno a uno viéndolos («vamos a elegir los clips primero y luego ponemos bien los vídeos») y van limpios, a corte, dentro de una ventana (escena «clips»). Palabras grandes solo en «esperar, o construir», «Polaris no decide. Deciden mis médicos», «no se puede quedar en teoría» y el cierre; «Entender mi enfermedad» y «Mejores preguntas» conservan su rótulo grande porque lo pidió ella el 4-oct. Lista de finalistas y quién decidió cada uno: _data/…/produccion/dji-hoy/para-elegir/finalistas/finalistas.json. · v10c (6-oct): cambia UNA frase de voz, la de la asociación ({{TITULAR}}: «decídelo»; redacción del comité de voz y marketing sobre su idea «somos de tecnología al alcance de pacientes»). El resto de la voz es la toma «l» de la v9: entra en el build v10 como toma «e» y solo se sustituye el capítulo «peticion» (mezcla_tomas.py).",
+  "tomas": {
+    "entera": "p"
+  }
 }

@@ -156,5 +156,60 @@ class LaExcepcionDelPanelDatos(unittest.TestCase):
         self.assertIn("estructura", {c for c, _ in W.revisar_caso(self._caso(sello="seguro"))})
 
 
+class CifrasDeDianasCotejadas(unittest.TestCase):
+    """17-oct-2026, decisión de {{TITULAR}}: las cifras de dianas se publican, pero cotejadas. Ese día
+    la nota interna decía «NY-BR-1 58 %» y la web había publicado ≈50 de cada 100: si el carril
+    automático deja pasar una cifra tecleada, publica la equivocada. Cierra la deuda
+    `web-lint-no-caza-diana-con-porcentaje` (antes el lint ni la veía)."""
+
+    SELLADAS = {"NYBR1": [(50.0, True)], "5T4": [(25.0, False)], "PRAME": [(0.0, False)]}
+    RESULTADOS = {"bloques": {
+        "R3": {"sello": "verificado", "ok_titular": True, "datos": {"muestras": {"higado": {"dianas": [
+            {"gen": "NY-BR-1", "por_100": 50, "aprox": True}, {"gen": "5T4", "por_100": 25}]}}}},
+        "R9": {"sello": "inferido", "ok_titular": True, "datos": {"gen": "HER3", "por_100": 32}},
+        "R8": {"sello": "verificado", "ok_titular": False, "datos": {"gen": "TROP2", "por_100": 70}},
+    }}
+
+    def clases(self, t):
+        return [c for c, _ in W.revisar_cifras_diana(t, cifras=self.SELLADAS)]
+
+    def test_el_caso_real_58_contra_50_aprox_no_sale(self):
+        self.assertEqual(self.clases("NY-BR-1 aparece en el 58% de las células tumorales."),
+                         ["cifra-diana"])
+
+    def test_la_cifra_sellada_si_sale(self):
+        self.assertEqual(self.clases("NY-BR-1 aparece en unas 50 de cada 100 células tumorales."), [])
+        self.assertEqual(self.clases("5T4 está en el 25% de las células del hígado."), [])
+
+    def test_aproximada_no_se_da_como_exacta(self):
+        self.assertEqual(self.clases("NY-BR-1 aparece en 50 de cada 100 células tumorales."),
+                         ["cifra-diana"])
+
+    def test_diana_sin_cifra_sellada_no_sale(self):
+        self.assertEqual(self.clases("HER3 aparece en el 32% de las células del hígado."),
+                         ["cifra-diana"])
+
+    def test_sin_fuente_legible_ninguna_cifra_sale_sola(self):
+        self.assertEqual([c for c, _ in W.revisar_cifras_diana(
+            "5T4 está en el 25% de las células.", cifras=None, repo="/no/existe")], ["cifra-diana"])
+
+    def test_no_bloquea_porcentajes_que_no_son_de_dianas(self):
+        for t in ("Hoy el 80% de la gente ha leído la página nueva.",
+                  "Seguimos con el ensayo TB06, que va por el 30% del camino.",
+                  "NY-BR-1 es una de las dianas. El 90% de las visitas llega desde X."):
+            with self.subTest(t=t):
+                self.assertEqual(self.clases(t), [])
+
+    def test_solo_cuentan_bloques_verificados_y_aprobados(self):
+        c = W.cifras_de_resultados(self.RESULTADOS)
+        self.assertEqual(c.get("NYBR1"), [(50.0, True)])
+        self.assertNotIn("HER3", c)     # sello inferido
+        self.assertNotIn("TROP2", c)    # sin su OK
+
+    def test_revisar_lo_incluye(self):
+        self.assertIn("cifra-diana", {c for c, _ in W.revisar(
+            "NY-BR-1 aparece en el 58% de las células tumorales.", cifras=self.SELLADAS)})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,0 +1,11 @@
+{
+ "pieza": "web_al_dia.py",
+ "estado_ficha": "completa",
+ "para": "Detector determinista, sin IA, de los HECHOS que merecen cambiar o añadir algo en helptitular.com: estados de /ciencia que el Tablero contradice (en las dos direcciones), /datos atrasado, e informes o páginas nuevas sin entrada en la cronología. Deduplica por identidad del hecho y lo apunta una sola vez.",
+ "cuando_si": "Lo llama web_guardian.py al final de su pasada diaria. A mano, para ver qué propondría hoy: python3 tools/web_al_dia.py estado.",
+ "cuando_no": "Para redactar, abrir PRs o escribirle a {{TITULAR}}: eso es del redactor (siguiente pieza del plan) y de web_lote.pedir_ok. Tampoco lee correo, redes ni DMs.",
+ "reemplaza": "Darse cuenta a mano de que la web se había quedado atrás (single-cell, 17-oct-2026, PRs #280 y #281).",
+ "test": "tests/test_web_al_dia.py",
+ "alta": "2026-10-17",
+ "origen": "Plan «web al día» (docs/plan-web-al-dia.md §3-§5), aprobado por {{TITULAR}} el 17-oct-2026. Va aparte de web_guardian.py porque el guardián da hallazgos sobre la salud de la web; esto da hechos con identidad y ciclo de vida (encolado → propuesto → publicado) que consume el redactor."
+}

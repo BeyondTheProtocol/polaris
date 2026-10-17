@@ -1,0 +1,270 @@
+{
+  "_doc": "Lo que helptitular.com afirma y puede caducar. Lo lee y lo comprueba tools/web_mapa.py; plan docs/plan-web-al-dia.md §2. `valor` es lo PUBLICADO hoy: si la web cambia a mano, se cambia aquí (lo exige el test). `fuente` ata cada afirmación a lo interno; null = aún sin atar. `transiciones` vacío = nada se propone solo hasta que voz-titular y diseno aprueben las frases (ES y EN escritas aparte).",
+  "sembrado": "2026-10-17 desde origin/main",
+  "a_mano": {
+    "_doc": "Fuera del automático siempre (plan §7.7): deciden por dónde entra y navega la gente, o son identidad.",
+    "rutas": [
+      "hero/H1 (i18n home.hero.*)",
+      "navegación (app/utils/navegacion.ts)",
+      "quién soy",
+      "página de la vacuna",
+      "content/*/team.yml",
+      "content/*/press.yml",
+      "citas de personas o instituciones"
+    ]
+  },
+  "afirmaciones": [
+    {
+      "id": "ciencia-germinal",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Referencia germinal (tumor-normal)",
+        "en": "Germline reference (tumour-normal)"
+      },
+      "valor": {
+        "es": "Pendiente: aún no enviada",
+        "en": "Pending: not yet shipped"
+      },
+      "tono": "pendiente",
+      "fuente": {
+        "tipo": "tablero",
+        "hilo": "si-eso-está-en-proceso-esta-semana-queda"
+      },
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-panel-tejido",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Perfil genómico de tejido (panel)",
+        "en": "Tissue genomic profile (panel)"
+      },
+      "valor": {
+        "es": "Hecho (julio 2026)",
+        "en": "Done (July 2026)"
+      },
+      "tono": "hecho",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-wes",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Exoma (WES)",
+        "en": "Exome (WES)"
+      },
+      "valor": {
+        "es": "Material en el laboratorio",
+        "en": "Material at the lab"
+      },
+      "tono": "curso",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-scrna-flex",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Single-cell RNA-seq (10x Genomics Flex)",
+        "en": "Single-cell RNA-seq (10x Genomics Flex)"
+      },
+      "valor": {
+        "es": "Primeros resultados (octubre 2026)",
+        "en": "First results (October 2026)"
+      },
+      "tono": "curso",
+      "fuente": {
+        "tipo": "tablero",
+        "hilo": "revisar-correo-de-carlos-rubio-castillo-",
+        "nota": "el 17-oct el hilo seguía «esperando resultados» con los resultados ya publicados: el Tablero solo no basta, hace falta evidencia"
+      },
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-ihq-extendida",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "IHQ extendida",
+        "en": "Extended IHC"
+      },
+      "valor": {
+        "es": "Parcial",
+        "en": "Partial"
+      },
+      "tono": "curso",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-hla-alta-resolucion",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Tipado HLA de alta resolución",
+        "en": "High-resolution HLA typing"
+      },
+      "valor": {
+        "es": "Pendiente",
+        "en": "Pending"
+      },
+      "tono": "pendiente",
+      "fuente": {
+        "tipo": "tablero",
+        "hilo": "si-eso-está-en-proceso-esta-semana-queda"
+      },
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-epigenetica",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Epigenética",
+        "en": "Epigenetics"
+      },
+      "valor": {
+        "es": "Planteado, según material",
+        "en": "Proposed, material permitting"
+      },
+      "tono": "pendiente",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-biopsia-liquida",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Biopsia líquida (ctDNA)",
+        "en": "Liquid biopsy (ctDNA)"
+      },
+      "valor": {
+        "es": "Hecho (3 extracciones, 4 informes, abr–may 2026)",
+        "en": "Done (3 draws, 4 reports, Apr–May 2026)"
+      },
+      "tono": "hecho",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-inmunopeptidomica",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Inmunopeptidómica (HLA-peptidoma)",
+        "en": "Immunopeptidomics (HLA peptidome)"
+      },
+      "valor": {
+        "es": "No posible hoy",
+        "en": "Not possible today"
+      },
+      "tono": "no",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-fosfoproteomica",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Fosfoproteómica",
+        "en": "Phosphoproteomics"
+      },
+      "valor": {
+        "es": "No posible hoy",
+        "en": "Not possible today"
+      },
+      "tono": "no",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    },
+    {
+      "id": "ciencia-organoides",
+      "pagina": "ciencia",
+      "fichero": "content/{idioma}/science.yml",
+      "campo": "status",
+      "componente": {
+        "es": "Organoides + cribado de fármacos",
+        "en": "Organoids + drug screening"
+      },
+      "valor": {
+        "es": "No posible hoy",
+        "en": "Not possible today"
+      },
+      "tono": "no",
+      "fuente": null,
+      "evidencia_exigida": [
+        "hecho_cuando",
+        "nota_archivada",
+        "informe"
+      ],
+      "transiciones": {}
+    }
+  ]
+}

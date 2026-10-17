@@ -211,6 +211,158 @@ def voz_por_capitulos(g, build):
         json.dump(por_frase, fh, ensure_ascii=False, indent=1)
 
 
+def voz_entera(g, build):
+    """TODA la narración en UNA toma también con Eleven v4 ({{TITULAR}}, 4-oct-2026: «que toda la voz tenga continuidad en todo
+    el tiempo que se habla»). Por capítulos eran once tomas pegadas, cada una con su energía. Sin <break>: cada capítulo
+    va en su párrafo y la pausa la pone el modelo; aquí solo se ALARGA (o se acorta en el silencio) la pausa entre
+    capítulos, nunca se corta ni se pega voz. Se piden n tomas enteras; gana la que dice el texto exacto en todos los
+    capítulos y no dice nada de «evitar» (grafías que delatan una palabra mal acentuada, p. ej. «neuroendócrina»); entre
+    esas, la más viva. Los tiempos de cada palabra los da Whisper sobre la toma. Deja lo mismo que voz_por_capitulos."""
+    import difflib, hashlib, re, elevenlabs_voz, palabras, whisper
+    import guion as guion_mod
+    n1 = lambda s: guion_mod.norm(s).replace("-", "")
+    caps = [{"id": c["id"], "frases": c["frases"], "pausa": c.get("pausa_despues", g.get("pausa_entre_capitulos", 0.9)),
+             "decir": " ".join(f.get("decir") or f["texto"] for f in c["frases"]),
+             "pal": [w for f in c["frases"] for w in (f.get("pantalla") or f["texto"]).split()]} for c in g["capitulos"]]
+    texto = "\n\n".join(c["decir"] for c in caps)
+    aj, lc, n = g.get("ajustes", {}), g.get("language_code"), g.get("n_tomas", 1)
+    base = g["voice_id"] + g["model"] + g.get("prefijo", "") + texto + json.dumps(aj, sort_keys=True) + (lc or "")
+    vd = os.path.join(build, "voz"); os.makedirs(vd, exist_ok=True)
+    w, filas = whisper.load_model("small"), []
+    elegida = g.get("tomas", {}).get("entera")  # ya elegida (a mano, o una mezcla de mezcla_tomas.py): solo se escucha esa
+    for x in ([elegida] if elegida else "abcdefghijkl"[:n]):
+        mp3 = os.path.join(vd, f"entera-{x}.mp3"); marca = mp3 + ".sha1"
+        firma = hashlib.sha1((base + x).encode()).hexdigest()
+        if not (os.path.exists(mp3) and os.path.exists(marca) and open(marca).read() == firma):
+            elevenlabs_voz.speak(g.get("prefijo", "") + texto, g["voice_id"], g["model"], mp3, stability=aj.get("stability", 0.5),
+                                 similarity=aj.get("similarity", 0.85), style=aj.get("style", 0.0), language_code=lc)
+            open(marca, "w").write(firma)
+        r = w.transcribe(mp3, language=g["idioma"], word_timestamps=True, fp16=False)
+        oidas = [p for s in r["segments"] for p in s.get("words", [])]
+        # alineación GLOBAL guion↔oído (difflib), para saber qué trozo de lo oído es cada capítulo aunque Whisper junte o parta palabras
+        todas = [(k, p) for k, c in enumerate(caps) for p in c["pal"]]
+        bloques = difflib.SequenceMatcher(None, [n1(p) for _, p in todas], [n1(o["word"]) for o in oidas], autojunk=False).get_matching_blocks()
+        par = {a + d: b + d for a, b, tam in bloques for d in range(tam)}  # índice de palabra del guion → índice de palabra oída
+        tramo, i0 = [], 0
+        for k, c in enumerate(caps):
+            mias = [par[i] for i in range(i0, i0 + len(c["pal"])) if i in par]; i0 += len(c["pal"])
+            tramo.append((min(mias), max(mias)) if mias else None)
+        if any(t is None for t in tramo):
+            filas.append({"toma": x, "ok": False, "motivo": "un capítulo entero no se oye"}); continue
+        # la frontera entre dos capítulos es la pausa MÁS LARGA entre la última palabra segura de uno y la primera del
+        # siguiente: si Whisper no casa justo la primera palabra de un capítulo, el corte no cae en mitad de una frase
+        lim = [0]
+        for k in range(len(caps) - 1):
+            cand = range(tramo[k][1], max(tramo[k][1] + 1, tramo[k + 1][0]))
+            lim.append(1 + max(cand, key=lambda j: oidas[j + 1]["start"] - oidas[j]["end"] if j + 1 < len(oidas) else -1))
+        lim.append(len(oidas))
+        por_cap, peor = [], 1.0
+        for k, c in enumerate(caps):
+            mias = oidas[lim[k]:lim[k + 1]]
+            oido = "".join(o["word"] for o in mias).strip()
+            ratio = difflib.SequenceMatcher(None, guion_mod.norm(c["decir"]), guion_mod.norm(oido), autojunk=False).ratio()
+            peor = min(peor, ratio)
+            por_cap.append({"id": c["id"], "a": mias[0]["start"], "b": mias[-1]["end"], "texto": round(ratio, 3), "oido": oido, "oidas": mias})
+        malas = [m for m in g.get("evitar", []) if m.lower() in r["text"].lower()] + \
+                ["falta «" + m + "»" for m in g.get("exigir", []) if not re.search(m, r["text"], re.I)]
+        filas.append({"toma": x, "ok": True, "mp3": mp3, "d": round(voz.dur(mp3), 2), "viva": round(voz.variacion_tono(mp3), 2),
+                      "peor": round(peor, 3), "media": round(sum(c["texto"] for c in por_cap) / len(por_cap), 4), "evitar": malas, "caps": por_cap})
+        print(f"  toma {x}: {voz.dur(mp3):.1f} s · texto peor={peor:.3f} media={filas[-1]['media']:.4f} · viva={filas[-1]['viva']:.2f}" + (f" · DICE {malas}" if malas else ""))
+    with open(os.path.join(build, "revision_toma_elegida.json" if elegida else "revision_tomas.json"), "w", encoding="utf-8") as fh:
+        json.dump([{k: v for k, v in f.items() if k != "caps"} | {"caps": [{a: b for a, b in c.items() if a != "oidas"} for c in f.get("caps", [])]}
+                   for f in filas], fh, ensure_ascii=False, indent=1)
+    buenas = [f for f in filas if f["ok"]]
+    if not buenas:
+        sys.exit("ninguna toma entera vale")
+    T = next(f for f in buenas if f["toma"] == elegida) if elegida else \
+        max(buenas, key=lambda f: (-len(f["evitar"]), round(f["peor"], 2), round(f["media"], 3), f["viva"]))
+    print(f"  → toma {T['toma']}" + (" (elegida a mano)" if elegida else ""))
+    # Las pausas: lo que dio el modelo, tocado solo DENTRO del silencio. Entre capítulos se estira (o se recoge) hasta la
+    # pausa pedida; entre frases solo se estira hasta pausa_entre_frases cuando el modelo las dejó más juntas (la toma
+    # entera corre un 9 % más que las tomas por capítulo de la v8, y a ella la voz acelerada le suena rara). La voz no se toca.
+    import bisect
+    import numpy as np
+    ent, cs, pf = g["entrada"], T["caps"], g.get("pausa_entre_frases", 0.35)
+    x = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", T["mp3"], "-ac", "1", "-ar", "16000", "-f", "s16le", "-"],
+                                     capture_output=True, check=True).stdout, np.int16) / 32768
+    rms = np.sqrt(np.convolve(x ** 2, np.ones(320) / 320, "same")[::160])  # una medida cada 10 ms
+    umbral = 0.1 * np.percentile(rms, 90)
+
+    def silencio(a, b):
+        """(inicio, fin) del silencio más largo entre el final de una frase y el final de la PRIMERA palabra de la
+        siguiente: Whisper a veces mete la pausa dentro de esa palabra y, buscando solo junto al final de la anterior,
+        el silencio se medía corto y se estiraba de más."""
+        i0, i1 = max(0, int((a - 0.15) * 100)), min(len(rms), int(b * 100))
+        mejor, desde = None, None
+        for i in range(i0, i1 + 1):
+            callado = i < i1 and rms[i] < umbral
+            if callado and desde is None:
+                desde = i
+            if not callado and desde is not None:
+                if mejor is None or i - desde > mejor[1] - mejor[0]:
+                    mejor = (desde, i)
+                desde = None
+        return (mejor[0] / 100, mejor[1] / 100) if mejor else None
+    frases = []  # en orden, con el tiempo de cada palabra DENTRO de la toma
+    for k, c in enumerate(caps):
+        a0, b0 = cs[k]["a"], cs[k]["b"]
+        rel = [{"word": o["word"], "start": o["start"] - a0, "end": o["end"] - a0} for o in cs[k]["oidas"]]
+        ws, j = palabras.alinea([p.replace("N-E-D", "NED") for p in c["pal"]], rel, b0 - a0), 0
+        for i, f in enumerate(c["frases"]):
+            m = len((f.get("pantalla") or f["texto"]).split())
+            frases.append({"id": f"{c['id']}-{i}", "cap": k, "texto": f["texto"], "pal": [{"w": p["w"], "a": a0 + p["a"], "b": a0 + p["b"]} for p in ws[j:j + m]]})
+            j += m
+    acum = ent - frases[0]["pal"][0]["a"]
+    cortes, desp, pausas, de_cap = [0.0], [acum], [], [0]
+    for f, sig in zip(frases, frases[1:]):
+        fin_f, ini_s = f["pal"][-1]["b"], sig["pal"][0]["a"]
+        hueco = silencio(fin_f, max(ini_s, sig["pal"][0]["b"] - 0.08))
+        if hueco:  # los bordes de las dos palabras, al silencio de verdad
+            f["pal"][-1]["b"] = max(f["pal"][-1]["a"] + 0.05, min(fin_f, hueco[0] + 0.03))
+            sig["pal"][0]["a"] = min(sig["pal"][0]["b"] - 0.05, max(ini_s, hueco[1] - 0.03))
+        centro, largo = ((hueco[0] + hueco[1]) / 2, hueco[1] - hueco[0]) if hueco else (None, 0.0)
+        if f["cap"] != sig["cap"]:
+            if centro is None:
+                centro, largo = (fin_f + ini_s) / 2, max(0.0, ini_s - fin_f)
+            final = caps[f["cap"]]["pausa"]
+        elif centro is not None and 0.12 <= largo < pf:
+            final = pf
+        else:
+            pausas.append({"tras": f["id"], "natural": round(largo, 2), "final": round(largo, 2)}); continue
+        acum += final - largo
+        cortes.append(centro); desp.append(acum); de_cap.append(sig["cap"])
+        pausas.append({"tras": f["id"], "natural": round(largo, 2), "final": round(final, 2), "capitulo": f["cap"] != sig["cap"]})
+    cortes.append(voz.dur(T["mp3"]))
+    sale = lambda t: t + desp[max(0, bisect.bisect_right(cortes, t) - 1)]  # del tiempo de la toma al tiempo del vídeo
+    total = round(sale(frases[-1]["pal"][-1]["b"]) + g["salida"], 3)
+    gan = voz.VOZ_LUFS - voz.lufs(T["mp3"])  # una sola toma: una ganancia para toda ella…
+    # …y un retoque por capítulo, de ±3 dB como mucho y aplicado en el silencio: la toma entera arranca más alta y va
+    # bajando (4,5 dB entre el saludo y el final, medido el 4-oct), y eso se oye como un salto. La dinámica de cada frase no cambia.
+    db = [20 * np.log10(np.sqrt(np.mean(np.concatenate([x[int(f["pal"][0]["a"] * 16000):int(f["pal"][-1]["b"] * 16000)] for f in frases if f["cap"] == k]) ** 2)) + 1e-9)
+          for k in range(len(caps))]
+    retoque = [float(np.clip(np.median(db) - d, -3, 3)) for d in db]
+    n_seg = len(desp)
+    filtros = ";".join(f"[0:a]atrim={cortes[k]:.3f}:{cortes[k + 1]:.3f},asetpts=PTS-STARTPTS,afade=t=in:d=0.015,"
+                       f"afade=t=out:st={max(0, cortes[k + 1] - cortes[k] - 0.015):.3f}:d=0.015,"
+                       f"aresample={voz.SR},aformat=channel_layouts=stereo,volume={gan + retoque[de_cap[k]]:.2f}dB,adelay={int((cortes[k] + desp[k]) * 1000)}|{int((cortes[k] + desp[k]) * 1000)}[a{k}]"
+                       for k in range(n_seg))
+    mezcla = "".join(f"[a{k}]" for k in range(n_seg)) + f"amix=inputs={n_seg}:normalize=0,apad=whole_dur={total}[v]"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", T["mp3"], "-filter_complex", filtros + ";" + mezcla, "-map", "[v]",
+                    "-ar", str(voz.SR), "-t", str(total), os.path.join(build, "voz.wav")], check=True)
+    tramos, por_frase = [], {}
+    for f in frases:
+        a, b = sale(f["pal"][0]["a"]), sale(f["pal"][-1]["b"])
+        tramos.append({"id": f["id"], "escena": caps[f["cap"]]["id"], "texto": f["texto"], "t0": round(a, 3), "t1": round(b, 3)})
+        por_frase[f["id"]] = [{"w": p["w"], "a": round(sale(p["a"]) - a, 3), "b": round(sale(p["b"]) - a, 3)} for p in f["pal"]]
+    os.makedirs(os.path.join(build, "assets"), exist_ok=True)
+    with open(os.path.join(build, "assets", "tiempos.js"), "w", encoding="utf-8") as fh:
+        fh.write("window.TIEMPOS = " + json.dumps({"total": total, "tramos": tramos}, ensure_ascii=False) + ";\n")
+    with open(os.path.join(build, "palabras.json"), "w", encoding="utf-8") as fh:
+        json.dump(por_frase, fh, ensure_ascii=False, indent=1)
+    with open(os.path.join(build, "cortes.json"), "w", encoding="utf-8") as fh:  # para continuidad.py: dónde se tocó el silencio y cuánto
+        json.dump({"toma": T["toma"], "pausas": pausas, "retoque_db": {c["id"]: round(r, 2) for c, r in zip(caps, retoque)}}, fh, ensure_ascii=False, indent=1)
+    print(f"  pausas tocadas: {sum(p['final'] != p['natural'] for p in pausas)} de {len(pausas)} (solo en silencio)")
+
 def palabras_en_que_faltan(g):
     """Cada elemento de escena que entra «cuando la voz dice su palabra» (campo `en`) tiene que tener esa palabra en
     su capítulo. Si no, Pitch/Narrado lo hacen entrar al principio del capítulo, fuera de orden: el 16-oct-2026 la
@@ -243,7 +395,9 @@ def main(guion, build):
     ruta_plano = os.path.join(build, "guion_plano.json")
     json.dump(plano, open(ruta_plano, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     modo = g.get("toma_unica", True)
-    if modo == "capitulo":  # una toma por capítulo (Eleven v4, que no admite <break>)
+    if modo == "entera":  # una sola toma de toda la narración, también con Eleven v4
+        voz_entera(g, build)
+    elif modo == "capitulo":  # una toma por capítulo (Eleven v4, que no admite <break>)
         voz_por_capitulos(g, build)
     elif modo:
         voz_unica(g, plano, build)
@@ -273,6 +427,7 @@ def main(guion, build):
         T["aviso"] = g["aviso"] | {"entrada": g["entrada"]}
     os.makedirs(PUBLICO, exist_ok=True)
     json.dump(T, open(os.path.join(PUBLICO, "timeline.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    shutil.copyfile(os.path.join(PUBLICO, "timeline.json"), os.path.join(build, "timeline.json"))  # public/ no está en git: la copia que dura va con las tomas
     acabado = g.get("acabado_voz")  # EQ/compresión en local sobre las MISMAS tomas (no se vuelve a pedir nada a ElevenLabs)
     if acabado:
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(build, "voz.wav"), "-af", acabado,

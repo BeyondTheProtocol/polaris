@@ -1,0 +1,11 @@
+{
+ "pieza": "web_mapa.py",
+ "estado_ficha": "completa",
+ "para": "Mapa de lo que helptitular.com afirma y puede caducar (hoy los estados de las pruebas en /ciencia). Ata cada afirmación a su fuente interna y comprueba cobertura y deriva contra la web publicada.",
+ "cuando_si": "Para saber qué afirmaciones públicas vigila el sistema y de qué fuente cuelga cada una; antes de que el detector del guardián proponga un cambio de estado; al añadir una prueba nueva a /ciencia (el test exige su fila).",
+ "cuando_no": "Para publicar o redactar: no escribe en la web. Tampoco detecta todavía que una fuente cambió: eso es del detector del guardián (siguiente pieza del plan web al día).",
+ "reemplaza": "Corregir a mano los estados de /ciencia cuando alguien nota que caducaron (PR #281, 17-oct-2026).",
+ "test": "tests/test_web_mapa.py",
+ "alta": "2026-10-17",
+ "origen": "Plan «web al día» (docs/plan-web-al-dia.md §2), aprobado por {{TITULAR}} el 17-oct-2026. Va aparte de web_guardian.py porque el mapa es un dato versionado que leen el detector y los tests, no una señal."
+}
