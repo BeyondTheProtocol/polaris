@@ -316,9 +316,74 @@ class TestVozV4(unittest.TestCase):
         # ninguna cifra cuenta en pantalla: un fotograma con «6×» camino del 7× es un dato falso (15-oct-2026)
         self.assertNotRegex(tsx, r"Math\.round\([^)]*\*\s*(cuenta|progreso|x)\b", "contador sobre una cifra")
         self.assertIn("mascara(", tsx, "las cifras se descubren con máscara, sin valores intermedios")
-        # nunca el mismo texto dos veces: sin subtítulos donde lo dicho ya está escrito en grande
-        for tipo in ("portada", "cierre", "golpes", "cita", "lista"):
-            self.assertRegex(tsx, rf"\[[^\]]*'{tipo}'[^\]]*\]\.includes\(c\.escena\.tipo\)\) continue")
+        # subtítulos SIEMPRE, también donde lo dicho ya está escrito en grande ({{TITULAR}}, 14-oct-2026; el Pitch los
+        # filtraba todavía el 16-oct y ella vio que «salen a veces y otras no»)
+        self.assertNotRegex(tsx, r"\.includes\(c\.escena\.tipo\)\) continue", "el Pitch no puede saltarse subtítulos por tipo de escena")
+        # una sola escala tipográfica: ningún tamaño suelto en px
+        self.assertIn("const TIPO = {", tsx)
+        self.assertNotRegex(tsx, r"fontSize: \d", "tamaño de letra fuera de la escala TIPO")
+
+    def test_comparar_tomas_sin_autojunk(self):
+        # difflib con autojunk (por defecto) hunde la nota en textos de >200 caracteres: la toma correcta del
+        # capítulo «cuna» puntuaba 0,326 y sin autojunk 0,997, así que «texto exacto primero» no elegía nada (16-oct-2026)
+        import difflib
+        a = " ".join(["the answer is already sitting in archived trial samples tmb counts mutations"] * 5)
+        b = a.replace("samples", "sample", 1)
+        self.assertLess(difflib.SequenceMatcher(None, a, b).ratio(), 0.9, "si esto falla, difflib cambió y el test sobra")
+        for f in ("narrado.py", "revisa_tomas.py"):
+            src = leer(f)
+            for llamada in re.findall(r"SequenceMatcher\([^\n]*\)", src):
+                self.assertIn("autojunk=False", llamada, f"{f}: {llamada}")
+
+    def test_elemento_sin_su_palabra_no_pasa(self):
+        # 16-oct-2026: la cifra «3 tumor types» entraba con «three», la frase cambió y salió sola al principio
+        sys.path.insert(0, DIR)
+        import narrado
+        g = {"capitulos": [{"id": "prueba", "frases": [{"texto": "We run five programs across glioblastoma."}],
+                            "escena": {"cifras": [{"n": "5", "en": "five"}, {"n": "3", "en": "three"}]}}]}
+        self.assertEqual(narrado.palabras_en_que_faltan(g), ["prueba.cifras: «three» no se dice en el capítulo"])
+        g["capitulos"][0]["escena"]["cifras"][1]["en"] = "glioblastoma"
+        self.assertEqual(narrado.palabras_en_que_faltan(g), [])
+
+    def test_cama_musical_no_repite_el_tema_por_pocos_segundos(self):
+        # 16-oct-2026: el tema de 131 s se encadenaba consigo mismo para un vídeo de 136 s y la melodía
+        # volvía a empezar en la tarjeta final. Con poco margen se alarga con silencio.
+        src = leer("narrado.py")
+        self.assertRegex(src, r"n = 1 if total <= d \+ \d+ else")
+        self.assertIn("apad=whole_dur={total}", src)
+
+    def test_pitch_relevo_subtitulos_y_nodo_destacado(self):
+        # tres fallos vistos fotograma a fotograma en la v9 de ClinicOmics (16-oct-2026)
+        tsx = leer("remotion/src/Pitch.tsx")
+        # 1) relevo: el saliente acaba ANTES de fin (sin titulares solapados) y el kicker entrante no espera (sin pantalla vacía)
+        m = re.search(r"lin\(t, fin\(i\) - ([\d.]+), fin\(i\) ([+-]) ([\d.]+)\)", tsx)
+        self.assertTrue(m, "la salida del capítulo se calcula contra fin(i)")
+        self.assertEqual(m.group(2), "-", "si la salida acaba después de fin, dos titulares se leen a la vez")
+        cab = tsx[tsx.index("const Cabecera"):tsx.index("const Titular")]
+        k = re.search(r"\.\.\.entra\(t, a ([+-]) ([\d.]+)\)\}\}>", cab)
+        self.assertTrue(k and (k.group(1) == "-" or float(k.group(2)) <= 0.05), "la cabecera entrante no puede esperar: deja un hueco vacío")
+        lg = re.search(r"entra\(t, a ([+-]) ([\d.]+)\)\}><Img src=\{staticFile\('narrado/logo-clinicomics\.png'\)\}", tsx)
+        self.assertTrue(lg and (lg.group(1) == "-" or float(lg.group(2)) <= 0.05), "el logo del cierre tampoco puede esperar")
+        # 2) subtítulos a trozos de una línea: una frase larga en tres líneas tapaba el diagrama
+        n = re.search(r"u\.length >= (\d+)", tsx)
+        self.assertTrue(n and int(n.group(1)) <= 9, "el subtítulo va a trozos de ≤9 palabras")
+        # 3) lo que delataba plantilla de IA no vuelve ({{TITULAR}}, 16-oct-2026: «no quiero el típico diseño que se sabe que lo ha hecho IA»):
+        #    ni halo azul en el fondo, ni tarjetas iguales con borde en el diagrama; sí el hilo de cromatina propio de la marca
+        fondo = tsx[tsx.index("const Fondo"):tsx.index("const NP")]
+        self.assertNotIn("radial-gradient", fondo, "el halo azul de fondo era el rasgo más reconocible de diseño generado")
+        diag = tsx[tsx.index("const EDiagrama"):tsx.index("const ECita")]
+        self.assertNotIn("border: `3px solid", diag, "el diagrama va en nodos sobre el hilo, sin cajas iguales")
+        self.assertIn("<Hilo />", tsx, "el hilo de cromatina recorre el vídeo")
+        # planos reales de stock: en blanco y negro con velo de marca; fuente y licencia en el guion (`_broll`) (16-oct-2026)
+        self.assertIn("grayscale(1)", tsx[tsx.index("const PlanoReal"):])
+        # ningún relleno grande del azul eléctrico del logo (#1622F7 / C.azul): a {{TITULAR}} le chirría (16-oct-2026, dos veces:
+        # el nodo final de la v11 y el bloque del 7× de la v16). Como texto pequeño o borde fino, sí
+        self.assertNotRegex(tsx, r"background: C\.azul\b", "relleno de C.azul: chirría")
+        self.assertNotIn("background: '#1622F7'", tsx)
+        # el hilo no puede pasar por la franja de los subtítulos ({{TITULAR}}, 16-oct-2026: «los subtítulos tapan la línea»)
+        franja = int(re.search(r"const FRANJA_SUB = (\d+);", tsx).group(1))
+        for y0, amp in re.findall(r"onda\((\d+), (\d+),", tsx):
+            self.assertLess(int(y0) + int(amp) + 3, franja, f"onda a y={y0}±{amp} cruza los subtítulos")
 
 
 if __name__ == "__main__":
