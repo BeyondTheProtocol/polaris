@@ -39,6 +39,13 @@ BROKER_PERMITIDAS = frozenset((
     "btp-gdrive-client-id", "btp-gdrive-client-secret", "btp-gdrive-refresh-token",
     "btp-umami-api", "btp-gcal-sa-key", "btp-hf-token", "btp-synapse-token",
     "btp-youtube-api", "btp-canario-llavero",
+    # Tramo B, opción 1 ({{TITULAR}}, 17-oct-26: «abre el tramo B, opción 1»): las claves de modelo
+    # cuyo gasto llega a cost_guard (Claude lo gatea en ia.py; las otras ocho lo apuntan vía
+    # gasto.registrar → avisa al pasar el tope, no corta antes), y ElevenLabs (cuota de su plan,
+    # sin contador nuestro). Telegram y el resto de APIs de pago siguen fuera.
+    "btp-anthropic-api", "btp-openai-api", "btp-gemini-api", "btp-grok-api", "btp-glm-api",
+    "btp-nan-api", "btp-nvidia-api", "btp-openrouter-api", "btp-perplexity-api",
+    "btp-elevenlabs-api",
 ))
 
 

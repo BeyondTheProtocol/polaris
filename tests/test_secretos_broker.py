@@ -78,9 +78,14 @@ check(not (SB.PERMITIDAS & _secrets.RESERVADOS), "PERMITIDAS no toca las RESERVA
 check(not (SB.PERMITIDAS & SB.NUNCA), "PERMITIDAS no toca NUNCA")
 check(_secrets.RESERVADOS <= SB.NUNCA, "las RESERVADAS están en NUNCA")
 for svc in ("btp-restic-password", "btp-latido-externo", "btp-claude-oauth-token",
-            "btp-x-mcp-client-secret", "btp-anthropic-api", "btp-telegram-token"):
+            "btp-x-mcp-client-secret", "btp-anthropic-api-prestada",
+            # tramo B que NO entró con la opción 1 (17-oct-26)
+            "btp-telegram-token", "btp-telegram-chatid", "btp-serpapi", "btp-scaleway-api",
+            "btp-fugu-api", "btp-typesafe-api", "btp-elicit-api"):
     check(SB.decidir(svc) == "denegado", "%s → denegado" % svc)
-for svc in ("btp-gmail-app-password-2", "btp-umami-api", "btp-gdrive-refresh-token"):
+for svc in ("btp-gmail-app-password-2", "btp-umami-api", "btp-gdrive-refresh-token",
+            # tramo B, opción 1
+            "btp-anthropic-api", "btp-grok-api", "btp-perplexity-api", "btp-elevenlabs-api"):
     check(SB.decidir(svc) is None, "%s → se sirve" % svc)
 with mock.patch.object(SB, "PERMITIDAS", SB.PERMITIDAS | {"btp-firmante-ed25519"}):
     check(SB.decidir("btp-firmante-ed25519") == "denegado", "aunque alguien la añada, NUNCA gana")

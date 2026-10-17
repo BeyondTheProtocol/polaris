@@ -49,7 +49,12 @@ python3 tools/deuda.py cerrar correo_imap_login:titular_mgp --test tests/test_se
 
 La lista es `_secrets.BROKER_PERMITIDAS`: una constante del código, no configuración. El cliente ni siquiera pregunta por las claves que no están en ella, así que no deja ruido en el log. Una clave nueva entra con un commit y el OK de {{TITULAR}}. Las de `NUNCA` no entran ni aunque se añadan: el test lo impide.
 
-El tramo B (APIs de pago y Telegram) está fuera hasta que ella decida.
+Del tramo B (APIs de pago y Telegram), {{TITULAR}} abrió la opción 1 el 17-oct-26:
+- **Entran:** las claves de modelo cuyo gasto llega a `cost_guard`: anthropic, openai, gemini, grok, glm, nan, nvidia, openrouter y perplexity. Además entra ElevenLabs.
+  - Claude se corta en `ia.py` antes de gastar.
+  - Las otras ocho apuntan el gasto después de cada llamada. Avisan al pasar el tope, pero no lo cortan.
+  - ElevenLabs gasta de la cuota de su plan, sin contador nuestro.
+- **Siguen fuera:** Telegram, anthropic-prestada, serpapi, scaleway, fugu, typesafe y elicit.
 
 ## Límites conocidos
 
