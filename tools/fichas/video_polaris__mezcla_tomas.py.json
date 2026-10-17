@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/mezcla_tomas.py",
+ "estado_ficha": "completa",
+ "para": "Compone una toma entera con una base y capítulos de otra toma entera, cortando en el silencio entre capítulos, con la firma que narrado.py da por buena.",
+ "cuando_si": "Cuando ninguna toma entera sale limpia (p. ej. EN v3 para Lexie: portada de la v2 aprobada).",
+ "cuando_no": "Para pegar tomas sueltas frase a frase (suena a trompicones).",
+ "reemplaza": "pedir tomas enteras hasta que salga una limpia",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-04, vídeo de Orellana v9",
+ "origen": "de diez tomas de Eleven v4 ninguna salió limpia"
+}

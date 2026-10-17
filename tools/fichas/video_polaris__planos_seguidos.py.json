@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/planos_seguidos.py",
+ "estado_ficha": "completa",
+ "para": "Planos a pulso de una pantalla en los que el recorte sigue a lo que importa fotograma a fotograma y desenfoca lo de fuera (datos de otros pacientes, número de paciente).",
+ "cuando_si": "Para planos de cámara de una pantalla con datos alrededor.",
+ "cuando_no": "Para grabaciones de la web (eso es grabar_herramienta.mjs).",
+ "reemplaza": "recortes fijos que dejaban ver datos al moverse la cámara",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-05, vídeo de Orellana v10",
+ "origen": "privacidad de los planos de la SBRT y del monitor"
+}

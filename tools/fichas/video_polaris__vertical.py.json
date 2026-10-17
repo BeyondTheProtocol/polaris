@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/vertical.py",
+ "estado_ficha": "completa",
+ "para": "Máster vertical 1080×1920 de un render 16:9, entero y con el aviso de voz clonada repetido abajo.",
+ "cuando_si": "Cuando un vídeo con su voz clonada se va a publicar en vertical.",
+ "cuando_no": "Para el móvil 16:9 comprimido de render.sh.",
+ "reemplaza": "pasar a vertical sin el aviso legal visible",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-03, vídeo de Orellana",
+ "origen": "condición 8 de legal (aviso de voz clonada, art. 50.4 RIA)"
+}

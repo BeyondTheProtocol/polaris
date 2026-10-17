@@ -1,0 +1,438 @@
+{
+  "_nota": "Vídeo EN v3 para Lexie Barnhorn (Anthropic), centrado en las herramientas que {{TITULAR}} ha construido con IA (17-oct-2026). Guion APROBADO: 00_FUENTE-DE-VERDAD/07 · Marca/video-en-v3-para-lexie-centrado-en-las-herramientas-2026-10-17.md (escenas 1-11 y 4b; «a team at {{CENTRO}}» se mantiene). No se cambia una frase sin su OK. Intro y cierre, los planos de la v2 (orellana-circulo.en.json); el resto, grabaciones reales de helptitular.com (planos/herramientas-lexie.json, grabar_herramienta.mjs). Fuera la mesa redonda y el pódcast; no se nombran ClinicOmics ni ChromaLogic. Voz: su clon en Eleven v4, una toma entera, acento americano como la v2. «decir»: la grafía para la voz (lección del 11-oct: «yelp titular»).",
+  "slug": "lexie-herramientas-en",
+  "idioma": "en",
+  "voice_id": "51aLNh96A9WJZODzYIyP",
+  "model": "eleven_v4",
+  "prefijo": "[General American accent] ",
+  "language_code": "en",
+  "ajustes": {
+    "stability": 0.45,
+    "similarity": 0.85,
+    "style": 0.2,
+    "tempo": 1.0
+  },
+  "toma_unica": "entera",
+  "enlazado": true,
+  "n_tomas": 3,
+  "evitar": [
+    "yelp"
+  ],
+  "exigir": [
+    "gonz[aá]lez",
+    "neuroendocrine",
+    "software engineer",
+    "claude'?s? science",
+    "dana.farber",
+    "ai for science",
+    "exome",
+    "personali[sz]ed vaccine",
+    "no evidence of disease",
+    "help ?titular"
+  ],
+  "pausa_entre_frases": 0.5,
+  "pausa_entre_capitulos": 0.8,
+  "entrada": 2.0,
+  "salida": 5.0,
+  "musica": "musica-elevenlabs-tech-65s.mp3",
+  "aviso": {
+    "texto": "{{TITULAR}}'s voice, cloned with AI",
+    "hasta": 9
+  },
+  "tomas": {
+    "entera": "m"
+  },
+  "capitulos": [
+    {
+      "id": "portada",
+      "kicker": "",
+      "titulo": "{{TITULAR}} {{APELLIDO}}",
+      "escena": {
+        "tipo": "portada",
+        "sub": "software engineer",
+        "video": "narrado/flow/portada.mp4"
+      },
+      "frases": [
+        {
+          "texto": "I'm {{TITULAR}} {{APELLIDO}}."
+        }
+      ]
+    },
+    {
+      "id": "caso",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "ficha",
+        "src": "orellana/retrato-vertical.jpg",
+        "foco": "50% 12%",
+        "rol": "Age 35",
+        "vertical": true,
+        "palabras": [
+          {
+            "txt": "Breast cancer",
+            "en": "breast",
+            "grande": true
+          },
+          {
+            "txt": "Rare",
+            "en": "rare"
+          },
+          {
+            "txt": "Metastatic",
+            "en": "metast"
+          },
+          {
+            "txt": "With a neuroendocrine component",
+            "en": "with",
+            "acento": true
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "I'm thirty-five, and I have a rare metastatic breast cancer, with a neuroendocrine component."
+        }
+      ]
+    },
+    {
+      "id": "construir",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/dji/trabajando.mp4",
+            "inicio_s": 2
+          },
+          {
+            "src": "narrado/dji/estrella.mp4",
+            "desde": "with"
+          },
+          {
+            "src": "narrado/lexie/indice.mp4",
+            "desde": "set",
+            "rotulo": "All tools",
+            "ruta": "helptitular.com/en/tools"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "I'm a software engineer."
+        },
+        {
+          "texto": "When the standard protocol didn't cover me, I chose to build."
+        },
+        {
+          "texto": "With Claude, I built Polaris, and a set of tools anyone can open at helptitular.com.",
+          "decir": "With Claude, I built Polaris, and a set of tools anyone can open at help {{TITULAR}} dot com."
+        }
+      ]
+    },
+    {
+      "id": "mapa",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/lexie/mapa.mp4",
+            "rotulo": "Metastasis map",
+            "ruta": "helptitular.com/en/mapa-metastasis"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "A metastasis map: my bone lesions from two PET scans, over my own reports."
+        },
+        {
+          "texto": "It helped my doctors choose which lesion to biopsy."
+        }
+      ]
+    },
+    {
+      "id": "lesiones",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/lexie/lesiones.mp4",
+            "rotulo": "Breast, liver and bone",
+            "ruta": "helptitular.com/en/lesiones"
+          },
+          {
+            "src": "narrado/lexie/biopsia.mp4",
+            "desde": "own",
+            "rotulo": "Bone biopsy",
+            "ruta": "helptitular.com/en/bone-biopsy"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "My lesions in 3D, at a glance.",
+          "decir": "My lesions in three-D, at a glance."
+        },
+        {
+          "texto": "And my own bone biopsy, measured against its scale bar, with what the image can and can't tell."
+        }
+      ]
+    },
+    {
+      "id": "ciencia",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "cita",
+        "en": "i'm",
+        "texto": "Claude Science, on my scanned biopsy slides.",
+        "_nota": "solo texto (17-oct): no había ventana ni análisis vivo de Claude Science que grabar, y la laminilla de /en/bone-biopsy se procesó en local (lo dice esa página): no se le pega el nombre de Claude Science a ninguna imagen concreta"
+      },
+      "frases": [
+        {
+          "texto": "I'm also using Claude Science on my scanned biopsy slides, to read them cell by cell."
+        }
+      ]
+    },
+    {
+      "id": "reservorio",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/lexie/reservorio.mp4",
+            "rotulo": "The reservoir",
+            "ruta": "helptitular.com/en/reservorio"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "When my port stopped working, I rebuilt the catheter's path on three CT scans."
+        },
+        {
+          "texto": "No sign it had moved."
+        }
+      ]
+    },
+    {
+      "id": "datos",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/lexie/datos.mp4",
+            "rotulo": "The case in data",
+            "ruta": "helptitular.com/en/data"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "My whole case in data, every number with its source, for anyone who can move it forward."
+        }
+      ]
+    },
+    {
+      "id": "celula",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/lexie/celula.mp4",
+            "rotulo": "Cell by cell",
+            "ruta": "helptitular.com/en/cell-by-cell"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "And now, cell by cell: a team at {{CENTRO}} read my metastases one cell at a time, and this page explains what that can and can't say.",
+          "decir": "And now, cell by cell. A team at {{CENTRO}} read my metastases one cell at a time. And this page explains what that can and can't say."
+        }
+      ]
+    },
+    {
+      "id": "polaris",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clip",
+            "src": "narrado/dji/panel.mp4"
+          },
+          {
+            "tipo": "lista",
+            "desde": "read",
+            "items": [
+              {
+                "icono": "web",
+                "texto": "Reads studies",
+                "en": "read"
+              },
+              {
+                "icono": "radar",
+                "texto": "Searches trials worldwide",
+                "en": "search"
+              },
+              {
+                "icono": "firma",
+                "texto": "Prepares the evidence for my doctors",
+                "en": "prepare"
+              }
+            ]
+          },
+          {
+            "tipo": "cita",
+            "desde": "doesn't",
+            "en": "doesn't",
+            "texto": "Polaris doesn't decide. My doctors do.",
+            "grande": true
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/panel-fondo.mp4",
+            "desde": "read",
+            "inicio_s": 4.6,
+            "velo": 1.15
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Behind it all, Polaris: Claude agents that read studies, search trials worldwide and prepare the evidence for my doctors.",
+          "decir": "Behind it all, Polaris. Claude agents that read studies, search trials worldwide, and prepare the evidence for my doctors."
+        },
+        {
+          "texto": "Polaris doesn't decide."
+        },
+        {
+          "texto": "My doctors do."
+        }
+      ]
+    },
+    {
+      "id": "limites",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "cita",
+            "en": "usage",
+            "texto": "Usage limits used to stop my research."
+          },
+          {
+            "tipo": "cita",
+            "desde": "thanks",
+            "en": "science",
+            "texto": "Anthropic · AI for Science",
+            "grande": true
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/stock/puerta.mp4",
+            "ancla": {
+              "en": "anymore",
+              "clip_s": 9.6
+            },
+            "velo": 0.75
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Usage limits used to stop my research."
+        },
+        {
+          "texto": "Thanks to Anthropic's AI for Science program, they don't anymore."
+        }
+      ]
+    },
+    {
+      "id": "siguiente",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "diagrama",
+        "nodos": [
+          {
+            "t": "Whole exome",
+            "s": "next",
+            "en": "exome"
+          },
+          {
+            "t": "HLA typing",
+            "s": "next",
+            "en": "hla"
+          },
+          {
+            "t": "Personalized vaccine",
+            "s": "to design",
+            "en": "vaccine"
+          },
+          {
+            "t": "NED",
+            "s": "no evidence of disease",
+            "en": "evidence"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Next: my exome and HLA typing, to design a personalized vaccine.",
+          "decir": "Next: my exome and H-L-A typing, to design a personalized vaccine."
+        },
+        {
+          "texto": "The goal: no evidence of disease."
+        }
+      ],
+      "pausa_despues": 1.4
+    },
+    {
+      "id": "cierre",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "cierre",
+        "titular": "I'm not asking for guarantees. I'm asking for opportunities.",
+        "url": "helptitular.com",
+        "pie": "{{TITULAR}} {{APELLIDO}} · software engineer",
+        "credito": "Polaris put this video together, the voice too: a clone of mine made with AI.",
+        "video": "narrado/flow/cierre.mp4",
+        "foto": "orellana/retrato-vertical.jpg",
+        "foco": "50% 12%",
+        "titular_px": 92,
+        "titular_ancho": 1600
+      },
+      "frases": [
+        {
+          "texto": "I'm not asking for guarantees. I'm asking for opportunities."
+        },
+        {
+          "texto": "helptitular.com",
+          "decir": "help, {{TITULAR}}, dot com."
+        }
+      ]
+    }
+  ],
+  "_nota_4b": "4b: texto del MD aprobado tras la tarde del 17-oct («I'm also using…», sin «Right now»: no había análisis vivo).",
+  "_toma": "17-oct-2026: tanda 1 (4 tomas, voz/tanda1) sin ninguna limpia: «{{APELLIDO}}» anglicanizado en todas (Whisper ES: «-falif») y la «b» se comía «with its source». Tanda 2 (3 tomas, cierre dicho «help, {{TITULAR}}, dot com»): la «b» dice todo exacto y el cierre «HelpTitular.com», salvo «{{APELLIDO}}». Toma «m» = mezcla_tomas.py: base b de la tanda 2 + capítulo portada de la toma «a» de la EN v2 aprobada el 8-oct (la única en que Whisper ES oyó «{{APELLIDO}}»), cortando en el silencio."
+}

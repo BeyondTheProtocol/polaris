@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/hoja.sh",
+ "estado_ficha": "completa",
+ "para": "Hoja de contactos de un render: un fotograma por instante pedido, en rejilla de 4×5.",
+ "cuando_si": "Para mirar costuras o tramos concretos de un render.",
+ "cuando_no": "Para la revisión N2 de todos los fotogramas (eso es revisa_n2.py) o una hoja del vídeo entero.",
+ "reemplaza": "sacar fotogramas sueltos a mano",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-04, vídeo de Orellana v9",
+ "origen": "mirar, no suponer (paso 8 del LEEME)"
+}

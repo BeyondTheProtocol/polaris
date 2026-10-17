@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/taller_orellana.py",
+ "estado_ficha": "completa",
+ "para": "Monta el taller del vídeo de Orellana (remotion/public, node_modules) desde las fuentes que viven fuera del worktree.",
+ "cuando_si": "Al empezar a renderizar un vídeo narrado en un worktree nuevo.",
+ "cuando_no": "Para cambiar lo que dice la voz (eso es narrado.py).",
+ "reemplaza": "rehacer a mano recursos, clips y tomas tras podar un worktree",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-04, vídeo de Orellana",
+ "origen": "el worktree del rodaje se podó y se fue lo ignorado por git"
+}

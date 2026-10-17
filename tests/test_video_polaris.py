@@ -386,6 +386,54 @@ class TestVozV4(unittest.TestCase):
             self.assertLess(int(y0) + int(amp) + 3, franja, f"onda a y={y0}±{amp} cruza los subtítulos")
 
 
+class TestPlanosOrellana(unittest.TestCase):
+    """v10 (5-oct-2026): los planos del vídeo de Orellana son los de su cámara, elegidos por ella. Lo que aquí se fija son
+    las cosas que ya se colaron una vez: datos de otros pacientes, un terminal legible y planos que el guion pide y no existen."""
+
+    def setUp(self):
+        sys.path.insert(0, DIR)
+        import taller_orellana
+        self.t = taller_orellana
+        self.g = json.loads(leer(os.path.join("guiones", "orellana-circulo.es.json")))
+
+    def _srcs(self, o):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in ("src", "fondo") and isinstance(v, str):
+                    yield v
+                else:
+                    yield from self._srcs(v)
+        elif isinstance(o, list):
+            for x in o:
+                yield from self._srcs(x)
+
+    def test_cada_plano_del_guion_tiene_su_receta(self):
+        recetas = set(self.t.DJI) | set(self.t.FOCO) | set(self.t.SEGUIDOS)
+        for src in self._srcs([c["escena"] for c in self.g["capitulos"]]):
+            if src.startswith("narrado/dji/"):
+                self.assertIn(os.path.basename(src)[:-4], recetas, f"el guion pide {src} y el taller no sabe hacerlo")
+
+    def test_la_consola_con_otros_pacientes_no_vuelve(self):
+        # 4-oct: en DJI 0153 y 0155-0157 del 20-jun se leen nombres y un número de historia de OTROS pacientes
+        usados = [v[:2] for v in list(self.t.DJI.values()) + list(self.t.FOCO.values()) + list(self.t.SEGUIDOS.values())]
+        for num in ("0153", "0155", "0156", "0157"):
+            self.assertNotIn(("20260620", num), usados, f"el clip {num} del 20-jun no se usa en ningún vídeo")
+
+    def test_la_pantalla_con_la_ia_va_desenfocada(self):
+        # 5-oct: a 1080p se leía la conversación y, en el terminal de al lado, el principio de una clave de API
+        self.assertIn("gblur", self.t.DJI["ia-monitor"][4])
+
+    def test_el_camino_de_zurich_empieza_con_la_acompanante_de_espaldas(self):
+        fecha, num, desde = self.t.DJI["{{CIUDAD}}-camino"][:3]
+        self.assertGreaterEqual(desde, 13.6, "antes del segundo 13,6 del clip se le ve la cara a su acompañante")
+
+    def test_tapa_y_acerca_dan_filtros_que_ffmpeg_entiende(self):
+        for filtro in (self.t.tapa((10, 10, 40, 30)).rstrip(","), self.t.acerca(3020, 901, 2.3, 0.3, 0.8, 1)):
+            r = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=3840x2160:r=30:d=1", "-vf", filtro + ",scale=320:180", "-frames:v", "3",
+                                "-f", "null", "-"], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr[-300:])
+
+
 if __name__ == "__main__":
     r = unittest.main(exit=False, verbosity=0).result
     ok = r.wasSuccessful()

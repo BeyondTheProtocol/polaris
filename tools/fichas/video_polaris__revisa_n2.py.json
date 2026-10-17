@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/revisa_n2.py",
+ "estado_ficha": "completa",
+ "para": "Tamiz N2 de un vídeo o de una carpeta de fotogramas antes de enseñarlo: OCR local de cada fotograma (tesseract, vía ocr_informes.ocr_image, egress 0) y búsqueda de cifras clínicas con unidad, SUV, fechas, identificadores de informe o bloque, marcas vetadas y nombres en informes.",
+ "cuando_si": "Antes de dar por bueno un vídeo con grabaciones de pantalla de la web o de herramientas clínicas (p. ej. /datos, /mapa-metastasis, Claude Science).",
+ "cuando_no": "Para imágenes sin texto (caras, imagen médica sin rótulos): eso lo ve la hoja de contactos. Tampoco para informes (eso es ocr_informes.py).",
+ "reemplaza": "La revisión solo a ojo de 60 fotogramas en hoja de contactos, que no ve el texto pequeño de todos los fotogramas.",
+ "test": "tests/test_revisa_n2.py",
+ "alta": "2026-10-17",
+ "origen": "Vídeo EN v3 para Lexie Barnhorn (Anthropic), 17-oct-2026: la tarea pedía revisión fotograma a fotograma sin cifras clínicas ni N2 en /datos y /mapa-metastasis."
+}

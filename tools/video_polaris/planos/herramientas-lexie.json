@@ -1,0 +1,214 @@
+{
+  "_nota": "Planos de las herramientas de helptitular.com para el vídeo EN v3 para Lexie (17-oct-2026). Coordenadas en px CSS de la página a 1920 de ancho, con la cabecera y la barra «Latest» ocultas. Se graban con grabar_herramienta.mjs. Todo texto con un dígito se oculta (sin cifras clínicas legibles); lo pintado en un canvas se revisa en la hoja de contactos.",
+  "mapa": {
+    "url": "https://helptitular.com/en/mapa-metastasis",
+    "seg": 11,
+    "mostrar": "[...document.querySelectorAll('svg')].filter(s => s.getBoundingClientRect().width > 300 && s.getBoundingClientRect().height > 500).concat([document.querySelector('canvas')])",
+    "camara": [
+      {
+        "t": 0,
+        "x": 200,
+        "y": 1990,
+        "w": 1520
+      },
+      {
+        "t": 11,
+        "x": 640,
+        "y": 2380,
+        "w": 1020
+      }
+    ],
+    "arrastres": [
+      {
+        "t0": 0.6,
+        "t1": 10.6,
+        "x": 1150,
+        "y": 2716,
+        "dx": 420,
+        "dy": 30
+      }
+    ]
+  },
+  "lesiones": {
+    "url": "https://helptitular.com/en/lesiones",
+    "seg": 7,
+    "mostrar": "[...document.querySelectorAll('canvas')].slice(0, 2).concat([document.querySelector('h1')], [...document.querySelectorAll('h2,h3')].filter(h => /^(Right breast|Liver)$/.test(h.textContent.trim())))",
+    "camara": [
+      {
+        "t": 0,
+        "x": 160,
+        "y": 90,
+        "w": 1600
+      },
+      {
+        "t": 7,
+        "x": 330,
+        "y": 330,
+        "w": 1260
+      }
+    ],
+    "arrastres": [
+      {
+        "t0": 0.4,
+        "t1": 6.8,
+        "x": 1270,
+        "y": 713,
+        "dx": 360,
+        "dy": 0
+      }
+    ]
+  },
+  "biopsia": {
+    "url": "https://helptitular.com/en/bone-biopsy",
+    "seg": 8,
+    "mostrar": "[document.querySelector('canvas')]",
+    "camara": [
+      {
+        "t": 0,
+        "x": 390,
+        "y": 33,
+        "w": 520
+      },
+      {
+        "t": 8,
+        "x": 700,
+        "y": 60,
+        "w": 440
+      }
+    ],
+    "clics": [
+      {
+        "t": 3,
+        "txt": "Nuclei"
+      }
+    ],
+    "dpr": 4
+  },
+  "reservorio": {
+    "url": "https://helptitular.com/en/reservorio",
+    "seg": 9,
+    "mostrar": "[document.querySelector('canvas')]",
+    "camara": [
+      {
+        "t": 0,
+        "x": 60,
+        "y": 420,
+        "w": 1140
+      },
+      {
+        "t": 9,
+        "x": 222,
+        "y": 497,
+        "w": 820
+      }
+    ],
+    "arrastres": [
+      {
+        "t0": 0.4,
+        "t1": 8.8,
+        "x": 632,
+        "y": 762,
+        "dx": 380,
+        "dy": 0
+      }
+    ],
+    "antes": [
+      {
+        "click": "Show the device (illustration)",
+        "espera": 2500
+      }
+    ],
+    "_nota": "con el modelo del dispositivo activado, el render lila ({{TITULAR}}, 17-oct: «las capturas del reservorio que sean con el render del modelo activado, el lila»)"
+  },
+  "datos": {
+    "url": "https://helptitular.com/en/data",
+    "seg": 10,
+    "mostrar": "(() => { const oscuro = (e) => { const m = getComputedStyle(e).backgroundColor.match(/[\\d.]+/g); return m && (m.length < 4 || +m[3] > 0.5) && +m[0] + +m[1] + +m[2] < 300 }; let e = document.querySelector('canvas'); while (e.parentElement && !oscuro(e)) e = e.parentElement; return [e] })()",
+    "camara": [
+      {
+        "t": 0,
+        "x": 450,
+        "y": 4640,
+        "w": 1020
+      },
+      {
+        "t": 10,
+        "x": 452,
+        "y": 4645,
+        "w": 900
+      }
+    ],
+    "_nota": "solo el campo de puntos (1.730 valores de laboratorio, sin la cifra): el canvas de «Every day since diagnosis» lleva meses, años y marcas de línea de tratamiento (1L/2L) pintadas y no se puede tachar · el encuadre no pasa de x=452 (diseño, 17-oct: a la derecha cortaba el titular «lab values»)",
+    "antes": [
+      {
+        "eval": "scrollTo({top: 4300, behavior: 'instant'})",
+        "espera": 3000
+      }
+    ]
+  },
+  "celula": {
+    "url": "https://helptitular.com/en/cell-by-cell",
+    "seg": 11,
+    "camara": [
+      {
+        "t": 0,
+        "x": 300,
+        "y": 110,
+        "w": 1320
+      },
+      {
+        "t": 4,
+        "x": 300,
+        "y": 110,
+        "w": 1320
+      },
+      {
+        "t": 11,
+        "x": 330,
+        "y": 2330,
+        "w": 1260
+      }
+    ]
+  },
+  "indice": {
+    "url": "https://helptitular.com/en/tools",
+    "seg": 7,
+    "sin_cifras": false,
+    "_nota": "índice de herramientas: sin tachar cifras («labs since 2021», «100 µm scale bar» son texto de la web, no datos clínicos)",
+    "camara": [
+      {
+        "t": 0,
+        "x": 360,
+        "y": 50,
+        "w": 1200
+      },
+      {
+        "t": 7,
+        "x": 250,
+        "y": 30,
+        "w": 1420
+      }
+    ]
+  },
+  "ciencia": {
+    "_nota": "4b: no hay análisis vivo ni ventana de Claude Science que grabar (17-oct: la app sin ventanas). Se enseña la laminilla escaneada que ya es pública en /en/bone-biopsy (la imagen grande), sin la interfaz de Claude Science; el rótulo lo dice.",
+    "url": "https://helptitular.com/en/bone-biopsy",
+    "seg": 7,
+    "dpr": 3,
+    "mostrar": "[...document.querySelectorAll('img')].filter(i => i.getBoundingClientRect().width > 600)",
+    "camara": [
+      {
+        "t": 0,
+        "x": 440,
+        "y": 505,
+        "w": 740
+      },
+      {
+        "t": 7,
+        "x": 610,
+        "y": 540,
+        "w": 560
+      }
+    ]
+  }
+}

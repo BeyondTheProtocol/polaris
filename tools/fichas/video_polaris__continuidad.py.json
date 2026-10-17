@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/continuidad.py",
+ "estado_ficha": "completa",
+ "para": "Mide capítulo a capítulo tono, volumen y ritmo de una narración en una toma, marca los saltos entre capítulos y comprueba que cada pausa tocada cae en silencio.",
+ "cuando_si": "Después de narrado.py, antes de dar una voz por buena.",
+ "cuando_no": "Como sustituto del oído de {{TITULAR}}: no detecta que la voz suene «a trompicones».",
+ "reemplaza": "la escucha a ciegas de cada costura",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-04, vídeo de Orellana v9",
+ "origen": "{{TITULAR}}, 4-oct-2026: «que toda la voz tenga continuidad en todo el tiempo que se habla»"
+}

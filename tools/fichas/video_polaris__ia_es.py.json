@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/ia_es.py",
+ "estado_ficha": "completa",
+ "para": "Mide si la voz dice «IA» en español (acaba en /a/) o en inglés (acaba en /i/), calibrado en la misma toma.",
+ "cuando_si": "En toda toma en español que diga «IA», antes de elegirla.",
+ "cuando_no": "En vídeos en inglés.",
+ "reemplaza": "el oído de {{TITULAR}} (Whisper escribe «IA» igual en los dos casos)",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-06, vídeo de Orellana v10",
+ "origen": "{{TITULAR}}, 6-oct-2026: «en la voz dice IA en inglés, debe decirlo en español»"
+}

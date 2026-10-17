@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/mide_giro.py",
+ "estado_ficha": "completa",
+ "para": "Mide cuánto cambia la imagen de un fotograma al siguiente en una secuencia de un visor 3D: repetidos, saltos y si el bucle cierra.",
+ "cuando_si": "Cuando un giro de visor se ve a trompicones.",
+ "cuando_no": "Para vídeos sin visores en secuencia.",
+ "reemplaza": "mirar el giro a ojo",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-05, vídeo de Orellana v10",
+ "origen": "el giro de los visores iba a trompicones"
+}

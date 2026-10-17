@@ -1,0 +1,11 @@
+{
+ "pieza": "video_polaris/huecos.py",
+ "estado_ficha": "completa",
+ "para": "Busca en un render los tramos con el escenario vacío (solo fondo), muestreando la franja central cada 0,25 s.",
+ "cuando_si": "Antes de dar por bueno un render narrado.",
+ "cuando_no": "Para juzgar el encuadre o el contenido de un plano.",
+ "reemplaza": "mirar el vídeo entero buscando huecos",
+ "test": "tests/test_video_polaris.py",
+ "alta": "2026-10-04, vídeo de Orellana v9",
+ "origen": "escenas que se quedaban sin nada en pantalla"
+}

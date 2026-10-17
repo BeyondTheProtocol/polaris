@@ -1,0 +1,677 @@
+{
+  "_nota": "Versión en INGLÉS del vídeo de Orellana v10 (8-oct-2026), pedida por {{TITULAR}}: «hazme una versión en inglés del vídeo que tenemos para Orellana incluyendo la parte que me bloquea del límite de IA y acceder a modelos de computación alta y especializados en investigación de ciencia», «sustituyendo lo de la asociación». Mismas escenas y planos que la v10; el capítulo «peticion» cambia entero (fuera Beyond the Protocol, dentro el límite de IA). El inglés está escrito, no traducido palabra a palabra. APROBADO por {{TITULAR}} el 8-oct-2026 tras ver la v2 con subtítulos («el vídeo perfecto»): desde aquí no se cambia una frase sin su OK. Voz: Eleven v4 en una toma entera, con la etiqueta de acento americano del vídeo «Polaris, so far».",
+  "slug": "orellana-circulo-en",
+  "idioma": "en",
+  "voice_id": "51aLNh96A9WJZODzYIyP",
+  "model": "eleven_v4",
+  "prefijo": "[General American accent] ",
+  "language_code": "en",
+  "ajustes": {
+    "stability": 0.45,
+    "similarity": 0.85,
+    "style": 0.2,
+    "tempo": 1.0
+  },
+  "toma_unica": "entera",
+  "enlazado": true,
+  "n_tomas": 3,
+  "evitar": [],
+  "exigir": [
+    "dana.farber",
+    "software engineer",
+    "neuroendocrine",
+    "world health organization",
+    "footnotes",
+    "usage limits",
+    "ai for science",
+    "exome",
+    "no evidence of disease"
+  ],
+  "pausa_entre_frases": 0.5,
+  "pausa_entre_capitulos": 0.85,
+  "entrada": 2.0,
+  "salida": 5.5,
+  "musica": "musica-elevenlabs-tech-65s.mp3",
+  "aviso": {
+    "texto": "{{TITULAR}}'s voice, cloned with AI",
+    "hasta": 9
+  },
+  "cifras_extra": {
+    "vistas_total": 1469689,
+    "vistas_x": 1030094,
+    "vistas_linkedin": 149385,
+    "vistas_instagram": 155110,
+    "vistas_tiktok": 135100
+  },
+  "tomas": {},
+  "capitulos": [
+    {
+      "id": "portada",
+      "kicker": "",
+      "titulo": "{{TITULAR}} {{APELLIDO}}",
+      "escena": {
+        "tipo": "portada",
+        "sub": "software engineer",
+        "video": "narrado/flow/portada.mp4"
+      },
+      "frases": [
+        {
+          "texto": "I'm {{TITULAR}} {{APELLIDO}}."
+        }
+      ]
+    },
+    {
+      "id": "caso",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "ficha",
+            "src": "orellana/retrato-vertical.jpg",
+            "foco": "50% 12%",
+            "rol": "Age 35",
+            "palabras": [
+              {
+                "txt": "Breast cancer",
+                "en": "breast",
+                "grande": true
+              },
+              {
+                "txt": "Rare",
+                "en": "rare"
+              },
+              {
+                "txt": "Metastatic",
+                "en": "metast"
+              },
+              {
+                "txt": "With a neuroendocrine component",
+                "en": "with",
+                "acento": true
+              }
+            ],
+            "vertical": true
+          },
+          {
+            "tipo": "puntos",
+            "desde": "according",
+            "en": "two",
+            "fuertes": 2,
+            "flojas": 3,
+            "txt": "2 to 5 in every 100",
+            "lbl": "breast cancers · World Health Organization",
+            "en_lbl": "world"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "I'm thirty-five, and I have breast cancer."
+        },
+        {
+          "texto": "A rare one."
+        },
+        {
+          "texto": "And metastatic."
+        },
+        {
+          "texto": "With a neuroendocrine component, something that, according to the World Health Organization, only two to five percent of breast cancers have."
+        }
+      ]
+    },
+    {
+      "id": "investigar",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/dji/trabajando.mp4",
+            "inicio_s": 2
+          },
+          {
+            "src": "narrado/dji/prueba-imagen.mp4",
+            "desde": "asked",
+            "rotulo": "Test brought forward",
+            "en": "test"
+          },
+          {
+            "src": "narrado/dji/{{CIUDAD}}-camino.mp4",
+            "desde": "of",
+            "rotulo": "Biopsy · {{CIUDAD}}",
+            "en": "biopsy"
+          },
+          {
+            "src": "narrado/dji/consulta.mp4",
+            "desde": "team",
+            "rotulo": "A {{CENTRO}} team joins in · Harvard",
+            "en": "dana"
+          },
+          {
+            "src": "narrado/dji/biopsia.mp4",
+            "desde": "joined",
+            "inicio_s": 4.4,
+            "rotulo": "A {{CENTRO}} team joins in · Harvard",
+            "en": "dana"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "So I started researching with AI."
+        },
+        {
+          "texto": "And it worked."
+        },
+        {
+          "texto": "I asked to bring forward a test that looked at the neuroendocrine part of my tumor."
+        },
+        {
+          "texto": "I got a biopsy in {{CIUDAD}}."
+        },
+        {
+          "texto": "And a team at {{CENTRO}}, at Harvard, joined in to study my tumor."
+        }
+      ]
+    },
+    {
+      "id": "construir",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "golpes",
+            "palabras": [
+              {
+                "txt": "STANDARD PROTOCOL",
+                "en": "protocol"
+              },
+              {
+                "txt": "WAIT",
+                "en": "wait"
+              },
+              {
+                "txt": "OR BUILD",
+                "en": "build",
+                "acento": true
+              }
+            ]
+          },
+          {
+            "tipo": "clips",
+            "desde": "i'm",
+            "cortes": [
+              {
+                "src": "narrado/dji/google-puerta.mp4",
+                "inicio_s": 0.8
+              },
+              {
+                "src": "narrado/dji/google-trabajando.mp4",
+                "desde": "chose"
+              },
+              {
+                "src": "narrado/dji/estrella.mp4",
+                "desde": "that"
+              }
+            ]
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/monitor-casa.mp4",
+            "hasta": "i'm",
+            "velo": 0.85
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "When the standard protocol doesn't cover you, you have two options: wait, or build."
+        },
+        {
+          "texto": "I'm a software engineer."
+        },
+        {
+          "texto": "I chose to build."
+        },
+        {
+          "texto": "And that's how Polaris was born."
+        }
+      ]
+    },
+    {
+      "id": "que-es",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clip",
+            "src": "narrado/dji/panel.mp4"
+          },
+          {
+            "tipo": "lista",
+            "desde": "reads",
+            "items": [
+              {
+                "icono": "web",
+                "texto": "Reads the studies",
+                "en": "reads"
+              },
+              {
+                "icono": "radar",
+                "texto": "Searches for trials worldwide",
+                "en": "searches"
+              },
+              {
+                "icono": "firma",
+                "texto": "Prepares the information for my doctors",
+                "en": "prepares"
+              }
+            ]
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/panel-fondo.mp4",
+            "desde": "reads",
+            "inicio_s": 4.6,
+            "velo": 1.15
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Polaris is like a research team that works for me day and night."
+        },
+        {
+          "texto": "It reads the studies, searches for clinical trials all over the world, and prepares the information for my doctors."
+        }
+      ]
+    },
+    {
+      "id": "entender",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clip",
+            "src": "narrado/dji/tac-pantalla.mp4",
+            "texto": "Understanding my disease",
+            "en": "understand"
+          },
+          {
+            "tipo": "clip",
+            "desde": "walk",
+            "src": "narrado/dji/cuaderno.mp4",
+            "texto": "Better questions",
+            "en": "better"
+          },
+          {
+            "tipo": "cita",
+            "desde": "polaris",
+            "en": "polaris",
+            "texto": "Polaris doesn't decide. My doctors do.",
+            "grande": true
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Above all, it helps me understand my disease."
+        },
+        {
+          "texto": "And walk into every appointment with better questions."
+        },
+        {
+          "texto": "Polaris doesn't decide."
+        },
+        {
+          "texto": "My doctors do."
+        }
+      ]
+    },
+    {
+      "id": "visores",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "visores2",
+            "en_diana": "choose",
+            "diana": "My doctors used it as support to choose the biopsy",
+            "piezas": [
+              {
+                "dir": "higado",
+                "n": 240,
+                "nombre": "Liver"
+              },
+              {
+                "dir": "mama",
+                "n": 240,
+                "nombre": "Breast",
+                "en": "see"
+              },
+              {
+                "src": "esqueleto.png",
+                "nombre": "Skeleton",
+                "en": "polaris"
+              },
+              {
+                "dir": "vertebra3",
+                "n": 150,
+                "nombre": "Vertebra",
+                "en": "bone"
+              }
+            ]
+          },
+          {
+            "tipo": "alcance",
+            "desde": "built",
+            "k": "vistas_total",
+            "millones": true,
+            "pre": "over",
+            "lbl": "views and impressions of my 3D maps · as of October 4",
+            "redes": [
+              {
+                "nombre": "X",
+                "txt": "1.03M"
+              },
+              {
+                "nombre": "Instagram",
+                "txt": "155K"
+              },
+              {
+                "nombre": "LinkedIn",
+                "txt": "149K"
+              },
+              {
+                "nombre": "TikTok",
+                "txt": "135K"
+              }
+            ],
+            "prensa": {
+              "cita": "The map the engineer has created of her metastasis.",
+              "pie": "El Español · photo caption · Jun 19, 2026 · translated",
+              "en": "surprise"
+            }
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "Ever since my diagnosis, I'd wanted to really see my metastases, not just imagine them."
+        },
+        {
+          "texto": "Polaris turned my scans into three-dimensional maps."
+        },
+        {
+          "texto": "The bone map helped my doctors choose which lesion to biopsy."
+        },
+        {
+          "texto": "I built it for my own case and, to my surprise, doctors at other hospitals have shown interest in using it."
+        }
+      ]
+    },
+    {
+      "id": "antes",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "clips",
+        "cortes": [
+          {
+            "src": "narrado/dji/micro.mp4"
+          },
+          {
+            "src": "narrado/dji/mesa-redonda.mp4",
+            "desde": "her"
+          },
+          {
+            "src": "narrado/dji/podcast.mp4",
+            "desde": "do"
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "I'm not the first patient to research her own cancer."
+        },
+        {
+          "texto": "Others did it with a lot of money and big teams."
+        },
+        {
+          "texto": "I do it with AI, and with my doctors."
+        }
+      ]
+    },
+    {
+      "id": "tiempo",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clips",
+            "cortes": [
+              {
+                "src": "narrado/dji/medicacion.mp4",
+                "texto": "All of this, in six months",
+                "en": "six"
+              },
+              {
+                "src": "narrado/dji/sbrt-rapido.mp4",
+                "desde": "every",
+                "inicio_s": 1
+              }
+            ]
+          },
+          {
+            "tipo": "carrera",
+            "desde": "i've",
+            "inicio": "JAN 2024",
+            "meses": 32,
+            "txt": "2 years and 8 months",
+            "lbl": "with metastatic breast cancer",
+            "en": "i've",
+            "en_carrera": "race",
+            "txt2": "A race",
+            "hoy": "OCT 2026"
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/sbrt-rapido.mp4",
+            "desde": "i've",
+            "inicio_s": 4.6,
+            "velo": 1.0
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "All of this happened in six months, because in my case every day counts."
+        },
+        {
+          "texto": "The disease doesn't wait."
+        },
+        {
+          "texto": "I've been living with metastases for almost three years, and there's barely any data on my subtype."
+        },
+        {
+          "texto": "This is a race."
+        }
+      ]
+    },
+    {
+      "id": "ilusion",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "clip",
+            "src": "narrado/dji/puente.mp4"
+          },
+          {
+            "tipo": "clip",
+            "desde": "will",
+            "src": "orellana/escalera-detalle.jpg",
+            "texto": "Many more patients",
+            "en": "many"
+          },
+          {
+            "tipo": "cita",
+            "desde": "rare",
+            "en": "rare",
+            "texto": "That rare cases stop being footnotes."
+          },
+          {
+            "tipo": "cita",
+            "desde": "what",
+            "en": "what",
+            "texto": "What my doctors and I are preparing with Polaris can't stay in theory."
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/dji/ensayo.mp4",
+            "desde": "what",
+            "velo": 0.9
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "My hope is that this, which is helping me, will help many more patients."
+        },
+        {
+          "texto": "That rare cases stop being footnotes and become data, studies, real options."
+        },
+        {
+          "texto": "And what my doctors and I are preparing with Polaris can't stay in theory."
+        }
+      ]
+    },
+    {
+      "id": "peticion",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "pasos",
+        "pasos": [
+          {
+            "tipo": "cita",
+            "en": "now",
+            "texto": "The research keeps going.",
+            "grande": true
+          },
+          {
+            "tipo": "diagrama",
+            "desde": "team",
+            "nodos": [
+              {
+                "t": "Single-cell",
+                "s": "done at {{CENTRO}}",
+                "en": "cell"
+              },
+              {
+                "t": "Whole exome",
+                "s": "next",
+                "en": "exome"
+              },
+              {
+                "t": "HLA typing",
+                "s": "next",
+                "en": "hla"
+              },
+              {
+                "t": "Personalized vaccine",
+                "s": "the targets",
+                "en": "vaccine"
+              },
+              {
+                "t": "NED",
+                "s": "no evidence of disease",
+                "en": "evidence"
+              }
+            ]
+          }
+        ],
+        "fondos": [
+          {
+            "src": "narrado/stock/puerta.mp4",
+            "desde": "now",
+            "ancla": {
+              "en": "going",
+              "clip_s": 9.6
+            },
+            "velo": 0.75
+          }
+        ]
+      },
+      "frases": [
+        {
+          "texto": "For a while, usage limits kept stopping my research."
+        },
+        {
+          "texto": "Now, thanks to Anthropic's AI for Science program, it keeps going."
+        },
+        {
+          "texto": "The team at {{CENTRO}} already read my metastases cell by cell."
+        },
+        {
+          "texto": "Next come the whole exome and my HLA typing, to find the targets for a personalized vaccine."
+        },
+        {
+          "texto": "The goal hasn't changed: no evidence of disease."
+        }
+      ],
+      "pausa_despues": 1.6
+    },
+    {
+      "id": "cierre",
+      "kicker": "",
+      "titulo": "",
+      "escena": {
+        "tipo": "cierre",
+        "titular": "I'm not asking for guarantees. I'm asking for opportunities.",
+        "sub": "And the one that matters most is more time, for me and for other patients.",
+        "en_sub": "matters",
+        "url": "helptitular.com/en/collaborate",
+        "pie": "{{TITULAR}} {{APELLIDO}} · software engineer",
+        "credito": "Polaris put this video together, the voice too: a clone of mine made with AI.",
+        "video": "narrado/flow/cierre.mp4",
+        "foto": "orellana/retrato-vertical.jpg",
+        "foco": "50% 12%",
+        "titular_px": 84,
+        "titular_ancho": 1700
+      },
+      "frases": [
+        {
+          "texto": "I'm not asking for guarantees. I'm asking for opportunities."
+        },
+        {
+          "texto": "And the one that matters most is more time, for me and for other patients."
+        },
+        {
+          "texto": "Thank you."
+        }
+      ]
+    }
+  ],
+  "_toma": "v1 (8-oct-2026): cuatro tomas enteras de Eleven v4; las cuatro dicen el texto exacto y suenan americanas en los cuatro tramos medidos (CommonAccent: us 0,71-0,79). Se queda la «a»: es la única en la que Whisper, escuchando en español, oye «{{APELLIDO}}» (las otras: «Wimsalis», «Glintaliff», «Guamfaleth»).",
+  "_nota_v3": "v3 (16-oct-2026): {{TITULAR}} aprueba sustituir el capítulo «peticion» (los créditos de IA ya no son cuello de botella: AI for Science) por lo conseguido y los siguientes pasos. Texto de voz-titular, OK suyo el 16-oct. Voz: el resto sale de la toma «a» aprobada de la v2; solo «peticion» viene de una toma entera nueva (mezcla_tomas.py, corte en el silencio)."
+}
