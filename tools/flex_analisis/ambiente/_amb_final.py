@@ -515,6 +515,10 @@ def run(*args):
     pat = pd.DataFrame({m: llam[m][grp["no_ref"]].astype(int) for m in ms})
     disc = pat.value_counts().reset_index(name="n_celulas")
     disc.to_csv(_a.outp("discordancia_v4.csv"), index=False)
+    # Post hoc (red-team 17-oct): HIGADO_v4 no decía que la cruda quedara fuera del veredicto.
+    POST_HOC.append("VEREDICTO_V4_EXCLUYE_CRUDA: la matriz cruda no cuenta para veredicto_v4 ni para el criterio del cierre; "
+                    "HIGADO_v4 no lo fijaba. Por la regla tal cual, cruda/CellBender/soupx_auto dan RESUELTO_v4 y se "
+                    "descartan por el diagnóstico de linaje (también post hoc)")
     validos = [m for m in ms if m != "cruda" and res["metodos"][m]["metodo_valido"] and res["metodos"][m]["C_v4"]["RESUELTO_v4"]]
     jv = [res["jaccard_v4"].get(f"{a}|{b}") or res["jaccard_v4"].get(f"{b}|{a}") for i, a in enumerate(validos) for b in validos[i + 1:]]
     res["veredicto_v4"] = ("RESUELTO" if len(validos) >= 2 and min(jv) >= 0.5 else "RESUELTO FRÁGIL" if validos else "NO RESUELTO")

@@ -23,6 +23,8 @@ FPR = ["0.0", "0.01", "0.05"]
 
 
 def _cmd(salida, epocas, tejido="higado"):
+    # Sin --seed: la CLI instalada no lo admite (la regla lo pedía). Declarado post hoc en
+    # ADENDA_POST_HOC_2026-10-17.json (CELLBENDER_SIN_SEED_Y_PRUEBA_EPOCAS).
     p = {"higado": ("19000", "45000"), "hueso": ("2500", "20000")}[tejido]
     return [CB, "remove-background", "--input", TC.ruta(tejido, "_raw_feature_barcode_matrix.h5"), "--output", salida,
             "--cpu-threads", "10", "--expected-cells", p[0], "--total-droplets-included", p[1],

@@ -1,0 +1,15 @@
+{
+  "_doc": "Post hoc que el red-team de la vía ambiental (verificacion, 17-oct-2026) encontró SIN declarar. Se declaran aquí, después de calcular, sin tocar las salidas selladas (MANIFIESTO_AMBIENTE). Acta: 00_FUENTE-DE-VERDAD/01 · Tratamiento/flex-acta-del-tribunal-fase-6-lo-que-se-sostiene-2026-10-16.md, sección «Vía ambiente y caminos propios».",
+  "post_hoc": [
+    {"clave": "VEREDICTO_V4_EXCLUYE_CRUDA",
+     "regla_afectada": "REGLAS_HIGADO_v4.json",
+     "que": "_amb_final.py excluye la matriz cruda de veredicto_v4 y del criterio del cierre; la regla no lo decía. Por la regla tal cual, cruda, los tres CellBender y soupx_auto dan RESUELTO_v4 (AUC 0,998-0,999; FP 0/490 y 1/159). Se descartan por el diagnóstico sin genes de linaje (AUC 0,873; FP 5/490 = 1,02 %), también post hoc.",
+     "efecto_en_conclusion": "Ninguno sobre «no resuelto», pero obliga a decirlo como juicio y no como regla.",
+     "codigo": "_amb_final.py lo añade a POST_HOC desde el 17-oct; las salidas ya selladas no lo llevan"},
+    {"clave": "CELLBENDER_SIN_SEED_Y_PRUEBA_EPOCAS",
+     "regla_afectada": "REGLAS_HIGADO_v4.json / REGLAS_AMBIENTE_v1.json",
+     "que": "La regla pedía --seed y la CLI de CellBender instalada no tiene esa opción: no reproducible bit a bit. La prueba de épocas dio una extrapolación inválida (2 épocas más lentas que 3) y se lanzó igual; duró 9,1 h, dentro del tope de 15 h.",
+     "efecto_en_conclusion": "Ninguno sobre el veredicto; limita la reproducibilidad exacta de las cifras de CellBender.",
+     "deuda": "cellbender-sin-seed-regla-no-ejecutable"}
+  ]
+}

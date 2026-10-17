@@ -144,7 +144,14 @@ def main():
     ok(vigia.detectar_healthcheck_parado() == [], "B: healthcheck fresco → silencio")
     viejo = (_dt.datetime.now() - _dt.timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%S")
     json.dump({"ts": viejo}, open(vigia.HC_LAST_CHECK, "w"))
+    # Uptime fijo: con el Mac recién reiniciado (< HC_BOOT_GRACE_MIN) la gracia de arranque silenciaba
+    # este caso y el test dependía del reloj real (rojo el 17-oct-26, 30 min tras un reinicio).
+    _uptime_real = vigia._uptime_seg
+    vigia._uptime_seg = lambda: 24 * 3600
     out = vigia.detectar_healthcheck_parado()
+    vigia._uptime_seg = lambda: 60
+    ok(vigia.detectar_healthcheck_parado() == [], "B: recién arrancado (gracia) → silencio aunque last_check sea viejo")
+    vigia._uptime_seg = _uptime_real
     ok(len(out) == 1 and out[0]["tipo"] == "healthcheck_parado", "B: healthcheck parado > umbral → anomalía")
 
     # ── Pieza 2: auto-curación del healthcheck (intentar → verificar → escalar solo si no revive) ──

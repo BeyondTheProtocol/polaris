@@ -705,6 +705,7 @@ runpy test_flex_ingesta.py   # 16-oct · ingesta Flex en streaming: solo lista b
 runpy test_flex_b.py         # 16-oct · analista B del Flex: sin ventanilla no arranca, muro_texto tira ids de bloque, _medida/IC95/CP10k, auditoría de sondas con sonda plantada (sintético)
 runpy test_flex_cierre.py   # 16-oct · cierre técnico Flex: etapa final 2 veces → sha256 idénticos y = MANIFIESTO_CIERRE; stdout sin barcodes; Wilson k=0/k=n (sin cachés o sin nescore, SKIP 77; ~55 s)
 runpy test_flex_ambiente.py   # 16-oct · ambiente Flex: SoupX+DecontX sintético con verdad conocida (caída >=75 %, retención >=80 %) dos veces idéntico; funciones puras; egress solo 10x; MANIFIESTO (sin entornos, SKIP 77)
+runpy test_flex_post_hoc_declarados.py   # 17-oct · Flex ambiente: post hoc del red-team (cruda fuera del veredicto v4, CellBender sin --seed) declarados en código y adenda
 runpy test_flex_higado_dianas.py   # 16-oct · dianas del hígado (3 vías): deconvolución sintética con respuesta conocida + dos ejecuciones sha idéntico y = MANIFIESTO; sin cachés, SKIP 77
 # test_laminillas.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · laminillas DFCI F1-infra: ventanilla enjaulada (sandbox-exec), puertas y jaulas con canarios sintéticos
 runpy test_laminillas_t1.py
