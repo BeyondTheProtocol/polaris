@@ -523,6 +523,12 @@ def poll_once():
         salida.vaciar_buzon_ficheros()
     except Exception as e:
         sys.stderr.write("bot: error vaciando el buzón de ficheros: %r\n" % (e,))
+    # Buzón de Drive (17-oct-26): una subida por vuelta, con aviso del enlace a {{TITULAR}}.
+    try:
+        import buzon_drive
+        buzon_drive.vaciar()
+    except Exception as e:
+        sys.stderr.write("bot: error vaciando el buzón de Drive: %r\n" % (e,))
     return n
 
 

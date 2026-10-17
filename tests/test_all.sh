@@ -407,6 +407,7 @@ runpy test_ocr_layout.py
 runpy test_salida_reintento.py
 runpy test_salida_idempotente.py   # 24-sep · auditoría 3.5: una aprobación entrega UNA vez; lo incierto no se reenvía solo
 runpy test_salida_report_file.py    # 17-oct · report-file manda un fichero SOLO al chat de {{TITULAR}} (mock), sin destino, con HALT
+runpy test_buzon_drive.py           # 17-oct · subidas a Drive encoladas que hace el bot: raíces, 200 MB, una por vuelta, HALT, 3 intentos, aviso con enlace
 runpy test_salida_buzon_tg.py       # 17-oct · sin Llavero se encola y el bot lo vacía: solo chat propio, raíces/tipo/50 MB, HALT, 3 intentos
 runpy test_dominios_con_dueno.py
 runpy test_honestidad_lint.py

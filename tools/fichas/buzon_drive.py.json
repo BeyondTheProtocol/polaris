@@ -1,0 +1,11 @@
+{
+ "pieza": "buzon_drive.py",
+ "estado_ficha": "completa",
+ "para": "Encolar subidas a Google Drive desde una sesión sin Llavero; el bot de Telegram (launchd, con Llavero) las hace y avisa a {{TITULAR}} con el enlace.",
+ "cuando_si": "Hay que subir a Drive un fichero de la fuente de verdad o de ~/tmp_subida y la sesión no puede leer el Llavero (rc=36).",
+ "cuando_no": "Zona clínica (drive.py la exige con TTY humano y aquí no hay); ficheros de más de 200 MB; subidas desde un proceso que ya tiene Llavero (usa drive.py directo).",
+ "reemplaza": "Pedirle a {{TITULAR}} que pegue `security unlock-keychain && drive.py upload` en su Terminal. Amplía drive.py, no lo duplica: la subida real sigue siendo drive.upload_file con todos sus frenos.",
+ "test": "tests/test_buzon_drive.py",
+ "alta": "2026-10-17",
+ "origen": "{{TITULAR}}, 17-oct-26: «implementa poder mandármelo sin tener que hacer yo ese paso de la consola» (Telegram) y «Siguiente» al mismo buzón para Drive."
+}
