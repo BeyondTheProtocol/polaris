@@ -24,7 +24,7 @@
      "por_que": "Continuidad/Handoff de macOS entre aparatos de la misma cuenta Apple."},
     {"proceso": "symptomsd", "puerto": "dinamico", "alcance": "todas", "estado": "excepcion",
      "por_que": "Diagnóstico de red de macOS."},
-    {"proceso": "sharingd", "puerto": 8770, "alcance": "todas", "estado": "revisar", "deuda": "sharingd-airdrop-8770-todas",
-     "por_que": "AirDrop/Compartir de macOS: abrió 8770 en todas las interfaces durante las dos pasadas de test_all del 17-oct-2026 y luego dejó de escuchar (lsof vacío). Pendiente decidir si AirDrop se queda encendido en Polaris o se pone en «Nadie»."}
+    {"proceso": "sharingd", "puerto": 8770, "alcance": "todas", "estado": "excepcion",
+     "por_que": "AirDrop/Compartir de macOS: abre 8770 en todas las interfaces a ratos (visto en test_all el 17-oct-2026). Decidido mantener AirDrop encendido en Polaris ({{TITULAR}}, 17-oct-2026)."}
   ]
 }
