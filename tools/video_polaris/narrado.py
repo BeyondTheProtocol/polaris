@@ -45,12 +45,15 @@ def tiempos(build):
 
 def cama_musical(src, total, out):
     """Alarga el tema encadenándolo consigo mismo con fundidos largos (4 s), y lo funde al final."""
-    d = voz.dur(src); n = max(1, int(total // (d - 4)) + 1)
+    d = voz.dur(src)
+    # si al tema le faltan pocos segundos, se alarga con silencio: encadenarlo consigo mismo volvía a empezar la
+    # melodía justo en la tarjeta final (pitch de ClinicOmics, 16-oct-2026)
+    n = 1 if total <= d + 8 else max(1, int(total // (d - 4)) + 1)
     ins = sum((["-i", src] for _ in range(n)), [])
     filtro, prev = "", "[0:a]"
     for k in range(1, n):
         filtro += f"{prev}[{k}:a]acrossfade=d=4:c1=tri:c2=tri[x{k}];"; prev = f"[x{k}]"
-    filtro += f"{prev}atrim=0:{total},afade=t=in:d=1.5,afade=t=out:st={max(0, total - 3)}:d=3,aresample=48000[o]"
+    filtro += f"{prev}apad=whole_dur={total},atrim=0:{total},afade=t=in:d=1.5,afade=t=out:st={max(0, total - 3)}:d=3,aresample=48000[o]"
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", filtro, "-map", "[o]", "-ac", "2", out], check=True)
 
 
@@ -156,14 +159,30 @@ def voz_por_capitulos(g, build):
     voz.main(build, ruta_guion=ruta)  # genera las tomas (o las reutiliza: van firmadas por texto, voz y ajustes)
     n = g.get("n_tomas", 1)
     if n > 1:
-        w, elegidas, informe = whisper.load_model("small"), dict(g.get("tomas", {})), {}
+        import hashlib
+        _w = []  # Whisper se carga solo si alguna toma no tiene ya su transcripción guardada
+        def oir(p):
+            # caché junto a la toma, firmada por su contenido: sin ella, cada pasada retranscribía las 21 tomas
+            # (8-10 min) aunque solo hubiera cambiado una frase (16-oct-2026)
+            firma = hashlib.sha1(open(p, "rb").read()).hexdigest()
+            cache = p + ".oido.json"
+            if os.path.exists(cache):
+                c = json.load(open(cache, encoding="utf-8"))
+                if c.get("sha1") == firma and c.get("idioma") == g["idioma"]:
+                    return c["oido"]
+            if not _w:
+                _w.append(whisper.load_model("small"))
+            oido = _w[0].transcribe(p, language=g["idioma"], fp16=False)["text"].strip()
+            json.dump({"sha1": firma, "idioma": g["idioma"], "oido": oido}, open(cache, "w", encoding="utf-8"), ensure_ascii=False)
+            return oido
+        elegidas, informe = dict(g.get("tomas", {})), {}
         for f in plano["frases"]:
             filas = []
             for x in "abcdefgh"[:n]:
                 p = os.path.join(build, "voz", "tomas", f"{f['id']}-{x}.mp3")
-                oido = w.transcribe(p, language=g["idioma"], fp16=False)["text"].strip()
+                oido = oir(p)
                 filas.append({"toma": x, "d": round(voz.dur(p), 2), "viva": round(voz.variacion_tono(p), 2), "oido": oido,
-                              "texto": round(difflib.SequenceMatcher(None, guion_mod.norm(f["decir"]), guion_mod.norm(oido)).ratio(), 3)})
+                              "texto": round(difflib.SequenceMatcher(None, guion_mod.norm(f["decir"]), guion_mod.norm(oido), autojunk=False).ratio(), 3)})
             informe[f["id"]] = filas
             if f["id"] not in elegidas:
                 mejor = max(r["texto"] for r in filas)
@@ -192,8 +211,33 @@ def voz_por_capitulos(g, build):
         json.dump(por_frase, fh, ensure_ascii=False, indent=1)
 
 
+def palabras_en_que_faltan(g):
+    """Cada elemento de escena que entra «cuando la voz dice su palabra» (campo `en`) tiene que tener esa palabra en
+    su capítulo. Si no, Pitch/Narrado lo hacen entrar al principio del capítulo, fuera de orden: el 16-oct-2026 la
+    cifra «3 tumor types» salió sola antes que «~600» porque la frase nueva ya no decía «three»."""
+    import unicodedata, re as _re
+    def norm(x):
+        x = unicodedata.normalize("NFD", x.lower())
+        return _re.sub(r"[^a-z0-9 ]", " ", "".join(ch for ch in x if unicodedata.category(ch) != "Mn")).split()
+    faltan = []
+    for c in g["capitulos"]:
+        dicho = [w for f in c["frases"] for w in norm(f.get("texto", ""))]
+        e = c.get("escena", {})
+        for clave in ("palabras", "nodos", "items", "cifras"):
+            for it in e.get(clave, []):
+                pref = (norm(it.get("en", "")) or [""])[0]
+                if pref and not any(w.startswith(pref) for w in dicho):
+                    faltan.append(f"{c['id']}.{clave}: «{it.get('en')}» no se dice en el capítulo")
+        if e.get("gancho_en") and not any(w.startswith(norm(e["gancho_en"])[0]) for w in dicho):
+            faltan.append(f"{c['id']}.gancho_en: «{e['gancho_en']}» no se dice en el capítulo")
+    return faltan
+
+
 def main(guion, build):
     g = json.load(open(guion, encoding="utf-8"))
+    faltan = palabras_en_que_faltan(g)
+    if faltan:
+        sys.exit("✗ elementos que entrarían fuera de orden (su palabra no está en la voz):\n  " + "\n  ".join(faltan))
     os.makedirs(build, exist_ok=True)
     plano = aplanar(g)
     ruta_plano = os.path.join(build, "guion_plano.json")
@@ -221,13 +265,20 @@ def main(guion, build):
     cifras = json.load(open(os.path.join(AQUI, "remotion", "public", "cifras.json"), encoding="utf-8"))
     cifras.update(g.get("cifras_extra", {}))  # cifras propias del vídeo (p. ej. alcance de un post), en el guion y no a mano
     T = {"slug": g["slug"], "idioma": g["idioma"], "total": tv["total"], "fps": 30, "capitulos": caps, "cifras": cifras}
+    if g.get("broll"):  # planos reales (stock con licencia) a pantalla completa sobre una frase: los pinta Pitch.tsx
+        T["broll"] = g["broll"]
     if g.get("tema"):  # marca de un vídeo que no es de Polaris (p. ej. un pitch de terceros): la pinta Pitch.tsx
         T["tema"] = g["tema"]
     if g.get("aviso"):  # aviso de voz clonada (art. 50.4 RIA): Narrado.tsx lo pinta desde el fotograma 0
         T["aviso"] = g["aviso"] | {"entrada": g["entrada"]}
     os.makedirs(PUBLICO, exist_ok=True)
     json.dump(T, open(os.path.join(PUBLICO, "timeline.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    shutil.copyfile(os.path.join(build, "voz.wav"), os.path.join(PUBLICO, "voz.wav"))
+    acabado = g.get("acabado_voz")  # EQ/compresión en local sobre las MISMAS tomas (no se vuelve a pedir nada a ElevenLabs)
+    if acabado:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(build, "voz.wav"), "-af", acabado,
+                        "-ar", "48000", "-ac", "2", os.path.join(PUBLICO, "voz.wav")], check=True)
+    else:
+        shutil.copyfile(os.path.join(build, "voz.wav"), os.path.join(PUBLICO, "voz.wav"))
     musica = g.get("musica")
     if musica:
         src = musica if os.path.isabs(musica) else os.path.join(MARCA, musica)

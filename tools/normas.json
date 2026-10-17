@@ -3768,6 +3768,18 @@
       "auditable": false,
       "repetida": false,
       "nota": "Clasificada el 16-oct-26 al nacer (Kevin Wimer: «I can tell your reply is written by AI»)."
+    },
+    {
+      "slug": "feedback-azul-electrico-no-en-bloques",
+      "que": "Nunca un relleno grande del azul eléctrico del logo de ClinicOmics (#1622F7); solo texto pequeño, borde fino o el logo",
+      "clase": "lint-doc",
+      "mecanismo": "tests/test_video_polaris.py",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": true,
+      "repetida": true,
+      "nota": "Clasificada el 16-oct-26. Repetida el mismo día (nodo final v11, bloque del 7× v16). El test falla si Pitch.tsx pinta background: C.azul."
     }
   ]
 }

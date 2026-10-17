@@ -18,7 +18,7 @@ else
 fi
 [ -d public ] || { echo "falta public/ (recursos: $D/recursos-remotion + voz/música/sfx)"; exit 1; }
 mkdir -p out
-npx remotion render src/index.ts "$COMP" out/render.mp4 --concurrency=8 --crf=16 --gl=angle
+npx remotion render src/index.ts "$COMP" out/render.mp4 --concurrency="${CONCURRENCIA:-8}" --crf=16 --gl=angle  # CONCURRENCIA=4 si la máquina va cargada: con 8 y carga ~50 el codificador se atascó (16-oct-2026)
 ffmpeg -v error -y -i out/render.mp4 -c:v copy \
   -af "loudnorm=I=-16:TP=-4:LRA=11,aresample=48000" -c:a aac -b:a 192k -movflags +faststart \
   "$BASE-1920x1080-BORRADOR.mp4"

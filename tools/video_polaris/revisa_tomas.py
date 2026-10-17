@@ -40,7 +40,7 @@ def main(build, idioma="en"):
                 continue
             oido = w.transcribe(p, language=idioma)["text"].strip()
             r = {"toma": x, "d": round(dur(p), 2), "viva": round(variacion_tono(p), 2),
-                 "texto": round(difflib.SequenceMatcher(None, plano(f["texto"]), plano(oido)).ratio(), 3), "oido": oido}
+                 "texto": round(difflib.SequenceMatcher(None, plano(f["texto"]), plano(oido), autojunk=False).ratio(), 3), "oido": oido}
             if acento:
                 wav = p[:-4] + ".16k.wav"
                 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", p, "-ar", "16000", "-ac", "1", wav], check=True)
