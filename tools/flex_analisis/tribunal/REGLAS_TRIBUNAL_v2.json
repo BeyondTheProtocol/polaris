@@ -1,0 +1,53 @@
+{
+ "estado": "especificación v2 EXPLORATORIA del tribunal. Fijada el 2026-10-16 ANTES de calcular ninguna cifra del tribunal. No es un prerregistro: A, B y el tribunal ya vieron resultados de v1 y la verdad de ADN. No sustituye a la espec. v1.",
+ "verdad_adn_calibracion": {
+  "hueso_FoundationOne": "amplificación focal 8p11 (FGFR1 33 copias, ZNF703, NSD3) y {{LOCUS}} (CCND1 37 copias, FGF3/4/19 37 copias)",
+  "primario_2024_TSO500": "FGFR1 amplificado (13 copias)",
+  "uso": "solo calibración. 8p11 está en dos especímenes (troncal probable); {{LOCUS}} solo en el hueso."
+ },
+ "gem": {
+  "definicion": "GEM = 16 primeros nt del barcode; el sufijo de 10 nt identifica la muestra.",
+  "limpio_primaria_T": "la célula del hueso NO comparte GEM con ningún barcode del hígado llamado como célula por Cell Ranger (filtered_barcodes del hígado). Igual en sentido inverso.",
+  "limpio_sensibilidad_A": "UMI totales de la otra muestra en el mismo GEM (matriz raw) <= 25 (regla de A, UMBRAL_GEM_LIMPIO.json).",
+  "socio_tipo": "tipo del socio del hígado según la anotación de A (hepatocito, maligna del set calibrado, otro, o quitado por QC)."
+ },
+ "fuga": {
+  "trazador": "HEP5 = ALB, APOA1, SERPINA1, HP, TF (ausentes del hueso).",
+  "alfa": "por par hueso-socio hepatocito: HEP5 en la célula del hueso / HEP5 en el socio. Se usa la mediana de alfa sobre pares con socio hepatocito y HEP5_socio >= 20.",
+  "atribucion": "UMI fugadas esperadas del gen g en la célula i del hueso = alfa_mediana × cuentas del socio en g. Fracción atribuible = suma esperada / suma observada, sobre malignas del hueso."
+ },
+ "adn": {
+  "sondas_nulas": "sondas unspliced incluidas de genes cuyo total en las células del hígado post-QC es 0 (no expresados) y que NO caen en las ventanas 8p11/{{LOCUS}}. Su cuenta en el hueso se lee como ADN genómico diploide.",
+  "delta_celula": "UMI por sonda nula y célula = suma de cuentas en sondas nulas / nº de sondas nulas.",
+  "esperado_adn_gen": "delta × nº de sondas unspliced del gen × (copias/2); copias = 2 salvo amplicón en malignas (FGFR1/ZNF703/NSD3: 33; CCND1/FGF3/FGF4/FGF19: 37).",
+  "discriminador": "FGF3 tiene 1 sonda spliced y 2 unspliced: cuentas por sonda en malignas del hueso frente al hígado.",
+  "ENMIENDA_1": "16-oct-2026, tras la primera ejecución de adn (desviación declarada). La regla «0 cuentas en el hígado» seleccionó 1.233 sondas con captura anómalamente baja: el ADN del hígado (0,2 %) ya predice ~1-3 UMI por sonda en 19.047 células, así que exigir 0 escoge sondas malas y subestima delta (~0,001 frente a ~0,004). Nuevo conjunto nulo: sondas unspliced de los receptores olfativos (símbolo ^OR[0-9], 982 sondas, sin expresión esperada en hígado ni hueso). Contraste: sondas unspliced de genes con 0 cuentas spliced en ambos tejidos. Lectura de copias en ventanas: genes de la ventana con < 0,001 UMI por sonda y célula en las malignas del hígado (amplificados pero silentes en ARN), de modo que su señal en el hueso solo puede ser ADN."
+ },
+ "calibra_higado": {
+  "ventanas_GRCh38": {"8p11": "chr8:37.0-39.0 Mb", "{{LOCUS}}": "chr11:69.0-70.5 Mb"},
+  "score": "log2((obs+0.5)/(esp+0.5)) por célula; obs = UMI en genes de la ventana; esp = UMI_total_celula × fracción de la ventana en el pseudobulk de la referencia (inmunes + endotelio de A).",
+  "corte": "> p99 del score en la referencia de la misma muestra. Sensibilidad: p95.",
+  "identidad": "luminal/epitelial: >= 2 genes distintos detectados de EPCAM, KRT19, KRT7, GATA3, FOXA1, ESR1, XBP1, AGR2, SPDEF, TFF1, TFF3, CDH1 (sin KRT8/KRT18, que también tienen los hepatocitos); y no ser referencia ni hepatocito (A).",
+  "conjuntos": ["8p11 solo", "8p11 Y {{LOCUS}}", "8p11 O {{LOCUS}}"],
+  "conjunto_para_tablas": "8p11 solo (troncal en dos especímenes).",
+  "circularidad": "FGFR1, ZNF703, NSD3, CCND1, FGF19 en la tabla C se marcan «por construcción» y se recalculan con el conjunto dejando fuera ese gen de la ventana (LOO)."
+ },
+ "suelo": {
+  "ambiente": "barcodes raw NO llamados con 10 <= UMI <= 100 de la misma muestra; perfil p_g = cuentas_g / total.",
+  "rho": "contaminación ambiental = (cuentas del trazador en inmunes de A / UMI de esas inmunes) / p_trazador(ambiente). Trazador hígado: HEP5. Trazador hueso: COL1A1 + COL1A2 + SPP1 (no los expresan inmunes), solo inmunes en GEM limpio.",
+  "modelo": "lambda_g,i = p_g × rho × UMI_i (+ componente ADN en el hueso para sondas unspliced). Suelo_g = media sobre malignas de 1 - exp(-lambda_g,i).",
+  "corregida": "frac - suelo; IC del bootstrap de frac desplazado por el suelo (suelo tratado como fijo, declarado).",
+  "referencia": "detección en la referencia con profundidad emparejada (reponderada por deciles de UMI a la distribución de las malignas): comparador, NO suelo para genes que la referencia expresa de verdad (APM).",
+  "sensibilidad": "curva de detección de genes housekeeping con 1, 2 y 3 sondas incluidas: P(>=1 UMI) frente a CP10k pseudobulk. Un «0 detectadas» es informativo si la cota superior (regla del tres, 3/n UMI por célula, en CP10k) cae por debajo del CP10k al que la curva da >= 5 % de detección para su nº de sondas."
+ },
+ "fase": {
+  "criterio_artefacto": "el S+G2M de malignas no se interpreta como proliferación si la referencia no ciclante (T, NK, mieloide, endotelio) o los hepatocitos con el mismo score_genes dan >= 50 % del S+G2M de las malignas.",
+  "alternativas": ["fracción con S_score y G2M_score exactamente 0", "fase por decil de UMI", "detección directa de MKI67 y TOP2A con profundidad emparejada"]
+ },
+ "tejido": {
+  "v1_literal": "texto de ESPEC_CONGELADA_v1 paso 2, sin reinterpretar.",
+  "v2": "pseudobulk HEP5 del hueso solo con GEM limpio (primaria T) frente a lo esperado por ambiente."
+ },
+ "ic": "IC95: bootstrap percentil 1.000 réplicas semilla 20261016 para fracciones de la tabla; Wilson para proporciones de conteo.",
+ "semilla": 20261016
+}

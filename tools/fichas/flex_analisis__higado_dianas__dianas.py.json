@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/higado_dianas/dianas.py",
+ "estado_ficha": "completa",
+ "para": "Dianas del hígado del Flex sin resolver la identidad célula a célula: tres vías independientes (conjunto de alta confianza por programa luminal con LOO y malla; deconvolución del pseudobulk del pool; ancla en las 68 malignas limpias del hueso) y veredicto mecánico por diana. Reglas congeladas en REGLAS_HIGADO_v1.json.",
+ "cuando_si": "Para regenerar o auditar la tabla de dianas del hígado (desde las cachés del cierre).",
+ "cuando_no": "No para contar células tumorales del hígado (el cierre lo dejó no resoluble) ni para cambiar reglas a posteriori (eso es una v2 con reglas nuevas antes de calcular).",
+ "reemplaza": "La fila «Dianas en el hígado (pool, cota superior)» del acta, que medía sobre el pool por exclusión.",
+ "test": "tests/test_flex_higado_dianas.py",
+ "alta": "2026-10-16",
+ "origen": "Encargo de {{TITULAR}} del 16-oct-2026: «¿y en el hígado? Queremos las dianas de todo»."
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/b/flex_b.py",
+ "estado_ficha": "completa",
+ "para": "analista B (independiente de A) del single-cell 10x Flex de hígado y hueso: QC por MAD + Scrublet, control de tejido, ARN ambiental, Leiden + marcadores, malignas por consenso inferCNV + segundo método CNV con identidad epitelial, tablas A-D de la especificación congelada v1 (fracción ≥1 UMI con IC95 bootstrap, media CP10k entre positivas, n), auditoría de especificidad de sondas MAGEA, secundarias y h5ad congelado con sha256. Solo por la ventanilla (lector_clinico.py procesa flex_b -- <orden>), stdout solo agregados.",
+ "cuando_si": "hay que (re)correr el análisis B del Flex sobre ~/Clinico-PRIVADO/flex/<sha12>/ o regenerar sus tablas y el h5ad congelado en analisis_B/.",
+ "cuando_no": "traer los datos (flex_ingesta); el análisis A (otro analista, código propio); cualquier salida hacia fuera; usar las anotaciones de 10x o analysis/ de Cell Ranger (prohibido por la especificación).",
+ "reemplaza": "nada: es la primera implementación B. Se escribió a ciegas del informe ChromaLogic y del análisis A.",
+ "test": "tests/test_flex_b.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 5 del plan Flex aprobado por {{TITULAR}} el 16-oct-2026; especificación docs/flex/ESPEC_CONGELADA_v1.md (sha256 6165b9ef…)."
+}

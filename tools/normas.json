@@ -3792,6 +3792,102 @@
       "auditable": true,
       "repetida": true,
       "nota": "Clasificada el 17-oct-26 al nacer (su «pues hazlo» para el vídeo de Anthropic no abrió el freno; 5 deudas de la misma clase)."
+    },
+    {
+      "slug": "feedback-dfci-no-discrepancias-sin-error-establecido",
+      "que": "Con DFCI/ClinicOmics no se habla de «discrepancias» sin error suyo establecido contra su original; lo nuestro va como aportación y pregunta de método",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26. Exige criterio sobre tono y sobre si la cifra se abrió en su original; la revisa `verificacion` en todo lo que va a DFCI. Sin hook posible."
+    },
+    {
+      "slug": "feedback-ensayos-no-filtrar-por-condiciones-transitorias",
+      "que": "Al cribar ensayos se filtra por lo estable; lo transitorio (ensayo actual, analítica, pulmón) va en columna aparte y no baja puestos",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26. Criterio de los agentes que buscan ensayos (comite-medico, consejero-acceso, oncologo-virtual, radar); no hay test que distinga transitorio de estable."
+    },
+    {
+      "slug": "feedback-pagina-de-prueba-lleva-resultados-y-auditoria-ds",
+      "que": "Una página web sobre una prueba suya lleva sus resultados (con puerta verificado + ok_titular) y una auditoría del sistema de diseño por otro revisor antes de darla por hecha",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26. La puerta de resultados existe en la web (public/celula/resultados.json, verificado + ok_titular), pero la auditoría por un `diseno` distinto es criterio. Aplicada en /celula-a-celula (PR web #280)."
+    },
+    {
+      "slug": "feedback-agentes-en-otro-worktree-mover-sesion-antes",
+      "que": "Antes de lanzar agentes que editan otro worktree, mover la sesión a ese worktree o dar sesión propia; si no, worktree_guard les veta Write/Edit",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26 (vencida en el registro, otra sesión la escribió). worktree_guard bloquea, pero lo que manda la norma es el orden previo: criterio."
+    },
+    {
+      "slug": "feedback-prometer-vigilar-exige-mecanismo",
+      "que": "No prometer «te aviso cuando acabe» sin un proceso en segundo plano que despierte; o se lanza el vigía en el mismo turno o se hace antes de cerrar",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26 (vencida en el registro). Requiere criterio sobre el `Siguiente:`; el gate de salida no sabe si hay vigía vivo."
+    },
+    {
+      "slug": "feedback-video-explicativo-intro-sangre2d-web-dicha",
+      "que": "Vídeos explicativos: intro con contexto, sangre en 2D y célula en 3D; la web se dice «help titular punto com»",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26 (vencida en el registro). Estructura y fonética son criterio; la grafía está fijada en guion_voz_es.json."
+    },
+    {
+      "slug": "feedback-adjuntar-sin-que-guie",
+      "que": "Adjuntar a correos lo resuelvo yo de punta a punta; si una vía está rota se arregla la vía, no se le devuelve el paso",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26 (vencida en el registro, otra sesión la escribió). Criterio de autonomía; no hay hook que sepa si se le devolvió el paso."
+    },
+    {
+      "slug": "feedback-borrador-s-programado-no-tocar",
+      "que": "Un borrador de Gmail con id «s:…» es un envío programado: editarlo lo envía; nunca reutilizarlo, crear uno nuevo",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 17-oct-26 (vencida en el registro). Candidata a bloqueo (hook PreToolUse sobre update_draft con id «s:»); hasta que exista, depende del criterio."
     }
   ]
 }

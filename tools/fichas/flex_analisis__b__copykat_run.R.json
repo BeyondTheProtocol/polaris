@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/b/copykat_run.R",
+ "estado_ficha": "completa",
+ "para": "lanzar CopyKAT (segundo método CNV, independiente de inferCNV) sobre una matriz de UMI crudos exportada por pasos.py con ids de célula opacos y referencia no epitelial; escribe la predicción aneuploid/diploid junto a la entrada.",
+ "cuando_si": "solo desde pasos.py cnv, dentro de la ventanilla, con el entorno R de ~/.claude-science/conda/envs/r (copykat 1.2.5).",
+ "cuando_no": "a mano sobre datos de la paciente fuera de la ventanilla; sobre matrices normalizadas (CopyKAT quiere UMI crudos).",
+ "reemplaza": "nada.",
+ "test": "tests/test_flex_b.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 5 del plan Flex (16-oct-2026), especificación congelada v1, paso 5."
+}

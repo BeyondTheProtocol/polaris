@@ -38,7 +38,7 @@ CAMPOS = ("para", "cuando_si", "cuando_no", "reemplaza", "test", "alta", "origen
 # Carpetas de tools/ que no son piezas: estado vivo, lo retirado, las propias fichas y activos.
 NO_PIEZA = {"state", "retired", "fichas", "__pycache__", "fonts", "templates", "visor3d_web",
             "visor_video_x", "config", "personas", "node_modules"}
-EXT = (".py", ".sh")
+EXT = (".py", ".sh", ".R")  # .R: scripts de análisis (p. ej. CopyKAT) también llevan ficha
 AVISO = "busca antes de crear; si hay algo parecido, amplíalo"
 
 

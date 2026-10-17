@@ -1,0 +1,9 @@
+{
+ "fijado": "2026-10-16, ANTES de correr la prueba A/B y antes de abrir ningún gen de las tablas A-C",
+ "motivo": "CopyKAT con la referencia inmune+endotelio del hígado llamó diploide al 100% de las 3.831 células evaluables del trozo 0 (0 aneuploides), mientras inferCNV ve ganancia de chr8 por clúster y el hueso (referencia limpia) da 237 aneuploides. Hipótesis: referencia contaminada de ARN tumoral.",
+ "referencia_purificada": "células de tipo referencia (inmune + endotelio) con 0 UMI en EPCAM, KRT8, KRT18, KRT19, ESR1 y FOXA1 (GATA3 no se usa: lo expresan las T)",
+ "prueba": "CopyKAT sobre las MISMAS células no-referencia del trozo 0 (orden de celulas.csv, índice % 4 == 0), cambiando solo la referencia; inferCNV rehecho con la referencia purificada y la misma regla de clúster.",
+ "exito": "≥50% de las células evaluables (aneuploid|diploid) que están en clústeres inferCNV-aberrantes salen aneuploides Y ≤10% de las células de referencia purificada evaluables salen aneuploides.",
+ "si_pasa": "se corren todos los trozos con la referencia purificada y ese es el brazo CopyKAT (desviación declarada).",
+ "si_falla": "CopyKAT no informativo en hígado; población de respaldo EXPLORATORIA = clúster epitelial ∧ clúster inferCNV-aberrante (un solo método), con chequeo de estabilidad de cada gen bajo 3 definiciones: respaldo, llamada por célula p99, todo clúster epitelial."
+}

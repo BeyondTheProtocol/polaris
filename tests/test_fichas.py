@@ -66,6 +66,12 @@ class Arbol:
         shutil.rmtree(self.raiz, ignore_errors=True)
 
 
+class TestExtensiones(unittest.TestCase):
+    def test_script_R_es_pieza(self):
+        self.assertTrue(fichas.es_pieza("flex_analisis/b/copykat_run.R"))
+        self.assertFalse(fichas.es_pieza("flex_analisis/a/_copykat.R"))
+
+
 class TestRepoDeVerdad(unittest.TestCase):
     def test_todas_las_piezas_tienen_ficha_valida(self):
         fuera = fichas.comprobar(RAIZ)

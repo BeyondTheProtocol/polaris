@@ -1,0 +1,1087 @@
+{
+ "probeset_sha256": "ef36df652c90c9436a4f81d2c9dc673ddb13b8b7b6f6eb78e9bf0168f924e777",
+ "cdna_sha256": "1881e80298f19207159b60bf1eb79b0c5fe34eb38c24c5b4e796a35f016c1e7d",
+ "cdna_fichero": "Homo_sapiens.GRCh38.cdna.all.fa.gz",
+ "fecha": "2026-10-16",
+ "regla": {
+  "max_mm_completa_familia": 3,
+  "o_bien": "ambas mitades exactas en otro gen"
+ },
+ "n_transcritos_total": 207249,
+ "genes_familia": [
+  "ANKRD30A",
+  "ANKRD30B",
+  "ANKRD30BL",
+  "ANKRD30BP1",
+  "ANKRD30BP2",
+  "ANKRD30BP3",
+  "CSAG1",
+  "CSAG2",
+  "CSAG3",
+  "CSAG4",
+  "CTAG1A",
+  "CTAG1B",
+  "CTAG2",
+  "CTAGE1",
+  "CTAGE10P",
+  "CTAGE11P",
+  "CTAGE12P",
+  "CTAGE13P",
+  "CTAGE14P",
+  "CTAGE15",
+  "CTAGE16P",
+  "CTAGE3P",
+  "CTAGE4",
+  "CTAGE6",
+  "CTAGE7P",
+  "CTAGE8",
+  "CTAGE9",
+  "MAGEA1",
+  "MAGEA10",
+  "MAGEA11",
+  "MAGEA12",
+  "MAGEA13P",
+  "MAGEA2",
+  "MAGEA2B",
+  "MAGEA3",
+  "MAGEA4",
+  "MAGEA5P",
+  "MAGEA6",
+  "MAGEA7P",
+  "MAGEA8",
+  "MAGEA9",
+  "MAGEA9B",
+  "MAGEB1",
+  "MAGEB10",
+  "MAGEB16",
+  "MAGEB17",
+  "MAGEB18",
+  "MAGEB2",
+  "MAGEB3",
+  "MAGEB4",
+  "MAGEB5",
+  "MAGEB6",
+  "MAGEB6B",
+  "MAGEC1",
+  "MAGEC2",
+  "MAGEC3",
+  "MAGED1",
+  "MAGED2",
+  "MAGED4",
+  "MAGED4B",
+  "MAGEE1",
+  "MAGEE2",
+  "MAGEF1",
+  "MAGEH1",
+  "MAGEL2",
+  "NDN",
+  "NSMCE3",
+  "PRAME",
+  "PRAMEF1",
+  "PRAMEF10",
+  "PRAMEF11",
+  "PRAMEF12",
+  "PRAMEF13",
+  "PRAMEF14",
+  "PRAMEF15",
+  "PRAMEF17",
+  "PRAMEF18",
+  "PRAMEF19",
+  "PRAMEF2",
+  "PRAMEF20",
+  "PRAMEF22",
+  "PRAMEF25",
+  "PRAMEF26",
+  "PRAMEF27",
+  "PRAMEF28P",
+  "PRAMEF29P",
+  "PRAMEF30P",
+  "PRAMEF31P",
+  "PRAMEF32P",
+  "PRAMEF33",
+  "PRAMEF34P",
+  "PRAMEF35P",
+  "PRAMEF36P",
+  "PRAMEF4",
+  "PRAMEF5",
+  "PRAMEF6",
+  "PRAMEF7",
+  "PRAMEF8",
+  "PRAMEF9",
+  "PRAMENP",
+  "TPBG",
+  "TRO"
+ ],
+ "n_transcritos_familia": 399,
+ "por_gen": {
+  "PRAME": {
+   "n_sondas": 2,
+   "resolubles": [
+    "ENSG00000185686|PRAME|1a2551d",
+    "ENSG00000185686|PRAME|2bbf37d"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEA4": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000147381|MAGEA4|3a144f8",
+    "ENSG00000147381|MAGEA4|41b46bf",
+    "ENSG00000147381|MAGEA4|94f41e1"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEA1": {
+   "n_sondas": 1,
+   "resolubles": [
+    "ENSG00000198681|MAGEA1|44bfeab"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEA6": {
+   "n_sondas": 2,
+   "resolubles": [],
+   "no_resolubles": [
+    [
+     "ENSG00000197172|MAGEA6|6786948",
+     [
+      "MAGEA3"
+     ],
+     []
+    ],
+    [
+     "ENSG00000197172|MAGEA6|80a9c95",
+     [
+      "MAGEA12",
+      "MAGEA2",
+      "MAGEA2B",
+      "MAGEA3"
+     ],
+     []
+    ]
+   ],
+   "estado": "no resoluble a nivel de parálogo"
+  },
+  "MAGEA10": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000124260|MAGEA10|0ad9fd1",
+    "ENSG00000124260|MAGEA10|3ef2218",
+    "ENSG00000124260|MAGEA10|a6b06c0"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEA11": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000185247|MAGEA11|301032b",
+    "ENSG00000185247|MAGEA11|603aa13",
+    "ENSG00000185247|MAGEA11|7a001aa"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEA12": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000213401|MAGEA12|7507103",
+    "ENSG00000213401|MAGEA12|7a2a23c",
+    "ENSG00000213401|MAGEA12|dab72e5"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEC1": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000155495|MAGEC1|4652451",
+    "ENSG00000155495|MAGEC1|a50cecb",
+    "ENSG00000155495|MAGEC1|c66f8bb"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "MAGEC2": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000046774|MAGEC2|023a471",
+    "ENSG00000046774|MAGEC2|16a9a85",
+    "ENSG00000046774|MAGEC2|6ea00bd"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "CTAG2": {
+   "n_sondas": 2,
+   "resolubles": [
+    "ENSG00000126890|CTAG2|7576039",
+    "ENSG00000126890|CTAG2|abbb115"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "ANKRD30A": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000148513|ANKRD30A|51eba73",
+    "ENSG00000148513|ANKRD30A|9d42229",
+    "ENSG00000148513|ANKRD30A|e1a0968"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  },
+  "TPBG": {
+   "n_sondas": 3,
+   "resolubles": [
+    "ENSG00000146242|TPBG|633282b",
+    "ENSG00000146242|TPBG|634baab",
+    "ENSG00000146242|TPBG|7f861ed"
+   ],
+   "no_resolubles": [],
+   "estado": "resoluble"
+  }
+ },
+ "sondas": [
+  {
+   "gen": "MAGEC2",
+   "probe_id": "ENSG00000046774|MAGEC2|023a471",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC2": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEC2",
+   "probe_id": "ENSG00000046774|MAGEC2|16a9a85",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC2": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEC1": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    }
+   }
+  },
+  {
+   "gen": "MAGEC2",
+   "probe_id": "ENSG00000046774|MAGEC2|6ea00bd",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC2": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA10",
+   "probe_id": "ENSG00000124260|MAGEA10|0ad9fd1",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA10": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA10",
+   "probe_id": "ENSG00000124260|MAGEA10|3ef2218",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA10": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA10",
+   "probe_id": "ENSG00000124260|MAGEA10|a6b06c0",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA10": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "CTAG2",
+   "probe_id": "ENSG00000126890|CTAG2|7576039",
+   "included": "TRUE",
+   "region": "spliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "CTAG1A": {
+     "mm_completa": 9,
+     "mm_lhs": 6,
+     "mm_rhs": 3
+    },
+    "CTAG1B": {
+     "mm_completa": 9,
+     "mm_lhs": 6,
+     "mm_rhs": 3
+    },
+    "CTAG2": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "CTAG2",
+   "probe_id": "ENSG00000126890|CTAG2|abbb115",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "CTAG1A": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    },
+    "CTAG1B": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    },
+    "CTAG2": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "TPBG",
+   "probe_id": "ENSG00000146242|TPBG|633282b",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "TPBG": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "TPBG",
+   "probe_id": "ENSG00000146242|TPBG|634baab",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "TPBG": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "TPBG",
+   "probe_id": "ENSG00000146242|TPBG|7f861ed",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "TPBG": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA4",
+   "probe_id": "ENSG00000147381|MAGEA4|3a144f8",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA8": {
+     "mm_completa": 9,
+     "mm_lhs": 8,
+     "mm_rhs": 1
+    },
+    "MAGEA3": {
+     "mm_completa": 8,
+     "mm_lhs": 6,
+     "mm_rhs": 2
+    },
+    "MAGEA2B": {
+     "mm_completa": 7,
+     "mm_lhs": 5,
+     "mm_rhs": 2
+    },
+    "MAGEA12": {
+     "mm_completa": 8,
+     "mm_lhs": 6,
+     "mm_rhs": 2
+    },
+    "MAGEA6": {
+     "mm_completa": 10,
+     "mm_lhs": 6,
+     "mm_rhs": 4
+    },
+    "MAGEA4": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA2": {
+     "mm_completa": 7,
+     "mm_lhs": 5,
+     "mm_rhs": 2
+    },
+    "MAGEA1": {
+     "mm_completa": 10,
+     "mm_lhs": 6,
+     "mm_rhs": 4
+    },
+    "MAGEA5P": {
+     "mm_completa": 8,
+     "mm_lhs": 6,
+     "mm_rhs": 2
+    }
+   }
+  },
+  {
+   "gen": "MAGEA4",
+   "probe_id": "ENSG00000147381|MAGEA4|41b46bf",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA4": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA5P": {
+     "mm_completa": 6,
+     "mm_lhs": 3,
+     "mm_rhs": 3
+    }
+   }
+  },
+  {
+   "gen": "MAGEA4",
+   "probe_id": "ENSG00000147381|MAGEA4|94f41e1",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA4": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA1": {
+     "mm_completa": 8,
+     "mm_lhs": 6,
+     "mm_rhs": 2
+    }
+   }
+  },
+  {
+   "gen": "ANKRD30A",
+   "probe_id": "ENSG00000148513|ANKRD30A|51eba73",
+   "included": "TRUE",
+   "region": "spliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "ANKRD30A": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "ANKRD30A",
+   "probe_id": "ENSG00000148513|ANKRD30A|9d42229",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "ANKRD30A": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "ANKRD30A",
+   "probe_id": "ENSG00000148513|ANKRD30A|e1a0968",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "ANKRD30B": {
+     "mm_completa": 8,
+     "mm_lhs": 5,
+     "mm_rhs": 2
+    },
+    "ANKRD30A": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "ANKRD30BP1": {
+     "mm_completa": 8,
+     "mm_lhs": 5,
+     "mm_rhs": 2
+    }
+   }
+  },
+  {
+   "gen": "MAGEC1",
+   "probe_id": "ENSG00000155495|MAGEC1|4652451",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC1": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEC1",
+   "probe_id": "ENSG00000155495|MAGEC1|a50cecb",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC3": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    },
+    "MAGEC1": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEC1",
+   "probe_id": "ENSG00000155495|MAGEC1|c66f8bb",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEC1": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA11",
+   "probe_id": "ENSG00000185247|MAGEA11|301032b",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA11": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA11",
+   "probe_id": "ENSG00000185247|MAGEA11|603aa13",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA11": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA11",
+   "probe_id": "ENSG00000185247|MAGEA11|7a001aa",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA11": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "PRAME",
+   "probe_id": "ENSG00000185686|PRAME|1a2551d",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "PRAME": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "PRAME",
+   "probe_id": "ENSG00000185686|PRAME|2bbf37d",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "PRAME": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA6",
+   "probe_id": "ENSG00000197172|MAGEA6|6786948",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [
+    "MAGEA3"
+   ],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": false,
+   "hits_familia": {
+    "MAGEA8": {
+     "mm_completa": 10,
+     "mm_lhs": 5,
+     "mm_rhs": 5
+    },
+    "MAGEA3": {
+     "mm_completa": 3,
+     "mm_lhs": 2,
+     "mm_rhs": 1
+    },
+    "MAGEA2B": {
+     "mm_completa": 5,
+     "mm_lhs": 3,
+     "mm_rhs": 2
+    },
+    "MAGEA12": {
+     "mm_completa": 4,
+     "mm_lhs": 3,
+     "mm_rhs": 1
+    },
+    "MAGEA6": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA2": {
+     "mm_completa": 5,
+     "mm_lhs": 3,
+     "mm_rhs": 2
+    }
+   }
+  },
+  {
+   "gen": "MAGEA6",
+   "probe_id": "ENSG00000197172|MAGEA6|80a9c95",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [
+    "MAGEA12",
+    "MAGEA2",
+    "MAGEA2B",
+    "MAGEA3"
+   ],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": false,
+   "hits_familia": {
+    "MAGEA8": {
+     "mm_completa": 10,
+     "mm_lhs": 4,
+     "mm_rhs": 6
+    },
+    "MAGEA3": {
+     "mm_completa": 3,
+     "mm_lhs": 2,
+     "mm_rhs": 1
+    },
+    "MAGEA2B": {
+     "mm_completa": 3,
+     "mm_lhs": 2,
+     "mm_rhs": 1
+    },
+    "MAGEA12": {
+     "mm_completa": 3,
+     "mm_lhs": 2,
+     "mm_rhs": 1
+    },
+    "MAGEA6": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA4": {
+     "mm_completa": 8,
+     "mm_lhs": 5,
+     "mm_rhs": 3
+    },
+    "MAGEA2": {
+     "mm_completa": 3,
+     "mm_lhs": 2,
+     "mm_rhs": 1
+    },
+    "MAGEA1": {
+     "mm_completa": 5,
+     "mm_lhs": 4,
+     "mm_rhs": 1
+    },
+    "MAGEA5P": {
+     "mm_completa": 7,
+     "mm_lhs": 5,
+     "mm_rhs": 2
+    }
+   }
+  },
+  {
+   "gen": "MAGEA1",
+   "probe_id": "ENSG00000198681|MAGEA1|44bfeab",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA1": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA12",
+   "probe_id": "ENSG00000213401|MAGEA12|7507103",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA3": {
+     "mm_completa": 7,
+     "mm_lhs": 3,
+     "mm_rhs": 4
+    },
+    "MAGEA2B": {
+     "mm_completa": 4,
+     "mm_lhs": 1,
+     "mm_rhs": 3
+    },
+    "MAGEA12": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA6": {
+     "mm_completa": 7,
+     "mm_lhs": 3,
+     "mm_rhs": 4
+    },
+    "MAGEA9": {
+     "mm_completa": 10,
+     "mm_lhs": 4,
+     "mm_rhs": 6
+    },
+    "MAGEA9B": {
+     "mm_completa": 10,
+     "mm_lhs": 4,
+     "mm_rhs": 6
+    },
+    "MAGEA2": {
+     "mm_completa": 4,
+     "mm_lhs": 1,
+     "mm_rhs": 3
+    },
+    "MAGEA5P": {
+     "mm_completa": 10,
+     "mm_lhs": 4,
+     "mm_rhs": 6
+    }
+   }
+  },
+  {
+   "gen": "MAGEA12",
+   "probe_id": "ENSG00000213401|MAGEA12|7a2a23c",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA12": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    }
+   }
+  },
+  {
+   "gen": "MAGEA12",
+   "probe_id": "ENSG00000213401|MAGEA12|dab72e5",
+   "included": "TRUE",
+   "region": "unspliced",
+   "mm_propio_familia": 0,
+   "exacta_en_objetivo_transcritoma": true,
+   "cruza_familia_<=3mm": [],
+   "ambas_mitades_exactas_en_otro_gen": [],
+   "lhs_exacta_en": [],
+   "rhs_exacta_en": [],
+   "resoluble": true,
+   "hits_familia": {
+    "MAGEA3": {
+     "mm_completa": 8,
+     "mm_lhs": 3,
+     "mm_rhs": 5
+    },
+    "MAGEA2B": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    },
+    "MAGEA12": {
+     "mm_completa": 0,
+     "mm_lhs": 0,
+     "mm_rhs": 0
+    },
+    "MAGEA6": {
+     "mm_completa": 9,
+     "mm_lhs": 4,
+     "mm_rhs": 5
+    },
+    "MAGEA2": {
+     "mm_completa": 9,
+     "mm_lhs": 3,
+     "mm_rhs": 6
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/tribunal/tribunal.py",
+ "estado_ficha": "completa",
+ "para": "Miembro computacional del tribunal (fase 6) del Flex: audita a los analistas A y B con código propio (fuga entre muestras por GEM, ADN genómico en sondas unspliced, llamada de malignas calibrada con el ADN de FoundationOne/TSO500 como espec. v2 EXPLORATORIA, suelo de ambiente y sensibilidad por nº de sondas, artefacto S/G2M, control de tejido). Escribe solo en ~/Clinico-PRIVADO/flex/tribunal/ con sha256; stdout solo agregados.",
+ "cuando_si": "revisar o reproducir el veredicto del tribunal sobre el Flex 931c64af777e; recalcular las tablas A-C con suelo de ambiente.",
+ "cuando_no": "análisis primario (analistas A y B, flex_analisis/a y /b); ingesta (flex_ingesta.py); cualquier otro dataset.",
+ "reemplaza": "nada: auditoría nueva.",
+ "test": "tests/test_flex_tribunal.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 6 del plan Flex aprobado por {{TITULAR}} el 16-oct-2026; encargo del tribunal a herramientas-medicas."
+}

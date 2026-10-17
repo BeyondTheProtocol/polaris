@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/a/flex_a.py",
+ "estado_ficha": "completa",
+ "para": "Analista A del single-cell 10x Flex (hígado y hueso): ejecuta la especificación congelada v1 (docs/flex/ESPEC_CONGELADA_v1.md) por pasos (inventario, QC+Scrublet, control de tejido, ambiental, Leiden, malignas por consenso inferCNV + segundo método CNV, tablas A-D, secundarias, auditoría de parálogos MAGEA) y escribe salidas solo en ~/Clinico-PRIVADO/flex/analisis_A/ con sha256; stdout solo agregados.",
+ "cuando_si": "análisis independiente A del Flex de fase 5; reproducir sus cifras desde cero (semilla 20261016, NUMBA_NUM_THREADS=1).",
+ "cuando_no": "ingesta del tar (flex_ingesta.py); analista B (independiente, otro directorio); cualquier dato que no sea el Flex 931c64af777e.",
+ "reemplaza": "nada: análisis nuevo.",
+ "test": "tests/test_flex_a.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 5 del plan Flex aprobado por {{TITULAR}} el 16-oct-2026; especificación congelada sha256 6165b9ef."
+}

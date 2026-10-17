@@ -1,0 +1,73 @@
+{
+ "estado": "Reglas v3 del CIERRE técnico del Flex (hígado y hueso). Fijadas el 2026-10-16 ANTES de calcular ninguna cifra del cierre. EXPLORATORIO: no es un prerregistro ciego (el cierre conoce las salidas de A, B, el tribunal y el red-team). Todo lo que se fije después de ver resultados del cierre irá en la sección POST_HOC de cierre.json, marcado y con fecha.",
+ "visto_antes_de_fijar": [
+  "Salidas del tribunal (calibra, fuga, adn, clon, suelo, fase, tejido) y el acta con las correcciones del red-team.",
+  "Composición del hígado por tipo de A y por leiden; detección de marcadores biliares y mamarios por tipo (_orienta_higado.py): HNF1B, CFTR y SCTR ~0 % en las luminales; GATA3 48-54 % y FGFR1 83-86 % en NK, endotelio y mieloide (el ambiente es ARN tumoral); 276 de 543 fibroblastos/estrelladas caían en luminal_T.",
+  "Estructura (no conteos) de las predicciones CopyKAT de A y B y de cnv_higado.h5ad de A; nº de sondas de los genes de T6."
+ ],
+ "precondiciones": {
+  "colangiocitos": "NO existen como referencia: 2 luminales con >=2 de 6 genes biliares y 0 mamarios; HNF1B/CFTR/SCTR ~0 %. La rama «inferCNV con referencia de colangiocitos» del encargo queda cerrada por dato.",
+  "endotelio_limpio": "NO existe: el endotelio lleva FGFR1 86 %, GATA3 48 %, ANKRD30A 18 % por ambiente tumoral. Una referencia no epitelial no puede separar linaje de CNV por construcción.",
+  "consecuencia": "Sin epitelio no tumoral de linaje mamario en el hígado, linaje y CNV no se separan del todo célula a célula. Se usan dos ejes ortogonales (identidad frente a nulo de ambiente; CNV de brazo sin chr8 ni chr11) y una cota de no-tumor por programas epiteliales no mamarios posibles en hígado."
+ },
+ "semilla": 20261016,
+ "determinismo": "NUMBA/OMP/MKL/OPENBLAS a 1 hilo; claves ordenadas en JSON; floats redondeados a 6 cifras significativas en las salidas; bootstrap con numpy default_rng(semilla).",
+ "T1_malignas_higado": {
+  "candidatas": "todas las células post-QC del hígado salvo las del nulo de ambiente (A: NK, endotelio, mieloide) y los hepatocitos de A.",
+  "eje1_identidad_vs_ambiente": {
+   "genes_GL": ["FOXA1", "ESR1", "ANKRD30A", "TRPS1", "SPDEF", "AGR2", "TFF1", "TFF3", "KRT19", "KRT7", "EPCAM", "CLDN4", "MUC1"],
+   "excluidos_y_por_que": "GATA3 (lo expresan T/NK), XBP1 (plasmáticas, hepatocitos), KRT8/KRT18 (hepatocitos), FGFR1/CCND1/ZNF703 (amplicón: no pueden definir identidad).",
+   "estadistico": "s_i = UMI en GL / UMI total de la célula.",
+   "nulo": "NK + endotelio + mieloide de A (n 1.669), emparejado por decil de UMI (deciles sobre candidatas + nulo).",
+   "p_valor": "empírico dentro del decil: (1 + nº nulas con s >= s_i) / (1 + n_nulas del decil).",
+   "llamada_primaria": "BH FDR 1 % sobre todas las candidatas.",
+   "sensibilidad": "p99 del nulo dentro del decil (1 % FP por célula); FDR 5 %."
+  },
+  "eje2_cnv_brazo": {
+   "brazos": "GRCh38, centrómeros aproximados (tabla CENTROMEROS_MB en el código; error de ±2 Mb aceptado). Acrocéntricos 13, 14, 15, 21, 22 solo q.",
+   "excluidos": "chr8 y chr11 ENTEROS (8p11 y {{LOCUS}} no pueden definir la llamada), chrX, chrY, chrM. Brazos con < 20 genes fuera.",
+   "genes": "CP10k pseudobulk >= 0,5 en el hígado y en el hueso; fuera los genes con |log2FC| > 1 en cualquiera de: malignas limpias del hueso (68) frente a referencia limpia del hueso; candidatas del hígado frente al nulo del hígado; hepatocitos frente al nulo del hígado (recorta programas de linaje; las ganancias/pérdidas de brazo dan |log2FC| < 1).",
+   "valor_celula_brazo": "media sobre los genes del brazo de [log1p(CP10k) de la célula - media de log1p(CP10k) del gen en la referencia de su muestra], y luego centrado por célula (resta la media de sus brazos).",
+   "referencia_por_muestra": "hígado: nulo de ambiente (NK+endotelio+mieloide). Hueso: REF_TIPOS de A con GEM limpio (limpio_T).",
+   "plantilla": "media por brazo de las 68 malignas limpias del hueso (hueso_calls maligna_T_limpio_T) frente a su referencia.",
+   "score_celula": "correlación de Pearson entre el vector de brazos de la célula y la plantilla.",
+   "controles_de_linaje": "el mismo score en hepatocitos (epitelio no tumoral), fibroblastos/estrelladas y el propio nulo. El exceso de las candidatas se mide contra los hepatocitos (nulo EPITELIAL) y contra todos los controles juntos.",
+   "llamada_celula": "score > p99 de los controles (hepatocitos + estroma + nulo) dentro del mismo decil de UMI.",
+   "fraccion_poblacional": "pi = 1 - P(score_cand < mediana_control)/0,5 por decil, ponderada por el nº de candidatas del decil (Storey, lambda 0,5); IC95 bootstrap de células (1.000, semilla). Se da con nulo hepatocitos y con nulo de todos los controles.",
+   "LOO_brazo": "repetir la llamada quitando cada brazo de uno en uno: rango de n y Jaccard mínimo con la llamada completa.",
+   "validacion_cruzada_brazo": "para cada brazo a: llamar sin a, y comprobar si el desplazamiento del brazo a en el pseudobulk de las llamadas (frente al nulo) tiene el mismo signo que en la plantilla del hueso. Se informa la concordancia de signo en brazos con |plantilla| > 0,02.",
+   "CIRCULARIDAD": "un conjunto del hígado llamado con la plantilla del hueso NO vale después como prueba de «mismo clon»."
+  },
+  "cota_no_tumor_epitelial": "dentro de las positivas por identidad: fracción con programa biliar (>=1 UMI en HNF1B, CFTR o SCTR) o mesotelial (>=1 UMI en UPK3B, CALB2, WT1 o MSLN) por encima de lo que da el nulo emparejado por decil. La cota superior de Wilson de esa fracción en exceso es el techo de epitelio no tumoral entre las positivas. Hepatocitos y dobletes hepatocito: positivas con >= 2 genes de HEP5 se cuentan aparte.",
+  "numero_final": "malignas del hígado = positivas por identidad (FDR 1 %) × (1 - techo de no tumor), con IC Wilson; la CNV se da como corroboración poblacional, no como filtro (la llamada por célula a ~2.000 UMI está sesgada a células profundas).",
+  "conjunto_para_tablas": "primario: positivas por identidad (FDR 1 %) sin las positivas con >=2 HEP5. Sensibilidad: identidad ∧ CNV+ por célula; luminal_T del tribunal (13.695); A (9.385).",
+  "sensibilidad_metodo_sin_recalcular": "CopyKAT de B (aneuploide), CopyKAT de A (trozo0 y purificada), infercnv_aberrante de A (cnv_higado.h5ad). No se repite CopyKAT.",
+  "si_no_se_resuelve": "si la CNV por brazo no separa candidatas de hepatocitos (pi con IC que toca 0, o AUC < 0,6), se escribe «no resoluble célula a célula» y se da la cota poblacional con nulo epitelial (hepatocitos) y el techo de no-tumor."
+ },
+ "T2_fuga": {
+  "alfa": "cociente de sumas ΣHEP5_hueso / ΣHEP5_socio sobre TODOS los pares hueso–socio cuyo socio es hepatocito de A (sin umbral de HEP5_socio). IC95 bootstrap de pares (1.000, semilla).",
+  "sensibilidad": "mismo cociente sin las células del hueso tipadas hepatocito; y con HEP5_socio >= 20.",
+  "fuera_por_regla": "células del hueso cuyo socio del hígado se quitó en QC: se declaran con su n y no entran en alfa.",
+  "fraccion_UMI": "UMI esperadas fugadas = alfa × UMI del socio; fracción = suma esperada / suma observada en: malignas del hueso 87 (todas), 68 (limpias: 0 por definición) y 200 de A. Con alfa y con 0,046 (mediana UMI_hueso/UMI_socio en hepatocitos del hueso) como cota alta."
+ },
+ "T3_wilson": "toda fracción de conteo lleva IC95 de Wilson (z 1,959964). Para k=0 y k=n, la cota de Wilson sustituye a los IC [0,0] y [1,1]. Se reescribe tablas_tribunal.csv con columnas wilson_lo/wilson_hi en cierre/.",
+ "T4_adn": {
+  "conjuntos": "malignas del hueso del tribunal: 68 (limpias) y 87 (todas).",
+  "sondas": "unspliced de genes de la ventana silentes en ARN (tasa por sonda < 0,001 en las malignas del hígado) — con el conjunto primario nuevo del hígado y, como sensibilidad, con el de A; nulas: unspliced de receptores olfativos (^OR[0-9]).",
+  "calibracion": "eficiencia relativa e = (UMI_silentes / n_sondas_silentes) / (UMI_OR / n_sondas_OR) en las no malignas del hueso (ni las 87 ni las 200 de A), que se igualan a 2 copias. Copias = 2 × e_malignas / e_no_malignas.",
+  "IC": "exacto: IC de Garwood (Poisson) del recuento de silentes en malignas, con lo esperado diploide escalado por la calibración; y razón de tasas por binomial condicional (Clopper-Pearson) frente a las no malignas. Si el IC incluye 2 copias: «no informativo», sin estimación puntual."
+ },
+ "T5_tablas": {
+  "genes": "TABLAS A, B y C del tribunal (sin cambios).",
+  "conjuntos": "hígado: primario de T1 + sensibilidades; hueso: 68 (primario) y 87.",
+  "por_encima_del_suelo_UNICA_DEFINICION": "límite inferior de Wilson de la fracción detectada − suelo de ambiente > 0, con rho del trazador NO tumoral (hígado HEP5 en inmunes; hueso COL1A1+COL1A2+SPP1 en inmunes con GEM limpio) y ADN en el hueso para sondas unspliced. La misma regla en las dos muestras.",
+  "sensibilidad": "suelo con rho tumoral (FGFR1, ANKRD30A, MUC1, ESR1 en T/NK) y referencia no tumoral emparejada por decil de UMI (comparador).",
+  "cero": "k=0: cota superior de Wilson de la fracción y regla del tres en CP10k frente a la curva de 5 % por nº de sondas (como el tribunal)."
+ },
+ "T6_genes_nuevos": {
+  "genes": ["GRPR", "FAP", "ITGB6", "ROR1", "SLC39A6", "ERBB3", "ANKRD30A", "TPBG"],
+  "lectura": "misma regla de T5 en malignas frente a referencia emparejada. FAP es diana de estroma (CAF): se da además en fibroblastos/estrelladas del hígado y estroma del hueso, y no se lee como diana tumoral."
+ },
+ "ENMIENDA_1": "2026-10-16, ANTES de calcular ninguna cifra (detectada al escribir el código). ANKRD30A y MUC1 están en GL (identidad) y en las tablas B/C y en T6: su detección en el conjunto primario es en parte «por construcción». Para esos dos genes la fila primaria se recalcula con la identidad dejando fuera ese gen de GL (LOO) y se marca. Además: si un decil de UMI tiene < 20 células control en T1, se usan las del decil contiguo más cercano hasta llegar a 20 (se registra si ocurre).",
+ "T7_test":"tests/test_flex_cierre.py: re-ejecuta las etapas finales desde las cachés del cierre dos veces y exige sha256 idénticos; si faltan los datos, SKIP visible (nunca PASS)."
+}

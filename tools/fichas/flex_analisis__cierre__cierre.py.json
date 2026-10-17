@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/cierre/cierre.py",
+ "estado_ficha": "completa",
+ "para": "Cierre técnico del análisis 10x Flex (hígado y hueso) tras el red-team del tribunal: malignas robustas del hígado (identidad frente a nulo de ambiente + CNV de brazo sin chr8/chr11), fuga α por cociente de sumas, cotas de Wilson, lectura de ADN calibrada, tablas A-C y genes nuevos. Reglas congeladas en REGLAS_CIERRE_v3.json.",
+ "cuando_si": "Para regenerar o auditar las cifras del Flex que van a DFCI (prep una vez; final desde cachés).",
+ "cuando_no": "No para análisis nuevos fuera de REGLAS_CIERRE_v3 (eso es una v4 con reglas nuevas antes de calcular); no sustituye a A, B ni al tribunal, que siguen siendo la fuente de sus cifras.",
+ "reemplaza": "Las tablas y la definición de malignas del hígado del tribunal (conjunto 8p11 p99 de 732 y estimador del 97 %), que el red-team invalidó.",
+ "test": "tests/test_flex_cierre.py",
+ "alta": "2026-10-16",
+ "origen": "Encargo de cierre técnico tras el acta del tribunal (fase 6) y sus correcciones del red-team, 16-oct-2026."
+}

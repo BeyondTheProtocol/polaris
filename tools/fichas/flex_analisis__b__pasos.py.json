@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/b/pasos.py",
+ "estado_ficha": "completa",
+ "para": "los pasos del analista B del Flex (explorar, qc, anotar, cnv, medidas, secundarias, congelar), importados por flex_b.py; cada paso lee lo que dejó el anterior en analisis_B/ y escribe sus salidas con sha256.",
+ "cuando_si": "siempre a través de flex_b.py por la ventanilla; nunca se importa ni se ejecuta solo.",
+ "cuando_no": "fuera de la ventanilla; para el análisis A; para leer anotaciones de 10x (prohibido).",
+ "reemplaza": "nada: módulo hermano de flex_b.py, separado para que el lanzador (muro, -I, rutas) sea corto y auditable.",
+ "test": "tests/test_flex_b.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 5 del plan Flex (16-oct-2026), especificación congelada v1."
+}

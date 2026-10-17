@@ -1,0 +1,69 @@
+{
+ "estado": "REGLAS_HIGADO_v1: dianas del hígado sin resolver la identidad célula a célula. Fijadas el 2026-10-16 ANTES de calcular ninguna cifra de diana en ningún conjunto de este análisis. EXPLORATORIO, no ciego: ya se conocían las filas del pool por exclusión del cierre (ANKRD30A, TPBG, SLC39A6, CD276, NECTIN4 y SEZ6 por encima del suelo; ERBB2, ERBB3, MUC1 y TACSTD2 no) y las del hueso (68 limpias). Lo que se fije después irá en POST_HOC del json de salida, con fecha.",
+ "visto_antes_de_fijar": [
+  "Acta del tribunal, sección ESTADO FINAL (cierre técnico + red-team).",
+  "cierre.json y tablas_cierre.csv (filas del pool y del hueso), y el código del cierre y del tribunal.",
+  "_orienta.py: nº de sondas de las dianas y de los genes de programa; tipos de célula y cuantiles de UMI de las dos muestras; pseudobulk CP10k de los CYP y de genes de hepatocito en hepatocitos frente a epitelial/no_asignado (para elegir CYP hepáticos y controles negativos). Ninguna diana se miró en ningún conjunto de este análisis."
+ ],
+ "semilla": 20261016,
+ "determinismo": "Hilos a 1; JSON con claves ordenadas y 6 cifras significativas; bootstrap con numpy default_rng(semilla); npz sin fecha (como el cierre).",
+ "datos": "Cachés del cierre (X_higado.npz, obs_higado.npz, X_hueso.npz, obs_hueso.npz), sin leer de nuevo Cell Ranger. No se guardan matrices nuevas.",
+ "dianas": {
+  "dianas": ["ANKRD30A", "TPBG", "SLC39A6", "ERBB3", "ERBB2", "CD276", "NECTIN4", "TACSTD2", "MUC1", "ITGB6", "ROR1", "FOLR1", "CEACAM5", "VTCN1", "CDH17", "GPNMB", "MSLN", "CLDN6", "CLDN18", "{{DIANA2}}", "SEZ6", "{{DIANA}}", "SSTR5", "NCAM1", "CHGA", "SYP", "{{DIANA3}}", "FGFR1", "CCND1", "ESR1", "PGR", "AR"],
+  "control_CT": ["PRAME", "MAGEA1", "MAGEA4", "MAGEA6", "MAGEA10", "MAGEA11", "MAGEA12", "MAGEC1", "MAGEC2", "CTAG2", "CTAG1B", "MAGEA3"],
+  "presentacion": ["B2M", "TAP1", "TAP2", "NLRC5", "PSMB8", "PSMB9"],
+  "controles_negativos_hepatocito": ["APOC3", "APOH", "ORM1"],
+  "notas": "CT y presentación NO reciben veredicto de diana: CT es control ya cerrado; presentación se da como nivel relativo (no se puede afirmar pérdida). MAGEA6 no resoluble (parálogo de MAGEA3). Sin fila en la matriz = «fuera del panel»."
+ },
+ "via1_alta_confianza": {
+  "panel_identidad": ["ESR1", "TFF1", "TFF3", "KRT8", "KRT18", "KRT19", "FOXA1", "SPDEF", "AGR2"],
+  "fuera_del_panel_y_por_que": "GATA3 (lo llevan NK y endotelio en el hígado); ANKRD30A y MUC1 (dianas, y ANKRD30A es de diferenciación mamaria: circular).",
+  "k_detectados": "célula con >= k genes del panel de identidad con >= 1 UMI",
+  "FGFR1_alto": "FGFR1/UMI de la célula > p90 del mismo cociente en la referencia (NK + mieloide + endotelio) dentro del decil de UMI (deciles sobre todas las células del hígado; < 20 células de referencia en un decil -> se añaden los contiguos, como ENMIENDA_1 del cierre).",
+  "exclusion_hepatocito": "fuera si >= 2 genes detectados de HEP = ALB, APOA1, SERPINA1, HP, TF + CYP hepáticos (CYP2E1, CYP2C9, CYP2C8, CYP3A4, CYP1A2, CYP4A11, CYP2A6, CYP2B6, CYP8B1, CYP2C18, CYP4F2: cociente hepatocito/epitelial >= 100 en _orienta). No 0 UMI: con rho_HEP5 ~0,085 eso sesgaría a células poco profundas.",
+  "exclusion_inmune": "fuera si >= 2 de PTPRC, NKG7, GNLY, CD2, CD3E, CD3D, LYZ, CD68, CD163, C1QA, CSF1R, MS4A1, CD79A",
+  "exclusion_endotelio": "fuera si >= 2 de PECAM1, VWF, CDH5, KDR, EMCN, CLEC4G, STAB2, FLT1",
+  "exclusion_estroma": "fuera si >= 2 de COL1A1, COL1A2, COL3A1, DCN, LUM, RGS5, PDGFRB, TAGLN, ACTA2",
+  "exclusion_tipo": "fuera las células tipadas por A como hepatocito, NK, mieloide, endotelio o fibroblasto_estelar (el conjunto sale solo de epitelial + no_asignado).",
+  "profundidad": "UMI >= umbral",
+  "primario": {"k": 4, "UMI_min": 1000, "FGFR1_alto": true, "exclusiones": ">= 2"},
+  "regla_si_primario_pequeno": "si el primario tiene n < 200, el primario pasa al mayor k de la malla (con UMI_min 1000 y FGFR1_alto) que dé n >= 200; se registra.",
+  "malla_sensibilidad": {"k": [2, 3, 4, 5, 6], "UMI_min": [0, 1000, 1500, 2500], "FGFR1_alto": [true, false], "exclusiones": [">= 2", ">= 1"]},
+  "LOO": "toda diana que esté en el panel de identidad se mide con un conjunto construido SIN ese gen (ESR1). FGFR1 se mide con el conjunto sin el criterio FGFR1_alto. El LOO de un gen no quita la inflación por programa correlacionado: PGR, AR y CCND1 (genes ligados a ER) salen favorecidos por seleccionar con ESR1/TFF1/FOXA1; se declara en su fila.",
+  "medida_por_diana": "fracción con >= 1 UMI, IC95 Wilson; media CP10k en positivas; pseudobulk CP10k.",
+  "suelo": "como el cierre: lambda_i = p_amb_g * rho * UMI_i; suelo = media(1 - exp(-lambda_i)). Primario: rho del trazador NO tumoral (HEP5 en inmunes del hígado). Sensibilidad: rho tumoral (FGFR1, ANKRD30A, MUC1, ESR1 en NK), que el red-team sabe que lo tumba todo en el hígado; se da, no se usa para el veredicto.",
+  "referencias_emparejadas": "detección ponderada por decil de UMI del conjunto (pesos_umi del tribunal) en: R1 = NK + mieloide + endotelio (en el hígado no hay T, B ni plasmáticas anotadas: «inmunes» = NK + mieloide); R2 = hepatocitos. Además, por compartimento (NK, mieloide, endotelio, hepatocito, fibroblasto_estelar) para ver si un compartimento no tumoral expresa la diana de forma nativa (NCAM1 en NK, GPNMB en macrófagos, CD276 en endotelio, MSLN en mesotelio).",
+  "positiva_via1": "Wilson inferior > suelo (rho no tumoral) Y Wilson inferior > R1 Y Wilson inferior > R2 Y k >= 10. Conservador: si un compartimento de referencia expresa la diana de forma nativa, la diana puede fallar aquí sin que el tumor no la tenga; se anota.",
+  "robustez_malla": "fracción de celdas de la malla (con n >= 50) en las que la diana es positiva_via1. Robusta si >= 0,75.",
+  "dobletes": "por diana: fracción de positivas del conjunto con >= 1 UMI de NKG7/GNLY/PTPRC frente a la de negativas (indicador de doblete inmune; clave para NCAM1).",
+  "control_verdad_conocida_hueso": "la MISMA regla (panel, FGFR1_alto con referencia del hueso REF_TIPOS con GEM limpio, exclusiones con >= 2 añadiendo a inmunes S100A8, S100A9, MZB1, JCHAIN, HBB, HBA1, HBA2, ACP5, CTSK, y sin la exclusión por tipo de A, que en el hueso tiene otras etiquetas) aplicada a todas las células del hueso: sensibilidad frente a las 68 malignas limpias y especificidad frente a la referencia limpia del tribunal (REF_TIPOS + fibroblasto_estelar + osteoclasto + eritroide con GEM limpio, fuera las 87). Se da con k 2-6 y UMI_min 0 (las 68 tienen otra profundidad)."
+ },
+ "via2_deconvolucion": {
+  "mezcla": "pool por exclusión del cierre (epitelial + no_asignado, fuera las de >= 2 HEP5): pseudobulk CP10k.",
+  "componentes": "ambiente (perfil p_amb de los vacíos, peso fijo rho) + hepatocito, NK, mieloide, endotelio, fibroblasto_estelar (perfiles medidos en la propia muestra) + resto (atribuible al tumor).",
+  "perfiles_sin_ambiente": "P*_c = (P_c - rho * A * 1e4) / (1 - rho), recortado a >= 0.",
+  "pesos": "NNLS de (pool - rho*A*1e4) sobre P*_c usando SOLO los genes marcadores de compartimento (los de las exclusiones de la vía 1 + controles negativos de hepatocito), suponiendo que el tumor no los expresa.",
+  "estimacion": "T_g = (pool_g - rho*A_g*1e4 - sum_c w_c P*_c,g) / w_T, con w_T = 1 - rho - sum_c w_c. CP10k atribuible al compartimento tumoral del pool. NO se convierte en «% de células tumorales positivas»: el denominador tumoral no existe (cierre: no resoluble).",
+  "IC": "bootstrap de células (1.000, semilla) dentro del pool y de cada compartimento, recalculando pesos y T_g; percentiles 2,5-97,5.",
+  "variantes": "primaria rho no tumoral; sin restar ambiente a los perfiles (sesgo hacia 0: se resta ARN tumoral con los perfiles contaminados); rho tumoral (sesgo hacia 0 aún mayor, se resta el tumor como ambiente). Se declara la dirección de cada sesgo.",
+  "positiva_via2": "IC95 inferior de T_g (primaria) >= c5_g, el CP10k al que el panel detecta el gen en >= 5 % de células de su clase de nº de sondas (curva del cierre sobre el pool). Con T_g > 0 pero < c5: «traza».",
+  "enriquecimiento": "T_g / max_c P*_c,g, informativo (no entra en el veredicto)."
+ },
+ "via3_hueso": {
+  "conjunto": "68 malignas limpias del tribunal (sensibilidad: 87).",
+  "medida": "como la vía 1, con el suelo del cierre en el hueso (rho COL1A1+COL1A2+SPP1, + ADN delta*n_sondas_unspliced) y referencia REF_TIPOS con GEM limpio emparejada por UMI. Positiva_hueso = Wilson inferior > suelo Y > referencia Y k >= 5.",
+  "profundidad": "las 68 tienen ~2.740 UMI de mediana y el conjunto del hígado otra: la comparación entre lesiones se hace en CP10k pseudobulk y en detección predicha a 2.000 UMI, d = 1 - exp(-cp * 2000 / 1e4).",
+  "coherencia_por_diana": "concordante si positiva_via1 (hígado primario) == positiva_hueso.",
+  "coherencia_global": "Spearman entre lesiones de log2((CP10k_conjunto + 0,05) / (CP10k_referencia + 0,05)) sobre las dianas con sonda; p por permutación (10.000, semilla)."
+ },
+ "veredicto": {
+  "no_medible": "fuera del panel; MAGEA6; o k = 0 en el conjunto primario con cero no informativo (cota de la regla del tres >= c5).",
+  "diana_real_en_el_higado": "positiva_via1 en el primario Y robusta en la malla (>= 0,75) Y positiva_via2.",
+  "debil": "exactamente una de positiva_via1 (primario) o positiva_via2; o las dos pero robustez < 0,75; o T_g «traza» con positiva_via1.",
+  "no": "ni positiva_via1 ni positiva_via2 (si k = 0 con cero informativo, se dice).",
+  "coletilla_hueso": "cada veredicto lleva «coherente con el hueso» o «discordante con el hueso» (vía 3). La vía 3 no cambia el veredicto del hígado; si coincide, la conclusión es más robusta.",
+  "lenguaje": "ARN, no proteína. Describe y equipa; no concluye elegibilidad para ningún ensayo."
+ },
+ "salidas": "~/Clinico-PRIVADO/flex/higado_dianas/ (o $HIGADO_OUT): higado_dianas.json, tabla_dianas_higado.csv, malla_via1.csv, conjuntos_higado_dianas.npz (máscaras booleanas). stdout: solo agregados.",
+ "test": "tests/test_flex_higado_dianas.py: dos ejecuciones desde las cachés con sha256 idénticos; stdout sin barcodes ni ids de bloque; Wilson y la deconvolución sobre un caso sintético con respuesta conocida; SKIP 77 si faltan cachés."
+}

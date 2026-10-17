@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/ambiente/ambiente.py",
+ "estado_ficha": "completa",
+ "para": "Descontaminación de ARN ambiental del Flex (hígado y hueso) con SoupX, DecontX y CellBender, y repetición sobre la matriz limpia de la llamada de malignas del hígado (CNV de brazo + AUC frente a hepatocitos con el criterio congelado del cierre), {{LOCUS}}/8p11 y tablas de dianas. Reglas en REGLAS_AMBIENTE_v1.json, congeladas antes de calcular.",
+ "cuando_si": "Para intentar resolver malignas célula a célula en el hígado cuando el ambiente tumoral contamina la referencia, o para auditar esas cifras (prep una vez; final desde cachés).",
+ "cuando_no": "No sustituye al cierre ni a higado_dianas: amplía su método con matrices descontaminadas. No para nada fuera de REGLAS_AMBIENTE_v1 (eso es una v2 con reglas nuevas antes de calcular). Nunca con cómputo externo: egress 0.",
+ "reemplaza": "Nada; complementa tools/flex_analisis/cierre/cierre.py (rama «no resoluble célula a célula»).",
+ "test": "tests/test_flex_ambiente.py",
+ "alta": "2026-10-16",
+ "origen": "Encargo de {{TITULAR}} (16-oct-2026): «investiga y resuelve lo que puedas» sobre la llamada maligna/no maligna del hígado contaminada por ARN ambiental tumoral."
+}

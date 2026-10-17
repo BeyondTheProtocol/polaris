@@ -1,0 +1,5 @@
+{
+ "fijado": "2026-10-16, antes de calcular ninguna tabla A-D (análisis de sensibilidad EXPLORATORIO, no sustituye a la espec.)",
+ "umi_otra_muestra_max": 25,
+ "definicion": "Una célula está en GEM limpio si la suma de UMI con el barcode de la OTRA muestra en el mismo GEM (16 nt, matriz raw) es <= 25. 25 está por debajo del mínimo de UMI que exige el QC a una célula (hueso 146, hígado 364), así que excluye cualquier GEM con una célula de la otra muestra y tolera ambiente."
+}

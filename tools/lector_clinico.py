@@ -210,6 +210,20 @@ LAMINILLAS = {
     "laminillas_he": ("tools/laminillas_he.py", os.path.join(_VENVS_LAM, "patologia", "bin", "python")),
 }
 PROCESADORES.update(LAMINILLAS)
+# Flex single-cell DFCI (Fase 1 del plan Flex, 16-oct-26): ingesta en streaming del tar de 52 GB
+# desde Drive a `~/Clinico-PRIVADO/flex/<sha12>/`, solo lista blanca, sha256 del flujo, fail-closed
+# por `zonas_clinicas`. Intérprete: el python de Homebrew, que es donde viven las librerías de Google
+# que usa `drive.py` (el del sistema no las tiene). No se enjaula como las laminillas: su único
+# egress es la DESCARGA desde Drive y no abre el contenido de lo que extrae.
+FLEX = {
+    "flex_ingesta": ("tools/flex_ingesta.py", "/opt/homebrew/bin/python3"),
+    # Fase 5 (16-oct-26): analista B del Flex. Lee las matrices de la zona clínica del Flex y
+    # escribe solo en su subcarpeta `analisis_B/`. Intérprete: el env `nescore` (scanpy,
+    # infercnvpy). El script se re-ejecuta con `-I` y su stdout solo lleva agregados.
+    "flex_b": ("tools/flex_analisis/b/flex_b.py",
+               os.path.join(HOME, ".claude-science", "conda", "envs", "nescore", "bin", "python")),
+}
+PROCESADORES.update(FLEX)
 
 
 def _raices_para_listar():

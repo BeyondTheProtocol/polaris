@@ -1,0 +1,27 @@
+{
+ "estado": "REGLAS_VIAS_PROPIAS_v1 (corrección de {{TITULAR}}, 16-oct-26: «no se trata de copiar a DFCI, se trata de ver si por otros caminos se mejora algo»). Fijadas ANTES de calcular la vía ADN, las metacélulas y la comparación entre vías. El tipo DFCI (REGLAS_HIGADO_v4) queda como UNA referencia de comparación. EXPLORATORIO, NO CIEGO. Escrito con python porque los hooks PreToolUse de Write/Edit no respondían (host inalcanzable).",
+ "visto_antes_de_fijar": [
+  "ambiente.json: cruda AUC cierre 0,585; v4 0,999 (separa por linaje); v4 sin genes de linaje (post hoc) 0,873 con 2.739 llamadas en el pool; v4 sin QC 1.338 llamadas (inestable).",
+  "SoupX primario sobrecorrige (rho 0,62; 38 % de UMI retenidas). SoupX auto no limpia (testigos en el nulo 0,373 -> 0,362). DecontX limpia el nulo (0,373 -> 0,040) pero borra FGFR1 en el tumor del hueso (68: 100 % -> 4 %): no válido.",
+  "Trazadores de ADN (OR unspliced): hígado 1.071 UMI en 19.047 células (905 con > 0); hueso 8.115 en 1.993. Ventana 8p11: 22 genes, 64 sondas unspliced."
+ ],
+ "via_ADN": {
+  "idea": "Etiqueta INDEPENDIENTE de la expresión: ADN genómico por sondas unspliced de genes silentes en ARN. En el hígado el ADN es ~70 veces más escaso por célula: se AGREGA por grupos.",
+  "sondas_silentes": "genes de la ventana con tasa de UMI unspliced por sonda y célula < 0,001 en el pool del hígado (criterio del cierre, T4), en la matriz cruda; se informa cuántos genes y sondas quedan.",
+  "calibracion": "copias(grupo) = 2 x [UMI_silentes/n_sondas_silentes]/[UMI_OR/n_sondas_OR] del grupo, dividido por el mismo cociente en la referencia (hepatocitos + NK + endotelio + mieloide + fibroblasto_estelar). IC: binomial condicional (Clopper-Pearson) de silentes frente a OR en grupo y referencia (razón de razones), y además IC Garwood del recuento.",
+  "grupos": "(a) llamadas y no llamadas de cada vía dentro del pool; (b) hepatocitos; (c) referencia; (d) clústeres leiden del pool (resolución 0,5; 50 PCs; 15 vecinos; semilla) con >= 300 células.",
+  "lectura": "Una vía MEJORA si sus llamadas tienen más ADN de 8p11 que sus no llamadas del pool (IC de la razón que excluye 1) y la diferencia es mayor que la de las otras vías. Si todo IC incluye 1: «no informativo», sin cifra puntual.",
+  "{{LOCUS}}": "igual, sin lectura (no informativo por ADN en el hueso según el cierre)."
+ },
+ "via_metacelulas": {
+  "construccion": "k-means determinista (semilla) en 50 PCs de log1p CP10k de genes SIN linaje (regla del cierre), por separado en pool, hepatocitos y referencia; k = n/30; se quedan las de >= 15 células.",
+  "medida": "Suma de conteos por metacélula y el mismo infercnvpy de v4 (ventana 100, paso 10, referencia = metacélulas de referencia) sobre genes sin linaje; correlación con el consenso del pool. AUC metacélulas del pool frente a metacélulas de hepatocitos.",
+  "concordancia_hueso": "r de Pearson por brazo, sin chr8 ni chr11, entre el perfil medio de las metacélulas del pool y la plantilla del hueso (68) del cierre.",
+  "lectura": "MEJORA si la AUC por metacélula supera la de célula sin linaje (0,873) y la r con el hueso es > 0,3."
+ },
+ "via_CellBender_scCDC": "CellBender completo solo si una prueba de épocas da <= 15 h con la máquina disponible; scCDC (GitHub ZJU-UoE-CCW-LAB) si instala. Misma batería de éxito/retención de AMBIENTE_v1 y misma comparación.",
+ "via_atlas": "Transferencia desde un atlas público de metástasis hepática de mama con matriz descargable; si no se encuentra, se declara con las fuentes buscadas.",
+ "via_WES_Clonalscope": "Paso futuro: con el WES, Clonalscope con su prior de segmentos. No se ejecuta.",
+ "comparacion": "Tabla única por vía: AUC frente a hepatocitos (célula y metacélula), FP en H2 y periportales, n llamadas con Wilson, ADN de 8p11 en llamadas frente a no llamadas, concordancia con el hueso y dianas (NY-BR-1, 5T4, HER3) crudo y corregido.",
+ "estabilidad_dianas": "Fracción detectada de ANKRD30A, TPBG y ERBB3 en las llamadas de cada vía (matriz cruda); rango entre vías. Estable si el rango < 10 puntos."
+}

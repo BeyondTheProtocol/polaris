@@ -1,0 +1,40 @@
+{
+ "estado": "REGLAS_HIGADO_v4: llamada maligna del hígado según el protocolo de comite-medico (modelado sobre el método de DFCI). Fijadas el 2026-10-16 ANTES de calcular ninguna CNV sobre matrices descontaminadas y antes de ver ninguna salida de SoupX/DecontX/CellBender en los datos de la paciente. EXPLORATORIO, NO CIEGO (se conocen cierre, higado_dianas y REGLAS_AMBIENTE_v1). Complementan REGLAS_AMBIENTE_v1 (que sigue rigiendo la descontaminación, el éxito/retención y el AUC del cierre como criterio adicional). POST_HOC en ambiente.json.",
+ "visto_antes_de_fijar": [
+  "Probe set de la muestra: Chromium Human Transcriptome Probe Set v2.0.0, GRCh38 2024-A; 0 sondas DEPRECATED; 499 sondas excluidas (included=False); matriz de features a nivel de gen sin IDs ni nombres duplicados (18.530 genes). Por tanto #372 (sumar sondas duplicadas) y #234 (quitar DEPRECATED) de CellBender no aplican: verificado con _amb_orienta2.py.",
+  "Candidatas de referencia externa: 10x 4-plex FFPE Liver_BC1 (probe set v1.0.1, 2020-A) y 320k 16-plex LN reactivo (v1.1.0, 2024-A). Ninguna es v2.0.0."
+ ],
+ "matrices": "Se analiza cada una por separado: cruda (cierre), SoupX primario, SoupX auto (sensibilidad), DecontX y CellBender (FPR 0,01 primaria; 0,0 y 0,05 sensibilidad) cuando exista. Discordantes a una tabla, sin promediar.",
+ "QC_tipo_DFCI": "Sobre las 19.047 células del cierre: fuera si genes detectados (matriz cruda) < 500, o Scrublet (0.2.3, nescore; expected_doublet_rate 0,06; semilla) > 0,25, o contaminación DecontX > 0,7. Sin filtro de MT (el panel Flex apenas trae genes MT; se informa cuántos hay). Se informa n excluidas por criterio. Sensibilidad: sin este QC.",
+ "zonacion_hepatocitos": {
+  "pericentral": "tipo A hepatocito con UMI(CYP2E1+CYP3A4) > UMI(HAL+SDS+ARG1) y sin KRT7 ni SOX9.",
+  "periportal_o_reactivo": "tipo A hepatocito con UMI(HAL+SDS+ARG1) > UMI(CYP2E1+CYP3A4), o con >= 1 UMI de KRT7 o SOX9.",
+  "sin_zona": "empates (incluido 0/0): fuera de referencia y de control; se cuentan.",
+  "nota": "KRT7/SOX9 solo se usan DENTRO de hepatocitos de A: KRT7 es marcador luminal del tumor y no puede definir control fuera de ellos."
+ },
+ "referencia": "pericentrales + NK + endotelio + mieloide + fibroblasto_estelar (tipos de A), tras QC. Hold-out del 20 % de la parte NO hepatocitaria, estratificado por tipo (semilla). El hold-out se parte en dos mitades (semilla): H1 fija el umbral, H2 mide el falso positivo (fijar y medir en el mismo conjunto sería circular).",
+ "infercnv": "infercnvpy 0.6.1: log1p(CP10k) de la matriz del método; genes con posición GRCh38 en autosomas (chrX/chrY fuera) y CP10k pseudobulk >= 0,1 en el hígado; window_size 100, step 10; reference_key = referencia (sin hold-out). Mismos genes para todos los métodos (intersección).",
+ "consenso_tumoral": "media del perfil CNV de las células del pool por exclusión del cierre (epitelial + no_asignado sin >= 2 HEP5) que pasan QC. No iterativo. Correlación de Pearson por célula con el consenso.",
+ "umbral": "percentil 98,5 de la correlación en H1 (FPR 1,5 %).",
+ "exito": "FP <= 1 % en periportales/reactivos Y FP <= 2 % en H2. Si falla, la llamada del método no vale (se informa).",
+ "criterio_cierre_adicional": "AUC de la correlación (pool frente a hepatocitos de A, todos) >= 0,6, como en REGLAS_CIERRE_v3; además AUC pool frente a periportales.",
+ "sensibilidad": "llamada por carga (infercnvpy cnv_score) con umbral p98,5 en H1; consenso sin chr8 ni chr11.",
+ "salida_malignas": "nº de malignas en el pool y en todas las células no de referencia, IC95 Wilson; Jaccard entre métodos; tabla de patrones de discordancia por célula (sin barcodes).",
+ "dosis_8p11_11q13": {
+  "8p11_amplicon": ["ZNF703", "ERLIN2", "BRF2", "RAB11FIP1", "ASH2L", "PLPP5", "NSD3", "LETM2", "FGFR1", "ADAM9"],
+  "8p11_flancos": "genes de chr8 con CP10k pseudobulk >= 0,5 entre 3 Mb por fuera de cada extremo del amplicón (fijado aquí; el protocolo no los nombraba).",
+  "11q13_amplicon": ["CCND1", "LTO1", "FGF19", "FGF4", "FGF3", "MYEOV", "TPCN2"],
+  "11q13_flancos": ["ANO1", "FADD", "CTTN", "SHANK2"],
+  "score": "por célula: media de log1p(CP10k) en amplicón (genes del panel) − media en flancos, menos la mediana de esa diferencia en la referencia. Se da mediana y fracción > p95 de la referencia, con IC Wilson, en malignas, pool, periportales y referencia. Es DOSIS TRANSCRIPCIONAL, no copias; anclaje: F1CDx (FGFR1 amplificado).",
+  "aviso": "ANO1, FADD y CTTN suelen co-amplificarse con CCND1 en {{LOCUS}}: usarlos de flanco puede infraestimar la dosis. Se informa como está y se marca."
+ },
+ "hueso": {
+  "ADN_por_celula": "UMI de ADN estimadas = (UMI en sondas unspliced de receptores olfativos / nº de esas sondas) × nº de sondas unspliced del panel; fracción = estimadas / UMI totales de la célula (sondas included). Fuera las células con fracción > 0,5.",
+  "expresion": "dianas del hueso solo con sondas spliced (de unión); un gen sin sonda spliced se marca «sin sonda de unión».",
+  "regla_dianas": "la del cierre (Wilson inferior − suelo > 0; supera_ref)."
+ },
+ "dianas": "ANKRD30A, TPBG, ERBB3, SLC39A6, ERBB2, NECTIN4, TACSTD2, CD276, CHGA, SYP, {{DIANA3}}, {{DIANA4}}, NCAM1, {{DIANA2}}, {{DIANA}}, FGFR1, ESR1, MUC1: crudo Y corregido en las malignas de cada método (regla del cierre), y comparación con tablas_cierre.csv y higado_dianas.",
+ "referencia_externa": "solo TERCER contraste: 10x Liver_BC1 (Flex v1) por intersección de genes; control de lote de REGLAS_AMBIENTE_v1 (perfil plano). No decide el veredicto.",
+ "contrastes_no_obligatorios": "CopyKAT con norm.cell.names = referencia limpia, SCEVAN, scCDC (FGFR1, CCND1, GATA3, ALB): si se instalan a tiempo; si no, se declara no hecho. Numbat y XClone inviables (Flex no conserva alelos).",
+ "CellBender_enmienda_a_AMBIENTE_v1": "Sustituye la línea CellBender de REGLAS_AMBIENTE_v1: GitHub master (broadinstitute/CellBender, commit f36ae299d565baccf20f015ceb10a6d6a3ea3006; PyPI 0.3.2 tiene el bug #444), --expected-cells 19000 --total-droplets-included 45000 --fpr 0.0 0.01 0.05 --epochs 150 --cpu-threads 10 --checkpoint-mins 600 --seed 20261016 sobre el raw del hígado. Se lanza en segundo plano si la prueba corta da <= 15 h; si da más, no se lanza y se informa."
+}

@@ -699,6 +699,13 @@ runpy test_muro_secreto_stdout.py
 runpy test_clinico_guard.py
 runpy test_log_auditoria_casa_base.py
 runpy test_lector_clinico_binario.py
+runpy test_flex_a.py         # 16-oct · analista A del Flex: bootstrap IC conocido, buscador de parálogos ≤2 fallos sintético, muro: sin identificadores de bloque en los scripts
+runpy test_flex_tribunal.py  # 16-oct · tribunal Flex: IC, GEM, lectura en bloques de h5 10x sintético, score de ventana, pesos de profundidad, reglas v2
+runpy test_flex_ingesta.py   # 16-oct · ingesta Flex en streaming: solo lista blanca, rechaza BAM/symlink/hardlink/.., hash erróneo → _RETIRADOS, 0600, stdout sin contenido
+runpy test_flex_b.py         # 16-oct · analista B del Flex: sin ventanilla no arranca, muro_texto tira ids de bloque, _medida/IC95/CP10k, auditoría de sondas con sonda plantada (sintético)
+runpy test_flex_cierre.py   # 16-oct · cierre técnico Flex: etapa final 2 veces → sha256 idénticos y = MANIFIESTO_CIERRE; stdout sin barcodes; Wilson k=0/k=n (sin cachés o sin nescore, SKIP 77; ~55 s)
+runpy test_flex_ambiente.py   # 16-oct · ambiente Flex: SoupX+DecontX sintético con verdad conocida (caída >=75 %, retención >=80 %) dos veces idéntico; funciones puras; egress solo 10x; MANIFIESTO (sin entornos, SKIP 77)
+runpy test_flex_higado_dianas.py   # 16-oct · dianas del hígado (3 vías): deconvolución sintética con respuesta conocida + dos ejecuciones sha idéntico y = MANIFIESTO; sin cachés, SKIP 77
 # test_laminillas.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · laminillas DFCI F1-infra: ventanilla enjaulada (sandbox-exec), puertas y jaulas con canarios sintéticos
 runpy test_laminillas_t1.py
 runpy test_laminillas_t2.py

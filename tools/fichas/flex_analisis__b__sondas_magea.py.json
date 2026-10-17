@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/b/sondas_magea.py",
+ "estado_ficha": "completa",
+ "para": "auditoría de especificidad de las sondas Flex v2 de la familia MAGE (y PRAME/CTAG2): descarga el probe set público de 10x y los cDNA públicos de Ensembl de todos los parálogos, alinea cada sonda de 50 nt (y sus dos mitades de 25) contra todos los transcritos y marca qué sondas casan con más de un parálogo. Solo datos públicos: no toca la zona clínica.",
+ "cuando_si": "antes de dar cualquier cifra de MAGEA del Flex (especificación congelada v1, tabla B).",
+ "cuando_no": "para alinear lecturas de la paciente (no las hay en Flex y no saldrían a la red).",
+ "reemplaza": "nada.",
+ "test": "tests/test_flex_b.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 5 del plan Flex (16-oct-2026), especificación congelada v1, tabla B."
+}

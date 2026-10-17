@@ -1,0 +1,58 @@
+{
+ "estado": "Reglas v1 de la DESCONTAMINACIÓN de ARN ambiental del Flex (hígado y hueso). Fijadas el 2026-10-16 ANTES de correr SoupX, DecontX o CellBender sobre los datos de la paciente y antes de calcular ninguna cifra de este análisis. EXPLORATORIO, NO CIEGO: se conocen las salidas de A, B, el tribunal, el cierre (REGLAS_CIERRE_v3) y higado_dianas (REGLAS_HIGADO_v1). Todo lo que se fije después de ver resultados va en POST_HOC de ambiente.json, con fecha y motivo.",
+ "visto_antes_de_fijar": [
+  "Cierre: AUC de la CNV de brazo del pool frente a hepatocitos 0,585 (< 0,6) → «no resoluble célula a célula»; pool por exclusión 13.577 células; identidad frente al nulo NK+endotelio+mieloide falla (EJE1_FALLA: el nulo lleva ~8 veces más GL de lo que explica el perfil de las gotas vacías).",
+  "Contaminación de la referencia: FGFR1 83-86 %, GATA3 48-54 %, ANKRD30A 18 % en NK/endotelio/mieloide del hígado.",
+  "Dianas: tablas del cierre (hueso 68 limpias) y de higado_dianas (subconjunto luminal de 993).",
+  "Curva de UMI del raw (solo para fijar parámetros de CellBender): hígado 539.030 barcodes, 20.625 llamados por Cell Ranger, 44.078 con >= 100 UMI, 119.722 con >= 10; hueso 237.405, 2.469 llamados, 19.693 con >= 100."
+ ],
+ "semilla": 20261016,
+ "determinismo": "Hilos BLAS/numba a 1 en Python; set.seed(semilla) en R antes de cada método; CellBender con --seed; JSON con claves ordenadas y floats a 6 cifras significativas.",
+ "celulas": "Las MISMAS células y el MISMO orden que las cachés del cierre (hígado 19.047; hueso 1.993; tipos de A). Solo cambian los conteos. Conjuntos prim, hep, fib, nulo, ctrl, mal68 y refB definidos exactamente como en _final.t1 del cierre.",
+ "gotas_vacias": "Misma definición que tribunal/_suelo.ambiente: barcodes raw NO llamados por Cell Ranger con 10 <= UMI <= 100. Su suma por gen es el perfil de ambiente para SoupX (setSoupProfile) y su matriz es el background de DecontX.",
+ "metodos": {
+  "SoupX_primario": "SoupX (CRAN). Perfil = gotas vacías. rho global estimado con calculateContaminationFraction sobre genes que NO expresan las células del nulo (NK, endotelio, mieloide): useToEst = TRUE solo en esas células para el conjunto GENES_ESTIMA. adjustCounts(method='subtraction', roundToInt=TRUE) con clusters = tipo de A.",
+  "SoupX_auto_sensibilidad": "autoEstCont(clusters = tipo de A) con parámetros por defecto. Solo sensibilidad: con ~70 % de tumor la sopa es casi el tumor y el automático tiende a sobrecorregir.",
+  "DecontX": "celda::decontX (Bioconductor) con z = tipo de A y background = matriz de gotas vacías; seed = semilla; resto por defecto. Conteos descontaminados redondeados al entero más cercano.",
+  "CellBender": "remove-background (PyPI, versión fijada), CPU. Parámetros desde la curva de UMI: hígado --expected-cells 20000 --total-droplets-included 45000; hueso --expected-cells 2500 --total-droplets-included 20000; --fpr 0.01; --seed semilla. Antes de lanzar entero: tiempo de 2 y 3 épocas, se toma la diferencia como coste por época y se extrapola a 150 épocas. Si el total > 8 h, NO se lanza; se informa con cifras. Nunca cómputo externo."
+ },
+ "GENES_ESTIMA": ["ESR1", "ANKRD30A", "TFF1", "SCGB2A2", "AGR2", "SPDEF", "KRT19", "FOXA1"],
+ "GENES_ESTIMA_nota": "Genes luminales sin expresión nativa esperable en NK, endotelio ni mieloide. Fuera GATA3 (nativo en T/NK), FGFR1 (nativo en endotelio y estroma), CCND1, XBP1, MUC1 (plasmáticas). Los ausentes del panel se quitan y se declaran.",
+ "exito_descontaminacion": {
+  "testigos": ["ESR1", "ANKRD30A", "TFF1", "SCGB2A2", "KRT19"],
+  "medida": "fracción de células del nulo (NK+endotelio+mieloide) del hígado con >= 1 UMI de cualquier testigo, antes y después.",
+  "criterio": "ÉXITO si la fracción después <= 25 % de la de antes (caída >= 75 %). Si no cae, se activa la rama MULTIPLETES (el residuo no es ambiente): se declara y se da un diagnóstico de dobletes dentro de la muestra (scrublet si está instalado en nescore; si no, no se ejecuta y se dice).",
+  "FGFR1_GATA3_informativos": "FGFR1 y GATA3 en el nulo se informan antes/después, pero NO son criterio (expresión nativa posible)."
+ },
+ "retencion_no_borrar_senal": {
+  "HEP5_en_hepatocitos": "UMI de HEP5 retenidas en hepatocitos >= 80 % de las de antes.",
+  "FGFR1_en_hueso_68": "fracción de las 68 malignas limpias del hueso con FGFR1 >= 1 UMI, después >= 80 % de la de antes.",
+  "FGFR1_en_pool_higado": "UMI de FGFR1 retenidas en el pool primario del hígado >= 70 % de las de antes.",
+  "8p11_hueso_68": "score_ventana 8p11 (tribunal, referencia limpia del hueso) en las 68: la mediana conserva el signo positivo.",
+  "si_falla": "método SOBRECORRIGE: sus cifras se dan pero no cuentan para el veredicto."
+ },
+ "T3_cnv": {
+  "metodo_primario": "El eje 2 del cierre SIN CAMBIOS de código (brazos sin chr8/chr11, genes filtrados por linaje, referencia = nulo NK+endotelio+mieloide de la matriz descontaminada, plantilla = 68 malignas limpias del hueso descontaminado), calculado sobre la matriz de cada método.",
+  "metodo_secundario": "infercnvpy 0.6.1 (ya instalado en nescore): log1p(CP10k), referencia = nulo, window_size 100, cnv_score por célula; mismos chr8/chr11 excluidos del score. AUC del mismo modo.",
+  "criterio_resuelto": "AUC(prim frente a hepatocitos) >= 0,6, calculado UNA VEZ por método, sin barrer parámetros mirando el AUC. Solo cuenta si ese método pasó éxito y retención.",
+  "llamada_celula": "score > p99 de los controles (hepatocitos + estroma + nulo) dentro del decil de UMI (como el cierre). Nº de malignas en el pool con IC95 Wilson; pi de Storey con IC bootstrap (1.000).",
+  "veredicto_global": "RESUELTO si >= 2 métodos válidos pasan el AUC y el Jaccard de sus llamadas en el pool >= 0,5; RESUELTO FRÁGIL si solo pasa uno; NO RESUELTO si ninguno.",
+  "concordancia_hueso": "signo por brazo (validación cruzada del cierre) y r del pseudobulk de las llamadas con la plantilla del hueso.",
+  "CIRCULARIDAD": "las llamadas del hígado hechas con la plantilla del hueso NO valen como prueba de «mismo clon»."
+ },
+ "T3_ventanas": "8p11 y {{LOCUS}} con TC.score_ventana (ventanas del tribunal), referencia = nulo descontaminado; en llamadas CNV+, pool, hepatocitos y nulo; con y sin el gen motor (FGFR1 en 8p11; CCND1 en {{LOCUS}}). Mediana, fracción > 1 (log2) e IC Wilson. Diferencia frente al cierre informada.",
+ "T3_dianas": {
+  "genes": ["ANKRD30A", "TPBG", "ERBB3", "SLC39A6", "ERBB2", "NECTIN4", "TACSTD2", "CD276", "CHGA", "SYP", "{{DIANA3}}", "{{DIANA4}}", "NCAM1", "{{DIANA2}}", "{{DIANA}}", "FGFR1", "ESR1", "MUC1"],
+  "regla": "la del cierre (_final.tablas) SIN CAMBIOS: por encima del suelo = Wilson inferior − suelo de ambiente > 0 (rho del trazador no tumoral), supera_ref = Wilson inferior > detección en la referencia emparejada por decil de UMI. Conjuntos: llamadas CNV+ del método, pool primario; hueso 68.",
+  "comparacion": "frente a tablas_cierre.csv y a higado_dianas (993): se informa qué diana cambia de veredicto."
+ },
+ "T4_referencia_externa": {
+  "busqueda": "10x Genomics datasets (Flex / Fixed RNA Profiling, humano: hígado, PBMC, tejido FFPE) y GEO («Chromium Flex», «fixed RNA profiling», FRP). Solo datos públicos. Descarga a un directorio propio y vacío; lectura con python -I.",
+  "requisito": "Mismo panel de sondas humano (Flex v1), o intersección de genes declarada.",
+  "uso": "Referencia de CNV alternativa para el eje 2 (sustituye al nulo como referencia): media de log1p(CP10k) por gen de las células externas del tipo elegido (inmunes o hepatocitos normales).",
+  "control_lote": "Nuestro nulo descontaminado frente a la referencia externa debe dar un perfil de brazos plano: |media de brazo| <= 0,1 en todos y DE entre brazos <= 0,05 (unidades log1p CP10k). Si no, la referencia mete lote y NO se usa para el veredicto (se informa).",
+  "AUC": "mismo criterio >= 0,6."
+ },
+ "recursos": "Disco: intermedios en ~/Clinico-PRIVADO/flex/ambiente/cache/, se borran los matrices de intercambio R<->Python al terminar; checkpoints de CellBender fuera al acabar. Tiempo y memoria pico de cada método se registran.",
+ "egress": "CERO con datos de la paciente: todo local. Nada a Modal ni a la nube de Claude Science. La referencia externa es pública y solo se DESCARGA."
+}

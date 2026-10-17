@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_ingesta.py",
+ "estado_ficha": "completa",
+ "para": "ingesta en un solo pase del tar Flex (single-cell DFCI, 52 GB) desde Drive: streaming + sha256 del flujo + extracción solo por lista blanca (matrices, métricas, config; nunca BAM) a ~/Clinico-PRIVADO/flex/<sha12>/ con MANIFIESTO.json; si el hash no coincide aparta lo extraído a _RETIRADOS/ y falla en rojo.",
+ "cuando_si": "hay que traer a zona clínica un tar de cellranger multi que no cabe entero en disco, por la vía sancionada (lector_clinico.py procesa flex_ingesta -- …).",
+ "cuando_no": "ficheros pequeños que caben en disco (usa drive.py download + lector_clinico --a); laminillas (laminillas_ingesta); cualquier análisis del contenido: esta tool no lee las matrices.",
+ "reemplaza": "nada: antes el tar venía por USB y se descomprimía a mano fuera de la ventanilla (sin hash, sin lista blanca, sin registro).",
+ "test": "tests/test_flex_ingesta.py",
+ "alta": "2026-10-16",
+ "origen": "Fase 1 del plan Flex aprobado por {{TITULAR}} el 16-oct-2026 (00_FUENTE-DE-VERDAD/01 · Tratamiento/flex-hígado-y-hueso-plan-para-sacar-el-máximo-hacia-ned-2026-10-16.md)"
+}
