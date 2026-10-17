@@ -1253,6 +1253,11 @@ def report_file_to_titular(path, *, caption="", dry=False, voz="calida"):
         return _result(False, True, "HALT activo: salida en pausa total")
     cid = _self_chatid()
     if not cid:
+        # Sin chat_id suele ser el Llavero bloqueado (sesiones de Claude Code: rc=36). En vez de
+        # fallar, se deja en el buzón y el bot de Telegram (launchd, que sí lee el Llavero) lo
+        # manda en su siguiente vuelta (17-oct-26: que {{TITULAR}} no tenga que pasar por la consola).
+        if not dry:
+            return encolar_fichero(path, caption)
         _audit("telegram", REPORT, None, "bloqueado", "sin self chat_id", n)
         return _result(False, True, "no hay chat_id de {{TITULAR}} configurado")
     if dry:
@@ -1263,6 +1268,94 @@ def report_file_to_titular(path, *, caption="", dry=False, voz="calida"):
            "fichero %s (%s)" % (os.path.basename(path), info), n)
     return _result(ok, not ok, ("fichero entregado (%s)" % info) if ok else
                    "entrega de fichero falló (%s)" % info)
+
+
+# ── Buzón de ficheros para {{TITULAR}} (17-oct-26) ────────────────────────────────────────────
+# Quien no puede leer el Llavero (una sesión de Claude Code) deja aquí el envío; el bot de
+# Telegram, que corre bajo launchd con el Llavero abierto, lo vacía en cada vuelta. Solo al
+# chat propio (vaciar llama a report_file_to_titular, que no acepta destino), solo ficheros de
+# la fuente de verdad o de ~/tmp_subida, de tipos conocidos y que quepan en un bot (50 MB).
+BUZON_RAICES = (os.path.expanduser("~/claudecode/00_FUENTE-DE-VERDAD"),
+                os.path.join(REPO, "00_FUENTE-DE-VERDAD"),
+                os.path.expanduser("~/tmp_subida"))
+BUZON_EXT = (".mp4", ".mov", ".m4v", ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".md", ".txt")
+BUZON_MAX_BYTES = 50 * 1024 * 1024
+BUZON_MAX_INTENTOS = 3
+
+
+def _buzon_dir(sub="pendientes"):
+    return os.path.join(STATE, "envios_tg", sub)
+
+
+def _fichero_permitido(path):
+    """(ok, motivo). Ruta real dentro de una raíz permitida, extensión conocida y ≤ 50 MB."""
+    real = os.path.realpath(os.path.expanduser(str(path)))
+    if not os.path.isfile(real):
+        return False, "no existe el fichero"
+    raices = [os.path.realpath(r) for r in BUZON_RAICES]
+    if not any(real == r or real.startswith(r + os.sep) for r in raices):
+        return False, "ruta fuera del buzón permitido"
+    if os.path.splitext(real)[1].lower() not in BUZON_EXT:
+        return False, "tipo de fichero no permitido"
+    if os.path.getsize(real) > BUZON_MAX_BYTES:
+        return False, "pasa de 50 MB, Telegram no lo admite"
+    return True, real
+
+
+def encolar_fichero(path, caption=""):
+    """Deja un fichero en el buzón para que el bot se lo mande a {{TITULAR}}. No envía nada."""
+    ok, info = _fichero_permitido(path)
+    if not ok:
+        _audit("telegram", REPORT, None, "bloqueado", "buzón: %s" % info, 0)
+        return _result(False, True, "no se encola: %s" % info)
+    d = _buzon_dir()
+    os.makedirs(d, exist_ok=True)
+    item = {"ruta": info, "pie": caption or "", "ts": _now_iso(), "intentos": 0}
+    nombre = "%s-%s-%s.json" % (time.strftime("%Y%m%dT%H%M%S"),
+                                hashlib.sha1(info.encode()).hexdigest()[:8], os.urandom(3).hex())
+    tmp = os.path.join(d, "." + nombre)
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(item, f, ensure_ascii=False)
+    os.replace(tmp, os.path.join(d, nombre))
+    _audit("telegram", REPORT, None, "encolado", "buzón: %s" % os.path.basename(info), os.path.getsize(info))
+    return _result(False, False, "encolado: el bot lo manda en su siguiente vuelta",
+                   extra={"encolado": True, "fichero": os.path.basename(info)})
+
+
+def vaciar_buzon_ficheros(max_n=5):
+    """Lo llama el bot en cada vuelta. Manda lo pendiente; a los 3 fallos, a fallidos/."""
+    d = _buzon_dir()
+    if halted() or not os.path.isdir(d) or not _self_chatid():
+        return 0
+    hechos = 0
+    for nombre in sorted(n for n in os.listdir(d) if n.endswith(".json") and not n.startswith("."))[:max_n]:
+        p = os.path.join(d, nombre)
+        try:
+            with open(p, encoding="utf-8") as f:
+                item = json.load(f)
+        except (OSError, ValueError):
+            os.makedirs(_buzon_dir("fallidos"), exist_ok=True)
+            os.replace(p, os.path.join(_buzon_dir("fallidos"), nombre))
+            continue
+        ok, info = _fichero_permitido(item.get("ruta", ""))
+        if ok:
+            res = report_file_to_titular(info, caption=item.get("pie", ""))
+            if res["delivered"]:
+                os.makedirs(_buzon_dir("enviados"), exist_ok=True)
+                os.replace(p, os.path.join(_buzon_dir("enviados"), nombre))
+                hechos += 1
+                continue
+        item["intentos"] = int(item.get("intentos", 0)) + 1
+        item["ultimo_error"] = info if not ok else res.get("reason", "")
+        destino = p
+        if not ok or item["intentos"] >= BUZON_MAX_INTENTOS:
+            os.makedirs(_buzon_dir("fallidos"), exist_ok=True)
+            destino = os.path.join(_buzon_dir("fallidos"), nombre)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(item, f, ensure_ascii=False)
+        if destino != p:
+            os.replace(p, destino)
+    return hechos
 
 
 def _deliver_telegram_reaction(chat_id, message_id, emoji):
@@ -2117,6 +2210,17 @@ def main(argv):
                                categoria=("respuesta" if cmd == "report-respuesta" else "humano"))
         print(json.dumps(res, ensure_ascii=False))
         return 0 if (res["delivered"] or res.get("dry") or res.get("retenido")) else 1
+    if cmd in ("report-file", "report-file-dry"):
+        # Fichero al chat PROPIO de {{TITULAR}} (report_file_to_titular: sin destino, HALT, auditoría).
+        # Existe para que el lazo pueda mandarle un fichero sin `python3 -c`, que el muro le veta
+        # (17-oct-26: un vídeo que pidió por Telegram se quedó sin enviar por eso).
+        if len(argv) < 2 or len(argv) > 3:
+            print("uso: salida.py report-file <ruta> [\"<pie>\"]  (solo al chat de {{TITULAR}}, sin destino)")
+            return 2
+        res = report_file_to_titular(argv[1], caption=(argv[2] if len(argv) > 2 else ""),
+                                    dry=(cmd == "report-file-dry"))
+        print(json.dumps(res, ensure_ascii=False))
+        return 0 if (res["delivered"] or res.get("dry") or res.get("encolado")) else 1
     if cmd == "reconciliar":
         if len(argv) < 3:
             print("uso: salida.py reconciliar <borrador> entregado|reintentar")

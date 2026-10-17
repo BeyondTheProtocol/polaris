@@ -518,6 +518,11 @@ def poll_once():
         n += 1
     if _est.get("ok"):
         _heartbeat("ok", procesados=n)
+    # Buzón de ficheros (17-oct-26): lo que una sesión sin Llavero dejó para {{TITULAR}} sale aquí.
+    try:
+        salida.vaciar_buzon_ficheros()
+    except Exception as e:
+        sys.stderr.write("bot: error vaciando el buzón de ficheros: %r\n" % (e,))
     return n
 
 
