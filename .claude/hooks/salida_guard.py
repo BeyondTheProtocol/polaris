@@ -31,6 +31,15 @@ LA VÁLVULA (para no romper su flujo)
 QUÉ NO TOCA
   Borradores (`create_draft`, `update_draft`), lecturas, búsquedas y etiquetas: todo eso es la
   zona autónoma de siempre y sigue igual de libre.
+
+ADJUNTAR A UN BORRADOR NO ES ENVIAR (17-oct-26)
+  `file_upload` del navegador se denegaba siempre, también sobre un borrador de Gmail: ningún «sí»
+  lo abría (el destinatario no va en la llamada) y adjuntar volvía a {{TITULAR}}. Ahora pasa SOLO si la
+  pestaña (`tabId`) se navegó en esta sesión, hace <10 min, a un compose de mail.google.com y no ha
+  habido ningún clic, tecla, `form_input` ni JS que actúe desde entonces. Y lo que lo separa de
+  enviar: tras adjuntar se cierra un CANDADO de 15 min en la sesión en el que todo clic se DENIEGA
+  (también en bypass, donde normalmente solo se avisa), salvo permiso suyo. Gmail guarda solo; el
+  adjunto se comprueba leyendo. Ver `_adjuntar_vale` y tests/test_salida_guard_adjuntar.py.
 """
 import json
 import os
@@ -2544,13 +2553,128 @@ def _acciones_de_batch(entrada):
     return salida
 
 
+# ── ADJUNTAR A UN BORRADOR DE GMAIL (17-oct-26) ─────────────────────────────────────────────────
+# El registro lleva el prefijo `ok_envio` a propósito: `_RE_NOMBRE_PERMISO` deniega escribirlo por
+# cualquier herramienta, así que solo lo escribe este guard. Ilegible o ausente = no vale (fail-closed).
+ADJUNTAR = os.path.join(STATE, "ok_envio_adjuntar.json")
+VENTANA_PESTANA = 600     # el compose navegado vale 10 min
+CANDADO = 900             # tras adjuntar, 15 min sin ningún clic en la sesión
+# El compose se abre por URL, sin clics: `create_draft` (conector de Gmail, `replyToMessageId` para
+# el hilo) devuelve `viewUrl` = https://mail.google.com/mail/?authuser=…#all?compose=… (visto 17-oct).
+_RE_COMPOSE = re.compile(r"^https://mail\.google\.com/mail/[^#\s]*#[^\s]*[?&]compose=[\w%:+.\-]+$", re.I)
+_RE_NAVEGADOR = re.compile(r"^mcp__(claude_in_chrome|claude_browser)__", re.I)
+
+
+# El temporal también lleva nombre protegido (`…tmp.json` casa con `_RE_NOMBRE_PERMISO`), y ni se
+# lee ni se escribe a través de un enlace: un symlink plantado en el temporal, tras el `os.replace`,
+# dejaba el registro apuntando a un fichero que el agente sí puede editar (verificado, 17-oct-26).
+ADJUNTAR_TMP = os.path.join(STATE, "ok_envio_adjuntar.tmp.json")
+
+
+def _lee_adjuntar():
+    if os.path.islink(ADJUNTAR):
+        return {}
+    try:
+        with open(ADJUNTAR, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _guarda_adjuntar(d):
+    ahora = datetime.now().timestamp()
+    d = {k: v for k, v in d.items() if isinstance(v, dict) and
+         max([v.get("candado", 0)] + list((v.get("pestanas") or {}).values())) > ahora - 86400}
+    os.makedirs(os.path.dirname(ADJUNTAR), exist_ok=True)
+    if os.path.lexists(ADJUNTAR_TMP):
+        os.unlink(ADJUNTAR_TMP)
+    fd = os.open(ADJUNTAR_TMP, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(ADJUNTAR_TMP, ADJUNTAR)
+
+
+def _items_navegador(tool, entrada):
+    """[(verbo, input)] de una llamada del navegador, suelta o en `browser_batch`."""
+    verbo = tool.rsplit("__", 1)[-1]
+    if not BATCH.search(verbo):
+        return [(verbo, entrada if isinstance(entrada, dict) else {})]
+    out = []
+    for a in (entrada or {}).get("actions") or []:
+        if isinstance(a, dict):
+            out.append((str(a.get("name") or ""), a.get("input") if isinstance(a.get("input"), dict) else {}))
+    return out
+
+
+def _anota_navegador(tool, entrada, sesion):
+    """Lleva, por sesión, qué pestañas están en un compose de Gmail recién navegado. En orden: un
+    navigate a un compose la apunta; a otra cosa, la borra; sin `tabId` (no se sabe cuál cambió) o
+    cualquier ítem que pulse, teclee o actúe, las borra TODAS."""
+    tool = _norm_tool(tool)
+    if not sesion or not _RE_NAVEGADOR.search(tool):
+        return
+    d = _lee_adjuntar()
+    v = d.get(sesion) if isinstance(d.get(sesion), dict) else {}
+    pest = dict(v.get("pestanas") or {})
+    antes = dict(pest)
+    pre = tool.rsplit("__", 1)[0]
+    for verbo, inp in _items_navegador(tool, entrada):
+        if verbo == "navigate":
+            tab, url = inp.get("tabId"), str(inp.get("url") or "")
+            if tab is None:
+                pest = {}
+            elif _RE_COMPOSE.match(url):
+                pest[str(tab)] = datetime.now().timestamp()
+            else:
+                pest.pop(str(tab), None)
+        elif verbo == "tabs_close_mcp":
+            pest.pop(str(inp.get("tabId")), None)
+        elif _sale_fuera(pre + "__" + verbo, inp, en_batch=True):
+            pest = {}
+    if pest != antes:
+        v["pestanas"] = pest
+        d[sesion] = v
+        _guarda_adjuntar(d)
+
+
+def _adjuntar_vale(entrada):
+    """¿Este `file_upload` va a un compose de Gmail navegado en ESTA sesión, sin clics desde entonces?"""
+    tab = (entrada or {}).get("tabId")
+    if not _SESION or tab is None:
+        return False
+    v = _lee_adjuntar().get(_SESION)
+    ts = ((v or {}).get("pestanas") or {}).get(str(tab)) if isinstance(v, dict) else None
+    return isinstance(ts, (int, float)) and 0 <= datetime.now().timestamp() - ts <= VENTANA_PESTANA
+
+
+def _candado_activo():
+    v = _lee_adjuntar().get(_SESION) if _SESION else None
+    ts = v.get("candado") if isinstance(v, dict) else None
+    return isinstance(ts, (int, float)) and datetime.now().timestamp() - ts <= CANDADO
+
+
+def _cierra_candado():
+    d = _lee_adjuntar()
+    v = d.get(_SESION) if isinstance(d.get(_SESION), dict) else {}
+    v["candado"] = datetime.now().timestamp()
+    v["pestanas"] = {}          # un adjunto por navegación: el siguiente vuelve a navegar
+    d[_SESION] = v
+    _guarda_adjuntar(d)
+
+
+_SESION = ""   # `session_id` del harness; lo fija `main()` (17-oct-26)
 _CWD = ""   # `cwd` de la entrada del PreToolUse; lo fija `main()` (22-sep-26)
 _POR_QUE = ""   # en Bash, QUÉ orden se ha leído como envío: va al log y al motivo
 _PUSH = None    # (repo, args) del `git push` que publica, para atarlo al commit que ella vio (F2b)
 
 
-def _sale_fuera(tool, entrada):
-    """Devuelve None (no sale fuera), "envia" (se deniega) o "clic" (se pregunta a {{TITULAR}}).
+_PESO = {None: 0, "adjuntar": 1, "clic": 2, "envia": 3}
+
+
+def _sale_fuera(tool, entrada, en_batch=False):
+    """Devuelve None (no sale fuera), "envia" (se deniega), "clic" (se pregunta a {{TITULAR}}) o
+    "adjuntar" (un `file_upload` a un compose de Gmail: pasa y cierra el candado de clics).
 
     La diferencia es de coste: un envío mal parado se repite en 10 segundos, pero un clic mal
     parado rompe el carril de lectura por navegador cientos de veces al mes. Lo que manda de
@@ -2560,6 +2684,26 @@ def _sale_fuera(tool, entrada):
         return None
     if tool.endswith("__computer"):
         return "clic" if (entrada or {}).get("action") in ACCION_CLIC else None
+    if BATCH.search(tool) and _RE_NAVEGADOR.search(tool):
+        # Cada ítem se juzga como si fuera suelto, por su NOMBRE (17-oct-26). Antes solo se miraba
+        # `input.action`, y un `file_upload`, un `form_input` o un JS que pulsa dentro de un batch
+        # no tienen `action`: pasaban libres. Dentro de un batch, subir un fichero nunca vale.
+        acts = (entrada or {}).get("actions")
+        if not isinstance(acts, list) or not acts:
+            return "clic"
+        peor = None
+        pre = tool.rsplit("__", 1)[0]
+        for a in acts:
+            if not isinstance(a, dict) or not a.get("name") or not isinstance(a.get("input"), dict):
+                return "clic"
+            nombre = str(a["name"])
+            if BATCH.search(nombre):
+                return "clic"
+            q = _sale_fuera(pre + "__" + _norm_tool(nombre), a["input"], en_batch=True)
+            q = q if q in _PESO else "envia"        # lo que no se sabe pesar, pesa lo máximo
+            if _PESO[q] > _PESO[peor]:
+                peor = q
+        return peor
     if BATCH.search(tool):
         acts = _acciones_de_batch(entrada)
         if acts is None:
@@ -2573,6 +2717,9 @@ def _sale_fuera(tool, entrada):
     if ENVIAN.search(tool):
         return "envia"
     verbo = tool.rsplit("__", 1)[-1] if tool.startswith("mcp__") else ""
+    if verbo == "file_upload" and not en_batch and _RE_NAVEGADOR.search(tool) \
+            and _adjuntar_vale(entrada):
+        return "adjuntar"
     # Verbos que mandan y se escapaban por el `$` de ENVIAN (`send_later`) o por no estar en la
     # lista (`share_file`, `file_upload`, `upload_image`): 24-sep-26, auditoría 3.2.
     if verbo and D is not None and D.VERBO_ENVIO_EXTRA.search(verbo):
@@ -2620,6 +2767,21 @@ Un clic puede ser «Enviar», «Publicar» o «Pagar», y desde aquí no se ve c
 Si es navegación o lectura, dile qué vas a pulsar y sigue."""
 
 
+MOTIVO_ADJUNTO = """📎 Adjunto a un BORRADOR de Gmail: pasa, porque adjuntar no es enviar.
+
+Desde ahora y durante 15 minutos esta sesión NO puede pulsar, teclear ni rellenar nada en el
+navegador ni en el escritorio (se deniega, también en bypass): así un adjunto no puede acabar en un
+«Enviar». Gmail guarda el borrador solo. Comprueba el adjunto LEYENDO (`find`, `read_page`,
+captura) y deja el borrador «a un clic»: lo envía {{TITULAR}}."""
+
+
+MOTIVO_CANDADO = """🔒 Candado de adjunto: en esta sesión se acaba de adjuntar un fichero a un borrador.
+
+Durante 15 minutos ningún clic, tecla, `form_input` ni JS que actúe pasa: es lo que separa
+«adjuntar» de «enviar». Lee para comprobar (capturas, `find`, `read_page`). Si de verdad hay que
+pulsar algo, que lo pida {{TITULAR}} en su mensaje («envíalo», o un «sí» a una «🔐 Propuesta de salida»)."""
+
+
 # Lo que la sombra tiene que ver aunque no salga fuera: navegar (host), y buscar/pulsar por JS el
 # botón de pedir o pedir una tarjeta (señal de paso de pago, P3 · F3, 26-sep-26).
 _NAVEGA_O_BATCH = re.compile(r"(navigate|preview_start|tabs_create|batch|__find$|javascript_tool|"
@@ -2648,8 +2810,9 @@ def main():
     except Exception:
         return 0
     tool = datos.get("tool_name") or ""
-    global _CWD
+    global _CWD, _SESION
     _CWD = str(datos.get("cwd") or "")
+    _SESION = str(datos.get("session_id") or "")
     escribe = _confia_nube(tool, datos.get("tool_input"))
     nube = bool(escribe)
     if not escribe:
@@ -2698,6 +2861,20 @@ def main():
                 "permissionDecisionReason": motivo, "additionalContext": motivo}}, ensure_ascii=False))
             return 0
     que = _sale_fuera(tool, datos.get("tool_input"))
+    # Lo que esta llamada hace a las pestañas (navegar a un compose, pulsar), DESPUÉS de juzgarla:
+    # el adjunto se juzga contra lo que pasó ANTES. Si no se puede anotar, no se apunta nada (y
+    # sin apunte el siguiente adjunto no vale: fail-closed).
+    try:
+        _anota_navegador(tool, datos.get("tool_input"), _SESION)
+    except Exception:
+        pass
+    if que == "adjuntar":
+        _cierra_candado()          # si no se puede cerrar, revienta → fail-closed (exit 2)
+        _log("adjuntar_borrador", tool, "pestaña %s" % (datos.get("tool_input") or {}).get("tabId"))
+        _sombra(datos, "envia", "adjuntar_borrador")
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse", "additionalContext": MOTIVO_ADJUNTO}}, ensure_ascii=False))
+        return 0
     if not que:
         _sombra(datos, None, "libre")
         return 0
@@ -2716,7 +2893,12 @@ def main():
     modo = (datos.get("permission_mode") or datos.get("permissionMode") or "").strip()
     motivo = (MOTIVO_CLIC if que == "clic" else MOTIVO).format(tool=tool)
     salida = {"hookEventName": "PreToolUse", "additionalContext": motivo}
-    if que == "clic":
+    if que == "clic" and _candado_activo():
+        salida.update(additionalContext=MOTIVO_CANDADO, permissionDecision="deny",
+                      permissionDecisionReason=MOTIVO_CANDADO)
+        _log("candado_adjunto", tool, modo or "modo-desconocido")
+        _sombra(datos, que, "denegado")
+    elif que == "clic":
         if modo in ("default", "plan", "acceptEdits"):
             salida.update(permissionDecision="ask", permissionDecisionReason=motivo)
             _log("preguntado", tool, modo)

@@ -35,3 +35,8 @@ El gestor de correo hace; Vega consulta ([[feedback-gestor-correo-hace-vega-cons
 
 Sí puedo adjuntar, archivar y preparar envíos: no digas «no puedo»
 ([[feedback-si-puedo-adjuntar-correos]]).
+
+## Adjuntar a una respuesta, de punta a punta (17-oct-26)
+Sin devolverle el paso a ella ([[feedback-adjuntar-sin-que-guie]]). Primero `python3 tools/correo_outbox.py status`:
+- **✓** → `correo_outbox.py draft … --attach f1 f2 --reply-to-message-id "<Message-ID del padre>"` (la cabecera `<…@…>` de `get_message`, no el id del hilo; asunto `Re: …`).
+- **🔒 bloqueado** (rc=36: la clave está, el Llavero no se abre) → vía Chrome: `create_draft` con `replyToMessageId` → `navigate` **con `tabId` explícito** a su `viewUrl` (compose) → `find` el input de fichero → `file_upload` **suelto, sin clics antes** y con todos los ficheros en una llamada. `salida_guard` lo deja pasar y cierra 15 min los clics de la sesión: se comprueba leyendo y queda a un clic. Ojo con los dos ids: `create_draft.replyToMessageId` lleva el id de mensaje de la API de Gmail; `--reply-to-message-id` de `correo_outbox`, la cabecera RFC `Message-ID`. Desbloquear el Llavero en su Terminal **no** sirve: las sesiones entran por SSH y no heredan el login gráfico; el arreglo de raíz es el broker de secretos (rama `claude/awesome-babbage-cee7dd`).

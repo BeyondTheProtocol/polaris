@@ -370,6 +370,11 @@
    "script": "web_guardian.py",
    "concern": "web-guardian",
    "nota": "Guardián de la web (plan aprobado por {{TITULAR}} el 13-oct-26). Diario 07:35, determinista, sin LLM y fuera de la cola: detecta cronología parada, /datos atrasado, ES/EN descuadrados, ancla y sitemap en vivo y deudas de contenido. MODO SOMBRA: apunta en state/web_guardian/ y no propone ni avisa. NO cargado: encenderlo es gate de {{TITULAR}} (activar_daemon.py desde casa base); al hacerlo, sacarlo de _PARKED_HC en healthcheck.py."
+  },
+  "com.btp.secretos": {
+   "script": "secretos_broker.py",
+   "concern": "broker-secretos-llavero",
+   "nota": "Sirve claves del Llavero (lista cerrada) desde gui/501 a las sesiones por SSH, donde el Llavero sale bloqueado (rc=36). Ver tools/launchd/SECRETOS.md."
   }
  }
 }

@@ -107,7 +107,7 @@
     "mejora del sistema": 10,
     "memoria y saber": 16,
     "modelos de IA": 19,
-    "muro y seguridad": 38,
+    "muro y seguridad": 39,
     "otras": 1,
     "redes y prensa": 14,
     "salud del sistema": 23
@@ -258,6 +258,7 @@
     "com.btp.radar-rutas",
     "com.btp.reconciliador",
     "com.btp.rotar-logs",
+    "com.btp.secretos",
     "com.btp.seguridad-sweep",
     "com.btp.staging",
     "com.btp.suite-nocturna",

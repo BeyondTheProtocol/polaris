@@ -22,11 +22,18 @@ Garantías del muro (Fase 1):
 
 Uso:
   python3 tools/correo_outbox.py draft --to a@b.com [--cc c@d.com] \\
-      --subject "Asunto" --body-file ruta.txt [--attach f1.pdf f2.pdf] [--account titular.mgp] [--dry]
+      --subject "Asunto" --body-file ruta.txt [--attach f1.pdf f2.pdf] [--account titular.mgp] [--dry] \\
+      [--reply-to-message-id "<abc@mail.example>" [--references "<a@x> <b@y>"]]
   python3 tools/correo_outbox.py status      # qué cuentas tienen App Password en el Llavero
 
 `--dry` construye y valida el MIME (destinatarios, adjuntos, tamaño) SIN conectar ni tocar la red:
 así se prueba sin credenciales. Sin `--dry`, hace falta la App Password (gate de {{TITULAR}}).
+
+`--reply-to-message-id` (17-oct-26): el borrador va DENTRO del hilo. Sin In-Reply-To ni References
+Gmail lo abría como hilo nuevo (respuesta al HuffPost, 17-oct). Ojo: es la cabecera `Message-ID`
+del correo al que se responde (`<…@…>`, la da `get_message` del conector de Gmail), NO el id del
+hilo de la web (`1a139c…`). `--references` es la cadena previa del padre, si se conoce; se le
+añade el padre al final. El asunto tiene que ser el del hilo (con «Re:» delante vale).
 """
 import email.utils
 import imaplib
@@ -51,12 +58,21 @@ ACCOUNTS = {
 }
 DEFAULT_ACCOUNT = "titular.mgp@gmail.com"
 
+RE_MSGID = re.compile(r"^<[^<>\s@]+@[^<>\s@]+>$")
 RE_EMAIL = re.compile(r"^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$")
 MAX_TOTAL_BYTES = 25 * 1024 * 1024   # tope de Gmail; por encima, abortar (no romper el envío)
 
 
 class FaltaClave(RuntimeError):
     pass
+
+
+def _sin_clave(service, account):
+    """El motivo de verdad: Llavero bloqueado (la clave está) o clave que falta."""
+    if _secrets.estado(service) == "bloqueado":
+        return ("el Llavero está BLOQUEADO: '%s' existe pero no se puede leer (rc=36), %s"
+                % (service, _secrets.DESBLOQUEO))
+    return "falta la App Password '%s' en el Llavero para %s (gate de {{TITULAR}})" % (service, account)
 
 
 def _assert_host(host, port):
@@ -88,7 +104,32 @@ def _valida_destinatarios(addrs, etiqueta):
     return out
 
 
-def construir_mime(account, to, cc, subject, body, attachments, html=None):
+def _valida_msgid(m, etiqueta):
+    """Un Message-ID con su forma `<x@y>` (se le ponen los ángulos si faltan). Nada de CR/LF."""
+    m = (m or "").strip()
+    if not m.startswith("<"):
+        m = "<%s>" % m
+    if "\n" in m or "\r" in m or not RE_MSGID.match(m):
+        raise ValueError("%s inválido: %r (hace falta la cabecera Message-ID, <x@y>, no el id del hilo)"
+                         % (etiqueta, m))
+    return m
+
+
+def cabeceras_hilo(reply_to, references=None):
+    """(In-Reply-To, References) para responder dentro del hilo, o (None, None)."""
+    if not reply_to:
+        if references:
+            raise ValueError("--references sin --reply-to-message-id no ata al hilo")
+        return None, None
+    padre = _valida_msgid(reply_to, "--reply-to-message-id")
+    cadena = [_valida_msgid(r, "--references") for r in (references or "").split()]
+    if padre not in cadena:
+        cadena.append(padre)
+    return padre, " ".join(cadena)
+
+
+def construir_mime(account, to, cc, subject, body, attachments, html=None, reply_to=None,
+                   references=None):
     """Construye el EmailMessage con cuerpo + adjuntos leídos DEL DISCO. Devuelve (msg, resumen)."""
     to = _valida_destinatarios(to, "To")
     cc = _valida_destinatarios(cc or [], "Cc")
@@ -97,6 +138,7 @@ def construir_mime(account, to, cc, subject, body, attachments, html=None):
     if "\n" in subject or "\r" in subject:
         raise ValueError("asunto con salto de línea (posible inyección de cabecera)")
 
+    in_reply_to, refs = cabeceras_hilo(reply_to, references)
     msg = EmailMessage()
     msg["From"] = account
     msg["To"] = ", ".join(to)
@@ -105,6 +147,9 @@ def construir_mime(account, to, cc, subject, body, attachments, html=None):
     msg["Subject"] = subject
     msg["Date"] = email.utils.formatdate(localtime=True)
     msg["Message-ID"] = email.utils.make_msgid(domain=account.split("@")[-1])
+    if in_reply_to:
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = refs
     msg.set_content(body)
     if html:
         msg.add_alternative(html, subtype="html")  # multipart/alternative: cuerpo plano + HTML
@@ -125,7 +170,7 @@ def construir_mime(account, to, cc, subject, body, attachments, html=None):
         raise ValueError("el correo pesa %.1f MB > 25 MB (tope de Gmail)" % (total / 1024 / 1024))
 
     resumen = {"from": account, "to": to, "cc": cc, "subject": subject,
-               "adjuntos": adj_info, "bytes_mime": len(msg.as_bytes())}
+               "adjuntos": adj_info, "bytes_mime": len(msg.as_bytes()), "in_reply_to": in_reply_to}
     return msg, resumen
 
 
@@ -149,8 +194,7 @@ def dejar_borrador(account, service, msg):
     """Conecta por IMAP y APPENDea el MIME a Borradores con el flag \\Draft. Devuelve la carpeta."""
     pw = _secrets.get(service)
     if not pw:
-        raise FaltaClave("falta la App Password '%s' en el Llavero para %s (gate de {{TITULAR}})"
-                         % (service, account))
+        raise FaltaClave(_sin_clave(service, account))
     _assert_host(IMAP_HOST, IMAP_PORT)
     M = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ssl.create_default_context())
     try:
@@ -171,7 +215,7 @@ def borrar_borrador(account, service, uid_or_subject):
     """Busca y borra un borrador por UID numérico o por asunto (parcial). Devuelve cuántos borró."""
     pw = _secrets.get(service)
     if not pw:
-        raise FaltaClave("falta la App Password '%s' en el Llavero para %s" % (service, account))
+        raise FaltaClave(_sin_clave(service, account))
     _assert_host(IMAP_HOST, IMAP_PORT)
     M = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, ssl_context=ssl.create_default_context())
     try:
@@ -198,10 +242,12 @@ def borrar_borrador(account, service, uid_or_subject):
 
 def _parse(argv):
     a = {"to": [], "cc": [], "subject": "", "body_file": None, "attach": [],
-         "html_file": None, "account": None, "dry": "--dry" in argv}
+         "html_file": None, "account": None, "reply_to": None, "references": None,
+         "dry": "--dry" in argv}
     i = 0
     multi = {"--to": "to", "--cc": "cc", "--attach": "attach"}
-    single = {"--subject": "subject", "--body-file": "body_file", "--html-file": "html_file", "--account": "account"}
+    single = {"--subject": "subject", "--body-file": "body_file", "--html-file": "html_file", "--account": "account",
+              "--reply-to-message-id": "reply_to", "--references": "references"}
     while i < len(argv):
         tok = argv[i]
         if tok in multi:
@@ -225,7 +271,9 @@ def main(argv):
         print(__doc__); return 0
     if cmd == "status":
         for user, service in ACCOUNTS.items():
-            tiene = "✓ App Password" if _secrets.get(service) else "✗ falta en el Llavero (gate)"
+            tiene = {"ok": "✓ App Password",
+                     "bloqueado": "🔒 está, pero el Llavero está bloqueado (%s)" % _secrets.DESBLOQUEO,
+                     }.get(_secrets.estado(service), "✗ falta en el Llavero (gate)")
             print("  %-26s %-26s %s" % (user, service, tiene))
         return 0
     if cmd == "delete-draft":
@@ -262,7 +310,8 @@ def main(argv):
             if not os.path.isfile(a["html_file"]):
                 print("✗ --html-file no existe: %s" % a["html_file"], file=sys.stderr); return 2
             html = open(a["html_file"], encoding="utf-8").read()
-        msg, r = construir_mime(account, a["to"], a["cc"], a["subject"], body, a["attach"], html=html)
+        msg, r = construir_mime(account, a["to"], a["cc"], a["subject"], body, a["attach"], html=html,
+                                reply_to=a["reply_to"], references=a["references"])
     except Exception as e:
         print("✗ %s" % e, file=sys.stderr); return 1
 
@@ -272,6 +321,7 @@ def main(argv):
     print("   para:     %s" % ", ".join(r["to"]))
     print("   cc:       %s" % (", ".join(r["cc"]) or "—"))
     print("   asunto:   %s" % r["subject"])
+    print("   en hilo:  %s" % (r["in_reply_to"] or "— (hilo nuevo)"))
     print("   adjuntos: %s" % adj)
     print("   tamaño:   %.0f KB" % (r["bytes_mime"] / 1024))
     if a["dry"]:

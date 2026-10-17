@@ -216,6 +216,8 @@ FAMILIAS = [
                           "ok_envio", "permiso_envio", "lote_envio",
                           # quien firma ese permiso (Ed25519, daemon com.btp.firmante, 14-oct-26)
                           "firmante",
+                          # el broker que sirve el Llavero a las sesiones por SSH (com.btp.secretos, 17-oct-26)
+                          "secretos_broker",
                           "decision_alto_riesgo",
                           # los señuelos del tripwire de exfiltración (24-sep-26)
                           "canarios",

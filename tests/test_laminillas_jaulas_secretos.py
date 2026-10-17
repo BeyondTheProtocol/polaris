@@ -85,6 +85,19 @@ print(json.dumps({"rutas": out, "venvs": J.VENVS, "cache": J.CACHE, "home": J.HO
 """
 
 
+# ¿Llega un connect() al socket? Solo «conecta» o el nombre del error; no manda nada.
+SONDA_SOCKET = r"""
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(3)
+try:
+    s.connect(sys.argv[1])
+    print("conecta")
+except Exception as e:
+    print(type(e).__name__)
+"""
+
+
 # Solo booleanos: ¿se puede LISTAR la carpeta? Nunca imprime nombres.
 SONDA_LISTA = r"""
 import json, os, sys
@@ -452,6 +465,47 @@ class SecretosAlFinal(unittest.TestCase):
         with open(ruta, "w", encoding="utf-8") as f:
             f.write(mut)
         self.assertEqual(self._llavero(ruta, servicio, env), {"fichero": NO_ENCONTRADO, "datos": NO_ENCONTRADO})
+
+    def test_e_ninguna_jaula_habla_con_el_broker_del_llavero(self):
+        """El broker (17-oct-26, tools/secretos_broker.py) sirve claves por un socket Unix a
+        cualquier proceso del usuario: una jaula no puede llegar a él. Señuelo: un socket que
+        escucha en `<tmp>/_secrets/broker.sock` (nunca el real). Control: sin jaula conecta.
+        Mutante: sin el deny de `network-outbound`, una jaula `(allow default)` conecta (medido el
+        17-oct: un deny de fichero sobre la ruta no basta)."""
+        import socket
+        d = tempfile.mkdtemp(prefix="sbj-", dir="/tmp")          # corto: sun_path tiene 104 bytes
+        os.makedirs(os.path.join(d, "_secrets"))
+        ruta_sock = os.path.join(d, "_secrets", "broker.sock")
+        srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        srv.bind(ruta_sock)
+        srv.listen(64)
+        try:
+            env = {"PATH": "/usr/bin:/bin", "HOME": self.home}
+
+            def conecta(perfil_ruta=None):
+                pre = [SANDBOX, "-f", perfil_ruta] if perfil_ruta else []
+                r = subprocess.run(pre + [PY_JAULA, "-c", SONDA_SOCKET, ruta_sock], capture_output=True,
+                                   text=True, timeout=120, env=env, cwd="/")
+                self.assertEqual(r.returncode, 0, "la sonda del socket no corrió (rc %d)" % r.returncode)
+                return r.stdout.strip()
+            self.assertEqual(conecta(), "conecta", "control sin jaula")
+            for perfil, cid in self.UNA.items():
+                self.assertNotEqual(conecta(self.rutas[cid]), "conecta", "%s habla con el broker" % perfil)
+            # Mutante: en las jaulas sin `(deny network*)` este deny es lo ÚNICO que frena el socket.
+            sin_freno = []
+            for perfil, cid in self.UNA.items():
+                texto = self._texto(cid)
+                mut = re.sub(r"^\(deny network-outbound \(remote unix-socket .*$", "", texto, flags=re.M)
+                self.assertNotEqual(mut, texto, "%s: falta el deny del broker" % perfil)
+                ruta = os.path.join(self.t, "mutante-sin-broker-%s.sb" % perfil)
+                with open(ruta, "w", encoding="utf-8") as f:
+                    f.write(mut)
+                if conecta(ruta) == "conecta":
+                    sin_freno.append(perfil)
+            self.assertTrue(sin_freno, "ningún mutante conecta: el test no prueba el deny del broker")
+        finally:
+            srv.close()
+            shutil.rmtree(d, ignore_errors=True)
 
     def test_limite_declarado_enlace_duro_plantado(self):
         """LÍMITE DECLARADO (laminillas_jaulas, cabecera): SBPL compara RUTAS. (1) Desde DENTRO, en

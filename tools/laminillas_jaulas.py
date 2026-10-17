@@ -273,10 +273,21 @@ def denies_secretos(con_red=False):
     return l
 
 
+# El broker del Llavero (17-oct-26, tools/secretos_broker.py) sirve claves por un socket Unix a
+# cualquier proceso del usuario: sin esto, una jaula le pediría el token sin pasar ni por securityd
+# ni por /usr/bin/security. Medido con sandbox-exec: un `deny file-read*` sobre la ruta NO frena
+# `connect()`; lo que lo frena es `network-outbound` a ese unix-socket. Por regex del nombre, para
+# que valga en casa base, en worktrees y en el estado aislado de los tests. El `[s]` es a propósito:
+# el texto de la línea no lleva «secrets», que es lo que usa test_laminillas_jaulas_secretos para
+# encontrar el bloque FINAL (y este deny va antes, con el resto del Llavero).
+BROKER_SOCKET_RX = "/_secret[s]/broker\\.sock$"
+
+
 def denies_llavero():
     return [";; ── Llavero",
             "(deny mach-lookup %s)" % " ".join('(global-name "%s")' % s for s in LLAVERO_MACH),
-            "(deny process-exec (literal %s))" % _q(SECURITY_BIN)]
+            "(deny process-exec (literal %s))" % _q(SECURITY_BIN),
+            '(deny network-outbound (remote unix-socket (path-regex #"%s")))' % BROKER_SOCKET_RX]
 
 
 def _sub(rutas, op="file-read*"):

@@ -37,6 +37,9 @@ ROJO_DIR="${ROJO_DIR%/}"
 # test que lanzaba algo que lee stdin sin darle `input` lo heredaba y esperaba para siempre.
 # Test: test_all_stdin_cerrado.py.
 exec </dev/null
+# Ningún test habla con el broker REAL del Llavero (17-oct-26, tools/secretos_broker.py): con él
+# encendido, un test que mockea `security` recibiría un valor real y un assert fallido lo imprimiría.
+export BTP_SECRETOS_BROKER=0
 # 19-sep-2026 — BTP_PORTABLE=1 (lo usa el CI del repo público en Linux): salta las baterías
 # que solo pueden pasar en la casa base: Llavero de macOS, plists de launchd, el binario
 # `xurl`, el panel técnico de la anatomía. No son opcionales, es que allí no hay con qué
@@ -355,6 +358,8 @@ runpy test_agentes_ritmo.py
 runpy test_radar_personas.py
 runpy test_salida_guard.py
 runpy test_salida_guard_vias.py   # 24-sep · auditoría 3.2: lo que lleva datos a la red se juzga por el DESTINO
+runpy test_correo_outbox_hilo.py  # 17-oct · el borrador con adjuntos va en el hilo; Llavero cerrado ≠ clave que falta
+runpy test_salida_guard_adjuntar.py # 17-oct · adjuntar a un borrador de Gmail no es enviar; tras adjuntar, ningún clic
 runpy test_trust_cloud_tty.py     # 1-oct · confiar una nube de píxeles N1 solo tecleando en su terminal
 # test_laminillas_n1.py va por TROZOS que corren a la vez (tests/_trozos.py, 13-oct-26; el original sigue entero y se corre a mano) · 1-oct · Puerta de N1, exporta_n1, vision_n1, nube_n1 (PII sintética)
 runpy test_laminillas_n1_t1.py
@@ -734,6 +739,7 @@ runpy test_esqueleto_niveles.py
 runpy test_esqueleto_referencia.py
 runpy test_secretos_largos.py
 runpy test_secretos_largos_paralelo.py
+runpy test_secretos_broker.py   # 17-oct · el broker del Llavero: lista cerrada, sin valores en el log, cliente que cae a security
 runpy test_guarda_memoria.py
 runpy test_visor3d_cuelgue.py
 runpy test_lector_sirve_sin_vigilante.py
