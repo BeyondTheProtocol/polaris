@@ -3756,6 +3756,18 @@
       "auditable": false,
       "repetida": false,
       "nota": "Clasificada el 14-oct-26. Exige criterio de diseño (comité `diseno`); no hay hook que sepa si una estructura se entiende. Primera aplicación: PR web #269 (índice Herramientas, menú, pie como mapa), fusionado el 14-oct."
+    },
+    {
+      "slug": "feedback-dm-ingles-suena-ia-acortar",
+      "que": "DMs que redacto para {{TITULAR}} (sobre todo en inglés): cortos, 2-3 frases simples, sin estructura de propuesta ni frases-eslogan; un contacto detectó la IA",
+      "clase": "contexto",
+      "mecanismo": "",
+      "fresca": true,
+      "heredada": false,
+      "aplicable": true,
+      "auditable": false,
+      "repetida": false,
+      "nota": "Clasificada el 16-oct-26 al nacer (Kevin Wimer: «I can tell your reply is written by AI»)."
     }
   ]
 }
