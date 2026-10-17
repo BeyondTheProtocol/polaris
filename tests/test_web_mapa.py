@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import web_mapa as M  # noqa: E402
+import web_lint as W  # noqa: E402
 from _entorno import es_espejo  # noqa: E402
 
 ES = """panelRows:
@@ -84,8 +85,13 @@ class ElMapaReal(unittest.TestCase):
         for a in mapa["afirmaciones"]:
             for i in M.IDIOMAS:
                 self.assertTrue(a["componente"].get(i) and a["valor"].get(i), a["id"])
-            # nada se propone solo hasta que voz-titular y diseno aprueben las frases
-            self.assertEqual(a.get("transiciones"), {}, a["id"])
+            # frases aprobadas por voz-titular + diseno (17-oct-26): ES y EN, con tono válido y
+            # sin nada que el lint pare
+            for destino, t in (a.get("transiciones") or {}).items():
+                self.assertIn(t.get("tono"), ("pendiente", "curso", "hecho", "no"), (a["id"], destino))
+                for idioma in M.IDIOMAS:
+                    self.assertTrue(t.get(idioma), (a["id"], destino, idioma))
+                self.assertEqual([c for c, _ in W.revisar(t["es"]) if c != "formato"], [], t["es"])
         self.assertIn("content/*/press.yml", mapa["a_mano"]["rutas"])
 
     def test_cubre_la_web_publicada(self):

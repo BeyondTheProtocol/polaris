@@ -470,6 +470,7 @@ runpy test_web_auditoria.py
 runpy test_web_lint.py
 runpy test_web_mapa.py
 runpy test_web_al_dia.py
+runpy test_web_redactor.py
 runpy test_caso_publico.py
 runpy test_seguridad_sweep_daemon.py
 runpy test_seguridad_sweep.py

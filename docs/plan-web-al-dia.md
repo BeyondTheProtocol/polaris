@@ -179,3 +179,19 @@ Telegram con antes/después ─ «sí» ─ fusionar_aprobado ─ despliegue ver
 
 - **Fase 1** (mapa + detector + redactor + carriles A, B, C + tests): unas 1,5-2 jornadas.
 - **Fase 2** (carril D con `comite-medico` y `verificacion` delante): otra jornada, después de una semana de sombra de la fase 1.
+
+## 13. Estado de la implementación (17-oct-2026)
+
+| Pieza | Fichero | Estado |
+|---|---|---|
+| Cotejo de cifras de dianas | `tools/web_lint.py::revisar_cifras_diana` | hecho, en casa base |
+| Mapa de afirmaciones (11 de /ciencia) | `tools/web_mapa.py`, `tools/web_afirmaciones.json` | hecho; frases de transición escritas por `voz-titular` y aprobadas por `diseno` con 2 correcciones |
+| Detector | `tools/web_al_dia.py`, en la pasada del guardián | hecho, en sombra |
+| Redactor | `tools/web_redactor.py`, tras el detector | hecho, en sombra: apunta el antes→después en `state/web_guardian/al_dia_propuestas_sombra.jsonl` |
+
+Decisiones de implementación:
+- **Un informe clínico nuevo no se redacta solo:** contarlo exige leerlo y que `comite-medico` lo mire (matiz de Vega). Queda `necesita_humano` y va al parte.
+- **El Telegram enseña también el inglés:** `web_lote.pedir_ok` renderiza todo el diff. Que salga solo el español (§0) depende de un ajuste en `web_publicar.render_textos`, todavía pendiente.
+- **Bucle de cambios:** si responde con cambios, siguen yendo al buzón de Vega (`encargar_cambios`). Rehacer el PR solo con sus cambios es la pieza siguiente.
+- **Modo activo:** se enciende con `{"modo": "activo"}` en `state/web_guardian/modo.json`, después de 7 días de sombra y de enseñar 3 propuestas reales.
+- **Bug que cazó el test de integración:** `web_novedad._git` hace `strip()` y cortaba la primera ruta de `git status --porcelain`. El redactor usa `git diff --name-only`.

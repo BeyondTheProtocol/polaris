@@ -1,0 +1,11 @@
+{
+ "pieza": "web_redactor.py",
+ "estado_ficha": "completa",
+ "para": "Convierte los hechos encolados por web_al_dia en UN cambio de la web al día (hasta 3): estados de /ciencia desde plantillas aprobadas, /datos regenerado con caso_publico y entradas nuevas de la cronología escritas con Claude. Pasa web_lint (con cotejo de cifras), abre un PR sin fusionar, espera al CI y encarga el Telegram sellado (web_lote.pedir_ok). En sombra solo apunta lo que habría propuesto.",
+ "cuando_si": "Lo llama web_guardian.py tras el detector en su pasada diaria. A mano: python3 tools/web_redactor.py estado (qué propondría o qué PR está vivo).",
+ "cuando_no": "Para fusionar o publicar: eso solo pasa con el «sí» de {{TITULAR}} por Telegram (salida → web_publicar.fusionar_aprobado). Nunca toca hero, navegación, equipo, prensa ni nada fuera de su lista de ficheros. Los informes clínicos nuevos no los redacta: van al parte.",
+ "reemplaza": "Escribir a mano la entrada de cronología o el estado de /ciencia cuando alguien nota que la web se quedó atrás.",
+ "test": "tests/test_web_redactor.py",
+ "alta": "2026-10-17",
+ "origen": "Plan «web al día» (docs/plan-web-al-dia.md §5-§8), aprobado por {{TITULAR}} el 17-oct-2026 («hazlo todo»)."
+}

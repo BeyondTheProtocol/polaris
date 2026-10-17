@@ -138,8 +138,18 @@ class NotasAfecta(unittest.TestCase):
             f.write("afecta: ciencia-panel-tejido\n")
         hace = time.time() - 200 * 86400
         os.utime(vieja, (hace, hace))
+        with open(os.path.join(raiz, "04 · IA", "Notas", "wes.md"), "w") as f:
+            f.write("afecta: ciencia-wes → resultados\n")
         n = A.leer_notas_afecta(raiz, hoy=datetime.date.today())
-        self.assertEqual(set(n), {"ciencia-scrna-flex"})
+        self.assertEqual(set(n), {"ciencia-scrna-flex", "ciencia-wes"})
+        self.assertEqual(n["ciencia-wes"][1], "resultados")
+
+    def test_el_destino_de_la_nota_llega_al_hecho(self):
+        hs = A.hechos_estados(MAPA, {"h-wes": {"estado": "hecho"}}, {"ciencia-wes": ("n.md", "resultados")})
+        self.assertEqual(hs[0]["datos"], {"id": "ciencia-wes", "sentido": "avanza", "destino": "resultados"})
+        self.assertEqual(hs[0]["evidencia"], "n.md")
+        hs = A.hechos_estados(MAPA, {"h-wes": {"estado": "hecho"}}, {"ciencia-wes": "n.md"})
+        self.assertEqual(hs[0]["datos"]["destino"], "hecho")
 
 
 if __name__ == "__main__":
