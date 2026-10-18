@@ -169,7 +169,37 @@ CNV_VENTANAS = ["8p11", "{{LOCUS}}"]
 # Es una INFERENCIA desde la expresión (ARN) frente a la referencia, no una lectura de ADN.
 CNV_METODOS = {"todas": "tribunal_score_ventana_log2_obs_esp", "spliced": "tribunal_score_ventana_log2_obs_esp_spliced"}
 WEB_KEYS = ("version", "lesion", "n_celulas", "grupos", "tipos", "celulas", "genes", "expr", "suelo",
-            "referencia", "veredicto", "sondas", "seleccion", "loo", "adn", "cnv")
+            "referencia", "veredicto", "sondas", "seleccion", "loo", "adn", "cnv", "qc")
+# QC agregado de la lesión («Loupe público», 18-oct): el del analista A, que es el que fija las células del
+# explorador (tribunal/_comun.carga: las del congelado de A, mismas que B). Allow-list cerrada; sin ids.
+QC_KEYS = ("fuente", "n_inicial", "n_final", "umbral_UMI", "umbral_genes", "umbral_pct_MT", "excluidas_UMI_genes",
+           "excluidas_MT_adicionales", "scrublet_dobletes", "scrublet_umbral", "mediana_UMI_inicial",
+           "mediana_UMI_final", "mediana_genes_inicial", "mediana_genes_final", "n_sondas_MT")
+QC_OBLIGATORIAS = ("fuente", "n_inicial", "n_final", "umbral_UMI", "umbral_genes", "scrublet_dobletes")
+QC_FUENTE = "analista A: QC común (MAD sobre UMI y genes, % MT si hay sondas, Scrublet); mismas células en A y B"
+
+
+def construye_qc(qc_a):
+    """QC agregado de una lesión desde el qc.json de A: solo las claves de la allow-list, en su orden."""
+    out = {"fuente": QC_FUENTE}
+    for k in QC_KEYS[1:]:
+        if k in qc_a:
+            out[k] = qc_a[k]
+    return out
+
+
+def _valida_qc(qc, n, b):
+    if not isinstance(qc, dict) or not set(QC_OBLIGATORIAS) <= set(qc) or not set(qc) <= set(QC_KEYS):
+        raise ValidacionFallida("%s: qc fuera del contrato" % b)
+    if qc["fuente"] != QC_FUENTE or qc["n_final"] != n or not _es_ent(qc["n_inicial"], n):
+        raise ValidacionFallida("%s: qc no cuadra con las células del explorador" % b)
+    for k in ("umbral_UMI", "umbral_genes"):
+        u = qc[k]
+        if not (isinstance(u, list) and len(u) == 2 and all(isinstance(x, (int, float)) and x >= 0 for x in u) and u[0] <= u[1]):
+            raise ValidacionFallida("%s: qc.%s fuera del contrato" % (b, k))
+    for k in set(qc) - {"fuente", "umbral_UMI", "umbral_genes", "umbral_pct_MT", "scrublet_umbral"}:
+        if not _es_ent(qc[k], 0) and not (isinstance(qc[k], float) and qc[k] >= 0):
+            raise ValidacionFallida("%s: qc.%s no es un número >= 0" % (b, k))
 # Genes que participan en la SELECCIÓN del grupo de interés (su cifra en ese grupo es circular): papel en
 # la regla. Hígado (REGLAS_HIGADO_v1, vía 1): panel de identidad, FGFR1_alto, marcadores de exclusión y
 # genes ligados al programa ER con el que se selecciona (favorecidos por seleccionar con ESR1/TFF1/FOXA1):
@@ -629,6 +659,7 @@ def valida_web_lesion(path, prohibidas=(), modo="todas"):
     n = obj["n_celulas"]
     if sum(x["n"] for x in obj["grupos"]) != n:
         raise ValidacionFallida("%s: la suma de n por grupo no es n_celulas" % b)
+    _valida_qc(obj["qc"], n, b)
     k = [x["n"] for x in obj["grupos"] if x["id"] == g["interes"]]
     if not k or k[0] != N_INTERES[les]:
         raise ValidacionFallida("%s: n del grupo de interés distinto de %d" % (b, N_INTERES[les]))
@@ -787,10 +818,18 @@ def valida_csv(path, prohibidas=()):
 # U1 (verificado en ObsFeatureMatrixAnndataLoader.js de @vitessce/zarr 4.1.0): Vitessce lee una csc_matrix
 # columna a columna por indptr; con csr_matrix recorre `indices` y `data` enteros en cada selección.
 ZARR_DIR = "zarr"
-ZARR_OBS_COLS = ["grupo", "tipo_celular"]
+# 18-oct (lo que un ingeniero necesita para no malinterpretar, inventario del comité médico): UMI y nº de genes
+# por célula, fracción de ADN genómico POR GRUPO (fórmula del tribunal, _adn.py, que es un cociente de medias:
+# célula a célula da >= 1 en células con pocas UMI; vacía en el modo spliced: no aplica), sondas por gen,
+# marcadores por grupo del contrato y el perfil por bins de 10 Mb.
+ZARR_OBS_COLS = ["grupo", "tipo_celular", "umi", "n_genes"]
 ZARR_OBSM = ["X_umap"]
-ZARR_UNS_KEYS = ("version", "lesion", "modo_sondas", "genes_sin_sonda")
-ZARR_VAR_FIJAS = ["ensembl", "referencia_emparejada"]
+ZARR_UNS_KEYS = ("version", "lesion", "modo_sondas", "genes_sin_sonda", "marcadores", "perfil_bins", "adn_por_grupo")
+ZARR_VAR_FIJAS = ["ensembl", "n_sondas", "n_sondas_union", "referencia_emparejada"]
+MARCADORES_KEYS = ("gen", "logfc", "fdr", "frac_grupo", "frac_resto", "suelo")
+MARCADORES_N = 50                   # por grupo, ordenados por el estadístico de Wilcoxon
+PERFIL_KEYS = ("cromosoma", "inicio_mb", "log2_rel")
+RE_CROMOSOMA = re.compile(r"^chr([1-9]|1\d|2[0-2])$")
 PREFIJO_SUELO = "suelo__"
 ZARR_CHUNK = 65536      # elementos por trozo de X/indices y X/data: un gen cae en 1-2 trozos
 
@@ -820,14 +859,16 @@ def sig3(x):
 
 
 def escribe_zarr_lesion(path, lesion, X, umi, simbolos, ensembl, grupo, tipo_c, umap, indices, suelo_todos,
-                        version, modo):
+                        version, modo, adn_por_grupo, n_sondas, n_sondas_union, marcadores, perfil):
     """AnnData-Zarr de UNA lesión: X = CP10k a 3 cifras (como `expr` de la web) en csc_matrix con trozos de
-    ZARR_CHUNK; obs = grupo + tipo_celular con el índice secuencial del h5ad; obsm = X_umap; var = ensembl,
-    referencia emparejada y suelo por grupo de TODOS los genes (`suelo_todos` = salida de _suelo_todos.calcula);
-    uns = version, lesion, modo_sondas, genes_sin_sonda."""
+    ZARR_CHUNK; obs = grupo, tipo_celular, umi, n_genes con el índice secuencial del h5ad;
+    obsm = X_umap; var = ensembl, sondas, referencia emparejada y suelo por grupo de TODOS los genes
+    (`suelo_todos` = salida de _suelo_todos.calcula); uns = version, lesion, modo_sondas, genes_sin_sonda,
+    marcadores (grupo → MARCADORES_KEYS) y perfil_bins (PERFIL_KEYS)."""
     import anndata as an
     import pandas as pd
     import scipy.sparse as sp
+    n_genes = np.asarray((sp.csr_matrix(X) > 0).sum(axis=1)).ravel().astype(np.int32)
     X = sp.csr_matrix(X, dtype=np.float64)
     X = (sp.diags(1e4 / np.asarray(umi, float)) @ X).tocsr()
     X.data = sig3(X.data)
@@ -837,17 +878,26 @@ def escribe_zarr_lesion(path, lesion, X, umi, simbolos, ensembl, grupo, tipo_c, 
     grupos = grupos_zarr(lesion, grupo)
     if list(suelo_todos["grupos"]) != grupos:
         raise ValueError("los grupos del suelo no siguen el orden del contrato")
-    cols = {"ensembl": np.asarray(ensembl).astype(str),
+    cols = {"ensembl": np.asarray(ensembl).astype(str), "n_sondas": np.asarray(n_sondas, np.int32),
+            "n_sondas_union": np.asarray(n_sondas_union, np.int32),
             "referencia_emparejada": np.asarray(suelo_todos["referencia"], float)}
     for k, gid in enumerate(grupos):
         cols[PREFIJO_SUELO + gid] = np.asarray(suelo_todos["suelo"], float)[:, k]
     var = pd.DataFrame(cols, index=pd.Index(np.asarray(simbolos).astype(str)))
     var.index = an.utils.make_index_unique(var.index)
     obs = pd.DataFrame({"grupo": pd.Categorical(np.asarray(grupo).astype(str)),
-                        "tipo_celular": pd.Categorical(np.asarray(tipo_c).astype(str))},
+                        "tipo_celular": pd.Categorical(np.asarray(tipo_c).astype(str)),
+                        "umi": np.asarray(umi, np.int64), "n_genes": n_genes},
                        index=pd.Index([str(i) for i in indices]))
     uns = {"version": str(version), "lesion": lesion, "modo_sondas": ETIQUETA_MODO[modo],
-           "genes_sin_sonda": np.array([str(var.index[i]) for i in suelo_todos["excluidos"]], dtype=object)}
+           "genes_sin_sonda": np.array([str(var.index[i]) for i in suelo_todos["excluidos"]], dtype=object),
+           "marcadores": {g: {"gen": np.array(m["gen"], dtype=object),
+                              **{k: np.asarray(m[k], np.float64) for k in MARCADORES_KEYS[1:]}}
+                          for g, m in marcadores.items()},
+           "perfil_bins": {"cromosoma": np.array(perfil["cromosoma"], dtype=object),
+                           "inicio_mb": np.asarray(perfil["inicio_mb"], np.float64),
+                           "log2_rel": np.asarray(perfil["log2_rel"], np.float64)},
+           "adn_por_grupo": {g: float(x) for g, x in adn_por_grupo.items()}}
     a = an.AnnData(X=X, obs=obs, var=var, uns=uns, obsm={"X_umap": np.asarray(umap, np.float32)})
     with an.settings.override(zarr_write_format=2):   # v2 fijado: anndata pasará a v3 por defecto; U1 se verificó con v2
         a.write_zarr(path)
@@ -918,6 +968,15 @@ def valida_zarr_lesion(path, lesion, prohibidas=()):
     data = np.asarray(X["data"][...])
     if data.dtype.kind != "f" or (data.size and (not np.isfinite(data).all() or data.min() < 0)):
         raise ValidacionFallida("%s: X con valores no finitos o negativos" % q)
+    # Privacidad primero: si hay un barcode, un id o el nombre, ese es el motivo que sale, no otro posterior.
+    cadenas = _cadenas_zarr(path)
+    for donde, c in cadenas:
+        m = cadena_prohibida(c, prohibidas)
+        if m:
+            raise ValidacionFallida("%s %s: %s" % (q, donde, m))
+        if RE_TITULAR_H5.search(c):
+            raise ValidacionFallida("%s %s: nombre de la titular" % (q, donde))
+    n_unicas, toleradas = _puerta_lote([c for _, c in cadenas], q, ignorar_capas=("casi_titular",))
     a = an.read_zarr(path)
     if list(a.obs.columns) != ZARR_OBS_COLS:
         raise ValidacionFallida("%s: columnas de obs fuera del contrato" % q)
@@ -947,20 +1006,63 @@ def valida_zarr_lesion(path, lesion, prohibidas=()):
         _suelo_todos().valida_completo(res, a.n_vars)
     except ValueError as e:
         raise ValidacionFallida("%s: %s" % (q, e))
+    _valida_extra_zarr(a, q, grupos, sin)
     um = np.asarray(a.obsm["X_umap"])
     if um.shape != (a.n_obs, 2) or not np.isfinite(um).all():
         raise ValidacionFallida("%s: X_umap fuera del contrato" % q)
-    cadenas = _cadenas_zarr(path)
-    for donde, c in cadenas:
-        m = cadena_prohibida(c, prohibidas)
-        if m:
-            raise ValidacionFallida("%s %s: %s" % (q, donde, m))
-        if RE_TITULAR_H5.search(c):
-            raise ValidacionFallida("%s %s: nombre de la titular" % (q, donde))
-    n_unicas, toleradas = _puerta_lote([c for _, c in cadenas], q, ignorar_capas=("casi_titular",))
+    adn_int = a.uns["adn_por_grupo"].get(grupos[0])
     return {"n_celulas": int(a.n_obs), "n_genes": int(a.n_vars), "n_genes_sin_sonda": len(excl), "grupos": grupos,
+            "adn_interes": None if adn_int is None else float(adn_int),
             "indices": idx, "n_cadenas": len(cadenas), "n_cadenas_unicas_puerta": n_unicas,
             "tokens_casi_titular_tolerados_como_vocabulario": toleradas}
+
+
+def _valida_extra_zarr(a, q, grupos, sin):
+    """Campos del 18-oct: UMI, nº de genes y ADN por célula; sondas por gen; marcadores; perfil por bins."""
+    import scipy.sparse as sp
+    modo = {v: k for k, v in ETIQUETA_MODO.items()}[a.uns["modo_sondas"]]
+    o, v = a.obs, a.var
+    if o["umi"].dtype.kind not in ("i", "u") or (o["umi"].values < 1).any():
+        raise ValidacionFallida("%s: umi por célula fuera del contrato" % q)
+    if o["n_genes"].dtype.kind not in ("i", "u") or \
+            not np.array_equal(o["n_genes"].values, np.asarray((sp.csr_matrix(a.X) > 0).sum(axis=1)).ravel()):
+        raise ValidacionFallida("%s: n_genes no es el nº de genes detectados de X" % q)
+    adn = {str(k): float(x) for k, x in a.uns["adn_por_grupo"].items()}
+    con_celulas = [g for g in grupos if (o["grupo"].astype(str).values == g).any()]
+    if modo == "todas" and (sorted(adn) != sorted(con_celulas) or not all(np.isfinite(x) and 0 <= x < 1 for x in adn.values())):
+        raise ValidacionFallida("%s: adn_por_grupo fuera del contrato (un valor en [0, 1) por grupo con células)" % q)
+    if modo == "spliced" and adn:
+        raise ValidacionFallida("%s: adn_por_grupo debe ir vacío en el modo spliced (no aplica)" % q)
+    ns, nu = v["n_sondas"].values, v["n_sondas_union"].values
+    if ns.dtype.kind not in ("i", "u") or nu.dtype.kind not in ("i", "u") or (nu < 0).any() or (nu > ns).any():
+        raise ValidacionFallida("%s: sondas por gen fuera del contrato" % q)
+    sin_sonda = set(v.index[(ns if modo == "todas" else nu) == 0].astype(str))
+    if sin_sonda != sin:
+        raise ValidacionFallida("%s: genes_sin_sonda no son los genes con 0 sondas del modo" % q)
+    mk = a.uns["marcadores"]
+    if not set(mk) <= set(grupos):
+        raise ValidacionFallida("%s: marcadores de un grupo fuera del contrato" % q)
+    validos = set(v.index.astype(str)) - sin
+    for gid, m in mk.items():
+        if set(m) != set(MARCADORES_KEYS):
+            raise ValidacionFallida("%s: marcadores de %s fuera del contrato" % (q, gid))
+        genes = [str(x) for x in np.asarray(m["gen"]).ravel()]
+        cols = {k: np.asarray(m[k], float).ravel() for k in MARCADORES_KEYS[1:]}
+        if len(genes) > MARCADORES_N or len(set(genes)) != len(genes) or not set(genes) <= validos \
+                or any(len(c) != len(genes) for c in cols.values()):
+            raise ValidacionFallida("%s: marcadores de %s: genes o longitudes fuera del contrato" % (q, gid))
+        if not (np.isfinite(cols["logfc"]).all() and all(((c >= 0) & (c <= 1)).all() for k, c in cols.items() if k != "logfc")):
+            raise ValidacionFallida("%s: marcadores de %s: valores fuera de rango" % (q, gid))
+        if genes and not np.array_equal(cols["suelo"], v.loc[genes, PREFIJO_SUELO + gid].to_numpy(float)):
+            raise ValidacionFallida("%s: marcadores de %s: el suelo no es el de var" % (q, gid))
+    pb = a.uns["perfil_bins"]
+    if set(pb) != set(PERFIL_KEYS):
+        raise ValidacionFallida("%s: perfil_bins fuera del contrato" % q)
+    cr = [str(x) for x in np.asarray(pb["cromosoma"]).ravel()]
+    ini, lr = np.asarray(pb["inicio_mb"], float).ravel(), np.asarray(pb["log2_rel"], float).ravel()
+    if not cr or len(ini) != len(cr) or len(lr) != len(cr) or not all(RE_CROMOSOMA.match(c) for c in cr) \
+            or not (np.isfinite(ini).all() and (ini >= 0).all() and np.isfinite(lr).all()):
+        raise ValidacionFallida("%s: perfil_bins fuera del contrato" % q)
 
 
 def _indices_h5ad(path):
@@ -986,6 +1088,12 @@ def valida_salidas(out_dir, prohibidas=(), con_informe=True):
         z = valida_zarr_lesion(os.path.join(out_dir, ZARR_DIR, "%s.zarr" % les), les, prohibidas)
         if z.pop("indices") != por_lesion[les]:
             raise ValidacionFallida("zarr %s: sus células no son las de esa lesión en el h5ad" % les)
+        with open(os.path.join(out_dir, "web", "%s.json" % les), encoding="utf-8") as fh:
+            adn_web = json.load(fh)["adn"]
+        za = z.pop("adn_interes")
+        if (adn_web is None) != (za is None) or \
+                (za is not None and abs(round(za, 5) - adn_web["frac_lecturas_interes"]) > 1e-5):
+            raise ValidacionFallida("zarr %s: el ADN del grupo de interés no cuadra con el de la web" % les)
         res["%s/%s.zarr" % (ZARR_DIR, les)] = z
     if con_informe:
         res["INFORME_LIMPIEZA.json"] = {"n_cadenas": valida_json_generico(os.path.join(out_dir, "INFORME_LIMPIEZA.json"), prohibidas)[1]}

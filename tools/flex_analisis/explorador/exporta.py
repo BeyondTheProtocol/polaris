@@ -402,6 +402,48 @@ def perfil_bins(X, gene_ids, mt, mr, cv, bin_bp=10e6):
     return p - p.median(), int(ok.sum())
 
 
+def perfil_dict(P):
+    """Serie (chr, bin de 10 Mb) → listas del contrato; solo autosomas chr1-chr22."""
+    filas = [(c, b, v) for (c, b), v in P.items() if C.RE_CROMOSOMA.match(str(c)) and np.isfinite(v)]
+    return {"cromosoma": [str(c) for c, _, _ in filas], "inicio_mb": [float(b * 10) for _, b, _ in filas],
+            "log2_rel": [float(np.round(v, 3)) for _, _, v in filas]}
+
+
+def marcadores_lesion(X, umi, grupo, g_ids, simb, excl, todos):
+    """Marcadores por grupo del contrato (cada grupo frente al resto de la lesión): Wilcoxon de scanpy sobre
+    log1p(CP10k), FDR de Benjamini-Hochberg, MARCADORES_N por grupo, con el suelo del gen en ese grupo al lado.
+    Solo grupos del contrato y genes con sonda; nunca sobre selecciones libres (comité médico, 18-oct)."""
+    import anndata as an
+    import pandas as pd
+    import scanpy as sc
+    import scipy.sparse as sp
+    keep = ~np.asarray(excl, bool)
+    nombres = np.asarray(an.utils.make_index_unique(pd.Index(np.asarray(simb).astype(str))))
+    Xn = (sp.diags(1e4 / np.asarray(umi, float)) @ sp.csr_matrix(X, dtype=np.float64)).tocsr()[:, keep]
+    Xn.data = np.log1p(Xn.data)
+    grupo = np.asarray(grupo).astype(str)
+    presentes = [g for g in g_ids if (grupo == g).sum() >= 2]
+    a = an.AnnData(X=Xn, obs=pd.DataFrame({"g": pd.Categorical(grupo, categories=g_ids)}, index=[str(i) for i in range(len(grupo))]),
+                   var=pd.DataFrame(index=nombres[keep]))
+    sc.tl.rank_genes_groups(a, "g", groups=presentes, reference="rest", method="wilcoxon", n_genes=C.MARCADORES_N,
+                            pts=True, use_raw=False)
+    r = a.uns["rank_genes_groups"]
+    pos = {s: i for i, s in enumerate(nombres)}
+    col = {g: k for k, g in enumerate(todos["grupos"])}
+    out = {}
+    for g in presentes:
+        lfc = np.asarray(r["logfoldchanges"][g], float)
+        fin = np.isfinite(lfc)                  # un logFC infinito (cero en un lado) no se enseña como cifra
+        genes = [str(x) for x, ok in zip(r["names"][g], fin) if ok]
+        out[g] = {"gen": genes,
+                  "logfc": [float(np.round(x, 4)) for x in lfc[fin]],
+                  "fdr": [float(min(max(x, 0.0), 1.0)) for x in np.asarray(r["pvals_adj"][g], float)[fin]],
+                  "frac_grupo": [float(np.round(x, 4)) for x in r["pts"].loc[genes, g]],
+                  "frac_resto": [float(np.round(x, 4)) for x in r["pts_rest"].loc[genes, g]],
+                  "suelo": [float(todos["suelo"][pos[x], col[g]]) for x in genes]}
+    return out
+
+
 # ── Una lesión ─────────────────────────────────────────────────────────────────────────────────
 def procesa_lesion(t, ps, cv, ctx):
     import scipy.sparse as sp
@@ -573,10 +615,25 @@ def procesa_lesion(t, ps, cv, ctx):
                          "n_sondas_nulas_OR_adn_json": int(aj["nulos"]["n_sondas"]),
                          "frac_malignas_A_adn_json": _r(float(aj[t]["frac_UMI_ADN_estimada_malignas_A"]), 5),
                          "nota": "frac_lecturas_interes es del grupo de interés de este export (993 / 68), no de las malignas de A (adn.json)"}
+        # 18-oct: la fórmula del tribunal es un cociente de MEDIAS; célula a célula da >= 1 en células con pocas UMI
+        # (una lectura en una sonda nula × ~46.000 sondas), así que se exporta por GRUPO y se cuenta el diagnóstico.
+        fc = dl * n_u / umi_f
+        L["adn_celula_diag"] = {"n_celulas": int(len(fc)), "n_estimacion_ge_1": int((fc >= 1).sum())}
+        L["_adn_dl"] = (dl, int(n_u), umi_f)
     else:
         L["adn"], L["adn_meta"] = None, {"nota": "modo spliced: X no lleva sondas dentro de exón; no aplica"}
+        L["adn_celula_diag"], L["_adn_dl"] = None, None
     g_ids = [C.GRUPOS[t]["interes"]] + [r for r in C.GRUPOS[t]["referencia"] if (grupo == r).any()] + [C.GRUPOS[t]["otras"]]
     L["grupos_web"] = g_ids
+    L["adn_por_grupo"] = {}
+    if L["_adn_dl"] is not None:            # misma forma que el tribunal: cociente de medias, por grupo
+        dl_, n_u_, umi_ = L.pop("_adn_dl")
+        L["adn_por_grupo"] = {g: float(dl_[grupo == g].mean() * n_u_ / umi_[grupo == g].mean())
+                              for g in g_ids if (grupo == g).any()}
+        di("%s: ADN por célula (no se exporta): %d de %d células con estimación >= 1"
+           % (t, L["adn_celula_diag"]["n_estimacion_ge_1"], L["adn_celula_diag"]["n_celulas"]))
+    else:
+        L.pop("_adn_dl", None)
     expr, suelo, refd = {}, {}, {}
     for g in genes:
         j = int(np.where(simb == g)[0][0])
@@ -598,7 +655,8 @@ def procesa_lesion(t, ps, cv, ctx):
     if malos:
         raise RuntimeError("%s: el suelo de todos los genes no reproduce el de la web (%d discrepancias)" % (t, len(malos)))
     ST.valida_completo(todos, len(simb))
-    L.update(suelo_todos=todos, umi=umi)
+    L.update(suelo_todos=todos, umi=umi, n_sondas_gen=ns_tot,
+             marcadores=marcadores_lesion(X, umi, grupo, g_ids, simb, excl_sin_sonda, todos))
 
     # CNV
     if t == "hueso":
@@ -622,6 +680,8 @@ def procesa_lesion(t, ps, cv, ctx):
         L["cnv"] = {"pseudobulk": {"ventana": "8p11", "percentil_genoma": pct}}
         L["cnv_meta"] = {"n_bins": int(len(P)), "n_genes_usados": n_ok, "referencia": REF_EMPAREJADA[t],
                          "log2_rel_bin_8p11": _r(P.loc[key], 3) if key in P.index else None}
+    # 18-oct: el perfil por bins entero, en las dos lesiones (interés frente a la referencia emparejada)
+    L["perfil"] = perfil_dict(P if t == "higado" else perfil_bins(X, gene_ids, interes, ref, cv)[0])
     di("%s: n %d · interés %d · grupos %d · genes web %d (excluidos %d) · vacíos %d · rho %.3f · %.0f s"
        % (t, L["n"], int(interes.sum()), len(g_ids), len(genes), len(excluidos), n_vac, rho, time.time() - T0))
     return L
@@ -650,7 +710,7 @@ def web_json(L):
                        "tipo": [tpos[x] for x in L["tipo_c"].astype(str)]},
            "genes": list(L["genes"]), "expr": L["expr"], "suelo": L["suelo"], "referencia": L["referencia"],
            "veredicto": L["veredicto"], "sondas": {g: L["sondas_union_genes_web"][g] for g in L["genes"]},
-           "seleccion": L["seleccion"], "loo": L["loo"], "adn": L["adn"], "cnv": L["cnv"]}
+           "seleccion": L["seleccion"], "loo": L["loo"], "adn": L["adn"], "cnv": L["cnv"], "qc": L["qc"]}
     return _escribe_json(os.path.join(OUT, "web", "%s.json" % t), obj)
 
 
@@ -747,6 +807,15 @@ def informe(Ls, resumen_u3, h5info, validadores, ruta_h5, pool):
         "X = CP10k a 3 cifras significativas, como `expr` de la web, en csc_matrix con trozos de %d elementos para que la página lea gen a gen "
         "(Vitessce 4.1.0 lee csc por columna; csr le obliga a recorrer la matriz entera). Vive FUERA de web/: publicarlo es un paso aparte "
         "(condiciones del laboratorio y decisión de la titular)." % C.ZARR_CHUNK,
+        "LO QUE UN ingeniero NECESITA PARA NO MALINTERPRETAR (inventario del comité médico, plan aprobado por la titular el 18-oct): en el "
+        "Zarr, UMI y nº de genes detectados por célula, fracción de ADN genómico POR GRUPO con la fórmula del tribunal (cociente de "
+        "medias: delta medio × sondas dentro de exón / UMI medio; en las dos lesiones porque está cotejada con tribunal/adn.json en las "
+        "dos; vacía en el modo spliced). POST HOC: el plan decía por célula, pero célula a célula esa fórmula da >= 1 en células con "
+        "pocas UMI (cuántas: ver adn_celula_diag), así que no se exporta por célula. Sondas por gen (total y de unión), marcadores por grupo del contrato (Wilcoxon de scanpy sobre log1p CP10k frente al "
+        "resto de la lesión, FDR BH, %d por grupo, con el suelo del gen al lado; los de logFC infinito no se enseñan) y el perfil por bins "
+        "de 10 Mb de las dos lesiones (expresión, no ADN). En web/<lesión>.json, el QC agregado de A (el que fija las células). La "
+        "probabilidad de doblete por célula NO se exporta: estas células ya son las que dejó A tras quitar los dobletes de Scrublet "
+        "(el QC lo cuenta)." % C.MARCADORES_N,
         "Validador, excepciones declaradas: (1) solo en el manifiesto PUBLICADO (sello verificado + ok_titular true), el valor de fecha_ok, y solo si es "
         "AAAA-MM-DD de calendario, no cuenta como fecha y se enmascara en la copia que pasa por puerta_n1 (A4; la clave ok_titular ya no necesita excepción, C1); "
         "(2) el índice secuencial c00000…cNNNNN queda exento de las tiras de 5 cifras de los ids (un índice denso contiene por construcción toda cifra menor que n); "
@@ -786,6 +855,7 @@ def informe(Ls, resumen_u3, h5info, validadores, ruta_h5, pool):
            "seleccion": {t: Ls[t]["seleccion"] for t in C.LESIONES}, "loo": {t: Ls[t]["loo"] for t in C.LESIONES},
            "adn": {t: {"web": Ls[t]["adn"], "meta": Ls[t]["adn_meta"]} for t in C.LESIONES},
            "pool_crudo_higiene": pool, "zarr": ZINFO,
+           "adn_celula_diag": {t: Ls[t]["adn_celula_diag"] for t in C.LESIONES},
            "quitado": quitado, "decisiones": decisiones, "post_hoc": post_hoc, "validadores": validadores}
     md = ["> ⚠️ %s" % aviso1, "",
           "# INFORME DE LIMPIEZA · explorador single-cell (export curado, zona clínica) · modo_sondas = %s" % inf["modo_sondas"], "",
@@ -872,7 +942,9 @@ def zarrs(Ls):
         os.makedirs(os.path.dirname(p), exist_ok=True)
         ESCRITOS.append(p)
         info = C.escribe_zarr_lesion(p, t, L["X"], L["umi"], L["simbolo"], L["gene_ids"], L["grupo"], L["tipo_c"],
-                                     L["umap"], ids, L["suelo_todos"], C.version_contrato(MODO), MODO)
+                                     L["umap"], ids, L["suelo_todos"], C.version_contrato(MODO), MODO,
+                                     L["adn_por_grupo"], L["n_sondas_gen"], L["n_sondas_union_gen"],
+                                     L["marcadores"], L["perfil"])
         tam = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(p) for f in fs)
         n_f = sum(len(fs) for _, _, fs in os.walk(p))
         out[t] = {**info, "n_genes_sin_sonda": len(L["suelo_todos"]["excluidos"]), "tamano_mb": _r(tam / 2 ** 20, 1),
@@ -895,8 +967,13 @@ def exportar(a):
        % (pool["n_sufijos"], pool["n_sufijos_de_la_paciente"], pool["n_sufijos_ajenos"], pool["n_barcodes_ajenos"],
           pool["umi_ajenas"], 100 * pool["frac_umi_ajenas"]))
     Ls = {}
+    with open(os.path.join(TC.A_DIR, "qc.json"), encoding="utf-8") as fh:
+        qc_a = json.load(fh)
     for t in C.LESIONES:
         Ls[t] = procesa_lesion(t, ps, cv, ctx)
+        Ls[t]["qc"] = C.construye_qc(qc_a[t])
+        if Ls[t]["qc"]["n_final"] != Ls[t]["n"]:   # el QC de A es el que fija las células del explorador
+            raise RuntimeError("%s: el QC de A no deja las mismas células que el explorador" % t)
     ruta_h5, h5info = h5ad(Ls)
     ZINFO.update(zarrs(Ls))
     for t in C.LESIONES:

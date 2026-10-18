@@ -146,7 +146,12 @@ def web_sintetico(les, L):
                         "tipo": [tpos[x] for x in L["tipo_c"].astype(str)]},
             "genes": genes, "expr": expr, "suelo": suelo, "referencia": ref,
             "veredicto": C.veredictos_lesion(les, genes), "sondas": sondas, "seleccion": sel, "loo": loo, "adn": adn,
-            "cnv": cnv}
+            "cnv": cnv,
+            "qc": C.construye_qc({"n_inicial": L["n"] + 150, "n_final": L["n"], "umbral_UMI": [120.0, 9000.0],
+                                  "umbral_genes": [90.0, 3000.0], "umbral_pct_MT": "sin sondas MT en el panel: no aplicable",
+                                  "excluidas_UMI_genes": 120, "scrublet_dobletes": 30, "scrublet_umbral": 0.31,
+                                  "mediana_UMI_inicial": 1500.0, "mediana_UMI_final": 1600.0, "mediana_genes_inicial": 900.0,
+                                  "mediana_genes_final": 950.0, "n_sondas_MT": 0, "pseudobulk_CP10k_hepatocitario": 3.2})}
 
 
 def escribe_json(p, obj):
@@ -200,8 +205,26 @@ def suelo_todos_sintetico(les, L):
 
 def escribe_zarr_sintetico(p, les, L, ids):
     todos, umi = suelo_todos_sintetico(les, L)
-    C.escribe_zarr_lesion(p, les, L["X"], umi, GENES, ["ENSG%011d" % i for i in range(len(GENES))], L["grupo"],
-                          L["tipo_c"], L["umap"], ids, todos, C.version_contrato("todas"), "todas")
+    G = len(GENES)
+    ns = rng.integers(1, 7, G)
+    ns[-2:] = 0                                       # los dos «sin sonda» de suelo_todos_sintetico
+    nu = np.minimum(rng.integers(0, 3, G), ns)
+    validos = [g for g, s in zip(GENES, ns) if s > 0]
+    col = {g: k for k, g in enumerate(todos["grupos"])}
+    pos = {g: i for i, g in enumerate(GENES)}
+    marc = {}
+    for gid in todos["grupos"][:3]:
+        genes = list(rng.choice(validos, 10, replace=False))
+        marc[gid] = {"gen": genes, "logfc": list(rng.normal(size=10)), "fdr": list(rng.random(10)),
+                     "frac_grupo": list(rng.random(10)), "frac_resto": list(rng.random(10)),
+                     "suelo": [float(todos["suelo"][pos[g], col[gid]]) for g in genes]}
+    perfil = {"cromosoma": ["chr%d" % (i % 22 + 1) for i in range(30)], "inicio_mb": [float(10 * i) for i in range(30)],
+              "log2_rel": list(rng.normal(size=30) * 0.3)}
+    grupo = np.asarray(L["grupo"]).astype(str)
+    adn = {g: (0.005 if k == 0 else float(rng.uniform(0, 0.05))) for k, g in enumerate(todos["grupos"]) if (grupo == g).any()}
+    C.escribe_zarr_lesion(p, les, L["X"], umi, GENES, ["ENSG%011d" % i for i in range(G)], L["grupo"],
+                          L["tipo_c"], L["umap"], ids, todos, C.version_contrato("todas"), "todas",
+                          adn, ns, nu, marc, perfil)
 
 
 def reescribe_zarr(p, f, csr=False):
@@ -352,6 +375,83 @@ def main():
     d = copia(base)
     shutil.rmtree(os.path.join(d, zb))
     debe_fallar(d, "zarr: falta el del hueso", "no existe")
+
+    # 18-oct: lo que un ingeniero necesita para no malinterpretar (UMI, genes, ADN, sondas, marcadores, perfil, QC)
+    qc_h = json.load(open(os.path.join(base, "web", "higado.json")))["qc"]
+    check("pseudobulk_CP10k_hepatocitario" not in qc_h and qc_h["fuente"] == C.QC_FUENTE,
+          "qc: solo la allow-list (lo que no es QC, fuera) y la fuente fija")
+
+    def _mut(desc, esperado, f, cual=zh):
+        d_ = copia(base)
+        reescribe_zarr(os.path.join(d_, cual), f)
+        debe_fallar(d_, desc, esperado)
+
+    def _adn_imposible(a):
+        d_ = dict(a.uns["adn_por_grupo"])
+        d_[list(d_)[-1]] = 1.2
+        a.uns["adn_por_grupo"] = d_
+    _mut("zarr: una fracción de ADN >= 1 (imposible)", "adn_por_grupo", _adn_imposible)
+
+    def _adn_sin_grupo(a):
+        d_ = dict(a.uns["adn_por_grupo"])
+        d_.pop(list(d_)[-1])
+        a.uns["adn_por_grupo"] = d_
+    _mut("zarr: un grupo con células sin fracción de ADN", "adn_por_grupo", _adn_sin_grupo)
+
+    def _adn_distinto_web(a):
+        d_ = dict(a.uns["adn_por_grupo"])
+        d_[C.GRUPOS["higado"]["interes"]] = 0.006
+        a.uns["adn_por_grupo"] = d_
+    _mut("zarr: ADN del grupo de interés distinto del de la web", "no cuadra con el de la web", _adn_distinto_web)
+
+    def _umi_cero(a):
+        u = a.obs["umi"].values.copy()
+        u[0] = 0
+        a.obs["umi"] = u
+    _mut("zarr: una UMI a cero", "umi por célula", _umi_cero)
+
+    def _n_genes(a):
+        n = a.obs["n_genes"].values.copy()
+        n[0] += 1
+        a.obs["n_genes"] = n
+    _mut("zarr: n_genes que no cuadra con X", "n_genes", _n_genes)
+
+    def _sonda_cero(a):
+        ns = a.var["n_sondas"].values.copy()
+        ns[0] = 0
+        a.var["n_sondas"] = ns
+        a.var["n_sondas_union"] = np.minimum(a.var["n_sondas_union"].values, ns)
+    _mut("zarr: un gen con 0 sondas que no se declara sin sonda", "genes_sin_sonda", _sonda_cero)
+
+    def _marcador_fuera(a):
+        m = dict(a.uns["marcadores"])
+        m["tumor"] = m[list(m)[0]]
+        a.uns["marcadores"] = m
+    _mut("zarr: marcadores de un grupo fuera del contrato", "fuera del contrato", _marcador_fuera)
+
+    def _marcador_suelo(a):
+        m = {k: dict(v) for k, v in a.uns["marcadores"].items()}
+        g0 = list(m)[0]
+        s = np.asarray(m[g0]["suelo"], float).copy()
+        s[0] = min(1.0, s[0] + 0.1)
+        m[g0]["suelo"] = s
+        a.uns["marcadores"] = m
+    _mut("zarr: un marcador con un suelo que no es el de var", "el suelo no es el de var", _marcador_suelo)
+
+    def _perfil_x(a):
+        pb = dict(a.uns["perfil_bins"])
+        c = np.array([str(x) for x in pb["cromosoma"]], dtype=object)
+        c[0] = "chrX"
+        pb["cromosoma"] = c
+        a.uns["perfil_bins"] = pb
+    _mut("zarr: perfil_bins con un cromosoma fuera de chr1-chr22", "perfil_bins", _perfil_x)
+
+    d = mutar_lesion(base, "higado", lambda o: o["qc"].update(umbral_pct_MT="muestra AB-12345_M1"))
+    debe_fallar(d, "qc: un id de muestra en un texto del QC", "identificador_de_muestra_o_pool")
+    d = mutar_lesion(base, "higado", lambda o: o["qc"].update(n_final=o["n_celulas"] - 1))
+    debe_fallar(d, "qc: n_final distinto de las células del explorador", "qc no cuadra")
+    d = mutar_lesion(base, "hueso", lambda o: o["qc"].update(pseudobulk_CP10k_oseo=1.0))
+    debe_fallar(d, "qc: una clave fuera de la allow-list", "qc fuera del contrato")
 
     d = copia(base)
     a = an.read_h5ad(os.path.join(d, "explorador.h5ad"))
