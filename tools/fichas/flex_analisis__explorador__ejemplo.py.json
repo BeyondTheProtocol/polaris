@@ -1,0 +1,11 @@
+{
+ "pieza": "flex_analisis/explorador/ejemplo.py",
+ "estado_ficha": "completa",
+ "para": "Genera los datos de EJEMPLO (sintéticos, deterministas) del explorador single-cell para la vista previa pública de la web (/celula-a-celula/explorar): web/<lesión>.json, manifiesto y zarr/<lesión>.zarr con el MISMO formato que el export real, construidos con los constructores de _contrato.py y validados con valida_salidas. Ninguna cifra, grupo ni veredicto del análisis real: tamaños de grupo inventados, veredictos «sin_veredicto», genes extra con nombre EJ0000…, todo marcado ejemplo: true.",
+ "cuando_si": "Para regenerar los datos de ejemplo de la web cuando cambia el contrato del explorador: python3 tools/flex_analisis/explorador/ejemplo.py --web <repo-web>/public/celula/explorador. Sin --web solo genera y valida en una carpeta temporal.",
+ "cuando_no": "No toca la zona clínica ni lee datos de la paciente; no sirve para el export real (eso es exporta.py por la ventanilla); no publica nada (la web decide con su puerta).",
+ "reemplaza": "scripts/genera-explorador-ejemplo.ts del repo de la web (otro formato, sin Zarr ni agregados): así hay un solo formato.",
+ "test": "tests/test_flex_ejemplo.py",
+ "alta": "2026-10-18",
+ "origen": "Plan aprobado «fase 1 del visor web Loupe público» (00_FUENTE-DE-VERDAD/01 · Tratamiento, 18-oct-2026), paso 1."
+}

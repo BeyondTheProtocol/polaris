@@ -437,7 +437,7 @@ def marcadores_lesion(X, umi, grupo, g_ids, simb, excl, todos):
         genes = [str(x) for x, ok in zip(r["names"][g], fin) if ok]
         out[g] = {"gen": genes,
                   "logfc": [float(np.round(x, 4)) for x in lfc[fin]],
-                  "fdr": [float(min(max(x, 0.0), 1.0)) for x in np.asarray(r["pvals_adj"][g], float)[fin]],
+                  "fdr": [float("%.4g" % min(max(x, 0.0), 1.0)) for x in np.asarray(r["pvals_adj"][g], float)[fin]],   # 4 cifras: puerta_n1 cierra la notación ingeniera larga
                   "frac_grupo": [float(np.round(x, 4)) for x in r["pts"].loc[genes, g]],
                   "frac_resto": [float(np.round(x, 4)) for x in r["pts_rest"].loc[genes, g]],
                   "suelo": [float(todos["suelo"][pos[x], col[g]]) for x in genes]}
@@ -628,7 +628,7 @@ def procesa_lesion(t, ps, cv, ctx):
     L["adn_por_grupo"] = {}
     if L["_adn_dl"] is not None:            # misma forma que el tribunal: cociente de medias, por grupo
         dl_, n_u_, umi_ = L.pop("_adn_dl")
-        L["adn_por_grupo"] = {g: float(dl_[grupo == g].mean() * n_u_ / umi_[grupo == g].mean())
+        L["adn_por_grupo"] = {g: _r(dl_[grupo == g].mean() * n_u_ / umi_[grupo == g].mean(), 5)   # como adn de la web
                               for g in g_ids if (grupo == g).any()}
         di("%s: ADN por célula (no se exporta): %d de %d células con estimación >= 1"
            % (t, L["adn_celula_diag"]["n_estimacion_ge_1"], L["adn_celula_diag"]["n_celulas"]))
@@ -710,7 +710,8 @@ def web_json(L):
                        "tipo": [tpos[x] for x in L["tipo_c"].astype(str)]},
            "genes": list(L["genes"]), "expr": L["expr"], "suelo": L["suelo"], "referencia": L["referencia"],
            "veredicto": L["veredicto"], "sondas": {g: L["sondas_union_genes_web"][g] for g in L["genes"]},
-           "seleccion": L["seleccion"], "loo": L["loo"], "adn": L["adn"], "cnv": L["cnv"], "qc": L["qc"]}
+           "seleccion": L["seleccion"], "loo": L["loo"], "adn": L["adn"], "cnv": L["cnv"], "qc": L["qc"],
+           "marcadores": L["marcadores"], "perfil_bins": L["perfil"], "adn_por_grupo": L["adn_por_grupo"]}
     return _escribe_json(os.path.join(OUT, "web", "%s.json" % t), obj)
 
 

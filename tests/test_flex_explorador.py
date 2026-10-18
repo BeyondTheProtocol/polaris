@@ -104,7 +104,7 @@ def lesion_sintetica(les):
     return {"X": X, "grupo": grupo, "tipo_c": tipo_c, "umap": umap, "interes": interes, "n": n}
 
 
-def web_sintetico(les, L):
+def web_sintetico(les, L, A):
     g = C.GRUPOS[les]
     g_ids = [g["interes"]] + [r for r in g["referencia"] if (L["grupo"] == r).any()] + [g["otras"]]
     rol = {g["interes"]: "interes", g["otras"]: "otras"}
@@ -151,7 +151,8 @@ def web_sintetico(les, L):
                                   "umbral_genes": [90.0, 3000.0], "umbral_pct_MT": "sin sondas MT en el panel: no aplicable",
                                   "excluidas_UMI_genes": 120, "scrublet_dobletes": 30, "scrublet_umbral": 0.31,
                                   "mediana_UMI_inicial": 1500.0, "mediana_UMI_final": 1600.0, "mediana_genes_inicial": 900.0,
-                                  "mediana_genes_final": 950.0, "n_sondas_MT": 0, "pseudobulk_CP10k_hepatocitario": 3.2})}
+                                  "mediana_genes_final": 950.0, "n_sondas_MT": 0, "pseudobulk_CP10k_hepatocitario": 3.2}),
+            "marcadores": A["marc"], "perfil_bins": A["perfil"], "adn_por_grupo": A["adn"]}
 
 
 def escribe_json(p, obj):
@@ -166,7 +167,8 @@ def export_sintetico(d):
     obs = C.construye_obs(["higado"] * Lh["n"] + ["hueso"] * Lb["n"], np.concatenate([Lh["grupo"], Lb["grupo"]]),
                           np.concatenate([Lh["tipo_c"], Lb["tipo_c"]]), np.vstack([Lh["umap"], Lb["umap"]]))
     var = pd.DataFrame({"ensembl": ["ENSG%011d" % i for i in range(len(GENES))]}, index=pd.Index(GENES))
-    webs = {les: web_sintetico(les, Ls[les]) for les in C.LESIONES}
+    AG = {les: agregados_sinteticos(les, Ls[les]) for les in C.LESIONES}
+    webs = {les: web_sintetico(les, Ls[les], AG[les]) for les in C.LESIONES}
     cnv_h = pd.DataFrame({wv: np.asarray(webs["hueso"]["cnv"]["valores"][i]) for i, wv in enumerate(C.CNV_VENTANAS)},
                          index=obs.index[Lh["n"]:])
     uns = C.construye_uns(suelo={les: webs[les]["suelo"] for les in C.LESIONES},
@@ -186,7 +188,7 @@ def export_sintetico(d):
     # «Loupe público»: un Zarr por lesión con TODOS los genes y su suelo (el mismo constructor que exporta.py)
     idx = list(obs.index)
     for les, ids in (("higado", idx[:Lh["n"]]), ("hueso", idx[Lh["n"]:])):
-        escribe_zarr_sintetico(os.path.join(d, C.ZARR_DIR, "%s.zarr" % les), les, Ls[les], ids)
+        escribe_zarr_sintetico(os.path.join(d, C.ZARR_DIR, "%s.zarr" % les), les, Ls[les], ids, AG[les])
     return Ls
 
 
@@ -203,7 +205,8 @@ def suelo_todos_sintetico(les, L):
                       grupo, g_ids, ref, rng.uniform(0, 2, int(ref.sum())), excl), umi
 
 
-def escribe_zarr_sintetico(p, les, L, ids):
+def agregados_sinteticos(les, L):
+    """Suelo de todos los genes, sondas y agregados de una lesión: los MISMOS van al JSON y al Zarr."""
     todos, umi = suelo_todos_sintetico(les, L)
     G = len(GENES)
     ns = rng.integers(1, 7, G)
@@ -222,9 +225,13 @@ def escribe_zarr_sintetico(p, les, L, ids):
               "log2_rel": list(rng.normal(size=30) * 0.3)}
     grupo = np.asarray(L["grupo"]).astype(str)
     adn = {g: (0.005 if k == 0 else float(rng.uniform(0, 0.05))) for k, g in enumerate(todos["grupos"]) if (grupo == g).any()}
-    C.escribe_zarr_lesion(p, les, L["X"], umi, GENES, ["ENSG%011d" % i for i in range(G)], L["grupo"],
-                          L["tipo_c"], L["umap"], ids, todos, C.version_contrato("todas"), "todas",
-                          adn, ns, nu, marc, perfil)
+    return {"todos": todos, "umi": umi, "ns": ns, "nu": nu, "marc": marc, "perfil": perfil, "adn": adn}
+
+
+def escribe_zarr_sintetico(p, les, L, ids, A):
+    C.escribe_zarr_lesion(p, les, L["X"], A["umi"], GENES, ["ENSG%011d" % i for i in range(len(GENES))], L["grupo"],
+                          L["tipo_c"], L["umap"], ids, A["todos"], C.version_contrato("todas"), "todas",
+                          A["adn"], A["ns"], A["nu"], A["marc"], A["perfil"])
 
 
 def reescribe_zarr(p, f, csr=False):
@@ -402,7 +409,20 @@ def main():
         d_ = dict(a.uns["adn_por_grupo"])
         d_[C.GRUPOS["higado"]["interes"]] = 0.006
         a.uns["adn_por_grupo"] = d_
-    _mut("zarr: ADN del grupo de interés distinto del de la web", "no cuadra con el de la web", _adn_distinto_web)
+    _mut("zarr: ADN del grupo de interés distinto del de la web", "los agregados de la web no son los del Zarr", _adn_distinto_web)
+
+    # agregados en el JSON de la web: mismas reglas que en el Zarr y exactamente los mismos valores
+    g_int = C.GRUPOS["higado"]["interes"]
+    d = mutar_lesion(base, "higado", lambda o: o["marcadores"].update(tumor=o["marcadores"][list(o["marcadores"])[0]]))
+    debe_fallar(d, "web: marcadores de un grupo fuera del contrato", "fuera del contrato")
+    d = mutar_lesion(base, "higado", lambda o: o["perfil_bins"]["cromosoma"].__setitem__(0, "chrX"))
+    debe_fallar(d, "web: perfil con un cromosoma fuera de chr1-chr22", "perfil_bins")
+    d = mutar_lesion(base, "higado", lambda o: o["marcadores"][list(o["marcadores"])[0]]["logfc"].__setitem__(0, 9.99))
+    debe_fallar(d, "web: un marcador con un valor distinto del Zarr", "los agregados de la web no son los del Zarr")
+    d = mutar_lesion(base, "hueso", lambda o: o["perfil_bins"]["log2_rel"].__setitem__(0, o["perfil_bins"]["log2_rel"][0] + 0.5))
+    debe_fallar(d, "web: un perfil con un valor distinto del Zarr", "los agregados de la web no son los del Zarr")
+    d = mutar_lesion(base, "hueso", lambda o: o["adn_por_grupo"].pop(list(o["adn_por_grupo"])[-1]))
+    debe_fallar(d, "web: un grupo con células sin fracción de ADN", "adn_por_grupo")
 
     def _umi_cero(a):
         u = a.obs["umi"].values.copy()

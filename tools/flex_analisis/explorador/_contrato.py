@@ -169,7 +169,8 @@ CNV_VENTANAS = ["8p11", "{{LOCUS}}"]
 # Es una INFERENCIA desde la expresión (ARN) frente a la referencia, no una lectura de ADN.
 CNV_METODOS = {"todas": "tribunal_score_ventana_log2_obs_esp", "spliced": "tribunal_score_ventana_log2_obs_esp_spliced"}
 WEB_KEYS = ("version", "lesion", "n_celulas", "grupos", "tipos", "celulas", "genes", "expr", "suelo",
-            "referencia", "veredicto", "sondas", "seleccion", "loo", "adn", "cnv", "qc")
+            "referencia", "veredicto", "sondas", "seleccion", "loo", "adn", "cnv", "qc",
+            "marcadores", "perfil_bins", "adn_por_grupo")   # agregados (18-oct): los mismos que el Zarr, cotejados
 # QC agregado de la lesión («Loupe público», 18-oct): el del analista A, que es el que fija las células del
 # explorador (tribunal/_comun.carga: las del congelado de A, mismas que B). Allow-list cerrada; sin ids.
 QC_KEYS = ("fuente", "n_inicial", "n_final", "umbral_UMI", "umbral_genes", "umbral_pct_MT", "excluidas_UMI_genes",
@@ -605,7 +606,7 @@ def fecha_ok_valida(v):
     return True
 
 
-def valida_json_generico(path, prohibidas=(), exento_fecha_ok=False):
+def valida_json_generico(path, prohibidas=(), exento_fecha_ok=False, exento_fecha_decision=False):
     """Patrones propios sobre TODAS las claves y cadenas, y después puerta_n1 sobre el texto. Sin
     excepciones salvo una, declarada y acotada (`exento_fecha_ok`, solo el manifiesto): el VALOR de la
     clave de primer nivel `fecha_ok`, y solo si es exactamente AAAA-MM-DD de calendario, no cuenta como
@@ -615,15 +616,27 @@ def valida_json_generico(path, prohibidas=(), exento_fecha_ok=False):
         texto = fh.read()
     obj = json.loads(texto)
     exento = bool(exento_fecha_ok and isinstance(obj, dict) and "fecha_ok" in obj and fecha_ok_valida(obj["fecha_ok"]))
+    # segunda excepción, igual de acotada (manifiesto PUBLICADO de la web, 18-oct): el valor de
+    # matriz_completa.fecha_decision, solo si es AAAA-MM-DD de calendario.
+    mc = obj.get("matriz_completa") if isinstance(obj, dict) else None
+    exento_dec = bool(exento_fecha_decision and isinstance(mc, dict) and fecha_ok_valida(mc.get("fecha_decision")))
     cadenas = list(_cadenas_json(obj))
     for donde, c in cadenas:
-        if exento and donde == "$.fecha_ok":
+        if (exento and donde == "$.fecha_ok") or (exento_dec and donde == "$.matriz_completa.fecha_decision"):
             continue
         m = cadena_prohibida(c, prohibidas)
         if m:
             raise ValidacionFallida("%s %s: %s" % (os.path.basename(path), donde, m))
     pn = _puerta()
-    texto_puerta = json.dumps({**obj, "fecha_ok": "fecha_ok_enmascarada"}, ensure_ascii=False) if exento else texto
+    if exento or exento_dec:
+        copia = dict(obj)
+        if exento:
+            copia["fecha_ok"] = "fecha_ok_enmascarada"
+        if exento_dec:
+            copia["matriz_completa"] = {**mc, "fecha_decision": "fecha_decision_enmascarada"}
+        texto_puerta = json.dumps(copia, ensure_ascii=False)
+    else:
+        texto_puerta = texto
     try:
         pn.revisar_json(texto_puerta, os.path.basename(path))
     except pn.PuertaCerrada as e:
@@ -660,6 +673,9 @@ def valida_web_lesion(path, prohibidas=(), modo="todas"):
     if sum(x["n"] for x in obj["grupos"]) != n:
         raise ValidacionFallida("%s: la suma de n por grupo no es n_celulas" % b)
     _valida_qc(obj["qc"], n, b)
+    agregados = {"marcadores": _valida_marcadores(obj["marcadores"], ids, b),
+                 "perfil_bins": _valida_perfil(obj["perfil_bins"], b),
+                 "adn_por_grupo": _valida_adn_grupos(obj["adn_por_grupo"], [x["id"] for x in obj["grupos"] if x["n"] > 0], modo, b)}
     k = [x["n"] for x in obj["grupos"] if x["id"] == g["interes"]]
     if not k or k[0] != N_INTERES[les]:
         raise ValidacionFallida("%s: n del grupo de interés distinto de %d" % (b, N_INTERES[les]))
@@ -738,7 +754,8 @@ def valida_web_lesion(path, prohibidas=(), modo="todas"):
         if set(cnv.keys()) != {"pseudobulk"} or pb.get("ventana") != "8p11" \
                 or not isinstance(pb.get("percentil_genoma"), int) or not (0 <= pb["percentil_genoma"] <= 100):
             raise ValidacionFallida("%s: cnv del hígado fuera del contrato" % b)
-    return {"n_celulas": n, "n_genes": len(genes), "n_cadenas": n_cad, "kb": round(os.path.getsize(path) / 1024, 1)}
+    return {"n_celulas": n, "n_genes": len(genes), "n_cadenas": n_cad, "kb": round(os.path.getsize(path) / 1024, 1),
+            "agregados": agregados}
 
 
 def sha256_fichero(path):
@@ -1006,13 +1023,13 @@ def valida_zarr_lesion(path, lesion, prohibidas=()):
         _suelo_todos().valida_completo(res, a.n_vars)
     except ValueError as e:
         raise ValidacionFallida("%s: %s" % (q, e))
-    _valida_extra_zarr(a, q, grupos, sin)
+    agregados = _valida_extra_zarr(a, q, grupos, sin)
     um = np.asarray(a.obsm["X_umap"])
     if um.shape != (a.n_obs, 2) or not np.isfinite(um).all():
         raise ValidacionFallida("%s: X_umap fuera del contrato" % q)
     adn_int = a.uns["adn_por_grupo"].get(grupos[0])
     return {"n_celulas": int(a.n_obs), "n_genes": int(a.n_vars), "n_genes_sin_sonda": len(excl), "grupos": grupos,
-            "adn_interes": None if adn_int is None else float(adn_int),
+            "adn_interes": None if adn_int is None else float(adn_int), "agregados": agregados,
             "indices": idx, "n_cadenas": len(cadenas), "n_cadenas_unicas_puerta": n_unicas,
             "tokens_casi_titular_tolerados_como_vocabulario": toleradas}
 
@@ -1027,42 +1044,75 @@ def _valida_extra_zarr(a, q, grupos, sin):
     if o["n_genes"].dtype.kind not in ("i", "u") or \
             not np.array_equal(o["n_genes"].values, np.asarray((sp.csr_matrix(a.X) > 0).sum(axis=1)).ravel()):
         raise ValidacionFallida("%s: n_genes no es el nº de genes detectados de X" % q)
-    adn = {str(k): float(x) for k, x in a.uns["adn_por_grupo"].items()}
     con_celulas = [g for g in grupos if (o["grupo"].astype(str).values == g).any()]
-    if modo == "todas" and (sorted(adn) != sorted(con_celulas) or not all(np.isfinite(x) and 0 <= x < 1 for x in adn.values())):
-        raise ValidacionFallida("%s: adn_por_grupo fuera del contrato (un valor en [0, 1) por grupo con células)" % q)
-    if modo == "spliced" and adn:
-        raise ValidacionFallida("%s: adn_por_grupo debe ir vacío en el modo spliced (no aplica)" % q)
+    adn = _valida_adn_grupos(a.uns["adn_por_grupo"], con_celulas, modo, q)
     ns, nu = v["n_sondas"].values, v["n_sondas_union"].values
     if ns.dtype.kind not in ("i", "u") or nu.dtype.kind not in ("i", "u") or (nu < 0).any() or (nu > ns).any():
         raise ValidacionFallida("%s: sondas por gen fuera del contrato" % q)
     sin_sonda = set(v.index[(ns if modo == "todas" else nu) == 0].astype(str))
     if sin_sonda != sin:
         raise ValidacionFallida("%s: genes_sin_sonda no son los genes con 0 sondas del modo" % q)
-    mk = a.uns["marcadores"]
-    if not set(mk) <= set(grupos):
+    mk = _valida_marcadores(a.uns["marcadores"], grupos, q, validos=set(v.index.astype(str)) - sin)
+    for gid, (genes, cols) in mk.items():
+        if genes and not np.array_equal(cols["suelo"], v.loc[genes, PREFIJO_SUELO + gid].to_numpy(float)):
+            raise ValidacionFallida("%s: marcadores de %s: el suelo no es el de var" % (q, gid))
+    pb = _valida_perfil(a.uns["perfil_bins"], q)
+    return {"marcadores": mk, "perfil_bins": pb, "adn_por_grupo": adn}
+
+
+def _valida_adn_grupos(adn, con_celulas, modo, q):
+    """Fracción de ADN por grupo: en el modo todas, un valor en [0, 1) por grupo con células; en spliced, vacío."""
+    if not hasattr(adn, "items"):
+        raise ValidacionFallida("%s: adn_por_grupo fuera del contrato" % q)
+    adn = {str(k): float(x) for k, x in adn.items()}
+    if modo == "todas" and (sorted(adn) != sorted(con_celulas) or not all(np.isfinite(x) and 0 <= x < 1 for x in adn.values())):
+        raise ValidacionFallida("%s: adn_por_grupo fuera del contrato (un valor en [0, 1) por grupo con células)" % q)
+    if modo == "spliced" and adn:
+        raise ValidacionFallida("%s: adn_por_grupo debe ir vacío en el modo spliced (no aplica)" % q)
+    return adn
+
+
+def _valida_marcadores(mk, grupos, q, validos=None):
+    """Marcadores por grupo del contrato: {grupo: (genes, {columna: array})}. `validos`: genes admitidos."""
+    if not hasattr(mk, "items") or not set(mk) <= set(grupos):
         raise ValidacionFallida("%s: marcadores de un grupo fuera del contrato" % q)
-    validos = set(v.index.astype(str)) - sin
+    out = {}
     for gid, m in mk.items():
-        if set(m) != set(MARCADORES_KEYS):
+        if not hasattr(m, "keys") or set(m) != set(MARCADORES_KEYS):
             raise ValidacionFallida("%s: marcadores de %s fuera del contrato" % (q, gid))
-        genes = [str(x) for x in np.asarray(m["gen"]).ravel()]
+        genes = [str(x) for x in np.asarray(m["gen"], dtype=object).ravel()]
         cols = {k: np.asarray(m[k], float).ravel() for k in MARCADORES_KEYS[1:]}
-        if len(genes) > MARCADORES_N or len(set(genes)) != len(genes) or not set(genes) <= validos \
-                or any(len(c) != len(genes) for c in cols.values()):
+        if len(genes) > MARCADORES_N or len(set(genes)) != len(genes) or not all(RE_TOKEN.match(g) for g in genes) \
+                or (validos is not None and not set(genes) <= validos) or any(len(c) != len(genes) for c in cols.values()):
             raise ValidacionFallida("%s: marcadores de %s: genes o longitudes fuera del contrato" % (q, gid))
         if not (np.isfinite(cols["logfc"]).all() and all(((c >= 0) & (c <= 1)).all() for k, c in cols.items() if k != "logfc")):
             raise ValidacionFallida("%s: marcadores de %s: valores fuera de rango" % (q, gid))
-        if genes and not np.array_equal(cols["suelo"], v.loc[genes, PREFIJO_SUELO + gid].to_numpy(float)):
-            raise ValidacionFallida("%s: marcadores de %s: el suelo no es el de var" % (q, gid))
-    pb = a.uns["perfil_bins"]
-    if set(pb) != set(PERFIL_KEYS):
+        out[str(gid)] = (genes, cols)
+    return out
+
+
+def _valida_perfil(pb, q):
+    """Perfil por bins de 10 Mb: listas paralelas, solo chr1-chr22, valores finitos."""
+    if not hasattr(pb, "keys") or set(pb) != set(PERFIL_KEYS):
         raise ValidacionFallida("%s: perfil_bins fuera del contrato" % q)
-    cr = [str(x) for x in np.asarray(pb["cromosoma"]).ravel()]
+    cr = [str(x) for x in np.asarray(pb["cromosoma"], dtype=object).ravel()]
     ini, lr = np.asarray(pb["inicio_mb"], float).ravel(), np.asarray(pb["log2_rel"], float).ravel()
     if not cr or len(ini) != len(cr) or len(lr) != len(cr) or not all(RE_CROMOSOMA.match(c) for c in cr) \
             or not (np.isfinite(ini).all() and (ini >= 0).all() and np.isfinite(lr).all()):
         raise ValidacionFallida("%s: perfil_bins fuera del contrato" % q)
+    return cr, ini, lr
+
+
+def _agregados_iguales(w, z):
+    """¿Los agregados de la web (JSON) son exactamente los del Zarr? (mismos genes, mismos valores)."""
+    if sorted(w["marcadores"]) != sorted(z["marcadores"]) or w["adn_por_grupo"] != z["adn_por_grupo"]:
+        return False
+    for gid, (genes, cols) in w["marcadores"].items():
+        zg, zc = z["marcadores"][gid]
+        if genes != zg or any(not np.array_equal(cols[k], zc[k]) for k in cols):
+            return False
+    (c1, i1, l1), (c2, i2, l2) = w["perfil_bins"], z["perfil_bins"]
+    return c1 == c2 and np.array_equal(i1, i2) and np.array_equal(l1, l2)
 
 
 def _indices_h5ad(path):
@@ -1073,6 +1123,91 @@ def _indices_h5ad(path):
         d = f["obs"]["lesion"]
         les = np.asarray(d["categories"].asstr()[()])[d["codes"][()]] if isinstance(d, h5py.Group) else d.asstr()[()]
     return {l: [str(i) for i in np.asarray(idx)[np.asarray(les) == l]] for l in LESIONES}
+
+
+# ── La carpeta PUBLICADA de la web (public/celula/explorador), 18-oct ───────────────────────────────────
+# Manifiesto de la web = el de Polaris + ejemplo, zarr (huella del árbol) y matriz_completa. FAIL-CLOSED (revisión de
+# verificación): la URL de un Zarr es pública aunque la página lo esconda, así que con datos reales NINGÚN Zarr sin la
+# fecha de la decisión de la titular de publicar la matriz completa.
+MANIFIESTO_WEB_KEYS = MANIFIESTO_KEYS + ("fecha_ok", "ejemplo", "zarr", "matriz_completa")
+
+
+def sha_arbol(path):
+    """sha256 del listado «ruta sha256» de todos los ficheros del árbol, ordenado (la misma huella que el test web)."""
+    import hashlib
+    filas = []
+    for d, _, fs in os.walk(path):
+        for f in fs:
+            p = os.path.join(d, f)
+            filas.append("%s %s" % (os.path.relpath(p, path).replace(os.sep, "/"), sha256_fichero(p)))
+    return hashlib.sha256("\n".join(sorted(filas)).encode()).hexdigest()
+
+
+def valida_publicado(dirp, prohibidas=()):
+    """Valida la carpeta pública tal cual la sirve la web. Devuelve un resumen; lanza ValidacionFallida."""
+    import shutil
+    import tempfile
+    man, _ = valida_json_generico(os.path.join(dirp, "manifiesto.json"), prohibidas, exento_fecha_ok=True,
+                                  exento_fecha_decision=True)
+    if not set(MANIFIESTO_KEYS) <= set(man) or not set(man) <= set(MANIFIESTO_WEB_KEYS) or man["version"] != 1 \
+            or man["lesiones"] != list(LESIONES) or man["modo_sondas"] not in ETIQUETA_MODO.values():
+        raise ValidacionFallida("publicado: cabecera del manifiesto fuera del contrato")
+    ejemplo = man.get("ejemplo") is True
+    if "ejemplo" in man and not ejemplo:
+        raise ValidacionFallida("publicado: «ejemplo» solo puede ser true o no estar")
+    estado = {"sello": man["sello"], CLAVE_OK_TITULAR: man[CLAVE_OK_TITULAR]}
+    if ejemplo and not (estado == ESTADO_EXPORT and "fecha_ok" not in man):
+        raise ValidacionFallida("publicado: un ejemplo no puede llevar sello, OK ni fecha de OK")
+    if not ejemplo and not (estado == ESTADO_PUBLICADO and man[CLAVE_OK_TITULAR] is True and fecha_ok_valida(man.get("fecha_ok"))):
+        raise ValidacionFallida("publicado: datos reales sin sello verificado, OK de la titular y su fecha")
+    if [f["ruta"] for f in man["ficheros"]] != ["%s.json" % l for l in LESIONES]:
+        raise ValidacionFallida("publicado: ficheros distintos del contrato")
+    for f in man["ficheros"]:
+        if sha256_fichero(os.path.join(dirp, f["ruta"])) != f["sha256"]:
+            raise ValidacionFallida("publicado: sha256 de %s no cuadra" % f["ruta"])
+    en_disco = sorted("%s/%s" % (ZARR_DIR, z) for z in os.listdir(os.path.join(dirp, ZARR_DIR))) \
+        if os.path.isdir(os.path.join(dirp, ZARR_DIR)) else []
+    declarados = [z["ruta"] for z in man.get("zarr", [])]
+    if sorted(declarados) != en_disco:
+        raise ValidacionFallida("publicado: los Zarr de la carpeta no son los del manifiesto")
+    mc = man.get("matriz_completa")
+    if ejemplo and mc not in (None, "ejemplo"):
+        raise ValidacionFallida("publicado: un ejemplo no puede declarar una decisión real de la matriz completa")
+    if en_disco:
+        if declarados != ["%s/%s.zarr" % (ZARR_DIR, l) for l in LESIONES]:
+            raise ValidacionFallida("publicado: Zarr fuera del contrato (uno por lesión)")
+        if ejemplo and mc != "ejemplo":
+            raise ValidacionFallida("publicado: Zarr de ejemplo sin matriz_completa «ejemplo»")
+        if not ejemplo and not (isinstance(mc, dict) and set(mc) == {"fecha_decision"} and fecha_ok_valida(mc["fecha_decision"])):
+            raise ValidacionFallida("publicado: Zarr real sin la fecha de la decisión de publicar la matriz completa")
+    modo = {v: k for k, v in ETIQUETA_MODO.items()}[man["modo_sondas"]]
+    res, tmp = {"ejemplo": ejemplo}, tempfile.mkdtemp(prefix="publicado_")
+    try:
+        for les in LESIONES:
+            obj = json.load(open(os.path.join(dirp, "%s.json" % les), encoding="utf-8"))
+            if (obj.get("ejemplo") is True) != ejemplo or ("ejemplo" in obj and obj["ejemplo"] is not True):
+                raise ValidacionFallida("publicado: %s.json mezcla ejemplo y real" % les)
+            obj.pop("ejemplo", None)
+            pt = os.path.join(tmp, "%s.json" % les)
+            with open(pt, "w", encoding="utf-8") as fh:
+                json.dump(obj, fh, ensure_ascii=False)
+            w = valida_web_lesion(pt, prohibidas, modo)
+            if en_disco:
+                zp = os.path.join(dirp, ZARR_DIR, "%s.zarr" % les)
+                zd = [z for z in man["zarr"] if z["ruta"] == "%s/%s.zarr" % (ZARR_DIR, les)][0]
+                if sha_arbol(zp) != zd.get("sha256_arbol"):
+                    raise ValidacionFallida("publicado: la huella del árbol de %s.zarr no cuadra" % les)
+                z = valida_zarr_lesion(zp, les, prohibidas)
+                z.pop("indices")
+                z.pop("adn_interes")
+                if z["n_celulas"] != w["n_celulas"] or not _agregados_iguales(w.pop("agregados"), z.pop("agregados")):
+                    raise ValidacionFallida("publicado: %s.zarr no dice lo mismo que %s.json" % (les, les))
+                res["zarr/%s" % les] = z
+            w.pop("agregados", None)
+            res[les] = w
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return res
 
 
 def valida_salidas(out_dir, prohibidas=(), con_informe=True):
@@ -1091,6 +1226,8 @@ def valida_salidas(out_dir, prohibidas=(), con_informe=True):
         with open(os.path.join(out_dir, "web", "%s.json" % les), encoding="utf-8") as fh:
             adn_web = json.load(fh)["adn"]
         za = z.pop("adn_interes")
+        if not _agregados_iguales(res["web/%s.json" % les].pop("agregados"), z.pop("agregados")):
+            raise ValidacionFallida("zarr %s: los agregados de la web no son los del Zarr" % les)
         if (adn_web is None) != (za is None) or \
                 (za is not None and abs(round(za, 5) - adn_web["frac_lecturas_interes"]) > 1e-5):
             raise ValidacionFallida("zarr %s: el ADN del grupo de interés no cuadra con el de la web" % les)
