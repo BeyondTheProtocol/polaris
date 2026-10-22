@@ -68,7 +68,7 @@ SENALES = {
     "metaanalisis": "¿Es un metaanálisis (combina cuantitativamente resultados de varios estudios)?",
     "rev_sistematica": "¿Es una revisión sistemática con método de búsqueda explícito?",
     "rct":         "¿Es un ensayo clínico ALEATORIZADO en personas?",
-    "ensayo":      "¿Es un ensayo clínico en personas NO aleatorizado (fase 1, fase 2 de un solo brazo)?",
+    "ensayo":      "¿Es un ensayo clínico en personas (la aleatorización se acredita por separado con rct)?",
     "prospectivo": "¿Los datos se recogieron de forma prospectiva, definidos antes de empezar?",
     "retrospectivo": "¿Los datos se sacaron de historias o registros ya existentes (retrospectivo)?",
     "serie_casos": "¿Es una serie de casos (varios pacientes descritos, sin grupo de comparación)?",
@@ -91,7 +91,7 @@ TIER_TXT = {
     "metaanalisis": "metaanálisis",
     "revision_sistematica": "revisión sistemática",
     "rct": "ensayo aleatorizado (RCT)",
-    "ensayo_clinico": "ensayo clínico no aleatorizado (fase 1/2)",
+    "ensayo_clinico": "ensayo clínico (aleatorización no acreditada)",
     "cohorte_prospectiva": "cohorte prospectiva",
     "cohorte_retrospectiva": "cohorte retrospectiva",
     "serie_casos": "serie de casos",
@@ -121,16 +121,18 @@ def teje(senales):
     s = {k: senales.get(k) for k in SENALES}
     faltan = [k for k in SENALES if s.get(k) is None]
 
-    # Preclínico = hay señal de banco Y no hay señal de personas. Se calcula ANTES de la
-    # jerarquía porque manda sobre ella: un paper en ratones que cita un RCT en su
-    # discusión no es un RCT, y la degradación no debe poder perderse por el camino.
-    banco = _si(s, "animal") or _si(s, "in_vitro")
-    es_preclinico = banco and not _si(s, "humanos")
+    # Humanos incluye muestras: no desactiva una señal explícita de in vitro.
+    # El banco manda antes de la jerarquía; ante señales mixtas conservamos la
+    # clasificación preclínica y las señales originales para revisión manual.
+    # La regla existente para animal sin humanos se mantiene.
+    es_preclinico = _si(s, "in_vitro") or (_si(s, "animal") and not _si(s, "humanos"))
 
     if es_preclinico:
         tier = "modelo_animal" if _si(s, "animal") else "in_vitro"
-        motivo = "señal de banco (%s) sin señal de personas" % (
-            "animal" if _si(s, "animal") else "in vitro")
+        motivo = ("señal de in vitro, también preclínica con muestras humanas"
+                  if _si(s, "in_vitro") and _si(s, "humanos")
+                  else "señal de banco (%s) sin señal de personas" % (
+                      "animal" if _si(s, "animal") else "in vitro"))
         return _resultado(tier, motivo, s, faltan)
 
     # Jerarquía clínica: la primera que case manda.
@@ -139,7 +141,7 @@ def teje(senales):
         ("metaanalisis",        lambda: _si(s, "metaanalisis"),         "catalogado como metaanálisis"),
         ("revision_sistematica", lambda: _si(s, "rev_sistematica"),     "revisión sistemática sin metaanálisis"),
         ("rct",                 lambda: _si(s, "rct"),                  "ensayo aleatorizado"),
-        ("ensayo_clinico",      lambda: _si(s, "ensayo"),               "ensayo clínico no aleatorizado"),
+        ("ensayo_clinico",      lambda: _si(s, "ensayo"),               "ensayo clínico; aleatorización no acreditada"),
         ("cohorte_prospectiva", lambda: _si(s, "prospectivo") and not _si(s, "retrospectivo"),
          "datos recogidos prospectivamente"),
         ("cohorte_retrospectiva", lambda: _si(s, "retrospectivo"),      "datos retrospectivos de registro/historia"),
@@ -204,8 +206,9 @@ _PT = {
     "meta-analysis": "metaanalisis",
     "systematic review": "rev_sistematica",
     "randomized controlled trial": "rct",
-    "controlled clinical trial": "rct",
-    "clinical trial, phase iii": "rct",
+    # La fase y la presencia de control no acreditan aleatorización.
+    "controlled clinical trial": "ensayo",
+    "clinical trial, phase iii": "ensayo",
     "clinical trial": "ensayo",
     "clinical trial, phase i": "ensayo",
     "clinical trial, phase ii": "ensayo",
