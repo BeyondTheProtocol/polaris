@@ -1,5 +1,7 @@
 # 🧱 Lo que falta
 
+[English](what-is-missing.md)
+
 Los cinco problemas abiertos de Polaris, dichos por su dueña. No es una lista de deseos: es
 donde el sistema **duele hoy**. Si alguno es tu terreno, un issue argumentado vale más que un PR.
 
