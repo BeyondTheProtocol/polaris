@@ -136,7 +136,9 @@ PROMPT="${1:-Revisa la cola de trabajo y avanza lo autónomo según CLAUDE.md y 
 # en asistente.json: si revienta su tope de turnos, el vigía lo leería como "el barrido diario de
 # Vega falló" cuando el barrido de las 7:55 está perfecto). El agente (BTP_AGENT) sigue mandando en
 # la lógica (modelo/esencial/clínico); esto solo cambia el FICHERO de latido.
-HB_NAME="${BTP_HEARTBEAT_NAME:-${BTP_AGENT:-asistente}}"
+# Sin agente, latido propio: con `asistente` el triaje de la cola pisaba el del barrido de las
+# 7:55, y `orquestador` es el de hoy-compose.
+HB_NAME="${BTP_HEARTBEAT_NAME:-${BTP_AGENT:-sin-agente}}"
 
 # ($PY ya se definió arriba, junto a la resolución de la caja de arquitecto.)
 
